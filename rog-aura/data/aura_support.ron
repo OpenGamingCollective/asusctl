@@ -48,7 +48,7 @@
         device_name: "FA617XS",
         product_id: "",
         layout_name: "fx505d",
-        basic_modes: [Static, Breathe, Strobing],
+        basic_modes: [Static, Breathe, Pulse],
         basic_zones: [],
         advanced_type: None,
         power_zones: [Keyboard],
