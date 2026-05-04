@@ -274,7 +274,13 @@ async fn main() -> Result<()> {
         }
     });
 
-    slint::run_event_loop_until_quit().unwrap();
+    slint::run_event_loop_until_quit().unwrap_or_else(|e| {
+        eprintln!(
+            "rog-control-center: GUI event loop failed: {e}\nIf you are on X11 or have no Wayland \
+             socket, rebuild and install with X11 support:\nmake X11=1 && sudo make install"
+        );
+        std::process::exit(1);
+    });
     rt.shutdown_background();
     Ok(())
 }

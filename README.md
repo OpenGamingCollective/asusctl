@@ -82,7 +82,7 @@ A gui is now in the repo - ROG Control Center. At this time it is still a WIP, b
 
 # BUILDING
 
-Rust and cargo are required, they can be installed from [rustup.rs](https://rustup.rs/) or from the distro repos if newer than 1.75.
+Rust and cargo are required; use [rustup.rs](https://rustup.rs/) unless your distro ships a compiler **new enough for the workspace `rust-version`** (see root `Cargo.toml` / `rust-toolchain.toml`).
 
 **fedora:**
 
@@ -108,9 +108,27 @@ officially unsuported,but you can still try and test it by yourself(some feature
     make
     sudo make install
 
-**Ubuntu, Popos (unsuported):**
+**Ubuntu 22.04 LTS (Jammy) — community / unsupported**
 
-instructions removed as outdated
+Ubuntu’s default `rustc` is below this workspace’s [MSRV](https://doc.rust-lang.org/cargo/reference/manifest.html#the-rust-version-field) (`rust-version` in the root `Cargo.toml`, mirrored in `rust-toolchain.toml`). Use **rustup** and match that toolchain.
+
+```bash
+sudo extra/install-build-deps-ubuntu-jammy.sh
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.82
+source "$HOME/.cargo/env"
+make
+sudo make install
+sudo systemctl daemon-reload
+sudo systemctl enable --now asusd.service   # if udev did not already start it
+```
+
+Wayland session is expected for `rog-control-center` (default Slint backend). For X11-only sessions, build with `make X11=1` after installing the usual X11/Winit dev libraries.
+
+**Pop!\_OS** and other Ubuntu derivatives: same steps; if `system76-power` conflicts with power profiles, consider disabling that service (see below).
+
+**Ubuntu, Popos (older note):**
+
+instructions for non-LTS / older releases are not maintained here; use 22.04+ with the steps above.
 
 ## Installing
 

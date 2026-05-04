@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added
+- Ubuntu 22.04 LTS (Jammy) build notes in `README.md`, helper script `extra/install-build-deps-ubuntu-jammy.sh`, and GitLab CI job `build:ubuntu-22.04` (release build in a clean `ubuntu:22.04` image).
+- `rust-toolchain.toml` aligned with workspace `rust-version` (1.82) for reproducible local builds.
+
+### Changed
+- GitLab CI `format` job: install nightly rustfmt and run `cargo +nightly fmt --check` instead of writing a `rust-toolchain` file that overrides the repo toolchain.
+- `Cargo.toml`: `[patch.crates-io]` for `uhid-virt` (vendored under `patches/uhid-virt`) so `uhid-virt` 0.0.8 matches `uhidrs-sys` 1.0.4 generated constants; `cargo test --workspace` including `simulators` compiles again.
+- `README.md`: document MSRV / rustup for Ubuntu; clarify `make X11=1` when not on Wayland.
+- `rog-control-center`: on Slint event loop failure, print a short hint to rebuild with `make X11=1` instead of panicking on `unwrap()`.
+
 ## [v6.1.12]
 
 ### Changed

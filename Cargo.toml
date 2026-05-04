@@ -9,6 +9,10 @@ homepage = "https://gitlab.com/asus-linux/asusctl"
 description = "Laptop feature control for ASUS ROG laptops and others"
 edition = "2021"
 
+[patch.crates-io]
+# uhid-virt 0.0.8 on crates.io references hid_report_type_* removed in uhidrs-sys 1.0.4 bindgen output.
+uhid-virt = { path = "patches/uhid-virt" }
+
 [workspace]
 resolver = "2"
 members = [
