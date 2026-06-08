@@ -31,7 +31,7 @@ jobs:
 
             - name: Install makedepends
               run: |
-                  pacman -Syu --noconfirm rust llvm clang at-spi2-core cairo gtk3
+                  pacman -Syu --noconfirm git rust llvm clang at-spi2-core cairo gtk3
 
             - name: Determine pkgrel
               run: |
@@ -54,7 +54,7 @@ jobs:
                   cp distro-packaging/PKGBUILD .
                   cp distro-packaging/asusctl.install .
                   mkdir -p src
-                  ln -s "$GITHUB_WORKSPACE" src/asusctl
+                  cp -al "$GITHUB_WORKSPACE" src/asusctl
                   chown -R builder:builder .
                   sudo -u builder \
                       _gitref=$(git rev-list -n 1 "${{ github.event.release.tag_name }}") \
