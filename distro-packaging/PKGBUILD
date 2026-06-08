@@ -23,12 +23,13 @@ provides=()
 conflicts=('asusctl-git' 'asus-nb-ctrl-git' 'asus-nb-ctrl' 'rog-core' 'tlp')
 if [ -n "${CI_BUILD:-}" ]; then
 	source=()
+	md5sums=()
 	_workdir="$PWD"
 else
 	source=('git+https://github.com/OpenGamingCollective/asusctl.git')
+	md5sums=('SKIP')
 	_workdir="$srcdir/asusctl"
 fi
-md5sums=('SKIP')
 
 pkgver() {
 	cd "$_workdir"
