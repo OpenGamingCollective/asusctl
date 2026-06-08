@@ -78,6 +78,8 @@ jobs:
                   AWS_ENDPOINT_URL: ${{ secrets.BUCKET_ENDPOINT }}
                   BUCKET: ${{ secrets.S3_BUCKET }}
               run: |
-                  aws s3 sync . "s3://$BUCKET/" --exclude "*" \
-                      --include "asusctl-*" --include "rog-*" \
-                      --include "ogc.*"
+                  for f in asusctl-*.pkg.tar.zst asusctl-*.pkg.tar.zst.sig \
+                           rog-control-center-*.pkg.tar.zst rog-control-center-*.pkg.tar.zst.sig \
+                           ogc.*; do
+                      [ -f "$f" ] && aws s3 cp "$f" "s3://$BUCKET/$f"
+                  done
