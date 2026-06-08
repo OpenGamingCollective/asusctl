@@ -36,9 +36,8 @@ jobs:
             - name: Determine pkgrel
               run: |
                   PKGREL=1
-                  curl -sf "${{ secrets.BUCKET_PUBLIC_URL }}/ogc.db.tar.gz" \
-                    -o "/tmp/ogc.db.tar.gz"; \
-                  if [ -f /tmp/ogc.db.tar.gz ]; then
+                  if curl -sf "${{ secrets.BUCKET_PUBLIC_URL }}/ogc.db.tar.gz" \
+                      -o "/tmp/ogc.db.tar.gz"; then
                       LAST=$(bsdtar -xOzf /tmp/ogc.db.tar.gz 2>/dev/null \
                           | strings \
                           | grep -E "^${{ github.event.release.tag_name }}" \
@@ -51,12 +50,13 @@ jobs:
 
             - name: Build packages
               run: |
+                  _gitref=$(git rev-list -n 1 "${{ github.event.release.tag_name }}")
                   cp distro-packaging/PKGBUILD .
                   cp distro-packaging/asusctl.install .
                   chown -R builder:builder .
                   sudo -u builder \
                       CI_BUILD=1 \
-                      _gitref=$(git rev-list -n 1 "${{ github.event.release.tag_name }}") \
+                      _gitref="$_gitref" \
                       pkgrel="$PKGREL" \
                       makepkg -s --noconfirm
 
