@@ -21,21 +21,27 @@ optdepends=(
 makedepends=('git' 'rust' 'llvm' 'clang' 'at-spi2-core' 'cairo' 'gtk3')
 provides=()
 conflicts=('asusctl-git' 'asus-nb-ctrl-git' 'asus-nb-ctrl' 'rog-core' 'tlp')
-source=('git+https://github.com/OpenGamingCollective/asusctl.git')
+if [ -n "${CI_BUILD:-}" ]; then
+	source=()
+	_workdir="$PWD"
+else
+	source=('git+https://github.com/OpenGamingCollective/asusctl.git')
+	_workdir="$srcdir/asusctl"
+fi
 md5sums=('SKIP')
 
 pkgver() {
-	cd "$srcdir/$pkgname"
+	cd "$_workdir"
 	git describe --long --tags | sed 's/\([^-]*-g\)/r\1/;s/-/./g'
 }
 
 prepare() {
-	cd "$srcdir/$pkgname"
+	cd "$_workdir"
 	git checkout "$_gitref"
 }
 
 build() {
-	cd "$srcdir/$pkgname"
+	cd "$_workdir"
 	make build
 }
 
@@ -44,7 +50,7 @@ _package-asusctl() {
 	optdepends+=('rog-control-center' 'power-profiles-daemon')
 	install="asusctl.install"
 
-	cd "$srcdir/asusctl"
+	cd "$_workdir"
 	make DESTDIR="$pkgdir" install
 	rm -rf $pkgdir/usr/bin/rog-control-center
 	rm -rf $pkgdir/usr/share/rog-gui
@@ -55,7 +61,7 @@ _package-asusctl() {
 _package-rog-control-center() {
 	depends+=('asusctl' 'libappindicator-gtk3' 'at-spi2-core' 'cairo' 'gtk3' 'seatd' 'ttf-font')
 
-	cd "$srcdir/asusctl"
+	cd "$_workdir"
 	make DESTDIR="$pkgdir" install
 	rm -rf $pkgdir/usr/bin/asusctl
 	rm -rf $pkgdir/usr/bin/asusd
