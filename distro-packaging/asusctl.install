@@ -1,0 +1,95 @@
+#!/hint/bash
+post_upgrade() {
+    local missing=0
+    if [[ $2 == 3* ]]; then
+        echo -e "\033[0;34m"
+        echo "-> Upgrading from asusctl 3.X.X"
+        echo "-> Enabling power-profiles-daemon and supergfxd services"
+        echo -e "\033[0m"
+        systemctl enable --now power-profiles-daemon.service
+        systemctl enable --now supergfxd.service
+        
+        if [[ -f "/etc/asusd/asusd.conf" ]]; then
+            echo -e "\033[0;33m"
+            echo "-> Old config found"
+            echo "-> Because of breaking changes your config will be moved too /etc/asusd/asusd.conf.old.3.X.X"
+            mv /etc/asusd/asusd.conf /etc/asusd/asusd.conf.old.3.X.X
+            echo -e "\033[0m"
+        fi
+
+        echo -e "\033[0m"
+    fi;
+
+    # test for features every upgrade, not just major 3.x -> 4.x
+
+    platform_profile_choices=$(cat /sys/firmware/acpi/platform_profile_choices)
+
+    if [[ $platform_profile_choices != "quiet balanced performance" ]]; then
+        if [[ $platform_profile_choices != "low-power balanced performance" ]]; then
+            echo -e "\033[0;31m"
+            echo "-> Platform profile support not found in current running kernel"
+            echo "-> Make sure you are using a kernel with patch: https://lore.kernel.org/lkml/20210818190731.19170-1-luke@ljones.dev/"
+            echo "-> and asus_wmi driver is loaded"
+            echo -e "\033[0m"
+            missing=1
+        fi
+    fi
+
+    # FIXME: test for fan control support here
+
+    if false; then      # FIXME
+        echo -e "\033[0;31m"
+        echo "-> Fan control support not found in current running kernel"
+        echo "-> Make sure you are using a kernel with patch: https://lore.kernel.org/lkml/20211024033705.5595-1-luke@ljones.dev/"
+        echo "-> and asus_wmi driver is loaded"
+        echo -e "\033[0m"
+        missing=1
+
+    fi
+
+    if (( missing != 0 )); then
+        echo -e "\033[0;31m"
+        echo "==> Missing kernel support detected: the linux-g14 kernel includes support for all features."
+        echo -e "\033[0m"
+    fi
+
+    if [ -d '/etc/mkinitcpio.conf.d' ]; then
+        if [ ! -f "/etc/mkinitcpio.conf.d/asus.conf" ]; then
+            echo -e "\033[0;33m"
+            echo "-> Adding asus modules to mkinitcpio.conf"
+            echo "MODULES+=(hid_asus asus_wmi asus_nb_wmi)" > /etc/mkinitcpio.conf.d/asus.conf
+            for f in /etc/mkinitcpio.d/*; do
+                all_config_fixed=$(cat $f | grep "#ALL_config" | wc -l)
+                default_config_fixed=$(cat $f | grep "#default_config" | wc -l)
+                if [[ $all_config_fixed == 0 ]]; then
+                    sed -i 's/^ALL_config/#&/' $f 
+                fi
+                if [[ $default_config_fixed == 0 ]]; then
+                    sed -i 's/^default_config/#&/' $f 
+                fi
+
+                mkinitcpio -p $(basename -s .preset $f)
+            done
+            echo -e "\033[0m"
+        fi
+    fi
+
+    # we might have missed this in a prior upgrade from 3.x
+    cleanup_asusd_leftovers
+
+    systemctl restart asusd.service
+}
+
+
+post_install() {
+    cleanup_asusd_leftovers
+    systemctl restart asusd.service
+}
+
+# cleanup any asusd leftovers from older versions that handled gfx mode switching
+cleanup_asusd_leftovers() {
+  if [[ -e /etc/modprobe.d/asusd.conf ]]; then
+    echo "-> Renaming old asusd graphics mode file, this file can be safely removed"
+    mv -vf /etc/modprobe.d/asusd.conf /etc/modprobe.d/asusd.old
+  fi
+}

@@ -1,0 +1,77 @@
+# Maintainer: thatayush <me@ayushm.com>
+# Previous maintainer: dragonn <dragonn@op.pl>
+# Contributor: Arglebargle <arglebargle@arglebargle.dev>
+# Contributor: Static_Rocket
+
+# shellcheck disable=SC2034,SC2154,SC2164
+
+pkgver=0.0.0
+_gitref="${_gitref:-HEAD}"
+pkgrel=${pkgrel:-1}
+pkgdesc="Asus laptop control utilities"
+arch=('x86_64')
+url="https://github.com/OpenGamingCollective/asusctl"
+license=('MPL2')
+depends=('libusb' 'udev')
+optdepends=(
+	'ASUS-WMI-FAN-CONTROL: custom fan curve support'
+	'linux-rog: deprecated name for custom fan curve capability'
+	'supergfxctl: graphics swithing for iGPU + dGPU laptops'
+	)
+makedepends=('git' 'rust' 'llvm' 'clang' 'at-spi2-core' 'cairo' 'gtk3')
+provides=()
+conflicts=('asusctl-git' 'asus-nb-ctrl-git' 'asus-nb-ctrl' 'rog-core' 'tlp')
+source=('git+https://github.com/OpenGamingCollective/asusctl.git')
+md5sums=('SKIP')
+
+pkgver() {
+	cd "$srcdir/$pkgname"
+	git describe --long --tags | sed 's/\([^-]*-g\)/r\1/;s/-/./g'
+}
+
+prepare() {
+	cd "$srcdir/$pkgname"
+	git checkout "$_gitref"
+}
+
+build() {
+	cd "$srcdir/$pkgname"
+	make build
+}
+
+_package-asusctl() {
+	# add runtime dependencies, these aren't needed during build
+	optdepends+=('rog-control-center' 'power-profiles-daemon')
+	install="asusctl.install"
+
+	cd "$srcdir/asusctl"
+	make DESTDIR="$pkgdir" install
+	rm -rf $pkgdir/usr/bin/rog-control-center
+	rm -rf $pkgdir/usr/share/rog-gui
+	rm -rf $pkgdir/usr/share/icons
+	rm -rf $pkgdir/usr/share/applications
+}
+
+_package-rog-control-center() {
+	depends+=('asusctl' 'libappindicator-gtk3' 'at-spi2-core' 'cairo' 'gtk3' 'seatd' 'ttf-font')
+
+	cd "$srcdir/asusctl"
+	make DESTDIR="$pkgdir" install
+	rm -rf $pkgdir/usr/bin/asusctl
+	rm -rf $pkgdir/usr/bin/asusd
+	rm -rf $pkgdir/usr/bin/asusd-user
+	rm -rf $pkgdir/usr/bin/asus-shutdown
+	rm -rf $pkgdir/usr/lib
+	rm -rf $pkgdir/usr/share/dbus-1
+	rm -rf $pkgdir/usr/share/asusd
+	rm -rf $pkgdir/etc/asusd
+	rm -rf $pkgdir/usr/share/asusctl/LICENSE
+}
+
+pkgname=("asusctl" "rog-control-center")
+for _p in "${pkgname[@]}"; do
+  eval "package_$_p() {
+    $(declare -f "_package-${_p#$pkgbase}")
+    _package-${_p#$pkgbase}
+  }"
+done
