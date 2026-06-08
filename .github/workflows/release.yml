@@ -36,7 +36,7 @@ jobs:
             - name: Determine pkgrel
               run: |
                   PKGREL=1
-                  curl -sf "https://${{ secrets.S3_BUCKET }}.${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com/ogc.db.tar.gz" \
+                  curl -sf "${{ secrets.BUCKET_PUBLIC_URL }}/ogc.db.tar.gz" \
                     -o "/tmp/ogc.db.tar.gz"; \
                   if [ -f /tmp/ogc.db.tar.gz ]; then
                       LAST=$(bsdtar -xOzf /tmp/ogc.db.tar.gz 2>/dev/null \
