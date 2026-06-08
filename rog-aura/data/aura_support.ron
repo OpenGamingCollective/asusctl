@@ -153,6 +153,15 @@
         power_zones: [Keyboard],
     ),
     (
+        device_name: "FX608JM",
+        product_id: "",
+        layout_name: "fa506i",
+        basic_modes: [Static, Breathe, RainbowCycle, Pulse],
+        basic_zones: [],
+        advanced_type: Zoned([SingleZone]),
+        power_zones: [Keyboard],
+    ),
+    (
         device_name: "FX617X",
         product_id: "",
         layout_name: "fa506i",
