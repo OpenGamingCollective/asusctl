@@ -50,6 +50,7 @@ jobs:
 
             - name: Build packages
               run: |
+                  git config --global --add safe.directory "$PWD"
                   _gitref=$(git rev-list -n 1 "${{ github.event.release.tag_name }}")
                   cp distro-packaging/PKGBUILD .
                   cp distro-packaging/asusctl.install .
