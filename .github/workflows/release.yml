@@ -13,7 +13,7 @@ jobs:
             - name: Prepare container
               run: |
                   pacman-key --init && pacman-key --populate archlinux
-                  pacman -Syu --noconfirm sudo aws-cli
+                  pacman -Syu --noconfirm git sudo aws-cli
 
             - uses: actions/checkout@v4
               with:
@@ -31,7 +31,7 @@ jobs:
 
             - name: Install makedepends
               run: |
-                  pacman -Syu --noconfirm git rust llvm clang at-spi2-core cairo gtk3
+                  pacman -Syu --noconfirm rust llvm clang at-spi2-core cairo gtk3
 
             - name: Determine pkgrel
               run: |
