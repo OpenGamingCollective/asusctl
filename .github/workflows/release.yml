@@ -1,0 +1,84 @@
+name: Build & Publish Arch Packages
+
+on:
+    release:
+        types: [published]
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        container:
+            image: archlinux/archlinux:base-devel
+
+    steps:
+        - name: Prepare container
+          run: |
+              pacman-key --init && pacman-key --populate archlinux
+              pacman -Syu --noconfirm sudo aws-cli
+
+        - uses: actions/checkout@v4
+          with:
+              fetch-depth: 0
+
+        - name: Create build user
+          run: |
+              useradd -m builder
+              echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+        - name: Import PGP Key
+          env:
+              PGP_KEY: ${{ secrets.PGP_SIGNING_KEY }}
+          run: echo "$PGP_KEY" | gpg --import --batch
+
+        - name: Install makedepends
+          run: |
+              pacman -Syu --noconfirm rust llvm clang at-spi2-core cairo gtk3
+
+        - name: Determine pkgrel
+          run: |
+              PKGREL=1
+              curl -sf "https://${{ secrets.S3_BUCKET }}.${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com/ogc.db.tar.gz" \
+                -o "/tmp/ogc.db.tar.gz"; \
+              if [ -f /tmp/ogc.db.tar.gz ]; then
+                  LAST=$(bsdtar -xOzf /tmp/ogc.db.tar.gz 2>/dev/null \
+                      | strings \
+                      | grep -E "^${{ github.event.release.tag_name }}" \
+                      | sed 's/^.*-//' \
+                      | sort -n \
+                      | tail -1)
+                  [ -n "$LAST" ] && PKGREL=$((LAST + 1))
+              fi
+              echo "PKGREL=$PKGREL" >> "$GITHUB_ENV"
+
+        - name: Build packages
+          run: |
+              cp distro-packaging/PKGBUILD .
+              cp distro-packaging/asusctl.install .
+              mkdir -p src
+              ln -s "$GITHUB_WORKSPACE" src/asusctl
+              chown -R builder:builder .
+              sudo -u builder \
+                  _gitref=$(git rev-list -n 1 "${{ github.event.release.tag_name }}") \
+                  pkgrel="$PKGREL" \
+                  makepkg -s --noconfirm
+
+        - name: Sign packages
+          run: |
+              for pkg in asusctl-*.pkg.tar.zst rog-*.pkg.tar.zst; do
+                  [ -f "$pkg" ] && gpg --detach-sign --batch "$pkg"
+              done
+
+        - name: Create repo db
+          run: |
+              repo-add --sign ogc.db.tar.gz *.pkg.tar.zst
+
+        - name: Upload to bucket
+          env:
+              AWS_ACCESS_KEY_ID: ${{ secrets.BUCKET_ACCESS_KEY }}
+              AWS_SECRET_ACCESS_KEY: ${{ secrets.BUCKET_SECRET_KEY }}
+              AWS_ENDPOINT_URL: ${{ secrets.BUCKET_ENDPOINT }}
+              BUCKET: ${{ secrets.S3_BUCKET }}
+          run: |
+              aws s3 sync . "s3://$BUCKET/" --exclude "*" \
+                  --include "asusctl-*" --include "rog-*" \
+                  --include "ogc.*"
