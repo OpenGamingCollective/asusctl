@@ -346,6 +346,7 @@ export component PageSystem inherits Rectangle {
 
             if SystemPageData.mini_led_mode != -1: SystemDropdown {
                 text: @tr("MiniLED Mode");
+                combo_min_width: 200px;
                 current_index <=> SystemPageData.mini_led_mode;
                 current_value: SystemPageData.mini_led_mode_choices[SystemPageData.mini_led_mode];
                 model <=> SystemPageData.mini_led_mode_choices;

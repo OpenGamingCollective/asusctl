@@ -248,6 +248,7 @@ export component SystemDropdown inherits RogItem {
     in-out property <string> current_value;
     in-out property <[string]> model;
     in property <bool> enabled: true;
+    in property <length> combo_min_width: 0px;
     callback selected(int);
     HorizontalLayout {
         HorizontalLayout {
@@ -267,6 +268,7 @@ export component SystemDropdown inherits RogItem {
             padding-top: 7px;
             padding-bottom: 7px;
             ComboBox {
+                min-width: root.combo_min_width;
                 model <=> root.model;
                 current-index <=> root.current_index;
                 current-value <=> root.current_value;
