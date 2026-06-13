@@ -58,6 +58,11 @@ export global SystemPageData {
     callback cb_mcu_powersave(int);
     in-out property <int> mini_led_mode;
     callback cb_mini_led_mode(int);
+    // Local-dimming modes (kernel ABI). setup_system.rs picks the 2- or
+    // 3-state set per device; the index is the value written over dbus.
+    in-out property <[string]> mini_led_mode_choices: [@tr("Off"), @tr("Multi-zone"), @tr("Multi-zone Strong")];
+    in-out property <[string]> mini_led_choices_onoff: [@tr("Off"), @tr("Multi-zone")];
+    in-out property <[string]> mini_led_choices_modes: [@tr("Off"), @tr("Multi-zone"), @tr("Multi-zone Strong")];
 
     in-out property <float> screenpad_gamma;
     callback cb_screenpad_gamma(float);
@@ -314,14 +319,6 @@ export component PageSystem inherits Rectangle {
                     }
                 }
 
-                if SystemPageData.mini_led_mode != -1: SystemToggleInt {
-                    text: @tr("MiniLED Mode");
-                    checked_int <=> SystemPageData.mini_led_mode;
-                    toggled => {
-                        SystemPageData.cb_mini_led_mode(SystemPageData.mini_led_mode)
-                    }
-                }
-
                 if SystemPageData.boot_sound != -1: SystemToggleInt {
                     text: @tr("POST boot sound");
                     checked_int <=> SystemPageData.boot_sound;
@@ -344,6 +341,16 @@ export component PageSystem inherits Rectangle {
                     toggled => {
                         SystemPageData.cb_mcu_powersave(SystemPageData.mcu_powersave)
                     }
+                }
+            }
+
+            if SystemPageData.mini_led_mode != -1: SystemDropdown {
+                text: @tr("MiniLED Mode");
+                current_index <=> SystemPageData.mini_led_mode;
+                current_value: SystemPageData.mini_led_mode_choices[SystemPageData.mini_led_mode];
+                model <=> SystemPageData.mini_led_mode_choices;
+                selected => {
+                    SystemPageData.cb_mini_led_mode(SystemPageData.mini_led_mode)
                 }
             }
 

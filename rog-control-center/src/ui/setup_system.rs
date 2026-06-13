@@ -699,6 +699,29 @@ pub fn setup_system_page_callbacks(ui: &MainWindow, _states: Arc<Mutex<Config>>)
                                 init_property!(mini_led_mode, handle, value, i32);
                                 setup_callback!(mini_led_mode, handle, attr, i32);
                                 setup_external!(mini_led_mode, i32, handle, attr, value);
+
+                                // possible_values count tells us how many dimming
+                                // modes the device has: 2 (MODE1) or 3 (MODE2).
+                                let handle_copy = handle.as_weak();
+                                let proxy_copy = attr.clone();
+                                tokio::spawn(async move {
+                                    let count = proxy_copy
+                                        .possible_values()
+                                        .await
+                                        .map(|v| v.len())
+                                        .unwrap_or(2);
+                                    handle_copy
+                                        .upgrade_in_event_loop(move |handle| {
+                                            let data = handle.global::<SystemPageData>();
+                                            let choices = if count >= 3 {
+                                                data.get_mini_led_choices_modes()
+                                            } else {
+                                                data.get_mini_led_choices_onoff()
+                                            };
+                                            data.set_mini_led_mode_choices(choices);
+                                        })
+                                        .ok();
+                                });
                             }
                             FirmwareAttribute::PendingReboot => {}
                             FirmwareAttribute::None => {}
