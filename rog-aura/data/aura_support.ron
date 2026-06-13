@@ -891,6 +891,15 @@
         power_zones: [Keyboard],
     ),
     (
+        device_name: "GL704GM",
+        product_id: "",
+        layout_name: "gl503",
+        basic_modes: [Static, Breathe, RainbowCycle, RainbowWave, Pulse],
+        basic_zones: [],
+        advanced_type: r#None,
+        power_zones: [Keyboard, Lightbar, RearGlow],
+    ),
+    (
         device_name: "GM501G",
         product_id: "",
         layout_name: "fa507",
