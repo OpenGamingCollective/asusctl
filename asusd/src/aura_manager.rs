@@ -515,80 +515,92 @@ impl DeviceManager {
                         }
 
                         if subsys == "hidraw" {
-                            if let Some(parent) =
-                                event.parent_with_subsystem_devtype("usb", "usb_device")?
-                            {
-                                if action == "remove" {
-                                    if let Some(path) = dbus_path_for_dev(&parent) {
-                                        // Find the indexs of devices matching the path
-                                        let removals: Vec<usize> = devices
-                                            .lock()
-                                            .await
-                                            .iter()
-                                            .enumerate()
-                                            .filter_map(|(i, dev)| {
-                                                if dev.dbus_path == path {
-                                                    Some(i)
-                                                } else {
-                                                    None
-                                                }
-                                            })
-                                            .collect();
-                                        if removals.is_empty() {
-                                            return Ok(());
-                                        }
-                                        info!("removing: {path:?}");
-                                        // Iter in reverse so as to not screw up indexing
-                                        for index in removals.iter().rev() {
-                                            let dev = devices.lock().await.remove(*index);
-                                            let hid_key = dev.hid_key.clone();
-                                            let path = path.clone();
-                                            let res = match dev.device {
-                                                DeviceHandle::Aura(_) => {
-                                                    conn_copy
-                                                        .object_server()
-                                                        .remove::<AuraZbus, _>(&path)
-                                                        .await?
-                                                }
-                                                DeviceHandle::Slash(_) => {
-                                                    conn_copy
-                                                        .object_server()
-                                                        .remove::<SlashZbus, _>(&path)
-                                                        .await?
-                                                }
-                                                DeviceHandle::AniMe(_) => {
-                                                    conn_copy
-                                                        .object_server()
-                                                        .remove::<AniMeZbus, _>(&path)
-                                                        .await?
-                                                }
-                                                DeviceHandle::Scsi(_) => {
-                                                    conn_copy
-                                                        .object_server()
-                                                        .remove::<ScsiZbus, _>(&path)
-                                                        .await?
-                                                }
-                                                _ => todo!(),
-                                            };
-                                            info!("AuraManager removed: {path:?}, {res}");
-                                            if let Some(key) = hid_key {
-                                                hid_handles.lock().await.remove(&key);
+                            if action == "remove" {
+                                // Key cleanup off the removed hidraw node itself, NOT the
+                                // USB parent. By the time a `remove` uevent arrives the USB
+                                // parent is usually already detached from sysfs, so
+                                // `parent_with_subsystem_devtype` returns None; gating the
+                                // cleanup on it meant we kept the `Arc<Mutex<HidRaw>>` (held
+                                // by both the handle map and the live zbus object) alive, so
+                                // the open hidraw `File` was never dropped. The kernel only
+                                // frees a hidraw minor once no fd remains open on it, so every
+                                // re-enumeration (s2idle resume, dock/undock) leaked one
+                                // minor until the 64-entry pool was exhausted system-wide.
+                                // The uevent always carries DEVNAME, so the devnode is the
+                                // stable key (and is exactly what we store as `hid_key`).
+                                let removed_node = event
+                                    .device()
+                                    .devnode()
+                                    .map(|n| n.to_string_lossy().to_string());
+                                if let Some(removed_node) = removed_node {
+                                    // Tear down any zbus objects backed by this node.
+                                    let removals: Vec<usize> = devices
+                                        .lock()
+                                        .await
+                                        .iter()
+                                        .enumerate()
+                                        .filter_map(|(i, dev)| {
+                                            if dev.hid_key.as_deref()
+                                                == Some(removed_node.as_str())
+                                            {
+                                                Some(i)
+                                            } else {
+                                                None
                                             }
-                                        }
+                                        })
+                                        .collect();
+                                    // Iter in reverse so as to not screw up indexing
+                                    for index in removals.iter().rev() {
+                                        let dev = devices.lock().await.remove(*index);
+                                        let path = dev.dbus_path.clone();
+                                        let res = match dev.device {
+                                            DeviceHandle::Aura(_) => {
+                                                conn_copy
+                                                    .object_server()
+                                                    .remove::<AuraZbus, _>(&path)
+                                                    .await?
+                                            }
+                                            DeviceHandle::Slash(_) => {
+                                                conn_copy
+                                                    .object_server()
+                                                    .remove::<SlashZbus, _>(&path)
+                                                    .await?
+                                            }
+                                            DeviceHandle::AniMe(_) => {
+                                                conn_copy
+                                                    .object_server()
+                                                    .remove::<AniMeZbus, _>(&path)
+                                                    .await?
+                                            }
+                                            DeviceHandle::Scsi(_) => {
+                                                conn_copy
+                                                    .object_server()
+                                                    .remove::<ScsiZbus, _>(&path)
+                                                    .await?
+                                            }
+                                            // sysfs/USB-backed handles (e.g. OldAura) own no
+                                            // shared hidraw fd; nothing to remove here.
+                                            _ => false,
+                                        };
+                                        info!("AuraManager removed: {path:?}, {res}");
                                     }
-                                } else if action == "add" {
+                                    // Always drop the shared handle for this node, even if no
+                                    // AsusDevice referenced it, so the fd (and minor) is freed.
+                                    if hid_handles.lock().await.remove(&removed_node).is_some() {
+                                        info!("Dropped hid handle for {removed_node}");
+                                    }
+                                }
+                            } else if action == "add" {
+                                if let Some(parent) =
+                                    event.parent_with_subsystem_devtype("usb", "usb_device")?
+                                {
                                     // Guard against initialising a second hidraw interface for a
                                     // USB device we already track. Without this, a USB reset
                                     // (e.g. triggered by an earlier duplicate init) fires
                                     // remove+add events that cause another duplicate init and a
                                     // permanent reset loop.
                                     if let Some(path) = dbus_path_for_dev(&parent) {
-                                        if devices
-                                            .lock()
-                                            .await
-                                            .iter()
-                                            .any(|d| d.dbus_path == path)
-                                        {
+                                        if devices.lock().await.iter().any(|d| d.dbus_path == path) {
                                             debug!("Hotplug add: device {path:?} already registered, skipping");
                                             return Ok(());
                                         }
@@ -604,7 +616,7 @@ impl DeviceManager {
                                     {
                                         devices.lock().await.append(&mut new_devs);
                                     }
-                                };
+                                }
                             }
                         }
                         Ok::<(), RogError>(())
