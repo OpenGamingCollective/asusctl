@@ -134,6 +134,7 @@ sudo make install
 - openSUSE = https://download.opensuse.org/repositories/home:/luke_nukem:/asus/
 - Arch = Via the AUR, install `asusctl`
 - Nix/NixOS = `asusctl`
+- Solus = `eopkg install asusctl`
 
 Some other distros may have asusctl packaged, we recommend checking before building from source.
 
