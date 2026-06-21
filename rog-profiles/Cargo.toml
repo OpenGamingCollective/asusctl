@@ -19,3 +19,4 @@ serde.workspace = true
 rog_platform = { path = "../rog-platform" }
 
 zbus = { workspace = true, optional = true }
+thiserror.workspace = true

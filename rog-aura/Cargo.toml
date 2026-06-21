@@ -25,3 +25,4 @@ dmi_id = { path = "../dmi-id" }
 log.workspace = true
 
 ron = { version = "*", optional = true }
+thiserror.workspace = true

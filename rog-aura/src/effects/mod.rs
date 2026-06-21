@@ -123,25 +123,6 @@ impl AdvancedEffects {
     }
 }
 
-// how to be lazy
-#[macro_export]
-macro_rules! effect_state_impl {
-    () => {
-        fn get_colour(&self) -> $crate::Colour {
-            self.colour
-        }
-
-        fn get_led(&self) -> $crate::keyboard::LedCode {
-            self.led.clone()
-        }
-
-        /// Change the led type
-        fn set_led(&mut self, address: $crate::keyboard::LedCode) {
-            self.led = address;
-        }
-    };
-}
-
 /// A helper macro to quickly add new effects to the matching on `Effect`
 macro_rules! effect_impl {
     ($($effect:ident),*) => {
@@ -187,6 +168,8 @@ pub enum Effect {
     Breathe(Breathe),
     DoomFlicker(DoomFlicker),
     DoomLightFlash(DoomLightFlash),
+    // InputBased is not in the Effect enum because it contains Box<dyn InputForEffect>
+    // which can't derive Debug/Clone/Serialize
 }
 
 impl Default for Effect {

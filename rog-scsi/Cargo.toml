@@ -22,3 +22,4 @@ zbus = { workspace = true, optional = true }
 # cli and logging
 
 ron = { version = "*", optional = true }
+thiserror.workspace = true

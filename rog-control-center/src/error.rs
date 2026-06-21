@@ -1,34 +1,30 @@
-use std::fmt;
+use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum Error {
-    Io(std::io::Error),
+    #[error("Failed to open: {0}")]
+    Io(#[source] std::io::Error),
+
+    #[error("Failed to load user config")]
     ConfigLoadFail,
+
+    #[error("Failed to lock user config")]
     ConfigLockFail,
+
+    #[error("XDG environment vars appear unset")]
     XdgVars,
-    Zbus(zbus::Error),
-    ZbusFdo(zbus::fdo::Error),
-    Notification(notify_rust::error::Error),
-}
 
-impl fmt::Display for Error {
-    // This trait requires `fmt` with this exact signature.
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Error::Io(err) => write!(f, "Failed to open: {}", err),
-            Error::ConfigLoadFail => write!(f, "Failed to load user config"),
-            Error::ConfigLockFail => write!(f, "Failed to lock user config"),
-            Error::XdgVars => write!(f, "XDG environment vars appear unset"),
-            Error::Zbus(err) => write!(f, "Error: {}", err),
-            Error::ZbusFdo(err) => write!(f, "Error: {}", err),
-            Error::Notification(err) => write!(f, "Notification Error: {}", err),
-        }
-    }
-}
+    #[error("Zbus error: {0}")]
+    Zbus(#[source] zbus::Error),
 
-impl std::error::Error for Error {}
+    #[error("Zbus FDO error: {0}")]
+    ZbusFdo(#[source] zbus::fdo::Error),
+
+    #[error("Notification error: {0}")]
+    Notification(#[source] notify_rust::error::Error),
+}
 
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Self {

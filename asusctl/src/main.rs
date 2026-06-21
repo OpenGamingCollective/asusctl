@@ -20,18 +20,18 @@ use rog_dbus::zbus_aura::AuraProxyBlocking;
 use rog_dbus::zbus_backlight::BacklightProxyBlocking;
 use rog_dbus::zbus_fan_curves::FanCurvesProxyBlocking;
 use rog_dbus::zbus_platform::PlatformProxyBlocking;
-use rog_dbus::zbus_slash::SlashProxyBlocking;
 use rog_platform::platform::{PlatformProfile, Properties};
 use rog_profiles::error::ProfileError;
 use rog_scsi::AuraMode;
-use rog_slash::SlashMode;
 use ron::ser::PrettyConfig;
 use scsi_cli::ScsiCommand;
 use zbus::blocking::proxy::ProxyImpl;
 use zbus::blocking::Connection;
 
 use crate::cli_opts::*;
-use crate::slash_cli::SlashCommand;
+use crate::slash_cli::{
+    handle_slash_get, handle_slash_list, handle_slash_set, SlashCommand, SlashSubCommand,
+};
 
 mod anime_cli;
 mod aura_cli;
@@ -532,63 +532,10 @@ fn verify_brightness(brightness: f32) {
 }
 
 fn handle_slash(cmd: &SlashCommand) -> Result<(), Box<dyn std::error::Error>> {
-    if cmd.brightness.is_none()
-        && cmd.interval.is_none()
-        && cmd.show_on_boot.is_none()
-        && cmd.show_on_shutdown.is_none()
-        && cmd.show_on_sleep.is_none()
-        && cmd.show_on_battery.is_none()
-        && cmd.show_battery_warning.is_none()
-        && cmd.mode.is_none()
-        && !cmd.list
-        && !cmd.enable
-        && !cmd.disable
-    {
-        println!("Missing arg or command; run 'asusctl slash --help' for usage");
-    }
-
-    let slashes = find_iface::<SlashProxyBlocking>("xyz.ljones.Slash")?;
-    for proxy in slashes {
-        if cmd.enable {
-            proxy.set_enabled(true)?;
-        }
-        if cmd.disable {
-            proxy.set_enabled(false)?;
-        }
-        if let Some(brightness) = cmd.brightness {
-            proxy.set_brightness(brightness)?;
-        }
-        if let Some(interval) = cmd.interval {
-            proxy.set_interval(interval)?;
-        }
-        if let Some(slash_mode) = cmd.mode {
-            proxy.set_mode(slash_mode)?;
-        }
-        if let Some(show) = cmd.show_on_boot {
-            proxy.set_show_on_boot(show)?;
-        }
-
-        if let Some(show) = cmd.show_on_shutdown {
-            proxy.set_show_on_shutdown(show)?;
-        }
-        if let Some(show) = cmd.show_on_sleep {
-            proxy.set_show_on_sleep(show)?;
-        }
-        if let Some(show) = cmd.show_on_battery {
-            proxy.set_show_on_battery(show)?;
-        }
-        if let Some(show) = cmd.show_battery_warning {
-            proxy.set_show_battery_warning(show)?;
-        }
-        // if let Some(show) = cmd.show_on_lid_closed {
-        //     proxy.set_show_on_lid_closed(show)?;
-        // }
-    }
-    if cmd.list {
-        let res = SlashMode::list();
-        for p in &res {
-            println!("{:?}", p);
-        }
+    match &cmd.command {
+        SlashSubCommand::Get(_) => handle_slash_get()?,
+        SlashSubCommand::Set(cmd) => handle_slash_set(cmd)?,
+        SlashSubCommand::List(_) => handle_slash_list(),
     }
 
     Ok(())

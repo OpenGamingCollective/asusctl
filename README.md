@@ -91,7 +91,7 @@ Distro packaging should work with the stable toolchain. If your distro does not 
 **fedora:**
 
 ```sh
-dnf install cmake clang-devel  libxkbcommon-devel systemd-devel expat-devel pcre2-devel libzstd-devel gtk3-devel
+dnf install cmake clang-devel libxkbcommon-devel systemd-devel expat-devel pcre2-devel libzstd-devel gtk3-devel
 make
 sudo make install
 ```
@@ -129,8 +129,14 @@ sudo make install
 
 ## Installing
 
-- Fedora copr = https://copr.fedorainfracloud.org/coprs/lukenukem/asus-linux/
+- Ultramarine/Nobara: `dnf install asusctl`. Enable the services: `systemctl enable --now asusd.service; systemctl enable --now  asus-shutdown.service`.
+- Fedora = Install [Terra](https://terrapkg.com/), then `dnf install asusctl`. Enable the services: `systemctl enable --now asusd.service; systemctl enable --now  asus-shutdown.service`.
 - openSUSE = https://download.opensuse.org/repositories/home:/luke_nukem:/asus/
+- Arch = Via the AUR, install `asusctl`
+- Nix/NixOS = `asusctl`
+- Solus = `eopkg install asusctl`
+
+Some other distros may have asusctl packaged, we recommend checking before building from source.
 
 =======
 
@@ -150,6 +156,7 @@ systemctl daemon-reload && systemctl restart asusd
 ## Uninstalling
 
 Run `sudo make uninstall` in the source repo, and remove `/etc/asusd/`.
+If you have installed with a package manager, use your package managers uninstall function.
 
 ## Contributing
 

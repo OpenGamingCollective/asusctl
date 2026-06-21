@@ -43,6 +43,7 @@ dirs.workspace = true
 notify-rust.workspace = true
 concat-idents.workspace = true
 futures-util.workspace = true
+thiserror.workspace = true
 
 [dependencies.slint]
 git = "https://github.com/slint-ui/slint.git"

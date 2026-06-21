@@ -2,7 +2,24 @@ use serde::{Deserialize, Serialize};
 
 use crate::effects::{p_random, EffectState};
 use crate::keyboard::{KeyLayout, LedCode};
-use crate::{effect_state_impl, Colour};
+use crate::Colour;
+
+/// Compute max/min light colours from a base colour and percentage values.
+fn compute_light_range(base: Colour, max_percentage: u8, min_percentage: u8) -> (Colour, Colour) {
+    let max_light = Colour {
+        r: (base.r as f32 / 100.0 * max_percentage as f32) as u8,
+        g: (base.g as f32 / 100.0 * max_percentage as f32) as u8,
+        b: (base.b as f32 / 100.0 * max_percentage as f32) as u8,
+    };
+
+    // min light is a percentage of the set colour
+    let min_light = Colour {
+        r: (base.r as f32 / 100.0 * min_percentage as f32) as u8,
+        g: (base.g as f32 / 100.0 * min_percentage as f32) as u8,
+        b: (base.b as f32 / 100.0 * min_percentage as f32) as u8,
+    };
+    (max_light, min_light)
+}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct DoomFlicker {
@@ -30,7 +47,17 @@ impl DoomFlicker {
 }
 
 impl EffectState for DoomFlicker {
-    effect_state_impl!();
+    fn get_colour(&self) -> Colour {
+        self.colour
+    }
+
+    fn get_led(&self) -> LedCode {
+        self.led
+    }
+
+    fn set_led(&mut self, address: LedCode) {
+        self.led = address;
+    }
 
     fn next_colour_state(&mut self, _layout: &KeyLayout) {
         let Self {
@@ -50,17 +77,8 @@ impl EffectState for DoomFlicker {
         }
 
         // TODO: make a "percentage" method on Colour.
-        let max_light = Colour {
-            r: (start_colour.r as f32 / 100.0 * *max_percentage as f32) as u8,
-            g: (start_colour.g as f32 / 100.0 * *max_percentage as f32) as u8,
-            b: (start_colour.b as f32 / 100.0 * *max_percentage as f32) as u8,
-        };
-        // min light is a percentage of the set colour
-        let min_light = Colour {
-            r: (start_colour.r as f32 / 100.0 * *min_percentage as f32) as u8,
-            g: (start_colour.g as f32 / 100.0 * *min_percentage as f32) as u8,
-            b: (start_colour.b as f32 / 100.0 * *min_percentage as f32) as u8,
-        };
+        let (max_light, min_light) =
+            compute_light_range(*start_colour, *max_percentage, *min_percentage);
 
         // Convert the 255 to percentage
         let amount = (p_random() & 7) as f32 * 8.0;
@@ -115,7 +133,17 @@ impl DoomLightFlash {
 }
 
 impl EffectState for DoomLightFlash {
-    effect_state_impl!();
+    fn get_colour(&self) -> Colour {
+        self.colour
+    }
+
+    fn get_led(&self) -> LedCode {
+        self.led
+    }
+
+    fn set_led(&mut self, address: LedCode) {
+        self.led = address;
+    }
 
     fn next_colour_state(&mut self, _layout: &KeyLayout) {
         let Self {
@@ -132,17 +160,8 @@ impl EffectState for DoomLightFlash {
         }
 
         // TODO: make a "percentage" method on Colour.
-        let max_light = Colour {
-            r: (start_colour.r as f32 / 100.0 * *max_percentage as f32) as u8,
-            g: (start_colour.g as f32 / 100.0 * *max_percentage as f32) as u8,
-            b: (start_colour.b as f32 / 100.0 * *max_percentage as f32) as u8,
-        };
-        // min light is a percentage of the set colour
-        let min_light = Colour {
-            r: (start_colour.r as f32 / 100.0 * *min_percentage as f32) as u8,
-            g: (start_colour.g as f32 / 100.0 * *min_percentage as f32) as u8,
-            b: (start_colour.b as f32 / 100.0 * *min_percentage as f32) as u8,
-        };
+        let (max_light, min_light) =
+            compute_light_range(*start_colour, *max_percentage, *min_percentage);
 
         if *colour == max_light {
             *colour = min_light;

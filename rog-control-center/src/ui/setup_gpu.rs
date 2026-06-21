@@ -164,6 +164,39 @@ fn set_gpu_mode(caps: Arc<GpuCaps>, handle: Weak<MainWindow>, mode: GpuMode) {
     });
 }
 
+fn set_apu_mem(proxy: AsusArmouryProxy<'static>, handle: Weak<MainWindow>, value: i32) {
+    let p = proxy.clone();
+    let w = handle.clone();
+    tokio::spawn(async move {
+        let result = p.set_current_value(value).await;
+        show_toast(
+            SharedString::from(
+                "Reserved GPU memory updated — reboot required for changes to apply.",
+            ),
+            SharedString::from("Failed to set reserved GPU memory"),
+            w.clone(),
+            result,
+        );
+
+        // Refresh the dropdown to show the (possibly unchanged) hardware state.
+        let new_current = p.current_value().await.unwrap_or(value);
+        let choices = p.possible_values().await.unwrap_or_default();
+        let new_index = choices.iter().position(|v| *v == new_current).unwrap_or(0) as i32;
+        w.upgrade_in_event_loop(move |h| {
+            h.global::<GPUPageData>().set_apu_mem_index(new_index);
+        })
+        .unwrap_or_else(|e| error!("setup_gpu: failed to refresh apu_mem index: {e:?}"));
+    });
+}
+
+fn apu_mem_val_to_label(value: i32) -> SharedString {
+    if value == 0 {
+        SharedString::from("AUTO")
+    } else {
+        SharedString::from(format!("{}G", value))
+    }
+}
+
 // Populate GPU page choices and wire the `cb_set_gpu_mode` callback
 pub fn setup_gpu_page(ui: &MainWindow) {
     let handle = ui.as_weak();
@@ -202,6 +235,58 @@ pub fn setup_gpu_page(ui: &MainWindow) {
             });
         }) {
             error!("setup_gpu_page: upgrade_in_event_loop: {e:?}");
+        }
+
+        // --- APU mem ---
+        let apu_mem_proxy: Option<AsusArmouryProxy<'static>> = async {
+            let Ok(attrs) = find_iface_async::<AsusArmouryProxy>("xyz.ljones.AsusArmoury").await
+            else {
+                error!("setup_gpu: failed to find AsusArmoury proxies for apu_mem");
+                return None;
+            };
+            for attr in attrs {
+                match attr.name().await {
+                    Ok(FirmwareAttribute::ApuMem) => return Some(attr),
+                    Ok(_) => {}
+                    Err(e) => error!("setup_gpu: failed to read attribute name: {e:?}"),
+                }
+            }
+            None
+        }
+        .await;
+
+        if let Some(proxy) = apu_mem_proxy {
+            let possible = proxy.possible_values().await.unwrap_or_default();
+            let current = proxy.current_value().await.unwrap_or(0);
+            let apu_choices: Vec<SharedString> =
+                possible.iter().map(|v| apu_mem_val_to_label(*v)).collect();
+            let apu_index = possible.iter().position(|v| *v == current).unwrap_or(0) as i32;
+
+            let proxy_cb = proxy.clone();
+            let handle_cb = handle.clone();
+            if let Err(e) = handle.upgrade_in_event_loop(move |h| {
+                let global = h.global::<GPUPageData>();
+                global.set_apu_mem_present(true);
+                global.set_apu_mem_choices(apu_choices.as_slice().into());
+                global.set_apu_mem_index(apu_index);
+                let weak_handle = h.as_weak();
+                global.on_cb_set_apu_mem(move |index| {
+                    let Some(value) = possible.get(index as usize).copied() else {
+                        return;
+                    };
+                    // Disable the dropdown while applying
+                    weak_handle
+                        .upgrade_in_event_loop(move |h| {
+                            h.global::<GPUPageData>().set_apu_mem_index(index);
+                        })
+                        .unwrap_or_else(|e| {
+                            error!("setup_gpu: failed to set apu_mem index: {e:?}")
+                        });
+                    set_apu_mem(proxy_cb.clone(), handle_cb.clone(), value);
+                });
+            }) {
+                error!("setup_gpu: failed to wire apu_mem callback: {e:?}");
+            }
         }
 
         // --- XG Mobile LED ---

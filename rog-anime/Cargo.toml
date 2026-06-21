@@ -34,3 +34,4 @@ glam.workspace = true
 zbus = { workspace = true, optional = true }
 
 dmi_id = { path = "../dmi-id", optional = true }
+thiserror.workspace = true

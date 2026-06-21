@@ -13,6 +13,11 @@ export global GPUPageData {
     in-out property <bool> has_xgm_led: false; // true when XG Mobile LED is present
     in-out property <bool> xgm_led_enabled: false; // current LED state
     callback cb_set_xgm_led_enabled(bool);
+
+    in-out property <int> apu_mem_index: -1; // -1 when apu_mem is not available
+    in-out property <[string]> apu_mem_choices: []; // available choices, in display order
+    in-out property <bool> apu_mem_present: false; // false when apu_mem is not available
+    callback cb_set_apu_mem(int);
 }
 
 export component PageGPU inherits Rectangle {
@@ -68,6 +73,31 @@ export component PageGPU inherits Rectangle {
                     enabled <=> GPUPageData.gpu_dropdown_enabled;
                     selected => {
                         GPUPageData.cb_set_gpu_mode(GPUPageData.gpu_mode_index)
+                    }
+                }
+            }
+
+            if GPUPageData.apu_mem_present: HorizontalLayout {
+                padding-right: 10px;
+                padding-left: 10px;
+                alignment: LayoutAlignment.space-between;
+                Rectangle {
+                    height: 32px;
+                    Text {
+                        font-size: 16px;
+                        text: @tr("Note: Reserved GPU memory changes take effect after a reboot.");
+                    }
+                }
+            }
+
+            if GPUPageData.apu_mem_present: HorizontalLayout {
+                SystemDropdown {
+                    text: @tr("Reserved GPU memory");
+                    model <=> GPUPageData.apu_mem_choices;
+                    current_index <=> GPUPageData.apu_mem_index;
+                    current_value: GPUPageData.apu_mem_choices[GPUPageData.apu_mem_index];
+                    selected => {
+                        GPUPageData.cb_set_apu_mem(GPUPageData.apu_mem_index)
                     }
                 }
             }

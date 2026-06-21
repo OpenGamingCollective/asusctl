@@ -32,6 +32,7 @@ config-traits = { path = "../config-traits" }
 
 zbus.workspace = true
 env_logger.workspace = true
+thiserror.workspace = true
 
 [package.metadata.deb]
 license-file = ["../LICENSE", "4"]

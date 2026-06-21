@@ -261,6 +261,9 @@ pub enum FirmwareAttributeType {
     Bios,
     /// Attribute is read-only and must never be written by asusd.
     ReadOnly,
+    /// Attribute is written synchronously to sysfs but is never re-applied
+    /// at startup/reload and is never persisted to config.
+    Norestore,
 }
 
 macro_rules! define_attribute_getters {
@@ -347,6 +350,8 @@ define_attribute_getters!(
         mini_led_mode: Immediate,
         panel_hd_mode: Immediate,
         panel_od: Immediate,
+
+        apu_mem: Norestore,
 
         charge_mode: Immediate,
     }

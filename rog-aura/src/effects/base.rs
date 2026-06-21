@@ -2,7 +2,6 @@ use super::{EffectState, InputForEffect};
 use crate::keyboard::{KeyLayout, LedCode};
 use crate::Colour;
 
-#[allow(dead_code)]
 pub struct InputBased {
     led: LedCode,
     colour: Colour,
@@ -12,6 +11,16 @@ pub struct InputBased {
     /// - fan speed
     /// - time
     input: Box<dyn InputForEffect>,
+}
+
+impl InputBased {
+    pub fn new(led: LedCode, input: Box<dyn InputForEffect>) -> Self {
+        Self {
+            led,
+            colour: Colour::default(),
+            input,
+        }
+    }
 }
 
 impl EffectState for InputBased {

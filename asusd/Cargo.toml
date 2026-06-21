@@ -37,6 +37,7 @@ env_logger.workspace = true
 futures-util.workspace = true
 zbus.workspace = true
 logind-zbus.workspace = true
+thiserror.workspace = true
 
 # serialisation
 serde.workspace = true

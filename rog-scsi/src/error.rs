@@ -1,32 +1,28 @@
-use std::{error, fmt};
+use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum Error {
+    #[error("Could not parse mode")]
     ParseMode,
+
+    #[error("Could not parse colour")]
     ParseColour,
+
+    #[error("Could not parse speed")]
     ParseSpeed,
+
+    #[error("Could not parse direction")]
     ParseDirection,
-    IoPath(String, std::io::Error),
-    Ron(ron::Error),
-    RonParse(ron::error::SpannedError),
-}
 
-impl fmt::Display for Error {
-    // This trait requires `fmt` with this exact signature.
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Error::ParseColour => write!(f, "Could not parse colour"),
-            Error::ParseSpeed => write!(f, "Could not parse speed"),
-            Error::ParseDirection => write!(f, "Could not parse direction"),
-            Error::ParseMode => write!(f, "Could not parse mode"),
-            Error::IoPath(path, io) => write!(f, "IO Error: {path}, {io}"),
-            Error::Ron(e) => write!(f, "RON Parse Error: {e}"),
-            Error::RonParse(e) => write!(f, "RON Parse Error: {e}"),
-        }
-    }
-}
+    #[error("IO Error: {1}: {0}")]
+    IoPath(String, #[source] std::io::Error),
 
-impl error::Error for Error {}
+    #[error("RON Parse Error: {0}")]
+    Ron(#[source] ron::Error),
+
+    #[error("RON Parse Error: {0}")]
+    RonParse(#[source] ron::error::SpannedError),
+}
 
 impl From<ron::Error> for Error {
     fn from(e: ron::Error) -> Self {

@@ -36,6 +36,15 @@
         power_zones: [Keyboard],
     ),
     (
+        device_name: "FA608UH",
+        product_id: "",
+        layout_name: "fa608",
+        basic_modes: [Static, Breathe, RainbowCycle, RainbowWave, Pulse, Flash],
+        basic_zones: [],
+        advanced_type: r#None,
+        power_zones: [Keyboard],
+    ),
+    (
         device_name: "FA617NS",
         product_id: "",
         layout_name: "fa507",

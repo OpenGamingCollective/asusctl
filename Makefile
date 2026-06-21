@@ -12,6 +12,7 @@ libdir = $(exec_prefix)/lib
 zshcpl = $(datarootdir)/zsh/site-functions
 
 BIN_ROG := rog-control-center
+APP_ID := org.opengamingcollective.rog-control-center
 BIN_C := asusctl
 BIN_D := asusd
 BIN_S := asus-shutdown
@@ -97,6 +98,7 @@ install-program: install-asusd install-asus-shutdown install-asusctl install-asu
 install-data-rog_gui:
 	$(INSTALL_DATA) "./rog-control-center/data/$(BIN_ROG).desktop" "$(DESTDIR)$(datarootdir)/applications/$(BIN_ROG).desktop"
 	$(INSTALL_DATA) "./rog-control-center/data/$(BIN_ROG).png" "$(DESTDIR)$(datarootdir)/icons/hicolor/512x512/apps/$(BIN_ROG).png"
+	$(INSTALL_DATA) "./rog-control-center/data/$(APP_ID).metainfo.xml" "$(DESTDIR)$(datarootdir)/metainfo/$(APP_ID).metainfo.xml"
 	cd rog-aura/data/layouts && find . -type f -name "*.ron" -exec $(INSTALL_DATA) "{}" "$(DESTDIR_REALPATH)$(datarootdir)/rog-gui/layouts/{}" \;
 
 	$(INSTALL_DATA) "./data/icons/asus_notif_yellow.png" "$(DESTDIR)$(datarootdir)/icons/hicolor/512x512/apps/asus_notif_yellow.png"
@@ -134,6 +136,7 @@ uninstall:
 	rm -f "$(DESTDIR)$(bindir)/$(BIN_ROG)"
 	rm -f "$(DESTDIR)$(datarootdir)/applications/$(BIN_ROG).desktop"
 	rm -f "$(DESTDIR)$(datarootdir)/icons/hicolor/512x512/apps/$(BIN_ROG).png"
+	rm -f "$(DESTDIR)$(datarootdir)/metainfo/$(APP_ID).metainfo.xml"
 
 	rm -f "$(DESTDIR)$(bindir)/$(BIN_C)"
 	rm -f "$(DESTDIR)$(bindir)/$(BIN_D)"

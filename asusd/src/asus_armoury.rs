@@ -218,6 +218,14 @@ impl crate::Reloadable for AsusArmouryAttribute {
                 info!("Reload called on read-only attribute {name}: doing nothing");
                 AttrValue::None
             }
+            FirmwareAttributeType::Norestore => {
+                if config.armoury_settings.remove(&attribute).is_some() {
+                    info!("Removed stale persisted norestore attribute {name} from config");
+                    config.write();
+                }
+                info!("Reload called on norestore attribute {name}: doing nothing");
+                AttrValue::None
+            }
             _ => {
                 info!("Reload called on firmware attribute {name}");
                 match config.armoury_settings.get(&attribute) {
@@ -453,6 +461,16 @@ impl AsusArmouryAttribute {
                 self.queued_gpu.lock().await.insert(self.name(), value);
                 return Ok(());
             }
+            FirmwareAttributeType::Norestore => {
+                debug!("Setting norestore attribute {name} = {value} synchronously");
+                self.attr
+                    .set_current_value(&AttrValue::Integer(value))
+                    .map_err(|e| {
+                        error!("Could not set value {value} to attribute {name}: {e:?}");
+                        e
+                    })?;
+                return Ok(());
+            }
             _ => {
                 let mut settings = self.config.lock().await;
                 settings
@@ -657,6 +675,16 @@ pub async fn set_config_or_default(
                     changed = true;
                 }
                 // Never restore or apply read-only attributes
+            }
+            FirmwareAttributeType::Norestore => {
+                if config.armoury_settings.remove(&name).is_some() {
+                    info!(
+                        "Removed stale persisted norestore attribute {} from config",
+                        <&str>::from(name)
+                    );
+                    changed = true;
+                }
+                // Never restore or apply norestore attributes
             }
             _ => {
                 if let Some(saved_value) = config.armoury_settings.get(&name) {

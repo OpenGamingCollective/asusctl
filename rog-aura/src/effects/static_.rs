@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use super::EffectState;
 use crate::keyboard::{KeyLayout, LedCode};
-use crate::{effect_state_impl, Colour};
+use crate::Colour;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Static {
@@ -21,7 +21,17 @@ impl Static {
 }
 
 impl EffectState for Static {
-    effect_state_impl!();
+    fn get_colour(&self) -> Colour {
+        self.colour
+    }
+
+    fn get_led(&self) -> LedCode {
+        self.led
+    }
+
+    fn set_led(&mut self, address: LedCode) {
+        self.led = address;
+    }
 
     fn next_colour_state(&mut self, _layout: &KeyLayout) {}
 }

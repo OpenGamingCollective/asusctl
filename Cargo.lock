@@ -266,6 +266,7 @@ dependencies = [
  "rog_slash",
  "ron",
  "serde",
+ "thiserror 2.0.18",
  "tokio",
  "udev 0.8.0",
  "zbus",
@@ -285,6 +286,7 @@ dependencies = [
  "ron",
  "serde",
  "smol",
+ "thiserror 2.0.18",
  "zbus",
 ]
 
@@ -4704,6 +4706,7 @@ dependencies = [
  "serde",
  "slint",
  "slint-build",
+ "thiserror 2.0.18",
  "tokio",
  "zbus",
 ]
@@ -4719,6 +4722,7 @@ dependencies = [
  "pix",
  "png_pong",
  "serde",
+ "thiserror 2.0.18",
  "zbus",
 ]
 
@@ -4730,6 +4734,7 @@ dependencies = [
  "log",
  "ron",
  "serde",
+ "thiserror 2.0.18",
  "zbus",
 ]
 
@@ -4757,6 +4762,7 @@ dependencies = [
  "rusb",
  "serde",
  "serde_json",
+ "thiserror 2.0.18",
  "udev 0.8.0",
  "zbus",
 ]
@@ -4768,6 +4774,7 @@ dependencies = [
  "log",
  "rog_platform",
  "serde",
+ "thiserror 2.0.18",
  "udev 0.8.0",
  "zbus",
 ]
@@ -4779,6 +4786,7 @@ dependencies = [
  "ron",
  "serde",
  "sg",
+ "thiserror 2.0.18",
  "zbus",
 ]
 
@@ -4798,6 +4806,7 @@ version = "6.3.8"
 dependencies = [
  "dmi_id",
  "serde",
+ "thiserror 2.0.18",
  "zbus",
 ]
 

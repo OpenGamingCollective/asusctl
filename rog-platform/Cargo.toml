@@ -15,8 +15,8 @@ zbus.workspace = true
 concat-idents.workspace = true
 udev.workspace = true
 inotify.workspace = true
-
 rusb.workspace = true
+thiserror.workspace = true
 
 [dev-dependencies]
 serde_json = { version = "1.0", default-features = false, features = ["preserve_order"] }

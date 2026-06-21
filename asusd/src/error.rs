@@ -1,98 +1,101 @@
-use std::convert::From;
-use std::fmt;
-
 use config_traits::ron;
 use rog_anime::error::AnimeError;
 use rog_platform::error::PlatformError;
 use rog_profiles::error::ProfileError;
 use rog_slash::error::SlashError;
 
-#[derive(Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum RogError {
+    #[error("Parse gfx vendor error")]
     ParseVendor,
+
+    #[error("Parse LED error")]
     ParseLed,
+
+    #[error("Profile does not exist {0}")]
     MissingProfile(String),
-    Udev(String, std::io::Error),
-    Path(String, std::io::Error),
-    Read(String, std::io::Error),
-    Write(String, std::io::Error),
+
+    #[error("udev {0}: {1}")]
+    Udev(String, #[source] std::io::Error),
+
+    #[error("Path {0}: {1}")]
+    Path(String, #[source] std::io::Error),
+
+    #[error("Read {0}: {1}")]
+    Read(String, #[source] std::io::Error),
+
+    #[error("Write {0}: {1}")]
+    Write(String, #[source] std::io::Error),
+
+    #[error("Not supported")]
     NotSupported,
+
+    #[error("Not found: {0}")]
     NotFound(String),
+
+    #[error("Task error: {0}")]
     DoTask(String),
+
+    #[error("Missing functionality: {0}")]
     MissingFunction(String),
-    MissingLedBrightNode(String, std::io::Error),
+
+    #[error(
+        "Led node at {0} is missing, please check you have the required patch or dkms \
+         module installed: {1}"
+    )]
+    MissingLedBrightNode(String, #[source] std::io::Error),
+
+    #[error("Reload error: {0}")]
     ReloadFail(String),
-    Profiles(ProfileError),
+
+    #[error("Profile error: {0}")]
+    Profiles(#[source] ProfileError),
+
+    #[error("Initiramfs error: {0}")]
     Initramfs(String),
+
+    #[error("Modprobe error: {0}")]
     Modprobe(String),
-    Io(std::io::Error),
-    Zbus(zbus::Error),
+
+    #[error("std::io error: {0}")]
+    Io(#[source] std::io::Error),
+
+    #[error("Zbus error: {0}")]
+    Zbus(#[source] zbus::Error),
+
+    #[error("Invalid charging limit, not in range 20-100%: {0}")]
     ChargeLimit(u8),
+
+    #[error("Aura effect not supported")]
     AuraEffectNotSupported,
+
+    #[error("No supported Aura keyboard")]
     NoAuraKeyboard,
+
+    #[error("No Aura keyboard node found")]
     NoAuraNode,
-    Anime(AnimeError),
-    Slash(SlashError),
-    Platform(PlatformError),
+
+    #[error("AniMe Matrix error: {0}")]
+    Anime(#[source] AnimeError),
+
+    #[error("Slash error: {0}")]
+    Slash(#[source] SlashError),
+
+    #[error("Asus Platform error: {0}")]
+    Platform(#[source] PlatformError),
+
+    #[error("systemd unit action {0} failed")]
     SystemdUnitAction(String),
+
+    #[error("Timed out waiting for systemd unit change {0} state")]
     SystemdUnitWaitTimeout(String),
-    Command(String, std::io::Error),
-    ParseRon(ron::Error),
-}
 
-impl fmt::Display for RogError {
-    // This trait requires `fmt` with this exact signature.
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            RogError::ParseVendor => write!(f, "Parse gfx vendor error"),
-            RogError::ParseLed => write!(f, "Parse LED error"),
-            RogError::MissingProfile(profile) => write!(f, "Profile does not exist {}", profile),
-            RogError::Udev(deets, error) => write!(f, "udev {}: {}", deets, error),
-            RogError::Path(path, error) => write!(f, "Path {}: {}", path, error),
-            RogError::Read(path, error) => write!(f, "Read {}: {}", path, error),
-            RogError::Write(path, error) => write!(f, "Write {}: {}", path, error),
-            RogError::NotSupported => write!(f, "Not supported"),
-            RogError::NotFound(deets) => write!(f, "Not found: {}", deets),
-            RogError::DoTask(deets) => write!(f, "Task error: {}", deets),
-            RogError::MissingFunction(deets) => write!(f, "Missing functionality: {}", deets),
-            RogError::MissingLedBrightNode(path, error) => write!(
-                f,
-                "Led node at {} is missing, please check you have the required patch or dkms \
-                 module installed: {}",
-                path, error
-            ),
-            RogError::ReloadFail(deets) => write!(f, "Reload error: {}", deets),
-            RogError::Profiles(deets) => write!(f, "Profile error: {}", deets),
-            RogError::Initramfs(detail) => write!(f, "Initiramfs error: {}", detail),
-            RogError::Modprobe(detail) => write!(f, "Modprobe error: {}", detail),
-            RogError::Io(detail) => write!(f, "std::io error: {}", detail),
-            RogError::Zbus(detail) => write!(f, "Zbus error: {}", detail),
-            RogError::ChargeLimit(value) => {
-                write!(f, "Invalid charging limit, not in range 20-100%: {}", value)
-            }
-            RogError::AuraEffectNotSupported => write!(f, "Aura effect not supported"),
-            RogError::NoAuraKeyboard => write!(f, "No supported Aura keyboard"),
-            RogError::NoAuraNode => write!(f, "No Aura keyboard node found"),
-            RogError::Anime(deets) => write!(f, "AniMe Matrix error: {}", deets),
-            RogError::Slash(deets) => write!(f, "Slash error: {}", deets),
-            RogError::Platform(deets) => write!(f, "Asus Platform error: {}", deets),
-            RogError::SystemdUnitAction(action) => {
-                write!(f, "systemd unit action {} failed", action)
-            }
-            RogError::SystemdUnitWaitTimeout(state) => {
-                write!(
-                    f,
-                    "Timed out waiting for systemd unit change {} state",
-                    state
-                )
-            }
-            RogError::Command(func, error) => write!(f, "Command exec error: {}: {}", func, error),
-            RogError::ParseRon(error) => write!(f, "Parse config error: {}", error),
-        }
-    }
-}
+    #[error("Command exec error: {0}: {1}")]
+    Command(String, #[source] std::io::Error),
 
-impl std::error::Error for RogError {}
+    #[error("Parse config error: {0}")]
+    ParseRon(#[source] ron::Error),
+}
 
 impl From<ProfileError> for RogError {
     fn from(err: ProfileError) -> Self {
@@ -137,15 +140,13 @@ impl From<ron::Error> for RogError {
 }
 
 impl From<RogError> for zbus::fdo::Error {
-    #[inline]
     fn from(err: RogError) -> Self {
-        zbus::fdo::Error::Failed(format!("{}", err))
+        zbus::fdo::Error::Failed(err.to_string())
     }
 }
 
 impl From<RogError> for zbus::Error {
-    #[inline]
     fn from(err: RogError) -> Self {
-        zbus::Error::Failure(format!("{}", err))
+        zbus::Error::Failure(err.to_string())
     }
 }
