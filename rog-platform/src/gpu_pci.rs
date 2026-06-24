@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str::FromStr;
 
-use log::{debug, info, trace, warn};
+use log::{info, trace, warn};
 use serde::{Deserialize, Serialize};
 use zbus::zvariant::{OwnedValue, Type, Value};
 
@@ -240,7 +240,7 @@ impl Device {
             PlatformError::Udev("scan_devices failed".into(), err)
         })? {
             let sysname = device.sysname().to_string_lossy();
-            debug!("Looking at PCI device {:?}", sysname);
+            trace!("Looking at PCI device {:?}", sysname);
             if let Some(id) = device.property_value("PCI_ID") {
                 if let Some(class) = device.property_value("PCI_CLASS") {
                     let id = id.to_string_lossy();
@@ -254,20 +254,20 @@ impl Device {
                             let displays =
                                 find_connected_displays(device.syspath()).unwrap_or_default();
                             if !displays.contains(&"eDP-1".to_string()) {
-                                info!(
+                                trace!(
                                     "Matched dGPU {id} at {:?} by checking display connections",
                                     device.sysname()
                                 );
                                 dgpu = class.starts_with("30")
                                     && (id.starts_with("10DE") || id.starts_with("1002"));
                             } else {
-                                info!(
+                                trace!(
                                     "Device {id} at {:?} appears to be the iGPU",
                                     device.sysname()
                                 );
                             }
                             if !dgpu && id.starts_with("1002") {
-                                debug!(
+                                trace!(
                                     "Found dGPU Device {id} without boot_vga attribute at {:?}",
                                     device.sysname()
                                 );
@@ -278,7 +278,7 @@ impl Device {
                                 let hwmon_n_opt = match dev_path.read_dir() {
                                     Ok(mut entries) => entries.next(),
                                     Err(e) => {
-                                        debug!("Error reading hwmon directory: {}", e);
+                                        trace!("Error reading hwmon directory: {}", e);
                                         None
                                     }
                                 };
@@ -292,13 +292,13 @@ impl Device {
                             if !dgpu {
                                 if let Some(label) = device.property_value("ID_MODEL_FROM_DATABASE")
                                 {
-                                    debug!(
+                                    trace!(
                                         "Found ID_MODEL_FROM_DATABASE property {id} at {:?} : {label:?}",
                                         device.sysname()
                                     );
                                     dgpu = lscpi_dgpu_check(&label.to_string_lossy());
                                 } else {
-                                    debug!(
+                                    trace!(
                                         "Didn't find dGPU with standard methods, using last resort for id:{id} at {:?}",
                                         device.sysname()
                                     );
