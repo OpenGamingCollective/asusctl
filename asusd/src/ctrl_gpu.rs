@@ -165,8 +165,8 @@ impl CtrlGpu {
     /// Spawn the inotify watcher for GPU power status changes.
     ///
     /// This watches the dGPU's `runtime_status` sysfs file. If no dGPU path
-    /// is available (e.g. dGPU disabled via ASUS attribute), we fall back to
-    /// periodic re-detection every 3 seconds to handle hotplug scenarios.
+    /// is available (e.g. dGPU disabled via ASUS attribute), the watcher will
+    /// wait for a PCI hotplug event via udev to re-detect the GPU.
     pub async fn start_watcher(&self, signal_ctxt: SignalEmitter<'static>) -> Result<(), RogError> {
         let ctrl = self.clone();
 
@@ -258,20 +258,51 @@ impl CtrlGpu {
                     continue;
                 }
 
-                // Fallback: periodic re-detection (for when no inotify path is available)
-                info!("CtrlGpu: starting periodic re-detection (every 3s)");
-                loop {
-                    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                // No dGPU path available, wait for PCI hotplug event via udev
+                info!("CtrlGpu: waiting for PCI hotplug event via udev...");
+                let hotplugged = tokio::task::spawn_blocking(move || {
+                    let monitor = match udev::MonitorBuilder::new() {
+                        Ok(builder) => match builder.match_subsystem("pci") {
+                            Ok(builder) => match builder.listen() {
+                                Ok(m) => m,
+                                Err(e) => {
+                                    error!("CtrlGpu: failed to listen to udev: {e}");
+                                    return false;
+                                }
+                            },
+                            Err(e) => {
+                                error!("CtrlGpu: failed to match subsystem: {e}");
+                                return false;
+                            }
+                        },
+                        Err(e) => {
+                            error!("CtrlGpu: failed to create MonitorBuilder: {e}");
+                            return false;
+                        }
+                    };
+
+                    for event in monitor.iter() {
+                        if let Some(action) = event.action() {
+                            if action.to_str() == Some("add") {
+                                info!("CtrlGpu: PCI device added");
+                                return true;
+                            }
+                        }
+                    }
+                    false
+                })
+                .await
+                .unwrap_or(false);
+
+                if hotplugged {
                     if ctrl.redetect() {
                         let status_str: &str = (&ctrl.power_status).into();
                         let _ = signal_ctxt
                             .emit("xyz.ljones.Gpu", "PowerStatusChanged", &(status_str,))
                             .await;
                     }
-                    if ctrl.dgpu_runtime_status_path.is_some() {
-                        info!("CtrlGpu: dGPU runtime_status restored, switching back to inotify");
-                        break;
-                    }
+                } else {
+                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                 }
             }
         });
