@@ -168,24 +168,23 @@ impl CtrlGpu {
     /// is available (e.g. dGPU disabled via ASUS attribute), we fall back to
     /// periodic re-detection every 3 seconds to handle hotplug scenarios.
     pub async fn start_watcher(&self, signal_ctxt: SignalEmitter<'static>) -> Result<(), RogError> {
-        let ctrl_inotify = self.clone();
-        let ctrl_fallback = self.clone();
-        let path = self.dgpu_runtime_status_path.clone();
+        let ctrl = self.clone();
 
         tokio::spawn(async move {
-            if let Some(runtime_path) = path {
-                // inotify-based monitoring of the runtime_status sysfs file
-                info!("CtrlGpu: starting inotify watcher on {:?}", runtime_path);
-                let mut ctrl = ctrl_inotify;
-                let mut buffer = [0u8; 32];
+            let mut ctrl = ctrl;
 
-                loop {
+            loop {
+                if let Some(runtime_path) = ctrl.dgpu_runtime_status_path.clone() {
+                    // inotify-based monitoring of the runtime_status sysfs file
+                    info!("CtrlGpu: starting inotify watcher on {:?}", runtime_path);
+                    let mut buffer = [0u8; 32];
+
                     let inotify = match inotify::Inotify::init() {
                         Ok(i) => i,
                         Err(e) => {
                             error!("CtrlGpu: failed to init inotify: {e}");
-                            // Fall back to polling
-                            break;
+                            tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                            continue;
                         }
                     };
 
@@ -204,7 +203,6 @@ impl CtrlGpu {
                                 .emit("xyz.ljones.Gpu", "PowerStatusChanged", &(status_str,))
                                 .await;
                         }
-                        // Wait a bit before retrying
                         tokio::time::sleep(std::time::Duration::from_secs(3)).await;
                         continue;
                     }
@@ -250,20 +248,30 @@ impl CtrlGpu {
                             }
                         }
                     }
-                }
-            }
 
-            // Fallback: periodic re-detection (for when no inotify path is available,
-            // or when inotify loop exited)
-            info!("CtrlGpu: starting periodic re-detection (every 3s)");
-            let mut ctrl = ctrl_fallback;
-            loop {
-                tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-                if ctrl.redetect() {
-                    let status_str: &str = (&ctrl.power_status).into();
-                    let _ = signal_ctxt
-                        .emit("xyz.ljones.Gpu", "PowerStatusChanged", &(status_str,))
-                        .await;
+                    if ctrl.redetect() {
+                        let status_str: &str = (&ctrl.power_status).into();
+                        let _ = signal_ctxt
+                            .emit("xyz.ljones.Gpu", "PowerStatusChanged", &(status_str,))
+                            .await;
+                    }
+                    continue;
+                }
+
+                // Fallback: periodic re-detection (for when no inotify path is available)
+                info!("CtrlGpu: starting periodic re-detection (every 3s)");
+                loop {
+                    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                    if ctrl.redetect() {
+                        let status_str: &str = (&ctrl.power_status).into();
+                        let _ = signal_ctxt
+                            .emit("xyz.ljones.Gpu", "PowerStatusChanged", &(status_str,))
+                            .await;
+                    }
+                    if ctrl.dgpu_runtime_status_path.is_some() {
+                        info!("CtrlGpu: dGPU runtime_status restored, switching back to inotify");
+                        break;
+                    }
                 }
             }
         });
