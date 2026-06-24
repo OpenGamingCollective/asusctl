@@ -49,6 +49,14 @@ impl CtrlGpu {
     fn detect_gpu() -> (GfxPower, GfxVendor, Option<std::path::PathBuf>) {
         use rog_platform::gpu_pci::Device;
 
+        // Check ASUS dgpu_disable first. If the dGPU is disabled, it won't appear on the PCI bus.
+        if rog_platform::gpu_pci::asus_dgpu_disable_exists() {
+            if let Ok(true) = rog_platform::gpu_pci::asus_dgpu_disabled() {
+                return (GfxPower::AsusDisabled, GfxVendor::AsusDgpuDisabled, None);
+            }
+        }
+
+        // dGPU is not disabled, scan PCI bus to find it
         let devices = Device::find().unwrap_or_default();
 
         if let Some(dgpu) = devices.iter().find(|d| d.is_dgpu()) {
@@ -69,14 +77,7 @@ impl CtrlGpu {
             return (GfxPower::Unknown, vendor, runtime_path);
         }
 
-        // No dGPU devices — check ASUS-specific attributes
-        if rog_platform::gpu_pci::asus_dgpu_disable_exists() {
-            if let Ok(disabled) = rog_platform::gpu_pci::asus_dgpu_disabled() {
-                if disabled {
-                    return (GfxPower::AsusDisabled, GfxVendor::AsusDgpuDisabled, None);
-                }
-            }
-        }
+        // No dGPU found, check if we're in MUX discreet mode
         if rog_platform::gpu_pci::asus_gpu_mux_exists() {
             if let Ok(discreet) = rog_platform::gpu_pci::asus_gpu_mux_discreet() {
                 if discreet {
@@ -225,26 +226,22 @@ impl CtrlGpu {
                                     warn!("CtrlGpu: runtime_status deleted, re-detecting");
                                     break;
                                 }
-                                // Read new power status
-                                if let Some(dgpu) = rog_platform::gpu_pci::Device::find()
-                                    .unwrap_or_default()
-                                    .iter()
-                                    .find(|d| d.is_dgpu())
-                                {
-                                    if let Ok(new_power) = dgpu.get_runtime_status() {
-                                        if new_power != ctrl.power_status {
-                                            info!("CtrlGpu: power status changed to {new_power:?}");
-                                            ctrl.power_status = new_power;
-                                            let status_str: &str = (&ctrl.power_status).into();
-                                            let _ = signal_ctxt
-                                                .emit(
-                                                    "xyz.ljones.Gpu",
-                                                    "PowerStatusChanged",
-                                                    &(status_str,),
-                                                )
-                                                .await;
-                                        }
-                                    }
+                                // Read new power status directly from sysfs
+                                let new_power = std::fs::read_to_string(&runtime_path)
+                                    .ok()
+                                    .and_then(|s| s.parse::<GfxPower>().ok())
+                                    .unwrap_or(GfxPower::Unknown);
+                                if new_power != ctrl.power_status {
+                                    info!("CtrlGpu: power status changed to {new_power:?}");
+                                    ctrl.power_status = new_power;
+                                    let status_str: &str = (&ctrl.power_status).into();
+                                    let _ = signal_ctxt
+                                        .emit(
+                                            "xyz.ljones.Gpu",
+                                            "PowerStatusChanged",
+                                            &(status_str,),
+                                        )
+                                        .await;
                                 }
                             }
                             Err(e) => {
