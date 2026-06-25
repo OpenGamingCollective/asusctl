@@ -502,6 +502,22 @@ impl AsusArmouryAttribute {
         // write config after setting value
         self.config.lock().await.write();
 
+        // When an nv_* attribute (Nvidia TDP/temp) is written, restart
+        // nvidia-powerd so it re-reads the new TDP limits from hardware.
+        match self.name() {
+            FirmwareAttribute::NvDynamicBoost
+            | FirmwareAttribute::NvTempTarget
+            | FirmwareAttribute::DgpuTgp => {
+                let _ = std::process::Command::new("systemctl")
+                    .args([
+                        "try-restart",
+                        "nvidia-powerd.service",
+                    ])
+                    .output();
+            }
+            _ => {}
+        }
+
         Ok(())
     }
 

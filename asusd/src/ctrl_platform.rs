@@ -290,6 +290,58 @@ impl CtrlPlatform {
         configured
     }
 
+    /// Manage nvidia-powerd service based on current power state and config.
+    /// When transitioning to battery with `disable_nvidia_powerd_on_battery = true`,
+    /// stop nvidia-powerd. When transitioning back to AC, restart it (if it was
+    /// previously stopped and the service unit is enabled on the system).
+    async fn manage_nvidia_powerd(&self, power_plugged: bool) {
+        let disable_on_battery = self.config.lock().await.disable_nvidia_powerd_on_battery;
+        if !disable_on_battery {
+            // When the toggle is off, attempt to ensure nvidia-powerd is running
+            // (it may have been stopped earlier by a previous battery session).
+            if power_plugged {
+                let _ = Command::new("systemctl")
+                    .args([
+                        "start",
+                        "nvidia-powerd.service",
+                    ])
+                    .output();
+            }
+            return;
+        }
+
+        if power_plugged {
+            // AC: start nvidia-powerd if it was stopped on battery
+            let _ = Command::new("systemctl")
+                .args([
+                    "start",
+                    "nvidia-powerd.service",
+                ])
+                .output();
+        } else {
+            // Battery: stop nvidia-powerd
+            let _ = Command::new("systemctl")
+                .args([
+                    "stop",
+                    "nvidia-powerd.service",
+                ])
+                .output();
+        }
+    }
+
+    /// Restart nvidia-powerd if the service unit exists on the system.
+    /// Called after nv_* attribute writes to apply new GPU TDP settings.
+    pub async fn restart_nvidia_powerd() {
+        // Check if the service is enabled by trying to start it; if the unit
+        // doesn't exist systemctl will report an error which we silently ignore.
+        let _ = Command::new("systemctl")
+            .args([
+                "try-restart",
+                "nvidia-powerd.service",
+            ])
+            .output();
+    }
+
     async fn update_policy_ac_or_bat(&self, power_plugged: bool, change_epp: bool) {
         if power_plugged && !self.config.lock().await.change_platform_profile_on_ac {
             debug!(
@@ -639,6 +691,22 @@ impl CtrlPlatform {
         Ok(())
     }
 
+    /// Whether nvidia-powerd should be stopped when switching to battery
+    #[zbus(property)]
+    async fn disable_nvidia_powerd_on_battery(&self) -> Result<bool, FdoErr> {
+        Ok(self.config.lock().await.disable_nvidia_powerd_on_battery)
+    }
+
+    #[zbus(property)]
+    async fn set_disable_nvidia_powerd_on_battery(
+        &mut self,
+        disable: bool,
+    ) -> Result<(), zbus::Error> {
+        self.config.lock().await.disable_nvidia_powerd_on_battery = disable;
+        self.config.lock().await.write();
+        Ok(())
+    }
+
     /// Set if the PPT tuning group for the current profile is enabled
     #[zbus(property)]
     async fn enable_ppt_group(&self) -> Result<bool, FdoErr> {
@@ -941,6 +1009,7 @@ impl CtrlTask for CtrlPlatform {
                             .await;
                     }
                     platform3.run_ac_or_bat_cmd(power_plugged).await;
+                    platform3.manage_nvidia_powerd(power_plugged).await;
                     // In case one-shot charge was used, restore the old charge limit
                     if platform3.power.has_charge_control_end_threshold() && !power_plugged {
                         platform3.restore_charge_limit().await;

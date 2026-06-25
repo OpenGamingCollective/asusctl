@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use log::error;
 use rog_dbus::asus_armoury::AsusArmouryProxy;
+use rog_dbus::zbus_platform::PlatformProxy;
 use rog_dbus::zbus_xgm_led::XgmLedProxy;
 use rog_platform::asus_armoury::FirmwareAttribute;
 use slint::{ComponentHandle, SharedString, Weak};
@@ -348,5 +349,76 @@ pub fn setup_gpu_page(ui: &MainWindow) {
                 }
             });
         }
+
+        // --- Disable nvidia-powerd on battery ---
+        let platform_proxy = match zbus::Connection::system().await {
+            Ok(conn) => match PlatformProxy::builder(&conn).build().await {
+                Ok(p) => p,
+                Err(e) => {
+                    error!("setup_gpu: failed to create PlatformProxy: {e:?}");
+                    return;
+                }
+            },
+            Err(e) => {
+                error!("setup_gpu: failed to connect to system bus: {e:?}");
+                return;
+            }
+        };
+
+        // Read initial value
+        let initial = platform_proxy
+            .disable_nvidia_powerd_on_battery()
+            .await
+            .unwrap_or(true);
+        handle
+            .upgrade_in_event_loop(move |h| {
+                h.global::<GPUPageData>()
+                    .set_disable_nvidia_powerd_on_battery(initial);
+            })
+            .ok();
+
+        // Wire callback
+        let proxy_cb = platform_proxy.clone();
+        let handle_cb = handle.clone();
+        handle
+            .upgrade_in_event_loop(move |h| {
+                h.global::<GPUPageData>()
+                    .on_cb_disable_nvidia_powerd_on_battery(move |value| {
+                        let p = proxy_cb.clone();
+                        let w = handle_cb.clone();
+                        tokio::spawn(async move {
+                            let res = p.set_disable_nvidia_powerd_on_battery(value).await;
+                            show_toast(
+                                SharedString::from("Updated nvidia-powerd on-battery setting"),
+                                SharedString::from(
+                                    "Failed to update nvidia-powerd on-battery setting",
+                                ),
+                                w,
+                                res,
+                            );
+                        });
+                    });
+            })
+            .ok();
+
+        // Listen for external changes
+        let proxy_stream = platform_proxy.clone();
+        let handle_stream = handle.clone();
+        tokio::spawn(async move {
+            use futures_util::StreamExt;
+            let mut stream = proxy_stream
+                .receive_disable_nvidia_powerd_on_battery_changed()
+                .await;
+            while let Some(e) = stream.next().await {
+                if let Ok(value) = e.get().await {
+                    handle_stream
+                        .upgrade_in_event_loop(move |h| {
+                            h.global::<GPUPageData>()
+                                .set_disable_nvidia_powerd_on_battery(value);
+                        })
+                        .ok();
+                }
+            }
+        });
     });
 }

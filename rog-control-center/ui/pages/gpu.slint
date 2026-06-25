@@ -14,6 +14,9 @@ export global GPUPageData {
     in-out property <bool> xgm_led_enabled: false; // current LED state
     callback cb_set_xgm_led_enabled(bool);
 
+    in-out property <bool> disable_nvidia_powerd_on_battery: true;
+    callback cb_disable_nvidia_powerd_on_battery(bool);
+
     in-out property <int> apu_mem_index: -1; // -1 when apu_mem is not available
     in-out property <[string]> apu_mem_choices: []; // available choices, in display order
     in-out property <bool> apu_mem_present: false; // false when apu_mem is not available
@@ -110,6 +113,19 @@ export component PageGPU inherits Rectangle {
                     checked <=> GPUPageData.xgm_led_enabled;
                     toggled(checked) => {
                         GPUPageData.cb_set_xgm_led_enabled(checked);
+                    }
+                }
+            }
+
+            // Disable nvidia-powerd on battery toggle
+            HorizontalLayout {
+                padding-right: 10px;
+                padding-left: 10px;
+                SystemToggle {
+                    text: @tr("Disable nvidia-powerd on battery");
+                    checked <=> GPUPageData.disable_nvidia_powerd_on_battery;
+                    toggled(checked) => {
+                        GPUPageData.cb_disable_nvidia_powerd_on_battery(checked);
                     }
                 }
             }

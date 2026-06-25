@@ -82,17 +82,23 @@ impl AuraPowerState {
         if self.sleep {
             a |= OldAuraPower::Sleep as u32;
         }
-        if matches!(
-            self.zone,
-            PowerZones::Keyboard | PowerZones::KeyboardAndLightbar
-        ) {
-            a |= OldAuraPower::Keyboard as u32;
-        }
-        if matches!(
-            self.zone,
-            PowerZones::Lightbar | PowerZones::KeyboardAndLightbar
-        ) {
-            a |= OldAuraPower::Lightbar as u32;
+        // Zone bits (Keyboard, Lightbar) should only be set when the zone
+        // is actually active (awake). Otherwise OR'ing multiple per-zone
+        // states together would always include zone bits from "off" states,
+        // making it impossible to turn off a zone independently.
+        if self.awake {
+            if matches!(
+                self.zone,
+                PowerZones::Keyboard | PowerZones::KeyboardAndLightbar
+            ) {
+                a |= OldAuraPower::Keyboard as u32;
+            }
+            if matches!(
+                self.zone,
+                PowerZones::Lightbar | PowerZones::KeyboardAndLightbar
+            ) {
+                a |= OldAuraPower::Lightbar as u32;
+            }
         }
         vec![
             ((a & 0xff0000) >> 16) as u8,

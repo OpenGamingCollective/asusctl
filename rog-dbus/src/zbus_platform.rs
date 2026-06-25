@@ -116,4 +116,12 @@ pub trait Platform {
     /// Set if the PPT tuning group for the current profile is enabled
     #[zbus(property)]
     fn set_enable_ppt_group(&self, enable: bool) -> zbus::Result<()>;
+
+    /// Whether nvidia-powerd should be stopped when switching to battery.
+    #[zbus(property)]
+    fn disable_nvidia_powerd_on_battery(&self) -> zbus::Result<bool>;
+
+    /// Whether nvidia-powerd should be stopped when switching to battery.
+    #[zbus(property)]
+    fn set_disable_nvidia_powerd_on_battery(&self, value: bool) -> zbus::Result<()>;
 }
