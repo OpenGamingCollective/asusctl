@@ -252,7 +252,6 @@ dependencies = [
  "config-traits",
  "dmi_id",
  "env_logger",
- "futures-lite",
  "futures-util",
  "inotify",
  "log",

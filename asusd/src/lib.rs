@@ -23,7 +23,7 @@ use std::future::Future;
 use std::time::Duration;
 
 use dmi_id::DMIID;
-use futures_lite::stream::StreamExt;
+use futures_util::stream::StreamExt;
 use log::{debug, info, warn};
 use logind_zbus::manager::ManagerProxy;
 use tokio::time::sleep;

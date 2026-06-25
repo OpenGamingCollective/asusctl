@@ -22,7 +22,6 @@ rog_scsi = { path = "../rog-scsi", features = ["dbus"] }
 rog_platform = { path = "../rog-platform" }
 rog_profiles = { path = "../rog-profiles" }
 dmi_id = { path = "../dmi-id" }
-futures-lite = "*"
 udev.workspace = true
 inotify.workspace = true
 

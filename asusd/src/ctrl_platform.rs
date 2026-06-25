@@ -1057,7 +1057,7 @@ impl CtrlTask for CtrlPlatform {
         // moved to zbus
         let attrs = FirmwareAttributes::new();
         tokio::spawn(async move {
-            use futures_lite::StreamExt;
+            use futures_util::StreamExt;
             let mut buffer = [0; 32];
             if let Ok(mut stream) = watch_platform_profile.into_event_stream(&mut buffer) {
                 while (stream.next().await).is_some() {
