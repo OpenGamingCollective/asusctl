@@ -270,11 +270,11 @@ pub trait CtrlTask {
                 let mut last_power = manager3.on_external_power().await.unwrap_or_default();
 
                 loop {
-                    if let Ok(next) = manager3.on_external_power().await {
-                        if next != last_power {
-                            last_power = next;
-                            on_external_power_change(next).await;
-                        }
+                    if let Ok(next) = manager3.on_external_power().await
+                        && next != last_power
+                    {
+                        last_power = next;
+                        on_external_power_change(next).await;
                     }
                     sleep(Duration::from_secs(2)).await;
                 }
@@ -284,11 +284,11 @@ pub trait CtrlTask {
                 let mut last_lid = manager.lid_closed().await.unwrap_or_default();
                 // need to loop on these as they don't emit signals
                 loop {
-                    if let Ok(next) = manager.lid_closed().await {
-                        if next != last_lid {
-                            last_lid = next;
-                            on_lid_change(next).await;
-                        }
+                    if let Ok(next) = manager.lid_closed().await
+                        && next != last_lid
+                    {
+                        last_lid = next;
+                        on_lid_change(next).await;
                     }
                     sleep(Duration::from_secs(2)).await;
                 }

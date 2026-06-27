@@ -127,83 +127,68 @@ impl DeviceManager {
         handles: Arc<Mutex<HashMap<String, Arc<Mutex<HidRaw>>>>>,
     ) -> Result<Vec<AsusDevice>, RogError> {
         let mut devices = Vec::new();
-        if let Some(usb_device) = device.parent_with_subsystem_devtype("usb", "usb_device")? {
-            if let Some(usb_id) = usb_device.attribute_value("idProduct") {
-                if let Some(vendor_id) = usb_device.attribute_value("idVendor") {
-                    if vendor_id != "0b05" {
-                        debug!("Not ASUS vendor ID: {}", vendor_id.to_string_lossy());
-                        return Ok(devices);
-                    }
-                    // Almost all devices are identified by the productId.
-                    // So let's see what we have and:
-                    // 1. Generate an interface path
-                    // 2. Create the device
-                    // Use the top-level endpoint, not the parent
-                    if let Ok((dev, hid_key)) =
-                        Self::get_or_create_hid_handle(&handles, &device).await
-                    {
-                        debug!("Testing device {usb_id:?}");
-                        // SLASH DEVICE
-                        if let Ok(dev_type) = DeviceHandle::new_slash_hid(
-                            dev.clone(),
-                            usb_id.to_str().unwrap_or_default(),
-                        )
+        if let Some(usb_device) = device.parent_with_subsystem_devtype("usb", "usb_device")?
+            && let Some(usb_id) = usb_device.attribute_value("idProduct")
+            && let Some(vendor_id) = usb_device.attribute_value("idVendor")
+        {
+            if vendor_id != "0b05" {
+                debug!("Not ASUS vendor ID: {}", vendor_id.to_string_lossy());
+                return Ok(devices);
+            }
+            // Almost all devices are identified by the productId.
+            // So let's see what we have and:
+            // 1. Generate an interface path
+            // 2. Create the device
+            // Use the top-level endpoint, not the parent
+            if let Ok((dev, hid_key)) = Self::get_or_create_hid_handle(&handles, &device).await {
+                debug!("Testing device {usb_id:?}");
+                // SLASH DEVICE
+                if let Ok(dev_type) =
+                    DeviceHandle::new_slash_hid(dev.clone(), usb_id.to_str().unwrap_or_default())
                         .await
-                        {
-                            if let DeviceHandle::Slash(slash) = dev_type.clone() {
-                                let path =
-                                    dbus_path_for_dev(&usb_device).unwrap_or(dbus_path_for_slash());
-                                let ctrl = SlashZbus::new(slash);
-                                ctrl.start_tasks(connection, path.clone()).await.unwrap();
-                                devices.push(AsusDevice {
-                                    device: dev_type,
-                                    dbus_path: path,
-                                    hid_key: Some(hid_key.clone()),
-                                });
-                            }
-                        }
-                        // ANIME MATRIX DEVICE
-                        if let Ok(dev_type) = DeviceHandle::maybe_anime_hid(
-                            dev.clone(),
-                            usb_id.to_str().unwrap_or_default(),
-                        )
-                        .await
-                        {
-                            if let DeviceHandle::AniMe(anime) = dev_type.clone() {
-                                let path =
-                                    dbus_path_for_dev(&usb_device).unwrap_or(dbus_path_for_anime());
-                                let ctrl = AniMeZbus::new(anime);
-                                ctrl.start_tasks(connection, path.clone()).await.unwrap();
-                                devices.push(AsusDevice {
-                                    device: dev_type,
-                                    dbus_path: path,
-                                    hid_key: Some(hid_key.clone()),
-                                });
-                            }
-                        }
-                        // AURA LAPTOP DEVICE
-                        if let Ok(dev_type) = DeviceHandle::maybe_laptop_aura(
-                            Some(dev),
-                            usb_id.to_str().unwrap_or_default(),
-                        )
-                        .await
-                        {
-                            if let DeviceHandle::Aura(aura) = dev_type.clone() {
-                                let path =
-                                    dbus_path_for_dev(&usb_device).unwrap_or(dbus_path_for_tuf());
-                                let ctrl = AuraZbus::new(aura);
-                                ctrl.start_tasks(connection, path.clone()).await.unwrap();
-                                devices.push(AsusDevice {
-                                    device: dev_type,
-                                    dbus_path: path,
-                                    hid_key: Some(hid_key),
-                                });
-                            }
-                        }
-                    } else {
-                        warn!("Failed to initialise shared hid handle for {usb_id:?}");
-                    }
+                    && let DeviceHandle::Slash(slash) = dev_type.clone()
+                {
+                    let path = dbus_path_for_dev(&usb_device).unwrap_or(dbus_path_for_slash());
+                    let ctrl = SlashZbus::new(slash);
+                    ctrl.start_tasks(connection, path.clone()).await.unwrap();
+                    devices.push(AsusDevice {
+                        device: dev_type,
+                        dbus_path: path,
+                        hid_key: Some(hid_key.clone()),
+                    });
                 }
+                // ANIME MATRIX DEVICE
+                if let Ok(dev_type) =
+                    DeviceHandle::maybe_anime_hid(dev.clone(), usb_id.to_str().unwrap_or_default())
+                        .await
+                    && let DeviceHandle::AniMe(anime) = dev_type.clone()
+                {
+                    let path = dbus_path_for_dev(&usb_device).unwrap_or(dbus_path_for_anime());
+                    let ctrl = AniMeZbus::new(anime);
+                    ctrl.start_tasks(connection, path.clone()).await.unwrap();
+                    devices.push(AsusDevice {
+                        device: dev_type,
+                        dbus_path: path,
+                        hid_key: Some(hid_key.clone()),
+                    });
+                }
+                // AURA LAPTOP DEVICE
+                if let Ok(dev_type) =
+                    DeviceHandle::maybe_laptop_aura(Some(dev), usb_id.to_str().unwrap_or_default())
+                        .await
+                    && let DeviceHandle::Aura(aura) = dev_type.clone()
+                {
+                    let path = dbus_path_for_dev(&usb_device).unwrap_or(dbus_path_for_tuf());
+                    let ctrl = AuraZbus::new(aura);
+                    ctrl.start_tasks(connection, path.clone()).await.unwrap();
+                    devices.push(AsusDevice {
+                        device: dev_type,
+                        dbus_path: path,
+                        hid_key: Some(hid_key),
+                    });
+                }
+            } else {
+                warn!("Failed to initialise shared hid handle for {usb_id:?}");
             }
         }
         Ok(devices)
@@ -237,13 +222,12 @@ impl DeviceManager {
         {
             // Only deduplicate ASUS devices; non-ASUS multi-interface devices are unaffected.
             if let Ok(Some(usb_parent)) = device.parent_with_subsystem_devtype("usb", "usb_device")
+                && usb_parent.attribute_value("idVendor") == Some(std::ffi::OsStr::new("0b05"))
             {
-                if usb_parent.attribute_value("idVendor") == Some(std::ffi::OsStr::new("0b05")) {
-                    let syspath = usb_parent.syspath().to_string_lossy().to_string();
-                    if !seen_usb_parents.insert(syspath) {
-                        debug!("Skipping duplicate hidraw for USB parent already processed");
-                        continue;
-                    }
+                let syspath = usb_parent.syspath().to_string_lossy().to_string();
+                if !seen_usb_parents.insert(syspath) {
+                    debug!("Skipping duplicate hidraw for USB parent already processed");
+                    continue;
                 }
             }
             devices.append(&mut Self::init_hid_devices(connection, device, handles.clone()).await?);
@@ -259,25 +243,24 @@ impl DeviceManager {
     ) -> Option<AsusDevice> {
         // "ID_MODEL_ID" "1932"
         // "ID_VENDOR_ID" "0b05"
-        if dev_prop_matches(device, "ID_VENDOR_ID", "0b05") {
-            if let Some(dev_node) = device.devnode() {
-                let prod_id = device
-                    .property_value("ID_MODEL_ID")
-                    .unwrap_or_default()
-                    .to_string_lossy();
-                if let Ok(dev_type) =
-                    DeviceHandle::maybe_scsi(dev_node.as_os_str().to_str().unwrap(), &prod_id).await
-                {
-                    if let DeviceHandle::Scsi(scsi) = dev_type.clone() {
-                        let ctrl = ScsiZbus::new(scsi);
-                        ctrl.start_tasks(connection, path.clone()).await.unwrap();
-                        return Some(AsusDevice {
-                            device: dev_type,
-                            dbus_path: path,
-                            hid_key: None,
-                        });
-                    }
-                }
+        if dev_prop_matches(device, "ID_VENDOR_ID", "0b05")
+            && let Some(dev_node) = device.devnode()
+        {
+            let prod_id = device
+                .property_value("ID_MODEL_ID")
+                .unwrap_or_default()
+                .to_string_lossy();
+            if let Ok(dev_type) =
+                DeviceHandle::maybe_scsi(dev_node.as_os_str().to_str().unwrap(), &prod_id).await
+                && let DeviceHandle::Scsi(scsi) = dev_type.clone()
+            {
+                let ctrl = ScsiZbus::new(scsi);
+                ctrl.start_tasks(connection, path.clone()).await.unwrap();
+                return Some(AsusDevice {
+                    device: dev_type,
+                    dbus_path: path,
+                    hid_key: None,
+                });
             }
         }
         None
@@ -399,17 +382,17 @@ impl DeviceManager {
             );
             if product_name.contains("TUF") || product_family.contains("TUF") {
                 info!("TUF laptop, try using sysfs backlight control");
-                if let Ok(dev_type) = DeviceHandle::maybe_laptop_aura(None, "tuf").await {
-                    if let DeviceHandle::Aura(aura) = dev_type.clone() {
-                        let path = dbus_path_for_tuf();
-                        let ctrl = AuraZbus::new(aura);
-                        ctrl.start_tasks(connection, path.clone()).await.unwrap();
-                        devices.push(AsusDevice {
-                            device: dev_type,
-                            dbus_path: path,
-                            hid_key: None,
-                        });
-                    }
+                if let Ok(dev_type) = DeviceHandle::maybe_laptop_aura(None, "tuf").await
+                    && let DeviceHandle::Aura(aura) = dev_type.clone()
+                {
+                    let path = dbus_path_for_tuf();
+                    let ctrl = AuraZbus::new(aura);
+                    ctrl.start_tasks(connection, path.clone()).await.unwrap();
+                    devices.push(AsusDevice {
+                        device: dev_type,
+                        dbus_path: path,
+                        hid_key: None,
+                    });
                 }
             }
         }
@@ -539,8 +522,7 @@ impl DeviceManager {
                                         .iter()
                                         .enumerate()
                                         .filter_map(|(i, dev)| {
-                                            if dev.hid_key.as_deref()
-                                                == Some(removed_node.as_str())
+                                            if dev.hid_key.as_deref() == Some(removed_node.as_str())
                                             {
                                                 Some(i)
                                             } else {
@@ -589,32 +571,30 @@ impl DeviceManager {
                                         info!("Dropped hid handle for {removed_node}");
                                     }
                                 }
-                            } else if action == "add" {
-                                if let Some(parent) =
+                            } else if action == "add"
+                                && let Some(parent) =
                                     event.parent_with_subsystem_devtype("usb", "usb_device")?
+                            {
+                                // Guard against initialising a second hidraw interface for a
+                                // USB device we already track. Without this, a USB reset
+                                // (e.g. triggered by an earlier duplicate init) fires
+                                // remove+add events that cause another duplicate init and a
+                                // permanent reset loop.
+                                if let Some(path) = dbus_path_for_dev(&parent)
+                                    && devices.lock().await.iter().any(|d| d.dbus_path == path)
                                 {
-                                    // Guard against initialising a second hidraw interface for a
-                                    // USB device we already track. Without this, a USB reset
-                                    // (e.g. triggered by an earlier duplicate init) fires
-                                    // remove+add events that cause another duplicate init and a
-                                    // permanent reset loop.
-                                    if let Some(path) = dbus_path_for_dev(&parent) {
-                                        if devices.lock().await.iter().any(|d| d.dbus_path == path) {
-                                            debug!("Hotplug add: device {path:?} already registered, skipping");
-                                            return Ok(());
-                                        }
-                                    }
-                                    let evdev = event.device();
-                                    if let Ok(mut new_devs) = Self::init_hid_devices(
-                                        &conn_copy,
-                                        evdev,
-                                        hid_handles.clone(),
-                                    )
-                                    .await
-                                    .map_err(|e| error!("Couldn't add new device: {e:?}"))
-                                    {
-                                        devices.lock().await.append(&mut new_devs);
-                                    }
+                                    debug!(
+                                        "Hotplug add: device {path:?} already registered, skipping"
+                                    );
+                                    return Ok(());
+                                }
+                                let evdev = event.device();
+                                if let Ok(mut new_devs) =
+                                    Self::init_hid_devices(&conn_copy, evdev, hid_handles.clone())
+                                        .await
+                                        .map_err(|e| error!("Couldn't add new device: {e:?}"))
+                                {
+                                    devices.lock().await.append(&mut new_devs);
                                 }
                             }
                         }

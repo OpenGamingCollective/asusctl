@@ -394,10 +394,10 @@ fn handle_anime(cmd: &AnimeCommand) -> Result<(), Box<dyn std::error::Error>> {
         }
 
         let mut anime_type = get_anime_type();
-        if let AnimeType::Unsupported = anime_type {
-            if let Some(model) = cmd.override_type {
-                anime_type = model;
-            }
+        if let AnimeType::Unsupported = anime_type
+            && let Some(model) = cmd.override_type
+        {
+            anime_type = model;
         }
 
         if cmd.clear {

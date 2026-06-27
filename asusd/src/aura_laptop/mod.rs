@@ -56,21 +56,21 @@ impl Aura {
             // mode, or random
             if config.multizone.is_none() {
                 create = true;
-            } else if let Some(multizones) = config.multizone.as_ref() {
-                if !multizones.contains_key(&mode) {
-                    create = true;
-                }
+            } else if let Some(multizones) = config.multizone.as_ref()
+                && !multizones.contains_key(&mode)
+            {
+                create = true;
             }
             if create {
                 info!("No user-set config for zone founding, attempting a default");
                 config.create_multizone_default()?;
             }
 
-            if let Some(multizones) = config.multizone.as_mut() {
-                if let Some(set) = multizones.get(&mode) {
-                    for mode in set.clone() {
-                        self.write_effect_and_apply(config.led_type, &mode).await?;
-                    }
+            if let Some(multizones) = config.multizone.as_mut()
+                && let Some(set) = multizones.get(&mode)
+            {
+                for mode in set.clone() {
+                    self.write_effect_and_apply(config.led_type, &mode).await?;
                 }
             }
         } else {
@@ -148,20 +148,20 @@ impl Aura {
             }
         } else if let Some(hid_raw) = &self.hid {
             let hid_raw = hid_raw.lock().await;
-            if let Some(p) = config.enabled.states.first() {
-                if p.zone == PowerZones::Ally {
-                    let msg = [
-                        0x5d,
-                        0xd1,
-                        0x09,
-                        0x01,
-                        p.new_to_byte() as u8,
-                        0x0,
-                        0x0,
-                    ];
-                    hid_raw.write_bytes(&msg)?;
-                    return Ok(());
-                }
+            if let Some(p) = config.enabled.states.first()
+                && p.zone == PowerZones::Ally
+            {
+                let msg = [
+                    0x5d,
+                    0xd1,
+                    0x09,
+                    0x01,
+                    p.new_to_byte() as u8,
+                    0x0,
+                    0x0,
+                ];
+                hid_raw.write_bytes(&msg)?;
+                return Ok(());
             }
 
             let bytes = config.enabled.to_bytes(config.led_type);
@@ -206,35 +206,35 @@ impl Aura {
                     hid_raw.write_bytes(row)?;
                 }
             }
-        } else if matches!(config.led_type, rog_aura::AuraDeviceType::LaptopKeyboardTuf) {
-            if let Some(tuf) = &self.backlight {
-                for row in effect.iter() {
-                    let r = row[9];
-                    let g = row[10];
-                    let b = row[11];
-                    tuf.lock().await.set_kbd_rgb_mode(&[
-                        0, 0, r, g, b, 0,
-                    ])?;
-                }
+        } else if matches!(config.led_type, rog_aura::AuraDeviceType::LaptopKeyboardTuf)
+            && let Some(tuf) = &self.backlight
+        {
+            for row in effect.iter() {
+                let r = row[9];
+                let g = row[10];
+                let b = row[11];
+                tuf.lock().await.set_kbd_rgb_mode(&[
+                    0, 0, r, g, b, 0,
+                ])?;
             }
         }
         Ok(())
     }
 
     pub async fn fix_ally_power(&mut self) -> Result<(), RogError> {
-        if self.config.lock().await.led_type == AuraDeviceType::Ally {
-            if let Some(hid_raw) = &self.hid {
-                let mut config = self.config.lock().await;
-                if config.ally_fix.is_none() {
-                    let msg = [
-                        0x5d, 0xbd, 0x01, 0xff, 0xff, 0xff, 0xff,
-                    ];
-                    hid_raw.lock().await.write_bytes(&msg)?;
-                    info!("Reset Ally power settings to base");
-                    config.ally_fix = Some(true);
-                }
-                config.write();
+        if self.config.lock().await.led_type == AuraDeviceType::Ally
+            && let Some(hid_raw) = &self.hid
+        {
+            let mut config = self.config.lock().await;
+            if config.ally_fix.is_none() {
+                let msg = [
+                    0x5d, 0xbd, 0x01, 0xff, 0xff, 0xff, 0xff,
+                ];
+                hid_raw.lock().await.write_bytes(&msg)?;
+                info!("Reset Ally power settings to base");
+                config.ally_fix = Some(true);
             }
+            config.write();
         }
         Ok(())
     }

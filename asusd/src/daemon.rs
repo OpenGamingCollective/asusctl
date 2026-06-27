@@ -171,10 +171,10 @@ async fn start_daemon() -> Result<(), Box<dyn Error>> {
             .map_err(|e| error!("CtrlGpu: failed to create signal context: {e}"))
             .ok();
         gpu_ctrl.clone().add_to_server(&mut server).await;
-        if let Some(ctx) = sig_ctx {
-            if let Err(e) = gpu_ctrl.start_watcher(ctx).await {
-                error!("CtrlGpu: watcher failed: {e}");
-            }
+        if let Some(ctx) = sig_ctx
+            && let Err(e) = gpu_ctrl.start_watcher(ctx).await
+        {
+            error!("CtrlGpu: watcher failed: {e}");
         }
         info!("CtrlGpu: initialized");
     }

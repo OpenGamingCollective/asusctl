@@ -112,14 +112,14 @@ impl CtrlPlatform {
                 let mut events = inotify.into_event_stream(&mut buffer).unwrap();
 
                 while let Some(ev) = events.next().await {
-                    if let Ok(ev) = ev {
-                        if ev.mask == inotify::EventMask::IGNORED {
-                            warn!(
-                                "Something modified asusd.ron vi/vim style. Now need to reload \
+                    if let Ok(ev) = ev
+                        && ev.mask == inotify::EventMask::IGNORED
+                    {
+                        warn!(
+                            "Something modified asusd.ron vi/vim style. Now need to reload \
                                  inotify watch"
-                            );
-                            break;
-                        }
+                        );
+                        break;
                     }
 
                     let res = config1.lock().await.read_new();
@@ -223,25 +223,25 @@ impl CtrlPlatform {
             return;
         }
         info!("ThrottlePolicy setting EPP");
-        if let Some(cpu) = self.cpu_control.as_ref() {
-            if let Ok(epp) = cpu.get_available_epp() {
-                debug!("Available EPP: {epp:?}");
+        if let Some(cpu) = self.cpu_control.as_ref()
+            && let Ok(epp) = cpu.get_available_epp()
+        {
+            debug!("Available EPP: {epp:?}");
+            if epp.contains(&enegy_pref) {
+                debug!("Setting {enegy_pref:?}");
+                cpu.set_epp(enegy_pref).ok();
+            } else if let Ok(gov) = cpu.get_governor()
+                && gov != CPUGovernor::Powersave
+            {
+                warn!("powersave governor is not is use, trying to set.");
+                cpu.set_governor(CPUGovernor::Powersave)
+                    .map_err(|e| error!("couldn't set powersave: {e:?}"))
+                    .ok();
                 if epp.contains(&enegy_pref) {
                     debug!("Setting {enegy_pref:?}");
-                    cpu.set_epp(enegy_pref).ok();
-                } else if let Ok(gov) = cpu.get_governor() {
-                    if gov != CPUGovernor::Powersave {
-                        warn!("powersave governor is not is use, trying to set.");
-                        cpu.set_governor(CPUGovernor::Powersave)
-                            .map_err(|e| error!("couldn't set powersave: {e:?}"))
-                            .ok();
-                        if epp.contains(&enegy_pref) {
-                            debug!("Setting {enegy_pref:?}");
-                            cpu.set_epp(enegy_pref)
-                                .map_err(|e| error!("couldn't set EPP: {e:?}"))
-                                .ok();
-                        }
-                    }
+                    cpu.set_epp(enegy_pref)
+                        .map_err(|e| error!("couldn't set EPP: {e:?}"))
+                        .ok();
                 }
             }
         }
@@ -266,25 +266,23 @@ impl CtrlPlatform {
 
         // Older configs may still contain Quiet on devices that only support LowPower.
         // Normalize at apply-time so AC/BAT transitions still work correctly.
-        if configured == PlatformProfile::Quiet {
-            if let Ok(choices) = self.platform.get_platform_profile_choices() {
-                if !choices.contains(&PlatformProfile::Quiet)
-                    && choices.contains(&PlatformProfile::LowPower)
-                {
-                    let mut cfg = self.config.lock().await;
-                    if power_plugged {
-                        cfg.platform_profile_on_ac = PlatformProfile::LowPower;
-                    } else {
-                        cfg.platform_profile_on_battery = PlatformProfile::LowPower;
-                    }
-                    cfg.write();
-                    warn!(
-                        "Configured profile Quiet is unavailable, falling back to LowPower for {}",
-                        if power_plugged { "AC" } else { "battery" }
-                    );
-                    return PlatformProfile::LowPower;
-                }
+        if configured == PlatformProfile::Quiet
+            && let Ok(choices) = self.platform.get_platform_profile_choices()
+            && !choices.contains(&PlatformProfile::Quiet)
+            && choices.contains(&PlatformProfile::LowPower)
+        {
+            let mut cfg = self.config.lock().await;
+            if power_plugged {
+                cfg.platform_profile_on_ac = PlatformProfile::LowPower;
+            } else {
+                cfg.platform_profile_on_battery = PlatformProfile::LowPower;
             }
+            cfg.write();
+            warn!(
+                "Configured profile Quiet is unavailable, falling back to LowPower for {}",
+                if power_plugged { "AC" } else { "battery" }
+            );
+            return PlatformProfile::LowPower;
         }
 
         configured
@@ -581,10 +579,11 @@ impl CtrlPlatform {
         // `Quiet`, fall back to `LowPower` so we don't write an unavailable
         // profile into the config file.
         let mut chosen = policy;
-        if let Ok(choices) = self.platform.get_platform_profile_choices() {
-            if chosen == PlatformProfile::Quiet && !choices.contains(&PlatformProfile::Quiet) {
-                chosen = PlatformProfile::LowPower;
-            }
+        if let Ok(choices) = self.platform.get_platform_profile_choices()
+            && chosen == PlatformProfile::Quiet
+            && !choices.contains(&PlatformProfile::Quiet)
+        {
+            chosen = PlatformProfile::LowPower;
         }
 
         self.config.lock().await.platform_profile_on_battery = chosen;
@@ -618,10 +617,11 @@ impl CtrlPlatform {
     ) -> Result<(), FdoErr> {
         // Mirror the same fallback behavior for AC profile changes.
         let mut chosen = policy;
-        if let Ok(choices) = self.platform.get_platform_profile_choices() {
-            if chosen == PlatformProfile::Quiet && !choices.contains(&PlatformProfile::Quiet) {
-                chosen = PlatformProfile::LowPower;
-            }
+        if let Ok(choices) = self.platform.get_platform_profile_choices()
+            && chosen == PlatformProfile::Quiet
+            && !choices.contains(&PlatformProfile::Quiet)
+        {
+            chosen = PlatformProfile::LowPower;
         }
 
         self.config.lock().await.platform_profile_on_ac = chosen;
@@ -931,42 +931,38 @@ impl CtrlTask for CtrlPlatform {
                             )
                             .ok();
                     }
-                    if let Ok(power_plugged) = platform1.power.get_online() {
-                        if platform1.config.lock().await.last_power_plugged != power_plugged {
-                            if !sleeping && platform1.platform.has_platform_profile() {
-                                let change_epp =
-                                    platform1.config.lock().await.platform_profile_linked_epp;
+                    if let Ok(power_plugged) = platform1.power.get_online()
+                        && platform1.config.lock().await.last_power_plugged != power_plugged
+                    {
+                        if !sleeping && platform1.platform.has_platform_profile() {
+                            let change_epp =
+                                platform1.config.lock().await.platform_profile_linked_epp;
+                            platform1
+                                .update_policy_ac_or_bat(power_plugged > 0, change_epp)
+                                .await;
+                        }
+                        if !sleeping {
+                            platform1.run_ac_or_bat_cmd(power_plugged > 0).await;
+                            if let Ok(profile) =
+                                platform1.platform.get_platform_profile().map(|p| p.into())
+                            {
+                                let attrs = FirmwareAttributes::new();
                                 platform1
-                                    .update_policy_ac_or_bat(power_plugged > 0, change_epp)
+                                    .apply_fan_curves_and_ppt(&attrs, power_plugged > 0, profile)
                                     .await;
-                            }
-                            if !sleeping {
-                                platform1.run_ac_or_bat_cmd(power_plugged > 0).await;
-                                if let Ok(profile) =
-                                    platform1.platform.get_platform_profile().map(|p| p.into())
+                                if let Err(e) = platform1
+                                    .armoury_registry
+                                    .emit_limits(&platform1.connection)
+                                    .await
                                 {
-                                    let attrs = FirmwareAttributes::new();
-                                    platform1
-                                        .apply_fan_curves_and_ppt(
-                                            &attrs,
-                                            power_plugged > 0,
-                                            profile,
-                                        )
-                                        .await;
-                                    if let Err(e) = platform1
-                                        .armoury_registry
-                                        .emit_limits(&platform1.connection)
-                                        .await
-                                    {
-                                        error!(
-                                            "Failed to emit armoury updates after power change: \
+                                    error!(
+                                        "Failed to emit armoury updates after power change: \
                                              {e:?}"
-                                        );
-                                    }
+                                    );
                                 }
                             }
-                            platform1.config.lock().await.last_power_plugged = power_plugged;
                         }
+                        platform1.config.lock().await.last_power_plugged = power_plugged;
                     }
                 }
             },

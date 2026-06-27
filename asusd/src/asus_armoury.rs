@@ -289,10 +289,9 @@ impl AsusArmouryAttribute {
         if let Ok(value) = self.attr.current_value().map_err(|e| {
             error!("Failed to read: {e:?}");
             e
-        }) {
-            if !matches!(value, AttrValue::None) {
-                attrs.push("current_value".to_string());
-            }
+        }) && !matches!(value, AttrValue::None)
+        {
+            attrs.push("current_value".to_string());
         }
         attrs
     }
@@ -321,10 +320,10 @@ impl AsusArmouryAttribute {
 
             let mut config = self.config.lock().await;
             let tuning = config.select_tunings(power_plugged == 1, profile);
-            if let Some(tune) = tuning.group.get_mut(&self.name()) {
-                if let AttrValue::Integer(i) = self.attr.default_value() {
-                    *tune = *i;
-                }
+            if let Some(tune) = tuning.group.get_mut(&self.name())
+                && let AttrValue::Integer(i) = self.attr.default_value()
+            {
+                *tune = *i;
             }
             if tuning.enabled {
                 self.attr
@@ -379,10 +378,10 @@ impl AsusArmouryAttribute {
                 .unwrap_or_default()
                 == 1;
             let config = self.config.lock().await;
-            if let Some(tuning) = config.select_tunings_ref(power_plugged, profile) {
-                if let Some(tune) = tuning.group.get(&self.name()) {
-                    return Ok(*tune);
-                }
+            if let Some(tuning) = config.select_tunings_ref(power_plugged, profile)
+                && let Some(tune) = tuning.group.get(&self.name())
+            {
+                return Ok(*tune);
             }
             if let AttrValue::Integer(i) = self.attr.default_value() {
                 return Ok(*i);

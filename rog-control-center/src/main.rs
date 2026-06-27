@@ -64,13 +64,13 @@ async fn main() -> Result<()> {
     // Try to open a proxy and check for app state first
     {
         let user_con = zbus::blocking::Connection::session()?;
-        if let Ok(proxy) = ROGCCZbusProxyBlocking::new(&user_con) {
-            if let Ok(state) = proxy.state() {
-                info!("App is already running: {state:?}, opening the window");
-                // if there is a proxy connection assume the app is already running
-                proxy.set_state(AppState::MainWindowShouldOpen)?;
-                std::process::exit(0);
-            }
+        if let Ok(proxy) = ROGCCZbusProxyBlocking::new(&user_con)
+            && let Ok(state) = proxy.state()
+        {
+            info!("App is already running: {state:?}, opening the window");
+            // if there is a proxy connection assume the app is already running
+            proxy.set_state(AppState::MainWindowShouldOpen)?;
+            std::process::exit(0);
         }
     }
 
@@ -184,10 +184,8 @@ async fn main() -> Result<()> {
     thread_local! { pub static UI: std::cell::RefCell<Option<MainWindow>> = Default::default()};
     // i_slint_backend_selector::with_platform(|_| Ok(())).unwrap();
 
-    if !startup_in_background {
-        if let Ok(mut app_state) = app_state.lock() {
-            *app_state = AppState::MainWindowShouldOpen;
-        }
+    if !startup_in_background && let Ok(mut app_state) = app_state.lock() {
+        *app_state = AppState::MainWindowShouldOpen;
     }
 
     if std::env::var("RUST_TRANSLATIONS").is_ok() {
@@ -302,13 +300,12 @@ async fn main() -> Result<()> {
             } else if state == AppState::QuitApp {
                 slint::quit_event_loop().unwrap();
                 exit(0);
-            } else if state != AppState::MainWindowOpen {
-                if let Ok(config) = config.lock() {
-                    if !config.run_in_background {
-                        slint::quit_event_loop().unwrap();
-                        exit(0);
-                    }
-                }
+            } else if state != AppState::MainWindowOpen
+                && let Ok(config) = config.lock()
+                && !config.run_in_background
+            {
+                slint::quit_event_loop().unwrap();
+                exit(0);
             }
         }
     });
