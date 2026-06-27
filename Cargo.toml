@@ -66,7 +66,6 @@ inotify = "^0.10"
 
 png_pong = "^0.8"
 pix = "^0.13"
-tinybmp = "^0.4"
 gif = "^0.12"
 
 notify-rust = { version = "4.11.5", features = ["z", "async"] }
