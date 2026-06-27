@@ -208,7 +208,7 @@ impl CtrlGpu {
                         continue;
                     }
 
-                    use futures_lite::StreamExt;
+                    use futures_util::StreamExt;
                     let mut events = match inotify.into_event_stream(&mut buffer) {
                         Ok(s) => s,
                         Err(e) => {

@@ -69,8 +69,6 @@ pix = "^0.13"
 tinybmp = "^0.4"
 gif = "^0.12"
 
-versions = "6.2"
-
 notify-rust = { version = "4.11.5", features = ["z", "async"] }
 
 sg = { git = "https://github.com/flukejones/sg-rs.git" }

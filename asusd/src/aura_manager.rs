@@ -8,7 +8,6 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use dmi_id::DMIID;
-use futures_lite::future::block_on;
 use log::{debug, error, info, warn};
 use mio::{Events, Interest, Poll, Token};
 use rog_platform::error::PlatformError;
@@ -466,7 +465,7 @@ impl DeviceManager {
                     let devices = devices.clone();
                     let conn_copy = conn_copy.clone();
                     let hid_handles = hid_handles_thread.clone();
-                    block_on(async move {
+                    rt.block_on(async move {
                         // SCSCI devs
                         if subsys == "block" {
                             if action == "remove" {

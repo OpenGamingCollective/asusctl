@@ -168,7 +168,7 @@ impl CtrlBacklight {
             tokio::spawn(async move {
                 let mut last_level = 0;
                 let mut buffer = [0; 32];
-                use futures_lite::StreamExt;
+                use futures_util::StreamExt;
                 if let Ok(mut stream) = watch.into_event_stream(&mut buffer) {
                     loop {
                         let _ = stream.next().await;
