@@ -1,5 +1,3 @@
-extern crate sg;
-
 pub use sg::Task;
 
 static ENE_APPLY_VAL: u8 = 0x01; // Value for Apply Changes Register
