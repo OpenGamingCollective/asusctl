@@ -71,6 +71,6 @@ impl From<DecodingError> for AnimeError {
 
 impl From<AnimeError> for zbus::fdo::Error {
     fn from(err: AnimeError) -> Self {
-        zbus::fdo::Error::Failed(format!("{}", err))
+        zbus::fdo::Error::Failed(format!("{err}"))
     }
 }

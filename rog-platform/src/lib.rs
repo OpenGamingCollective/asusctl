@@ -153,6 +153,11 @@ mod tests {
             .split(' ')
             .map(|v| v.parse::<u8>().unwrap_or(0))
             .collect();
-        assert_eq!(tmp, &[1, 2, 3, 4, 5]);
+        assert_eq!(
+            tmp,
+            &[
+                1, 2, 3, 4, 5
+            ]
+        );
     }
 }

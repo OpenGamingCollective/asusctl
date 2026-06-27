@@ -27,16 +27,16 @@ impl Backlight {
 
     pub fn new(device_type: BacklightType) -> Result<Self> {
         let mut enumerator = udev::Enumerator::new().map_err(|err| {
-            warn!("{}", err);
+            warn!("{err}");
             PlatformError::Udev("enumerator failed".into(), err)
         })?;
         enumerator.match_subsystem("backlight").map_err(|err| {
-            warn!("{}", err);
+            warn!("{err}");
             PlatformError::Udev("match_subsystem failed".into(), err)
         })?;
 
         for device in enumerator.scan_devices().map_err(|err| {
-            warn!("{}", err);
+            warn!("{err}");
             PlatformError::Udev("scan_devices failed".into(), err)
         })? {
             info!("Backlight: Checking {:?}", device.syspath());
@@ -64,8 +64,7 @@ impl Backlight {
         }
 
         Err(PlatformError::MissingFunction(format!(
-            "Backlight {:?} not found",
-            device_type
+            "Backlight {device_type:?} not found"
         )))
     }
 

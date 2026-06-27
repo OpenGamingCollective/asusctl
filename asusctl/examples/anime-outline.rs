@@ -1,5 +1,5 @@
-use rog_anime::usb::get_anime_type;
 use rog_anime::AnimeDataBuffer;
+use rog_anime::usb::get_anime_type;
 use rog_dbus::zbus_anime::AnimeProxyBlocking;
 use zbus::blocking::Connection;
 

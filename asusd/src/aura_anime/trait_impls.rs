@@ -4,19 +4,19 @@ use config_traits::StdConfig;
 use log::{debug, error, warn};
 use logind_zbus::manager::ManagerProxy;
 use rog_anime::usb::{
-    pkt_set_brightness, pkt_set_builtin_animations, pkt_set_enable_display,
-    pkt_set_enable_powersave_anim, Brightness,
+    Brightness, pkt_set_brightness, pkt_set_builtin_animations, pkt_set_enable_display,
+    pkt_set_enable_powersave_anim,
 };
 use rog_anime::{Animations, AnimeDataBuffer, DeviceState};
 use zbus::object_server::SignalEmitter;
 use zbus::proxy::CacheProperties;
 use zbus::zvariant::OwnedObjectPath;
-use zbus::{interface, Connection};
+use zbus::{Connection, interface};
 
-use super::config::AniMeConfig;
 use super::AniMe;
-use crate::error::RogError;
+use super::config::AniMeConfig;
 use crate::Reloadable;
+use crate::error::RogError;
 
 async fn get_logind_manager<'a>() -> ManagerProxy<'a> {
     let connection = Connection::system()

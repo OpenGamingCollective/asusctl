@@ -8,7 +8,7 @@ pub fn main() -> Result<(), Box<dyn Error>> {
         Ok(node) => {
             let id = node.prod_id().to_owned();
             usb_node = Some(node);
-            println!("Looked for keyboard controller 0x{}: Found", id);
+            println!("Looked for keyboard controller 0x{id}: Found");
         }
         Err(err) => println!("Looked for keyboard controller: {err}"),
     }

@@ -12,11 +12,11 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use zbus::object_server::SignalEmitter;
 use zbus::zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Type, Value};
-use zbus::{fdo, interface, Connection};
+use zbus::{Connection, fdo, interface};
 
 use crate::config::Config;
 use crate::error::RogError;
-use crate::{Reloadable, ASUS_ZBUS_PATH};
+use crate::{ASUS_ZBUS_PATH, Reloadable};
 
 const MOD_NAME: &str = "asus_armoury";
 

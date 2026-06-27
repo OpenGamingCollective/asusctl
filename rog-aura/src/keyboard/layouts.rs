@@ -249,10 +249,10 @@ impl KeyLayout {
     pub fn keyboard_height(&self) -> f32 {
         let mut height = 0.0;
         for r in &self.key_rows {
-            if let Some(key) = r.row.first() {
-                if !key.0.is_lightbar_zone() {
-                    height += r.height();
-                }
+            if let Some(key) = r.row.first()
+                && !key.0.is_lightbar_zone()
+            {
+                height += r.height();
             }
         }
         height
@@ -282,7 +282,7 @@ impl KeyLayout {
         // TODO: locales
         let layout_name = if led_data.layout_name.is_empty() {
             "ga401q".to_owned() // Need some sort of default here due to ROGCC
-                                // expecting it
+        // expecting it
         } else {
             led_data.layout_name
         };
@@ -305,7 +305,7 @@ impl KeyLayout {
         let mut files = Vec::new();
         std::fs::read_dir(path)
             .map_err(|e| {
-                println!("{:?}, {e}", path);
+                println!("{path:?}, {e}");
                 e
             })
             .unwrap()
@@ -471,7 +471,7 @@ mod tests {
         let path = data_path.as_path();
         for p in fs::read_dir(path)
             .map_err(|e| {
-                println!("{:?}, {e}", path);
+                println!("{path:?}, {e}");
                 e
             })
             .unwrap()

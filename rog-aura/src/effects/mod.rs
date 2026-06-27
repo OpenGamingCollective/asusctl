@@ -12,8 +12,8 @@ pub use breathe::*;
 mod static_;
 pub use static_::*;
 
-use crate::keyboard::{AuraLaptopUsbPackets, KeyLayout, LedCode, LedUsbPackets};
 use crate::Colour;
+use crate::keyboard::{AuraLaptopUsbPackets, KeyLayout, LedCode, LedUsbPackets};
 
 // static mut RNDINDEX: usize = 0;
 static mut PRNDINDEX: usize = 0;

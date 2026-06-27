@@ -18,8 +18,7 @@ impl USBRaw {
         }
 
         Err(PlatformError::MissingFunction(format!(
-            "USBRaw dev {} not found",
-            id_product
+            "USBRaw dev {id_product} not found"
         )))
     }
 

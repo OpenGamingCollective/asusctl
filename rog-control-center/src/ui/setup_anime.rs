@@ -8,7 +8,7 @@ use slint::ComponentHandle;
 
 use crate::config::Config;
 use crate::ui::show_toast;
-use crate::{set_ui_callbacks, set_ui_props_async, AnimePageData, MainWindow};
+use crate::{AnimePageData, MainWindow, set_ui_callbacks, set_ui_props_async};
 
 pub fn setup_anime_page(ui: &MainWindow, _states: Arc<Mutex<Config>>) {
     let handle = ui.as_weak();

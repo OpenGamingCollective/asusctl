@@ -5,7 +5,7 @@
 //! functions (`Device::find`, `get_gpu_power_status`) are tested via integration
 //! tests on machines with actual GPUs.
 
-use rog_platform::gpu_pci::{lscpi_dgpu_check, GfxPower, GfxVendor};
+use rog_platform::gpu_pci::{GfxPower, GfxVendor, lscpi_dgpu_check};
 use std::str::FromStr;
 
 // ---------------------------------------------------------------------------

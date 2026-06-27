@@ -11,7 +11,7 @@ use rog_aura::aura_detection::LedSupportData;
 use rog_aura::keyboard::KeyLayout;
 use rog_dbus::zbus_anime::AnimeProxyBlocking;
 use rog_dbus::zbus_aura::AuraProxyBlocking;
-use rog_dbus::{list_iface_blocking, DBUS_NAME};
+use rog_dbus::{DBUS_NAME, list_iface_blocking};
 use smol::Executor;
 use zbus::Connection;
 

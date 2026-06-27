@@ -9,7 +9,7 @@ use slint::{ComponentHandle, Model, RgbaColor, SharedString};
 use crate::config::Config;
 use crate::ui::show_toast;
 use crate::{
-    set_ui_callbacks, set_ui_props_async, AuraPageData, MainWindow, PowerZones as SlintPowerZones,
+    AuraPageData, MainWindow, PowerZones as SlintPowerZones, set_ui_callbacks, set_ui_props_async,
 };
 
 fn decode_hex(s: &str) -> RgbaColor<u8> {

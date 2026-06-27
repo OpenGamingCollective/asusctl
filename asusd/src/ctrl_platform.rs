@@ -7,18 +7,18 @@ use log::{debug, error, info, warn};
 use rog_platform::asus_armoury::{
     AttrValue, FirmwareAttribute, FirmwareAttributeType, FirmwareAttributes,
 };
-use rog_platform::cpu::{CPUControl, CPUGovernor, CPUEPP};
+use rog_platform::cpu::{CPUControl, CPUEPP, CPUGovernor};
 use rog_platform::platform::{PlatformProfile, Properties, RogPlatform};
 use rog_platform::power::AsusPower;
 use tokio::sync::Mutex;
 use zbus::fdo::Error as FdoErr;
 use zbus::object_server::SignalEmitter;
-use zbus::{interface, Connection};
+use zbus::{Connection, interface};
 
-use crate::asus_armoury::{set_config_or_default, ArmouryAttributeRegistry};
+use crate::asus_armoury::{ArmouryAttributeRegistry, set_config_or_default};
 use crate::config::Config;
 use crate::error::RogError;
-use crate::{task_watch_item, CtrlTask, ReloadAndNotify};
+use crate::{CtrlTask, ReloadAndNotify, task_watch_item};
 use rog_profiles::find_fan_curve_node;
 
 const PLATFORM_ZBUS_PATH: &str = "/xyz/ljones";

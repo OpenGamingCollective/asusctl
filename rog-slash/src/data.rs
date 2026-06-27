@@ -162,7 +162,7 @@ impl Display for SlashMode {
             SlashMode::Start => String::from("Start"),
             SlashMode::Buzzer => String::from("Buzzer"),
         };
-        write!(f, "{}", str)
+        write!(f, "{str}")
     }
 }
 

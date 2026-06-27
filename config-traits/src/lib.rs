@@ -5,15 +5,15 @@
 //!
 //! The end canonical file format is `.ron` as this supports rust types well
 
-use std::fs::{self, create_dir, File, OpenOptions};
+use std::fs::{self, File, OpenOptions, create_dir};
 use std::io::{Read, Write};
 use std::path::PathBuf;
 
 use log::{error, warn};
 pub use ron;
 use ron::ser::PrettyConfig;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 /// Config file helper traits. Only `new()` and `file_name()` are required to be
 /// implemented, the rest are intended to be free methods.
@@ -141,7 +141,7 @@ where
             }
         };
         file.write_all(ron.as_bytes())
-            .unwrap_or_else(|err| error!("Could not write config: {}", err));
+            .unwrap_or_else(|err| error!("Could not write config: {err}"));
     }
 
     /// Renames the existing file to `<file>-old`

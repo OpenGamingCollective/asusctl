@@ -34,17 +34,17 @@ impl KeyboardBacklight {
 
     pub fn new() -> Result<Self> {
         let mut enumerator = udev::Enumerator::new().map_err(|err| {
-            warn!("{}", err);
+            warn!("{err}");
             PlatformError::Udev("enumerator failed".into(), err)
         })?;
 
         enumerator.match_subsystem("leds").map_err(|err| {
-            warn!("{}", err);
+            warn!("{err}");
             PlatformError::Udev("match_subsystem failed".into(), err)
         })?;
 
         for device in enumerator.scan_devices().map_err(|err| {
-            warn!("{}", err);
+            warn!("{err}");
             PlatformError::Udev("scan_devices failed".into(), err)
         })? {
             let sys = device.sysname().to_string_lossy();

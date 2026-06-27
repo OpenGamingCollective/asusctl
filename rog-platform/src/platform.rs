@@ -38,20 +38,20 @@ impl RogPlatform {
 
     pub fn new() -> Result<Self> {
         let mut enumerator = udev::Enumerator::new().map_err(|err| {
-            warn!("{}", err);
+            warn!("{err}");
             PlatformError::Udev("enumerator failed".into(), err)
         })?;
         enumerator.match_subsystem("platform").map_err(|err| {
-            warn!("{}", err);
+            warn!("{err}");
             PlatformError::Udev("match_subsystem failed".into(), err)
         })?;
         enumerator.match_sysname("asus-nb-wmi").map_err(|err| {
-            warn!("{}", err);
+            warn!("{err}");
             PlatformError::Udev("match_subsystem failed".into(), err)
         })?;
 
         if let Some(device) = (enumerator.scan_devices().map_err(|err| {
-            warn!("{}", err);
+            warn!("{err}");
             PlatformError::Udev("scan_devices failed".into(), err)
         })?)
         .next()
@@ -228,7 +228,7 @@ impl From<i32> for PlatformProfile {
             3 => Self::LowPower,
             4 => Self::Custom,
             _ => {
-                warn!("Unknown number for PlatformProfile: {}", num);
+                warn!("Unknown number for PlatformProfile: {num}");
                 Self::Balanced
             }
         }

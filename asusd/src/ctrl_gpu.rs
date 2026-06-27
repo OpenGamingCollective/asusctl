@@ -6,7 +6,7 @@
 use log::{error, info, warn};
 use rog_platform::gpu_pci::{GfxPower, GfxVendor};
 use zbus::object_server::SignalEmitter;
-use zbus::{interface, Connection};
+use zbus::{Connection, interface};
 
 use crate::error::RogError;
 
@@ -57,11 +57,7 @@ impl CtrlGpu {
                 let mut p = dgpu.dev_path().clone();
                 p.push("power");
                 p.push("runtime_status");
-                if p.exists() {
-                    Some(p)
-                } else {
-                    None
-                }
+                if p.exists() { Some(p) } else { None }
             };
             if let Ok(power) = dgpu.get_runtime_status() {
                 return (power, vendor, runtime_path);

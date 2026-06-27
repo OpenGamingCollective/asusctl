@@ -8,7 +8,7 @@ pub fn main() -> Result<(), Box<dyn Error>> {
         Ok(node) => {
             let id = node.prod_id().to_owned();
             usb_node = Some(node);
-            println!("Looked for keyboard controller 0x{}: Found", id);
+            println!("Looked for keyboard controller 0x{id}: Found");
         }
         Err(err) => println!("Looked for keyboard controller: {err}"),
     }
@@ -58,7 +58,7 @@ pub fn main() -> Result<(), Box<dyn Error>> {
     packet[18] = checksum(&packet[6..=17]);
 
     for n in &packet[6..=17] {
-        print!("{:0x},", n);
+        print!("{n:0x},");
     }
     println!();
     println!("Checksum: {:0x}", packet[18]);

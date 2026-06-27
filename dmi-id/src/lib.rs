@@ -18,17 +18,17 @@ pub struct DMIID {
 impl DMIID {
     pub fn new() -> Result<Self, String> {
         let mut enumerator = udev::Enumerator::new().map_err(|err| {
-            warn!("{}", err);
+            warn!("{err}");
             format!("dmi enumerator failed: {err}")
         })?;
 
         enumerator.match_subsystem("dmi").map_err(|err| {
-            warn!("{}", err);
+            warn!("{err}");
             format!("dmi match_subsystem failed: {err}")
         })?;
 
         let mut result = enumerator.scan_devices().map_err(|err| {
-            warn!("{}", err);
+            warn!("{err}");
             format!("dmi scan_devices failed: {err}")
         })?;
 

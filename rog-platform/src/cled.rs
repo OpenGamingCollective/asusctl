@@ -24,21 +24,21 @@ impl CledDevice {
     /// `name` is matched against `device.sysname()` (e.g. `"asus:xgm-..."`).
     pub fn new(name: &str) -> Result<Self> {
         let mut enumerator = udev::Enumerator::new().map_err(|err| {
-            warn!("{}", err);
+            warn!("{err}");
             PlatformError::Udev("enumerator failed".into(), err)
         })?;
         enumerator.match_subsystem("leds").map_err(|err| {
-            warn!("{}", err);
+            warn!("{err}");
             PlatformError::Udev("match_subsystem failed".into(), err)
         })?;
 
         for device in enumerator.scan_devices().map_err(|err| {
-            warn!("{}", err);
+            warn!("{err}");
             PlatformError::Udev("scan_devices failed".into(), err)
         })? {
             let sysname = device.sysname().to_string_lossy();
             if sysname == name {
-                info!("Found class LED device at {:?}", sysname);
+                info!("Found class LED device at {sysname:?}");
                 return Ok(Self {
                     path: device.syspath().to_path_buf(),
                 });
@@ -56,24 +56,21 @@ impl CledDevice {
     /// Matches any device whose sysname **contains** `pattern`.
     pub fn new_from_pattern(pattern: &str) -> Result<Self> {
         let mut enumerator = udev::Enumerator::new().map_err(|err| {
-            warn!("{}", err);
+            warn!("{err}");
             PlatformError::Udev("enumerator failed".into(), err)
         })?;
         enumerator.match_subsystem("leds").map_err(|err| {
-            warn!("{}", err);
+            warn!("{err}");
             PlatformError::Udev("match_subsystem failed".into(), err)
         })?;
 
         for device in enumerator.scan_devices().map_err(|err| {
-            warn!("{}", err);
+            warn!("{err}");
             PlatformError::Udev("scan_devices failed".into(), err)
         })? {
             let sysname = device.sysname().to_string_lossy();
             if sysname.contains(pattern) {
-                info!(
-                    "Found class LED device matching '{pattern}' at {:?}",
-                    sysname
-                );
+                info!("Found class LED device matching '{pattern}' at {sysname:?}");
                 return Ok(Self {
                     path: device.syspath().to_path_buf(),
                 });

@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "dbus")]
 use zbus::zvariant::{OwnedValue, Type, Value};
 
-use crate::error::Error;
 use crate::AURA_LAPTOP_LED_MSG_LEN;
+use crate::error::Error;
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[cfg_attr(
@@ -494,7 +494,7 @@ impl Default for AuraEffect {
 
 impl Display for AuraEffect {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -547,7 +547,7 @@ impl From<&AuraEffect> for Vec<u8> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        AuraEffect, AuraModeNum, AuraZone, Colour, Direction, Speed, AURA_LAPTOP_LED_MSG_LEN,
+        AURA_LAPTOP_LED_MSG_LEN, AuraEffect, AuraModeNum, AuraZone, Colour, Direction, Speed,
     };
 
     #[test]
@@ -566,7 +566,7 @@ mod tests {
         };
         let ar = <[u8; AURA_LAPTOP_LED_MSG_LEN]>::from(&st);
 
-        println!("{:02x?}", ar);
+        println!("{ar:02x?}");
         let check = [
             0x5d, 0xb3, 0x0, 0x0, 0xff, 0x11, 0xdd, 0xeb, 0x0, 0x0, 0xa6, 0x0, 0x0, 0x0, 0x0, 0x0,
             0x0,

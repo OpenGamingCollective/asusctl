@@ -1,4 +1,4 @@
-use std::fs::{read_dir, File, OpenOptions};
+use std::fs::{File, OpenOptions, read_dir};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
@@ -434,7 +434,7 @@ impl From<&str> for FirmwareAttribute {
             "pending_reboot" => Self::PendingReboot,
             "screen_auto_brightness" => Self::ScreenAutoBrightness,
             _ => {
-                error!("Invalid firmware attribute: {}", s);
+                error!("Invalid firmware attribute: {s}");
                 Self::None
             }
         }

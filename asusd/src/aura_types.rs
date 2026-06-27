@@ -2,26 +2,26 @@ use std::sync::Arc;
 
 use config_traits::{StdConfig, StdConfigLoad};
 use log::{debug, error, info};
+use rog_anime::AnimeType;
 use rog_anime::error::AnimeError;
 use rog_anime::usb::get_anime_type;
-use rog_anime::AnimeType;
 use rog_aura::AuraDeviceType;
 use rog_platform::hid_raw::HidRaw;
 use rog_platform::keyboard_led::KeyboardBacklight;
 use rog_platform::usb_raw::USBRaw;
-use rog_scsi::{open_device, ScsiType};
-use rog_slash::error::SlashError;
+use rog_scsi::{ScsiType, open_device};
 use rog_slash::SlashType;
+use rog_slash::error::SlashError;
 use tokio::sync::Mutex;
 
-use crate::aura_anime::config::AniMeConfig;
 use crate::aura_anime::AniMe;
-use crate::aura_laptop::config::AuraConfig;
+use crate::aura_anime::config::AniMeConfig;
 use crate::aura_laptop::Aura;
-use crate::aura_scsi::config::ScsiConfig;
+use crate::aura_laptop::config::AuraConfig;
 use crate::aura_scsi::ScsiAura;
-use crate::aura_slash::config::SlashConfig;
+use crate::aura_scsi::config::ScsiConfig;
 use crate::aura_slash::Slash;
+use crate::aura_slash::config::SlashConfig;
 use crate::error::RogError;
 
 pub enum _DeviceHandle {

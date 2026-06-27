@@ -23,6 +23,6 @@ pub enum SlashError {
 
 impl From<SlashError> for zbus::fdo::Error {
     fn from(err: SlashError) -> Self {
-        zbus::fdo::Error::Failed(format!("{}", err))
+        zbus::fdo::Error::Failed(format!("{err}"))
     }
 }

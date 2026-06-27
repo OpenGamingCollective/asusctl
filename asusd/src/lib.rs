@@ -27,10 +27,10 @@ use futures_util::stream::StreamExt;
 use log::{debug, info, warn};
 use logind_zbus::manager::ManagerProxy;
 use tokio::time::sleep;
+use zbus::Connection;
 use zbus::object_server::{Interface, SignalEmitter};
 use zbus::proxy::CacheProperties;
 use zbus::zvariant::ObjectPath;
-use zbus::Connection;
 
 use crate::error::RogError;
 

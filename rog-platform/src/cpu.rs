@@ -24,18 +24,18 @@ pub struct CPUControl {
 impl CPUControl {
     pub fn new() -> Result<Self> {
         let mut enumerator = udev::Enumerator::new().map_err(|err| {
-            warn!("{}", err);
+            warn!("{err}");
             PlatformError::Udev("enumerator failed".into(), err)
         })?;
         enumerator.match_subsystem("cpu").map_err(|err| {
-            warn!("{}", err);
+            warn!("{err}");
             PlatformError::Udev("match_subsystem failed".into(), err)
         })?;
 
         let mut supported = false;
         let mut cpu = CPUControl { paths: Vec::new() };
         for device in enumerator.scan_devices().map_err(|err| {
-            warn!("{}", err);
+            warn!("{err}");
             PlatformError::Udev("CPU: scan_devices failed".into(), err)
         })? {
             if !supported {
@@ -49,7 +49,7 @@ impl CPUControl {
                     None => {
                         return Err(PlatformError::CPU(format!(
                             "{ATTR_AVAILABLE_GOVERNORS} not found"
-                        )))
+                        )));
                     }
                 }
                 match device.attribute_value(ATTR_GOVERNOR) {
@@ -61,7 +61,7 @@ impl CPUControl {
                     None => {
                         return Err(PlatformError::CPU(format!(
                             "{ATTR_AVAILABLE_EPP} not found"
-                        )))
+                        )));
                     }
                 }
                 match device.attribute_value(ATTR_EPP) {
@@ -260,7 +260,7 @@ impl From<CPUEPP> for i32 {
 #[cfg(test)]
 mod tests {
     use super::CPUControl;
-    use crate::cpu::{CPUGovernor, CPUEPP};
+    use crate::cpu::{CPUEPP, CPUGovernor};
 
     #[test]
     #[ignore = "Can't run this in a docker image"]

@@ -5,9 +5,9 @@ use std::time::Duration;
 
 use log::error;
 
+use crate::AnimeType;
 use crate::data::AnimeDataBuffer;
 use crate::error::{AnimeError, Result};
-use crate::AnimeType;
 
 /// Mostly intended to be used with ASUS gifs, but can be used for other
 /// purposes (like images)
@@ -412,20 +412,12 @@ impl AnimeDiagonal {
 
         // Helper: get row length for STRIX class (G635L/G835L)
         fn row_length(row: usize) -> usize {
-            if row < 28 {
-                row / 2 + 1
-            } else {
-                15
-            }
+            if row < 28 { row / 2 + 1 } else { 15 }
         }
 
         // Helper: starting X (in LED units) for the row
         fn first_x(row: usize) -> usize {
-            if row < 28 {
-                0
-            } else {
-                (row - 28) / 2
-            }
+            if row < 28 { 0 } else { (row - 28) / 2 }
         }
 
         // Process all 68 rows
@@ -448,10 +440,7 @@ impl AnimeDiagonal {
 
                 // Log first LED of each row for debugging
                 if i == 0 {
-                    debug!(
-                        "Row {}: len={}, first LED at img[{}][{}] = {}",
-                        row, len, img_y, img_x, val
-                    );
+                    debug!("Row {row}: len={len}, first LED at img[{img_y}][{img_x}] = {val}");
                 }
 
                 if buf_idx < buf.len() {
@@ -461,7 +450,7 @@ impl AnimeDiagonal {
             }
         }
 
-        debug!("STRIX packing complete: {} bytes written", buf_idx);
+        debug!("STRIX packing complete: {buf_idx} bytes written");
     }
 
     /// STRIX-class diagonal packing (G635L, G835L). Caller passes the

@@ -1,7 +1,7 @@
 use argh::FromArgs;
 use rog_platform::platform::PlatformProfile;
-use rog_profiles::fan_curve_set::CurveData;
 use rog_profiles::FanCurvePU;
+use rog_profiles::fan_curve_set::CurveData;
 
 #[derive(FromArgs, Debug, Clone)]
 #[argh(subcommand, name = "fan-curve", description = "fan curve commands")]

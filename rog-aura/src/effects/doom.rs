@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 
-use crate::effects::{p_random, EffectState};
-use crate::keyboard::{KeyLayout, LedCode};
 use crate::Colour;
+use crate::effects::{EffectState, p_random};
+use crate::keyboard::{KeyLayout, LedCode};
 
 /// Compute max/min light colours from a base colour and percentage values.
 fn compute_light_range(base: Colour, max_percentage: u8, min_percentage: u8) -> (Colour, Colour) {

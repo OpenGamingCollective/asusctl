@@ -131,31 +131,25 @@ impl LedSupportFile {
         // Load user configs first so they are first to be checked
         if let Ok(file) = std::fs::read_to_string(ASUS_LED_MODE_USER_CONF) {
             if file.is_empty() {
-                warn!("{} is empty", ASUS_LED_MODE_USER_CONF);
+                warn!("{ASUS_LED_MODE_USER_CONF} is empty");
             } else {
                 if let Ok(mut tmp) = ron::from_str::<LedSupportFile>(&file) {
                     data.0.append(&mut tmp.0);
                 }
-                info!(
-                    "Loaded user-defined LED support data from {}",
-                    ASUS_LED_MODE_USER_CONF
-                );
+                info!("Loaded user-defined LED support data from {ASUS_LED_MODE_USER_CONF}");
             }
         }
         // Load and append the default LED support data
         if let Ok(file) = std::fs::read_to_string(ASUS_LED_MODE_CONF) {
             if file.is_empty() {
-                warn!("{} is empty", ASUS_LED_MODE_CONF);
+                warn!("{ASUS_LED_MODE_CONF} is empty");
             } else {
                 let mut tmp: LedSupportFile = ron::from_str(&file)
                     .map_err(|e| error!("{e}"))
-                    .unwrap_or_else(|_| panic!("Could not deserialise {}", ASUS_LED_MODE_CONF));
+                    .unwrap_or_else(|_| panic!("Could not deserialise {ASUS_LED_MODE_CONF}"));
                 data.0.append(&mut tmp.0);
                 loaded = true;
-                info!(
-                    "Loaded default LED support data from {}",
-                    ASUS_LED_MODE_CONF
-                );
+                info!("Loaded default LED support data from {ASUS_LED_MODE_CONF}");
             }
         }
         data.0.sort_by(|a, b| a.device_name.cmp(&b.device_name));
@@ -183,7 +177,7 @@ impl LedSupportFile {
             }
         }
 
-        warn!("Does {} exist?", ASUS_LED_MODE_USER_CONF);
+        warn!("Does {ASUS_LED_MODE_USER_CONF} exist?");
         None
     }
 }

@@ -5,9 +5,9 @@ pub use glam::Vec2;
 use glam::{Mat3, Vec3};
 use log::error;
 
+use crate::AnimeType;
 use crate::data::AnimeDataBuffer;
 use crate::error::{AnimeError, Result};
-use crate::AnimeType;
 
 /// A single greyscale + alpha pixel in the image
 #[derive(Copy, Clone, Debug)]
@@ -197,11 +197,7 @@ impl AnimeImage {
                 // G835L/G635L have inverted geometry - triangle at top-left, rectangle shifts right
                 // Triangle (rows 0-27): no cumulative shift, just alternating stagger
                 // Rectangle (rows 28-67): shifts right by ~0.5px per row
-                if y < 28 {
-                    0
-                } else {
-                    (y - 28) / 2
-                }
+                if y < 28 { 0 } else { (y - 28) / 2 }
             }
             _ => {
                 // first 11 rows start at zero
@@ -249,11 +245,7 @@ impl AnimeImage {
                 // G835L/G635L rows GROW then stay constant (inverted from other devices)
                 // Triangle (rows 0-27): pairs of rows with same length, 1→14
                 // Rectangle (rows 28-67): constant 15 LEDs
-                if y < 28 {
-                    y / 2 + 1
-                } else {
-                    15
-                }
+                if y < 28 { y / 2 + 1 } else { 15 }
             }
             _ => {
                 if y <= 11 {
