@@ -147,6 +147,7 @@ pub fn setup_window(
             available.contains(&"xyz.ljones.Slash".to_string()),
             available.contains(&"xyz.ljones.FanCurves".to_string()),
             true, // GPU Configuration
+            available.contains(&"xyz.ljones.Platform".to_string()), // Battery Info
             true, // App Settings
             true, // About
         ]
