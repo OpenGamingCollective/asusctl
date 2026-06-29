@@ -12,6 +12,8 @@ export global AppSettingsPageData {
     callback set_enable_dgpu_notifications(bool);
     in-out property <bool> enable_autostart;
     callback set_enable_autostart(bool);
+    in-out property <bool> autostart_in_background;
+    callback set_autostart_in_background(bool);
 }
 
 export component PageAppSettings inherits VerticalLayout {
@@ -58,6 +60,17 @@ export component PageAppSettings inherits VerticalLayout {
                 checked <=> AppSettingsPageData.enable_autostart;
                 toggled => {
                     AppSettingsPageData.set_enable_autostart(AppSettingsPageData.enable_autostart)
+                }
+            }
+
+            if AppSettingsPageData.enable_autostart : HorizontalLayout {
+                padding-left: 20px;
+                SystemToggle {
+                    text: @tr("Start in background on startup");
+                    checked <=> AppSettingsPageData.autostart_in_background;
+                    toggled => {
+                        AppSettingsPageData.set_autostart_in_background(AppSettingsPageData.autostart_in_background)
+                    }
                 }
             }
 

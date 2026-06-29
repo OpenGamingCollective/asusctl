@@ -15,6 +15,8 @@ pub struct Config {
     pub enable_tray_icon: bool,
     #[serde(default)]
     pub enable_autostart: bool,
+    #[serde(default)]
+    pub autostart_in_background: bool,
     pub ac_command: String,
     pub bat_command: String,
     pub dark_mode: bool,
@@ -33,6 +35,7 @@ impl Default for Config {
             startup_in_background: false,
             enable_tray_icon: true,
             enable_autostart: false,
+            autostart_in_background: false,
             dark_mode: true,
             start_fullscreen: false,
             fullscreen_width: 1920,
@@ -90,6 +93,7 @@ impl From<Config461> for Config {
             startup_in_background: c.startup_in_background,
             enable_tray_icon: true,
             enable_autostart: false,
+            autostart_in_background: false,
             ac_command: c.ac_command,
             bat_command: c.bat_command,
             dark_mode: true,
@@ -101,7 +105,7 @@ impl From<Config461> for Config {
     }
 }
 
-pub fn update_autostart(enable: bool) {
+pub fn update_autostart(enable: bool, in_background: bool) {
     let autostart_dir = match dirs::config_dir() {
         Some(mut p) => {
             p.push("autostart");
@@ -123,15 +127,21 @@ pub fn update_autostart(enable: bool) {
             }
         }
 
-        let content = "[Desktop Entry]\n\
+        let exec_cmd = if in_background {
+            "rog-control-center --background"
+        } else {
+            "rog-control-center"
+        };
+
+        let content = format!("[Desktop Entry]\n\
                        Version=1.0\n\
                        Type=Application\n\
                        Name=ROG Control Center\n\
                        Comment=Make your ASUS ROG Laptop go Brrrrr!\n\
                        Categories=Settings;\n\
                        Icon=rog-control-center\n\
-                       Exec=rog-control-center\n\
-                       Terminal=false\n";
+                       Exec={}\n\
+                       Terminal=false\n", exec_cmd);
 
         if let Err(e) = std::fs::write(&desktop_file, content) {
             log::error!("Failed to write autostart desktop file: {e}");
@@ -170,14 +180,14 @@ mod tests {
             };
 
             // Test enabling
-            update_autostart(true);
+            update_autostart(true, true);
             assert!(path.exists());
             let content = std::fs::read_to_string(&path).unwrap();
             assert!(content.contains("Name=ROG Control Center"));
-            assert!(content.contains("Exec=rog-control-center"));
+            assert!(content.contains("Exec=rog-control-center --background"));
 
             // Test disabling
-            update_autostart(false);
+            update_autostart(false, false);
             assert!(!path.exists());
 
             // Restore backup if any

@@ -165,10 +165,10 @@ async fn main() -> Result<()> {
     }
 
     config.write();
-    rog_control_center::config::update_autostart(config.enable_autostart);
+    rog_control_center::config::update_autostart(config.enable_autostart, config.autostart_in_background);
 
     let enable_tray_icon = config.enable_tray_icon;
-    let startup_in_background = config.startup_in_background;
+    let startup_in_background = cli_parsed.background || config.startup_in_background;
     let config = Arc::new(Mutex::new(config));
 
     start_notifications(config.clone(), &rt)?;
