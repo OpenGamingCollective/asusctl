@@ -157,6 +157,15 @@ export global SystemPageData {
     in-out property <float> battery_power_consumption: -1.0;
     in-out property <string> battery_status: "Unknown";
     in-out property <string> battery_time_estimate: "";
+    in-out property <float> cpu_temp_val: -1.0;
+    in-out property <float> gpu_temp_val: -1.0;
+    in-out property <float> cpu_usage_val: -1.0;
+    in-out property <float> gpu_usage_val: -1.0;
+    in-out property <float> ram_usage_val: -1.0;
+    in-out property <float> cpu_freq_mhz: -1.0;
+    in-out property <int> cpu_fan_rpm: -1;
+    in-out property <int> gpu_fan_rpm: -1;
+    in-out property <int> mid_fan_rpm: -1;
 }
 
 export component PageSystem inherits Rectangle {
@@ -298,6 +307,19 @@ export component PageSystem inherits Rectangle {
                         }
                     }
                 }
+            }
+
+            if SystemPageData.cpu_usage_val != -1.0: VerticalLayout {
+                spacing: 6px;
+                Text { text: "CPU Temp: " + Math.round(SystemPageData.cpu_temp_val) + " C"; color: Palette.control-foreground; }
+                Text { text: "GPU Temp: " + Math.round(SystemPageData.gpu_temp_val) + " C"; color: Palette.control-foreground; }
+                Text { text: "CPU Usage: " + Math.round(SystemPageData.cpu_usage_val) + "%"; color: Palette.control-foreground; }
+                Text { text: "GPU Usage: " + Math.round(SystemPageData.gpu_usage_val) + "%"; color: Palette.control-foreground; }
+                Text { text: "RAM Usage: " + Math.round(SystemPageData.ram_usage_val) + "%"; color: Palette.control-foreground; }
+                Text { text: "CPU Freq: " + Math.round(SystemPageData.cpu_freq_mhz) + " MHz"; color: Palette.control-foreground; }
+                Text { text: "CPU Fan: " + SystemPageData.cpu_fan_rpm + " RPM"; color: Palette.control-foreground; }
+                Text { text: "GPU Fan: " + SystemPageData.gpu_fan_rpm + " RPM"; color: Palette.control-foreground; }
+                Text { text: "Mid Fan: " + SystemPageData.mid_fan_rpm + " RPM"; color: Palette.control-foreground; }
             }
 
             if SystemPageData.platform_profile != -1: HorizontalLayout {
