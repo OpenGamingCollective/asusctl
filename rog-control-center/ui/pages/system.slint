@@ -166,6 +166,10 @@ export global SystemPageData {
     in-out property <int> cpu_fan_rpm: -1;
     in-out property <int> gpu_fan_rpm: -1;
     in-out property <int> mid_fan_rpm: -1;
+    in-out property <string> refresh_rate_current: "";
+    in-out property <[string]> refresh_rate_choices: [];
+    in-out property <int> refresh_rate_active_idx: -1;
+    callback cb_refresh_rate_changed(int);
 }
 
 export component PageSystem inherits Rectangle {
@@ -308,6 +312,49 @@ export component PageSystem inherits Rectangle {
                 }
             }
 
+            if SystemPageData.refresh_rate_active_idx != -1: Rectangle {
+                background: Palette.alternate-background;
+                border-color: Palette.border;
+                border-width: 1px;
+                border-radius: 4px;
+                
+                VerticalLayout {
+                    padding: 12px;
+                    spacing: 8px;
+                    
+                    HorizontalLayout {
+                        alignment: LayoutAlignment.start;
+                        spacing: 8px;
+                        Text {
+                            font-size: 14px;
+                            font-weight: 700;
+                            color: Palette.accent-background;
+                            text: @tr("Display Settings");
+                        }
+                    }
+
+                    HorizontalLayout {
+                        alignment: LayoutAlignment.space-between;
+                        spacing: 12px;
+                        
+                        Text {
+                            text: @tr("Refresh Rate:");
+                            color: Palette.control-foreground;
+                            vertical-alignment: TextVerticalAlignment.center;
+                        }
+
+                        SystemDropdown {
+                            combo_min_width: 150px;
+                            current_index <=> SystemPageData.refresh_rate_active_idx;
+                            current_value: SystemPageData.refresh_rate_choices[SystemPageData.refresh_rate_active_idx];
+                            model <=> SystemPageData.refresh_rate_choices;
+                            selected => {
+                                SystemPageData.cb_refresh_rate_changed(SystemPageData.refresh_rate_active_idx)
+                            }
+                        }
+                    }
+                }
+            }
 
             if SystemPageData.cpu_usage_val != -1.0: Rectangle {
                 background: Palette.alternate-background;
