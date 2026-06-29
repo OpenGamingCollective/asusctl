@@ -156,6 +156,7 @@ export global SystemPageData {
     in-out property <int> battery_cycle_count: -1;
     in-out property <float> battery_power_consumption: -1.0;
     in-out property <string> battery_status: "Unknown";
+    in-out property <string> battery_time_estimate: "";
 }
 
 export component PageSystem inherits Rectangle {
@@ -280,6 +281,19 @@ export component PageSystem inherits Rectangle {
                                 text: Math.round(SystemPageData.battery_power_consumption * 10) / 10 + " W";
                                 font-weight: 700;
                                 color: SystemPageData.battery_status == "Discharging" ? #ef4444 : #22c55e;
+                            }
+                        }
+
+                        if SystemPageData.battery_time_estimate != "": HorizontalLayout {
+                            alignment: LayoutAlignment.space-between;
+                            Text {
+                                text: SystemPageData.battery_status == "Charging" ? @tr("Time to Full:") : @tr("Time Remaining:");
+                                color: Palette.control-foreground;
+                            }
+                            Text {
+                                text: SystemPageData.battery_time_estimate;
+                                font-weight: 700;
+                                color: Palette.control-foreground;
                             }
                         }
                     }
