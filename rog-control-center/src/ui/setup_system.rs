@@ -37,6 +37,10 @@ pub fn setup_system_page(ui: &MainWindow, _config: Arc<Mutex<Config>>) {
         .set_charge_control_end_threshold(-1.0);
     ui.global::<SystemPageData>()
         .set_charge_control_enabled(false);
+    ui.global::<SystemPageData>().set_battery_health(-1);
+    ui.global::<SystemPageData>().set_battery_cycle_count(-1);
+    ui.global::<SystemPageData>().set_battery_power_consumption(-1.0);
+    ui.global::<SystemPageData>().set_battery_status("Unknown".into());
     ui.global::<SystemPageData>().set_platform_profile(-1);
     ui.global::<SystemPageData>().set_panel_overdrive(-1);
     ui.global::<SystemPageData>().set_boot_sound(-1);
@@ -69,6 +73,44 @@ pub fn setup_system_page(ui: &MainWindow, _config: Arc<Mutex<Config>>) {
                 .set_charge_control_enabled(true);
         }
     }
+
+    let handle = ui.as_weak();
+    tokio::spawn(async move {
+        loop {
+            let power = rog_platform::power::AsusPower::new().ok();
+            let (has_bat, health, cycles, consumption, status) = if let Some(ref p) = power {
+                if p.has_battery() {
+                    let health = p.get_battery_health().unwrap_or(0) as i32;
+                    let cycles = p.get_battery_cycle_count().unwrap_or(-1);
+                    let consumption = p.get_battery_power_consumption().unwrap_or(-1.0);
+                    let status = p.get_battery_status().unwrap_or_else(|_| "Unknown".to_string());
+                    (true, health, cycles, consumption, status)
+                } else {
+                    (false, -1, -1, -1.0, "Unknown".to_string())
+                }
+            } else {
+                (false, -1, -1, -1.0, "Unknown".to_string())
+            };
+
+            let success = handle.upgrade_in_event_loop(move |ui| {
+                let data = ui.global::<SystemPageData>();
+                if has_bat {
+                    data.set_battery_health(health);
+                    data.set_battery_cycle_count(cycles);
+                    data.set_battery_power_consumption(consumption);
+                    data.set_battery_status(status.into());
+                } else {
+                    data.set_battery_health(-1);
+                }
+            });
+
+            if success.is_err() {
+                break;
+            }
+
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        }
+    });
 }
 
 macro_rules! convert_value {
