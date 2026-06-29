@@ -20,7 +20,7 @@ const MINMAX: AttrMinMax = AttrMinMax {
     current: -1.0,
 };
 
-pub fn setup_system_page(ui: &MainWindow, _config: Arc<Mutex<Config>>) {
+pub fn setup_system_page(ui: &MainWindow, config: Arc<Mutex<Config>>) {
     let conn = zbus::blocking::Connection::system()
         .map_err(|e| error!("DBus system connection failed: {e:?}"))
         .unwrap();
@@ -78,9 +78,23 @@ pub fn setup_system_page(ui: &MainWindow, _config: Arc<Mutex<Config>>) {
         }
     }
 
+    let handle_copy = ui.as_weak();
+    ui.global::<SystemPageData>().on_cb_refresh_rate_changed(move |idx| {
+        if let Some((name, _, modes)) = get_kscreen_info() {
+            if let Some(mode) = modes.get(idx as usize) {
+                set_kscreen_mode(&name, &mode.0);
+                if let Some(handle) = handle_copy.upgrade() {
+                    handle.global::<SystemPageData>().set_refresh_rate_active_idx(idx);
+                }
+            }
+        }
+    });
+
     let handle = ui.as_weak();
+    let config_clone = config.clone();
     tokio::spawn(async move {
         let mut prev_ticks = read_cpu_ticks();
+        let mut prev_online = None;
         loop {
             let power = rog_platform::power::AsusPower::new().ok();
             let (has_bat, health, cycles, consumption, status, estimate_str) =
@@ -131,6 +145,66 @@ pub fn setup_system_page(ui: &MainWindow, _config: Arc<Mutex<Config>>) {
             };
             prev_ticks = curr_ticks;
 
+            // Refresh rate auto-switching logic
+            let kscreen_info = get_kscreen_info();
+            let mut refresh_rate_choices_strings = Vec::new();
+            let mut active_idx = -1;
+            let mut output_name = String::new();
+            let mut current_mode_id = String::new();
+            let mut available_modes_store = Vec::new();
+            if let Some((name, curr_id, modes)) = kscreen_info {
+                output_name = name;
+                current_mode_id = curr_id;
+                available_modes_store = modes.clone();
+                for (i, m) in modes.iter().enumerate() {
+                    refresh_rate_choices_strings.push(format!("{:.2} Hz", m.2));
+                    if m.0 == current_mode_id {
+                        active_idx = i as i32;
+                    }
+                }
+            }
+
+            let curr_online = power.as_ref().map(|p| p.get_online().unwrap_or(1) == 1).unwrap_or(true);
+            if let Some(prev) = prev_online {
+                if prev != curr_online {
+                    let auto_switch_enabled = if let Ok(lock) = config_clone.try_lock() {
+                        lock.auto_refresh_rate
+                    } else {
+                        false
+                    };
+                    if auto_switch_enabled && !available_modes_store.is_empty() {
+                        let target_mode = if curr_online {
+                            available_modes_store.last()
+                        } else {
+                            available_modes_store.first()
+                        };
+                        if let Some(mode) = target_mode {
+                            if mode.0 != current_mode_id {
+                                set_kscreen_mode(&output_name, &mode.0);
+                                current_mode_id = mode.0.clone();
+                                if let Some(pos) = available_modes_store.iter().position(|x| x.0 == mode.0) {
+                                    active_idx = pos as i32;
+                                }
+                                let msg = if curr_online {
+                                    format!("AC connected. Refresh rate set to {:.2} Hz.", mode.2)
+                                } else {
+                                    format!("AC disconnected. Refresh rate set to {:.2} Hz for power saving.", mode.2)
+                                };
+                                tokio::spawn(async move {
+                                    let _ = notify_rust::Notification::new()
+                                        .summary("Display Refresh Rate")
+                                        .body(&msg)
+                                        .icon("rog-control-center")
+                                        .show();
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            prev_online = Some(curr_online);
+
+            let choices_strings = refresh_rate_choices_strings.clone();
             let success = handle.upgrade_in_event_loop(move |ui| {
                 let data = ui.global::<SystemPageData>();
                 if has_bat {
@@ -151,6 +225,32 @@ pub fn setup_system_page(ui: &MainWindow, _config: Arc<Mutex<Config>>) {
                 data.set_cpu_fan_rpm(cpu_fan);
                 data.set_gpu_fan_rpm(gpu_fan);
                 data.set_mid_fan_rpm(mid_fan);
+
+                // Refresh rate properties
+                if active_idx != -1 {
+                    if data.get_refresh_rate_active_idx() != active_idx {
+                        data.set_refresh_rate_active_idx(active_idx);
+                    }
+                    let ui_choices = data.get_refresh_rate_choices();
+                    let mut choices_changed = ui_choices.row_count() != choices_strings.len();
+                    if !choices_changed {
+                        for i in 0..ui_choices.row_count() {
+                            if ui_choices.row_data(i) != Some(choices_strings[i].clone().into()) {
+                                choices_changed = true;
+                                break;
+                            }
+                        }
+                    }
+                    if choices_changed {
+                        let model = slint::VecModel::default();
+                        for choice in &choices_strings {
+                            model.push(choice.clone().into());
+                        }
+                        data.set_refresh_rate_choices(slint::ModelRc::new(model));
+                    }
+                } else {
+                    data.set_refresh_rate_active_idx(-1);
+                }
             });
 
             if success.is_err() {
@@ -1008,4 +1108,60 @@ fn get_gpu_usage_pct() -> f32 {
         }
     }
     0.0
+}
+
+#[derive(serde::Deserialize, Debug)]
+struct KScreenOutput {
+    name: String,
+    #[serde(rename = "currentModeId")]
+    current_mode_id: String,
+    modes: Vec<KScreenMode>,
+    #[serde(rename = "type")]
+    output_type: i32,
+}
+
+#[derive(serde::Deserialize, Debug)]
+struct KScreenMode {
+    id: String,
+    name: String,
+    #[serde(rename = "refreshRate")]
+    refresh_rate: f64,
+}
+
+#[derive(serde::Deserialize, Debug)]
+struct KScreenConfig {
+    outputs: Vec<KScreenOutput>,
+}
+
+fn get_kscreen_info() -> Option<(String, String, Vec<(String, String, f64)>)> {
+    let output = std::process::Command::new("kscreen-doctor")
+        .arg("-j")
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let config: KScreenConfig = serde_json::from_slice(&output.stdout).ok()?;
+    let panel = config.outputs.iter().find(|o| o.output_type == 7 || o.name.starts_with("eDP"))?;
+    let current_mode = panel.modes.iter().find(|m| m.id == panel.current_mode_id)?;
+    let current_res = current_mode.name.split('@').next()?.trim();
+    
+    let mut available_rates = Vec::new();
+    for m in &panel.modes {
+        if let Some(res) = m.name.split('@').next() {
+            if res.trim() == current_res {
+                available_rates.push((m.id.clone(), m.name.clone(), m.refresh_rate));
+            }
+        }
+    }
+    available_rates.sort_by(|a, b| a.2.partial_cmp(&b.2).unwrap_or(std::cmp::Ordering::Equal));
+    
+    Some((panel.name.clone(), current_mode.id.clone(), available_rates))
+}
+
+fn set_kscreen_mode(output_name: &str, mode_id: &str) {
+    let arg = format!("output.{}.mode.{}", output_name, mode_id);
+    let _ = std::process::Command::new("kscreen-doctor")
+        .arg(arg)
+        .output();
 }
