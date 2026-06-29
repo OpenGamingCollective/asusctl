@@ -96,8 +96,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     loop {
         tokio::select! {
             _ = sigterm.recv() => {
-                warn!("Received SIGTERM");
-                warn!("Deferring exit until deferred shutdown apply reaches a safe completion point");
+                warn!("Received SIGTERM, exiting cleanly");
+                break;
             }
             event = shutdown_events.next() => {
                 match event {
