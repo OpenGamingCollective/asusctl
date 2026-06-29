@@ -112,4 +112,155 @@ impl AsusPower {
             usb,
         })
     }
+
+    pub fn has_battery(&self) -> bool {
+        !self.battery.as_os_str().is_empty()
+    }
+
+    pub fn get_battery_cycle_count(&self) -> Result<i32> {
+        let path = self.battery.join("cycle_count");
+        if !path.exists() {
+            return Err(PlatformError::Read(
+                path.to_string_lossy().into(),
+                std::io::Error::new(std::io::ErrorKind::NotFound, "file not found"),
+            ));
+        }
+        let content = std::fs::read_to_string(&path)
+            .map_err(|e| PlatformError::Read(path.to_string_lossy().into(), e))?;
+        content
+            .trim()
+            .parse::<i32>()
+            .map_err(|e| PlatformError::Read(
+                path.to_string_lossy().into(),
+                std::io::Error::new(std::io::ErrorKind::InvalidData, e),
+            ))
+    }
+
+    pub fn get_battery_health(&self) -> Result<u8> {
+        let full = if self.battery.join("energy_full").exists() {
+            let content = std::fs::read_to_string(self.battery.join("energy_full"))
+                .map_err(|e| PlatformError::Read("energy_full".into(), e))?;
+            content.trim().parse::<f64>().ok()
+        } else if self.battery.join("charge_full").exists() {
+            let content = std::fs::read_to_string(self.battery.join("charge_full"))
+                .map_err(|e| PlatformError::Read("charge_full".into(), e))?;
+            content.trim().parse::<f64>().ok()
+        } else {
+            None
+        };
+
+        let design = if self.battery.join("energy_full_design").exists() {
+            let content = std::fs::read_to_string(self.battery.join("energy_full_design"))
+                .map_err(|e| PlatformError::Read("energy_full_design".into(), e))?;
+            content.trim().parse::<f64>().ok()
+        } else if self.battery.join("charge_full_design").exists() {
+            let content = std::fs::read_to_string(self.battery.join("charge_full_design"))
+                .map_err(|e| PlatformError::Read("charge_full_design".into(), e))?;
+            content.trim().parse::<f64>().ok()
+        } else {
+            None
+        };
+
+        match (full, design) {
+            (Some(f), Some(d)) if d > 0.0 => {
+                let health = (f / d * 100.0).round().min(100.0).max(0.0) as u8;
+                Ok(health)
+            }
+            _ => Err(PlatformError::Read(
+                self.battery.to_string_lossy().into(),
+                std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    "energy/charge attributes not found",
+                ),
+            )),
+        }
+    }
+
+    pub fn get_battery_power_consumption(&self) -> Result<f32> {
+        if self.battery.join("power_now").exists() {
+            let content = std::fs::read_to_string(self.battery.join("power_now"))
+                .map_err(|e| PlatformError::Read("power_now".into(), e))?;
+            let power = content.trim().parse::<f32>().map_err(|e| {
+                PlatformError::Read(
+                    "power_now".into(),
+                    std::io::Error::new(std::io::ErrorKind::InvalidData, e),
+                )
+            })?;
+            Ok(power / 1_000_000.0)
+        } else if self.battery.join("current_now").exists() && self.battery.join("voltage_now").exists() {
+            let current_str = std::fs::read_to_string(self.battery.join("current_now"))
+                .map_err(|e| PlatformError::Read("current_now".into(), e))?;
+            let voltage_str = std::fs::read_to_string(self.battery.join("voltage_now"))
+                .map_err(|e| PlatformError::Read("voltage_now".into(), e))?;
+            let current = current_str.trim().parse::<f32>().map_err(|e| {
+                PlatformError::Read(
+                    "current_now".into(),
+                    std::io::Error::new(std::io::ErrorKind::InvalidData, e),
+                )
+            })?;
+            let voltage = voltage_str.trim().parse::<f32>().map_err(|e| {
+                PlatformError::Read(
+                    "voltage_now".into(),
+                    std::io::Error::new(std::io::ErrorKind::InvalidData, e),
+                )
+            })?;
+            Ok((current * voltage) / 1_000_000_000.0)
+        } else {
+            Err(PlatformError::Read(
+                self.battery.to_string_lossy().into(),
+                std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    "power/current/voltage attributes not found",
+                ),
+            ))
+        }
+    }
+
+    pub fn get_battery_status(&self) -> Result<String> {
+        let path = self.battery.join("status");
+        if !path.exists() {
+            return Err(PlatformError::Read(
+                path.to_string_lossy().into(),
+                std::io::Error::new(std::io::ErrorKind::NotFound, "file not found"),
+            ));
+        }
+        let content = std::fs::read_to_string(&path)
+            .map_err(|e| PlatformError::Read(path.to_string_lossy().into(), e))?;
+        Ok(content.trim().to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_battery_methods() {
+        let temp_dir = std::env::temp_dir().join("fake_battery");
+        fs::create_dir_all(&temp_dir).unwrap();
+
+        // Write fake files
+        fs::write(temp_dir.join("cycle_count"), "42\n").unwrap();
+        fs::write(temp_dir.join("energy_full"), "80000000\n").unwrap();
+        fs::write(temp_dir.join("energy_full_design"), "100000000\n").unwrap();
+        fs::write(temp_dir.join("power_now"), "15000000\n").unwrap();
+        fs::write(temp_dir.join("status"), "Discharging\n").unwrap();
+
+        let power = AsusPower {
+            mains: PathBuf::new(),
+            battery: temp_dir.clone(),
+            usb: None,
+        };
+
+        assert!(power.has_battery());
+        assert_eq!(power.get_battery_cycle_count().unwrap(), 42);
+        assert_eq!(power.get_battery_health().unwrap(), 80);
+        assert_eq!(power.get_battery_power_consumption().unwrap(), 15.0);
+        assert_eq!(power.get_battery_status().unwrap(), "Discharging");
+
+        // Clean up
+        fs::remove_dir_all(&temp_dir).ok();
+    }
 }
