@@ -127,13 +127,12 @@ impl AsusPower {
         }
         let content = std::fs::read_to_string(&path)
             .map_err(|e| PlatformError::Read(path.to_string_lossy().into(), e))?;
-        content
-            .trim()
-            .parse::<i32>()
-            .map_err(|e| PlatformError::Read(
+        content.trim().parse::<i32>().map_err(|e| {
+            PlatformError::Read(
                 path.to_string_lossy().into(),
                 std::io::Error::new(std::io::ErrorKind::InvalidData, e),
-            ))
+            )
+        })
     }
 
     pub fn get_battery_health(&self) -> Result<u8> {
@@ -187,7 +186,9 @@ impl AsusPower {
                 )
             })?;
             Ok(power / 1_000_000.0)
-        } else if self.battery.join("current_now").exists() && self.battery.join("voltage_now").exists() {
+        } else if self.battery.join("current_now").exists()
+            && self.battery.join("voltage_now").exists()
+        {
             let current_str = std::fs::read_to_string(self.battery.join("current_now"))
                 .map_err(|e| PlatformError::Read("current_now".into(), e))?;
             let voltage_str = std::fs::read_to_string(self.battery.join("voltage_now"))

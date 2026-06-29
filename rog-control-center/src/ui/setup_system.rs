@@ -39,8 +39,10 @@ pub fn setup_system_page(ui: &MainWindow, _config: Arc<Mutex<Config>>) {
         .set_charge_control_enabled(false);
     ui.global::<SystemPageData>().set_battery_health(-1);
     ui.global::<SystemPageData>().set_battery_cycle_count(-1);
-    ui.global::<SystemPageData>().set_battery_power_consumption(-1.0);
-    ui.global::<SystemPageData>().set_battery_status("Unknown".into());
+    ui.global::<SystemPageData>()
+        .set_battery_power_consumption(-1.0);
+    ui.global::<SystemPageData>()
+        .set_battery_status("Unknown".into());
     ui.global::<SystemPageData>().set_platform_profile(-1);
     ui.global::<SystemPageData>().set_panel_overdrive(-1);
     ui.global::<SystemPageData>().set_boot_sound(-1);
@@ -83,7 +85,9 @@ pub fn setup_system_page(ui: &MainWindow, _config: Arc<Mutex<Config>>) {
                     let health = p.get_battery_health().unwrap_or(0) as i32;
                     let cycles = p.get_battery_cycle_count().unwrap_or(-1);
                     let consumption = p.get_battery_power_consumption().unwrap_or(-1.0);
-                    let status = p.get_battery_status().unwrap_or_else(|_| "Unknown".to_string());
+                    let status = p
+                        .get_battery_status()
+                        .unwrap_or_else(|_| "Unknown".to_string());
                     (true, health, cycles, consumption, status)
                 } else {
                     (false, -1, -1, -1.0, "Unknown".to_string())
