@@ -162,7 +162,7 @@ impl AsusPower {
 
         match (full, design) {
             (Some(f), Some(d)) if d > 0.0 => {
-                let health = (f / d * 100.0).round().min(100.0).max(0.0) as u8;
+                let health = (f / d * 100.0).round().clamp(0.0, 100.0) as u8;
                 Ok(health)
             }
             _ => Err(PlatformError::Read(
