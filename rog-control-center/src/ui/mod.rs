@@ -211,11 +211,31 @@ pub fn setup_app_settings_page(ui: &MainWindow, config: Arc<Mutex<Config>>) {
             lock.write();
         }
     });
+    let config_copy = config.clone();
+    global.on_set_enable_autostart(move |enable| {
+        if let Ok(mut lock) = config_copy.try_lock() {
+            lock.enable_autostart = enable;
+            let in_bg = lock.autostart_in_background;
+            lock.write();
+            super::config::update_autostart(enable, in_bg);
+        }
+    });
+    let config_copy = config.clone();
+    global.on_set_autostart_in_background(move |enable| {
+        if let Ok(mut lock) = config_copy.try_lock() {
+            lock.autostart_in_background = enable;
+            let autostart = lock.enable_autostart;
+            lock.write();
+            super::config::update_autostart(autostart, enable);
+        }
+    });
 
     if let Ok(lock) = config.try_lock() {
         global.set_run_in_background(lock.run_in_background);
         global.set_startup_in_background(lock.startup_in_background);
         global.set_enable_tray_icon(lock.enable_tray_icon);
         global.set_enable_dgpu_notifications(lock.notifications.enabled);
+        global.set_enable_autostart(lock.enable_autostart);
+        global.set_autostart_in_background(lock.autostart_in_background);
     }
 }
