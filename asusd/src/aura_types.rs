@@ -205,6 +205,7 @@ impl DeviceHandle {
             backlight,
             config: Arc::new(Mutex::new(config)),
             is_lamparray: false,
+            effect_task: Arc::new(Mutex::new(None)),
         };
         aura.do_initialization().await?;
         Ok(Self::Aura(aura))
@@ -257,6 +258,7 @@ impl DeviceHandle {
             backlight: None,
             config: Arc::new(Mutex::new(config)),
             is_lamparray: true,
+            effect_task: Arc::new(Mutex::new(None)),
         };
         aura.do_initialization().await?;
         info!("LampArray ready: 0b05:{pid:04x} on {dev_path:?}");

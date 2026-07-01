@@ -1,14 +1,16 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use config::AuraConfig;
 use config_traits::StdConfig;
 use log::info;
 use rog_aura::keyboard::{AuraLaptopUsbPackets, LedUsbPackets};
 use rog_aura::usb::{AURA_LAPTOP_LED_APPLY, AURA_LAPTOP_LED_SET};
-use rog_aura::{AuraDeviceType, AuraEffect, LedBrightness, PowerZones, AURA_LAPTOP_LED_MSG_LEN};
+use rog_aura::{AuraDeviceType, AuraEffect, AuraModeNum, LedBrightness, PowerZones, Speed, AURA_LAPTOP_LED_MSG_LEN};
 use rog_platform::hid_raw::HidRaw;
 use rog_platform::keyboard_led::KeyboardBacklight;
 use tokio::sync::{Mutex, MutexGuard};
+use tokio::task::JoinHandle;
 
 use crate::error::RogError;
 
@@ -25,6 +27,13 @@ pub struct Aura {
     /// asus-wmi sysfs backlight is absent and all interactions go through
     /// HIDIOC[SG]FEATURE feature reports.
     pub is_lamparray: bool,
+    /// Handle for the currently-running LampArray dynamic-effect task.
+    /// The LampArray chip is passive: animations (Breathe, RainbowCycle,
+    /// RainbowWave, Pulse, ...) are driven by the host pushing
+    /// LampRangeUpdate frames at ~30 FPS from a tokio task. When a new
+    /// effect is written we abort the old task first so we never have two
+    /// loops fighting over the hid lock.
+    pub effect_task: Arc<Mutex<Option<JoinHandle<()>>>>,
 }
 
 impl Aura {
@@ -335,9 +344,9 @@ impl Aura {
     /// `AuraConfig` should prefer `lamparray_write_effect_locked` to avoid
     /// the fallback path entirely.
     pub async fn lamparray_write_effect(&self, mode: &AuraEffect) -> Result<(), RogError> {
-        let r = mode.colour1.r;
-        let g = mode.colour1.g;
-        let b = mode.colour1.b;
+        // Always stop any previous animation loop before doing anything else,
+        // so two effect tasks never race to push frames.
+        self.lamparray_stop_effect_task().await;
         let brightness = match self.config.try_lock() {
             Ok(cfg) => cfg.brightness,
             Err(_) => {
@@ -348,8 +357,22 @@ impl Aura {
             }
         };
         let intensity = Self::brightness_to_intensity(brightness);
-        info!("lamparray_write_effect: about to push rgb (no lock held)");
-        self.lamparray_push_rgb_i(r, g, b, intensity).await
+        match mode.mode {
+            AuraModeNum::Static => {
+                let r = mode.colour1.r;
+                let g = mode.colour1.g;
+                let b = mode.colour1.b;
+                info!("lamparray_write_effect: Static, single push");
+                self.lamparray_push_rgb_i(r, g, b, intensity).await
+            }
+            _ => {
+                info!(
+                    "lamparray_write_effect: dynamic mode {:?}, spawning effect task",
+                    mode.mode
+                );
+                self.lamparray_spawn_effect(mode.clone(), intensity).await
+            }
+        }
     }
 
     /// Variant for callers that already hold the config lock. Pass the
@@ -360,12 +383,26 @@ impl Aura {
         config: &AuraConfig,
         mode: &AuraEffect,
     ) -> Result<(), RogError> {
-        let r = mode.colour1.r;
-        let g = mode.colour1.g;
-        let b = mode.colour1.b;
+        // Same rule as `lamparray_write_effect`: kill any running animation
+        // before dispatching so we don't accumulate tasks across reloads.
+        self.lamparray_stop_effect_task().await;
         let intensity = Self::brightness_to_intensity(config.brightness);
-        info!("lamparray_write_effect_locked: about to push rgb (caller owns config lock)");
-        self.lamparray_push_rgb_i(r, g, b, intensity).await
+        match mode.mode {
+            AuraModeNum::Static => {
+                let r = mode.colour1.r;
+                let g = mode.colour1.g;
+                let b = mode.colour1.b;
+                info!("lamparray_write_effect_locked: Static, single push");
+                self.lamparray_push_rgb_i(r, g, b, intensity).await
+            }
+            _ => {
+                info!(
+                    "lamparray_write_effect_locked: dynamic mode {:?}, spawning effect task",
+                    mode.mode
+                );
+                self.lamparray_spawn_effect(mode.clone(), intensity).await
+            }
+        }
     }
 
     fn brightness_to_intensity(b: LedBrightness) -> u8 {
@@ -433,6 +470,203 @@ impl Aura {
             }
         };
         let intensity = if any_on { 255 } else { 0 };
+        // A power-state change also implies "stop whatever animation was
+        // running", otherwise the loop would happily override our push.
+        self.lamparray_stop_effect_task().await;
         self.lamparray_push_rgb_i(r, g, b, intensity).await
     }
+
+    /// Abort the current LampArray effect task, if any. Safe to call even
+    /// when no task is running.
+    pub async fn lamparray_stop_effect_task(&self) {
+        let mut slot = self.effect_task.lock().await;
+        if let Some(handle) = slot.take() {
+            handle.abort();
+            info!("lamparray_effect_task: cancelled");
+        }
+    }
+
+    /// Spawn a tokio task that drives one of the dynamic LampArray effects
+    /// (Breathe / RainbowCycle / RainbowWave / Pulse). The task loops at
+    /// ~30 FPS pushing LampRangeUpdate feature reports. `intensity` is the
+    /// current brightness cap (0..=255): brightness-driven effects
+    /// (Breathe, Pulse) modulate I within this cap; HSV effects
+    /// (RainbowCycle, RainbowWave) pass it straight through.
+    async fn lamparray_spawn_effect(
+        &self,
+        mode: AuraEffect,
+        intensity: u8,
+    ) -> Result<(), RogError> {
+        let hid_arc = self
+            .hid
+            .as_ref()
+            .ok_or(RogError::NoAuraKeyboard)?
+            .clone();
+
+        // Probe LampCount once, up-front, so the task doesn't need to touch
+        // GET_FEATURE at 30 FPS.
+        let lamp_count = {
+            let hid = hid_arc.lock().await;
+            hid.set_feature_report(&[0x46, 0x00])?;
+            let mut attr = vec![0u8; 23];
+            attr[0] = 0x41;
+            hid.get_feature_report(&mut attr)?;
+            u16::from_le_bytes([attr[1], attr[2]])
+        };
+        if lamp_count == 0 {
+            return Err(RogError::MissingFunction(
+                "LampArray reports zero lamps".to_string(),
+            ));
+        }
+
+        let period_ms = Self::speed_to_period_ms(mode.speed);
+        let frame_ms: u64 = 33; // ~30 FPS
+        let total_frames: u32 =
+            ((period_ms as f32) / (frame_ms as f32)).max(1.0) as u32;
+        let mode_kind = mode.mode;
+        let colour1 = mode.colour1;
+
+        info!(
+            "lamparray_effect_task: starting mode={:?} period={}ms frames={}              rgb1=({},{},{}) intensity_cap={}",
+            mode_kind,
+            period_ms,
+            total_frames,
+            colour1.r,
+            colour1.g,
+            colour1.b,
+            intensity
+        );
+
+        let hid_for_task = hid_arc.clone();
+        let handle = tokio::spawn(async move {
+            let mut ticker =
+                tokio::time::interval(Duration::from_millis(frame_ms));
+            // Discard the immediate first tick so the loop pacing is stable.
+            ticker.tick().await;
+            let mut frame: u32 = 0;
+            loop {
+                let t = (frame % total_frames) as f32
+                    / (total_frames as f32);
+                let (r, g, b, i) = match mode_kind {
+                    AuraModeNum::Breathe => {
+                        // Pure sinusoid on I; keep colour1 as the hue.
+                        let s = (2.0
+                            * std::f32::consts::PI
+                            * t)
+                            .sin();
+                        let level = ((s + 1.0) * 0.5) * intensity as f32;
+                        (
+                            colour1.r,
+                            colour1.g,
+                            colour1.b,
+                            level.round().clamp(0.0, 255.0) as u8,
+                        )
+                    }
+                    AuraModeNum::Pulse => {
+                        // Sharp attack, slow decay - "heartbeat" style.
+                        let phase = t;
+                        let level = if phase < 0.2 {
+                            (phase / 0.2) * intensity as f32
+                        } else {
+                            (1.0 - (phase - 0.2) / 0.8) * intensity as f32
+                        };
+                        (
+                            colour1.r,
+                            colour1.g,
+                            colour1.b,
+                            level.round().clamp(0.0, 255.0) as u8,
+                        )
+                    }
+                    AuraModeNum::RainbowCycle => {
+                        let hue = (t * 360.0) % 360.0;
+                        let (r, g, b) = hsv_to_rgb(hue, 1.0, 1.0);
+                        (r, g, b, intensity)
+                    }
+                    AuraModeNum::RainbowWave => {
+                        // On LampCount=1 there is no spatial "wave" to
+                        // encode - a single lamp is scalar. We keep the
+                        // same hue rotation as RainbowCycle but sweep the
+                        // hue backwards to give the user a visual
+                        // difference between the two modes.
+                        let hue = (360.0 - (t * 360.0)) % 360.0;
+                        let (r, g, b) = hsv_to_rgb(hue, 1.0, 1.0);
+                        (r, g, b, intensity)
+                    }
+                    // Should not happen: Static and unhandled modes go
+                    // through the single-push path in write_effect.
+                    _ => (colour1.r, colour1.g, colour1.b, intensity),
+                };
+
+                let last = lamp_count - 1;
+                let payload = [
+                    0x45,
+                    0x01,
+                    0x00,
+                    0x00,
+                    (last & 0xff) as u8,
+                    ((last >> 8) & 0xff) as u8,
+                    r,
+                    g,
+                    b,
+                    i,
+                ];
+                // Hold the hid lock only for the write, so brightness/other
+                // callers can interleave between frames.
+                {
+                    let hid = hid_for_task.lock().await;
+                    if let Err(e) = hid.set_feature_report(&payload) {
+                        log::warn!(
+                            "lamparray_effect_task: set_feature_report failed: {e:?} - stopping"
+                        );
+                        break;
+                    }
+                }
+
+                frame = frame.wrapping_add(1);
+                ticker.tick().await;
+            }
+            info!("lamparray_effect_task: exited");
+        });
+
+        let mut slot = self.effect_task.lock().await;
+        *slot = Some(handle);
+        Ok(())
+    }
+
+    /// Map the abstract rog_aura::Speed enum to a period in milliseconds
+    /// for one full cycle of the animation.
+    fn speed_to_period_ms(s: Speed) -> u32 {
+        match s {
+            Speed::Low => 4000,
+            Speed::Med => 2000,
+            Speed::High => 800,
+        }
+    }
+}
+
+/// Convert an HSV colour (hue in degrees, s/v in [0, 1]) to 8-bit RGB.
+/// Standard formula from https://en.wikipedia.org/wiki/HSL_and_HSV.
+fn hsv_to_rgb(h: f32, s: f32, v: f32) -> (u8, u8, u8) {
+    let c = v * s;
+    let hp = (h / 60.0) % 6.0;
+    let x = c * (1.0 - ((hp % 2.0) - 1.0).abs());
+    let (r1, g1, b1) = if hp < 1.0 {
+        (c, x, 0.0)
+    } else if hp < 2.0 {
+        (x, c, 0.0)
+    } else if hp < 3.0 {
+        (0.0, c, x)
+    } else if hp < 4.0 {
+        (0.0, x, c)
+    } else if hp < 5.0 {
+        (x, 0.0, c)
+    } else {
+        (c, 0.0, x)
+    };
+    let m = v - c;
+    (
+        ((r1 + m) * 255.0).round().clamp(0.0, 255.0) as u8,
+        ((g1 + m) * 255.0).round().clamp(0.0, 255.0) as u8,
+        ((b1 + m) * 255.0).round().clamp(0.0, 255.0) as u8,
+    )
 }
