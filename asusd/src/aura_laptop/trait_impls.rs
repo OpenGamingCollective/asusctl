@@ -61,6 +61,9 @@ impl AuraZbus {
     /// Return the current LED brightness
     #[zbus(property)]
     async fn brightness(&self) -> Result<LedBrightness, ZbErr> {
+        if self.0.is_lamparray {
+            return Ok(self.0.config.lock().await.brightness);
+        }
         if let Some(bl) = self.0.backlight.as_ref() {
             return Ok(bl.lock().await.get_brightness().map(|n| n.into())?);
         }
@@ -70,6 +73,13 @@ impl AuraZbus {
     /// Set the keyboard brightness level (0-3)
     #[zbus(property)]
     async fn set_brightness(&mut self, brightness: LedBrightness) -> Result<(), ZbErr> {
+        if self.0.is_lamparray {
+            self.0.lamparray_set_brightness(brightness.into()).await?;
+            let mut config = self.0.config.lock().await;
+            config.brightness = brightness;
+            config.write();
+            return Ok(());
+        }
         if let Some(bl) = self.0.backlight.as_ref() {
             let res = bl.lock().await.set_brightness(brightness.into());
             if res.is_ok() {
@@ -133,11 +143,17 @@ impl AuraZbus {
     async fn set_led_mode(&mut self, num: AuraModeNum) -> Result<(), ZbErr> {
         let mut config = self.0.config.lock().await;
         config.current_mode = num;
-        self.0.write_current_config_mode(&mut config).await?;
         if config.brightness == LedBrightness::Off {
             config.brightness = LedBrightness::Med;
         }
-        self.0.set_brightness(config.brightness.into()).await?;
+        self.0.write_current_config_mode(&mut config).await?;
+        if !self.0.is_lamparray {
+            // For LampArray write_current_config_mode already pushed both
+            // colour and intensity in one HID feature report (via the
+            // *_locked path). Avoid a second push that would race the
+            // colour with the white fallback in lamparray_set_brightness.
+            self.0.set_brightness(config.brightness.into()).await?;
+        }
         config.write();
         Ok(())
     }
@@ -173,13 +189,27 @@ impl AuraZbus {
             )));
         }
 
-        self.0
-            .write_effect_and_apply(config.led_type, &effect)
-            .await?;
         if config.brightness == LedBrightness::Off {
             config.brightness = LedBrightness::Med;
         }
-        self.0.set_brightness(config.brightness.into()).await?;
+        if self.0.is_lamparray {
+            // LampArray: a single HID feature report carries both colour and
+            // intensity, so we must push them together. The caller already
+            // owns config.lock(), so use the *_locked variant to avoid the
+            // try_lock fallback in lamparray_write_effect that would clobber
+            // the colour with a Med/white default. We also skip the
+            // subsequent set_brightness() call because lamparray_set_brightness
+            // would race the colour we just wrote (try_lock fails -> white
+            // fallback push).
+            self.0
+                .lamparray_write_effect_locked(&config, &effect)
+                .await?;
+        } else {
+            self.0
+                .write_effect_and_apply(config.led_type, &effect)
+                .await?;
+            self.0.set_brightness(config.brightness.into()).await?;
+        }
         config.set_builtin(effect);
         config.write();
         Ok(())

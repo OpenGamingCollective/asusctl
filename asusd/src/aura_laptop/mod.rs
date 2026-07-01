@@ -20,6 +20,11 @@ pub struct Aura {
     pub hid: Option<Arc<Mutex<HidRaw>>>,
     pub backlight: Option<Arc<Mutex<KeyboardBacklight>>>,
     pub config: Arc<Mutex<AuraConfig>>,
+    /// True when this Aura is driven via the HID LampArray usage page
+    /// (I2C-HID controllers on newer ASUS TUF laptops). When true the
+    /// asus-wmi sysfs backlight is absent and all interactions go through
+    /// HIDIOC[SG]FEATURE feature reports.
+    pub is_lamparray: bool,
 }
 
 impl Aura {
@@ -36,7 +41,10 @@ impl Aura {
     /// this in scope then a deadlock can occur.
     pub async fn update_config(&self) -> Result<(), RogError> {
         let mut config = self.config.lock().await;
-        let bright = if let Some(bl) = self.backlight.as_ref() {
+        let bright = if self.is_lamparray {
+            // LampArray brightness lives entirely in our config (no sysfs node).
+            config.brightness.into()
+        } else if let Some(bl) = self.backlight.as_ref() {
             bl.lock().await.get_brightness().unwrap_or_default()
         } else {
             config.brightness.into()
@@ -69,15 +77,26 @@ impl Aura {
             if let Some(multizones) = config.multizone.as_mut() {
                 if let Some(set) = multizones.get(&mode) {
                     for mode in set.clone() {
-                        self.write_effect_and_apply(config.led_type, &mode).await?;
+                        if self.is_lamparray {
+                            // Caller already owns `config`; re-locking
+                            // `self.config` inside `lamparray_write_effect`
+                            // used to deadlock us at init time.
+                            self.lamparray_write_effect_locked(config, &mode).await?;
+                        } else {
+                            self.write_effect_and_apply(config.led_type, &mode).await?;
+                        }
                     }
                 }
             }
         } else {
             let mode = config.current_mode;
             if let Some(effect) = config.builtins.get(&mode).cloned() {
-                self.write_effect_and_apply(config.led_type, &effect)
-                    .await?;
+                if self.is_lamparray {
+                    self.lamparray_write_effect_locked(config, &effect).await?;
+                } else {
+                    self.write_effect_and_apply(config.led_type, &effect)
+                        .await?;
+                }
             }
         }
 
@@ -93,6 +112,13 @@ impl Aura {
         dev_type: AuraDeviceType,
         mode: &AuraEffect,
     ) -> Result<(), RogError> {
+        if self.is_lamparray {
+            info!(
+                "LampArray write_effect_and_apply: dev_type={:?} mode={:?}",
+                dev_type, mode.mode
+            );
+            return self.lamparray_write_effect(mode).await;
+        }
         if matches!(dev_type, AuraDeviceType::LaptopKeyboardTuf) {
             if let Some(platform) = &self.backlight {
                 let buf = [
@@ -128,6 +154,9 @@ impl Aura {
     }
 
     pub async fn set_brightness(&self, value: u8) -> Result<(), RogError> {
+        if self.is_lamparray {
+            return self.lamparray_set_brightness(value).await;
+        }
         if let Some(backlight) = &self.backlight {
             backlight.lock().await.set_brightness(value)?;
             return Ok(());
@@ -140,6 +169,9 @@ impl Aura {
     /// Set combination state for boot animation/sleep animation/all leds/keys
     /// leds/side leds LED active
     pub async fn set_power_states(&self, config: &AuraConfig) -> Result<(), RogError> {
+        if self.is_lamparray {
+            return self.lamparray_set_aura_power(config).await;
+        }
         if matches!(config.led_type, rog_aura::AuraDeviceType::LaptopKeyboardTuf) {
             if let Some(backlight) = &self.backlight {
                 // TODO: tuf bool array
@@ -237,5 +269,170 @@ impl Aura {
             }
         }
         Ok(())
+    }
+
+    /// LampArray helper - write the current static colour to the whole
+    /// keyboard at the requested intensity (0-255). The protocol is the
+    /// Microsoft HID LampArray usage page:
+    ///   * report 0x46 - "autonomous mode" toggle (we disable so the OS owns)
+    ///   * report 0x41 - LampArrayAttributes (read to discover LampCount)
+    ///   * report 0x45 - LampArrayMultiUpdate / RangeUpdate
+    async fn lamparray_push_rgb_i(
+        &self,
+        r: u8,
+        g: u8,
+        b: u8,
+        intensity: u8,
+    ) -> Result<(), RogError> {
+        let hid_arc = self
+            .hid
+            .as_ref()
+            .ok_or(RogError::NoAuraKeyboard)?
+            .clone();
+        let hid = hid_arc.lock().await;
+        // Disable autonomous so we own the lamp array
+        hid.set_feature_report(&[0x46, 0x00])?;
+        // Read LampArrayAttributes to discover the lamp count
+        let mut attr = vec![0u8; 23];
+        attr[0] = 0x41;
+        hid.get_feature_report(&mut attr)?;
+        let lamp_count = u16::from_le_bytes([attr[1], attr[2]]);
+        if lamp_count == 0 {
+            return Err(RogError::MissingFunction(
+                "LampArray reports zero lamps".to_string(),
+            ));
+        }
+        let last = lamp_count - 1;
+        // RangeUpdate: 0x45, flags, start_lo, start_hi, end_lo, end_hi, r,g,b,i
+        let payload = [
+            0x45,
+            0x01,
+            0x00,
+            0x00,
+            (last & 0xff) as u8,
+            ((last >> 8) & 0xff) as u8,
+            r,
+            g,
+            b,
+            intensity,
+        ];
+        hid.set_feature_report(&payload)?;
+        info!(
+            "LampArray ready: LampCount={lamp_count} rgb=({r:02x},{g:02x},{b:02x}) i={intensity}"
+        );
+        Ok(())
+    }
+
+    /// Write a single effect (static colour for now) to a LampArray device.
+    ///
+    /// IMPORTANT: this used to take `self.config.lock().await` to read
+    /// brightness, but the typical call chain comes from a caller that ALREADY
+    /// holds the config lock (e.g. `write_current_config_mode`,
+    /// `set_led_mode_data`, `reload`). Re-locking caused an async deadlock at
+    /// init time, which made systemd kill asusd on the `Type=dbus` timeout.
+    /// We now use `try_lock` and fall back to `LedBrightness::Med` when the
+    /// lock is held by the caller. Callers that already have a locked
+    /// `AuraConfig` should prefer `lamparray_write_effect_locked` to avoid
+    /// the fallback path entirely.
+    pub async fn lamparray_write_effect(&self, mode: &AuraEffect) -> Result<(), RogError> {
+        let r = mode.colour1.r;
+        let g = mode.colour1.g;
+        let b = mode.colour1.b;
+        let brightness = match self.config.try_lock() {
+            Ok(cfg) => cfg.brightness,
+            Err(_) => {
+                info!(
+                    "lamparray_write_effect: config already locked by caller, using Med fallback"
+                );
+                LedBrightness::Med
+            }
+        };
+        let intensity = Self::brightness_to_intensity(brightness);
+        info!("lamparray_write_effect: about to push rgb (no lock held)");
+        self.lamparray_push_rgb_i(r, g, b, intensity).await
+    }
+
+    /// Variant for callers that already hold the config lock. Pass the
+    /// already-locked config in to avoid the deadlock that re-locking would
+    /// cause.
+    pub async fn lamparray_write_effect_locked(
+        &self,
+        config: &AuraConfig,
+        mode: &AuraEffect,
+    ) -> Result<(), RogError> {
+        let r = mode.colour1.r;
+        let g = mode.colour1.g;
+        let b = mode.colour1.b;
+        let intensity = Self::brightness_to_intensity(config.brightness);
+        info!("lamparray_write_effect_locked: about to push rgb (caller owns config lock)");
+        self.lamparray_push_rgb_i(r, g, b, intensity).await
+    }
+
+    fn brightness_to_intensity(b: LedBrightness) -> u8 {
+        match b {
+            LedBrightness::Off => 0,
+            LedBrightness::Low => 64,
+            LedBrightness::Med => 128,
+            LedBrightness::High => 255,
+        }
+    }
+
+    /// Brightness -> intensity mapping for LampArray. Reuses the colour from
+    /// the currently active builtin effect in config so the keyboard keeps
+    /// the same hue when the user only changes brightness.
+    ///
+    /// Uses `try_lock` to avoid the init-time deadlock when a caller higher
+    /// in the stack already owns the config lock (see comment on
+    /// `lamparray_write_effect`).
+    pub async fn lamparray_set_brightness(&self, value: u8) -> Result<(), RogError> {
+        let level = match value {
+            0 => LedBrightness::Off,
+            1 => LedBrightness::Low,
+            2 => LedBrightness::Med,
+            _ => LedBrightness::High,
+        };
+        let intensity = Self::brightness_to_intensity(level);
+        let (r, g, b) = match self.config.try_lock() {
+            Ok(mut cfg) => {
+                cfg.brightness = level;
+                let mode = cfg.current_mode;
+                if let Some(eff) = cfg.builtins.get(&mode) {
+                    (eff.colour1.r, eff.colour1.g, eff.colour1.b)
+                } else {
+                    (0xff, 0xff, 0xff)
+                }
+            }
+            Err(_) => {
+                info!(
+                    "lamparray_set_brightness: config already locked by caller, defaulting to white"
+                );
+                (0xff, 0xff, 0xff)
+            }
+        };
+        info!("lamparray_set_brightness: about to push rgb (no lock held)");
+        self.lamparray_push_rgb_i(r, g, b, intensity).await
+    }
+
+    /// Aura power states on LampArray - we collapse the per-zone flags into a
+    /// simple on/off: any zone enabled -> full intensity with the saved RGB,
+    /// all disabled -> intensity 0.
+    pub async fn lamparray_set_aura_power(
+        &self,
+        config: &AuraConfig,
+    ) -> Result<(), RogError> {
+        let any_on = config.enabled.states.iter().any(|s| {
+            // Treat the "new" zone state as on if any bit is set.
+            s.new_to_byte() != 0
+        });
+        let (r, g, b) = {
+            let mode = config.current_mode;
+            if let Some(eff) = config.builtins.get(&mode) {
+                (eff.colour1.r, eff.colour1.g, eff.colour1.b)
+            } else {
+                (0xff, 0xff, 0xff)
+            }
+        };
+        let intensity = if any_on { 255 } else { 0 };
+        self.lamparray_push_rgb_i(r, g, b, intensity).await
     }
 }
