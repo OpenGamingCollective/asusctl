@@ -127,6 +127,14 @@ impl DeviceManager {
         handles: Arc<Mutex<HashMap<String, Arc<Mutex<HidRaw>>>>>,
     ) -> Result<Vec<AsusDevice>, RogError> {
         let mut devices = Vec::new();
+        let sysname_dbg = device.sysname().to_string_lossy().to_string();
+        let devnode_dbg = device
+            .devnode()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| "<none>".to_string());
+        info!(
+            "init_hid_devices: probing hidraw sysname={sysname_dbg} devnode={devnode_dbg}"
+        );
         if let Some(usb_device) = device.parent_with_subsystem_devtype("usb", "usb_device")? {
             if let Some(usb_id) = usb_device.attribute_value("idProduct") {
                 if let Some(vendor_id) = usb_device.attribute_value("idVendor") {
@@ -204,6 +212,164 @@ impl DeviceManager {
                         warn!("Failed to initialise shared hid handle for {usb_id:?}");
                     }
                 }
+            }
+        }
+        if devices.is_empty() {
+            info!(
+                "init_hid_devices: no USB-side device matched for {sysname_dbg}, trying I2C-HID fallback"
+            );
+            match Self::init_i2c_hid_device(connection, &device, handles.clone()).await {
+                Ok(mut found) => {
+                    info!(
+                        "init_hid_devices: I2C-HID fallback for {sysname_dbg} returned {} device(s)",
+                        found.len()
+                    );
+                    devices.append(&mut found);
+                }
+                Err(e) => {
+                    error!(
+                        "init_hid_devices: I2C-HID fallback for {sysname_dbg} failed: {e:?}"
+                    );
+                }
+            }
+        }
+        Ok(devices)
+    }
+
+    async fn init_i2c_hid_device(
+        connection: &Connection,
+        endpoint: &Device,
+        handles: Arc<Mutex<HashMap<String, Arc<Mutex<HidRaw>>>>>,
+    ) -> Result<Vec<AsusDevice>, RogError> {
+        let mut devices = Vec::new();
+        let sysname = endpoint.sysname().to_string_lossy().to_string();
+        info!("I2C-HID probe: examining hidraw {sysname}");
+        let mut hid_id: Option<String> = None;
+        let mut cur = endpoint.parent();
+        while let Some(p) = cur {
+            if let Some(val) = p.property_value("HID_ID") {
+                hid_id = Some(val.to_string_lossy().to_string());
+                break;
+            }
+            cur = p.parent();
+        }
+        let Some(hid_id) = hid_id else {
+            info!("I2C-HID probe: no HID_ID property found for {sysname}");
+            return Ok(devices);
+        };
+        info!("I2C-HID probe: {sysname} HID_ID={hid_id}");
+        let parts: Vec<&str> = hid_id.split(':').collect();
+        if parts.len() != 3 {
+            info!("I2C-HID probe: HID_ID has unexpected shape: {hid_id}");
+            return Ok(devices);
+        }
+        // The HID_ID format is "BUS:VENDOR:PRODUCT" where VENDOR and PRODUCT are
+        // 8-char hex strings (e.g. "0018:00000B05:000019B6"). We must parse them
+        // numerically — a naive string compare against "0B05" fails because the
+        // actual VID string is "00000B05".
+        let vendor_str = parts[1];
+        let product_str = parts[2];
+        let vendor = u32::from_str_radix(vendor_str, 16).unwrap_or(0xFFFF_FFFF);
+        let product = u32::from_str_radix(product_str, 16).unwrap_or(0xFFFF_FFFF);
+        info!(
+            "I2C-HID probe: VID parsing raw='{vendor_str}' parsed=0x{vendor:08x}; PID parsing raw='{product_str}' parsed=0x{product:08x}"
+        );
+        if vendor != 0x0b05 {
+            info!(
+                "I2C-HID probe: not ASUS vendor 0x{vendor:08x} (raw '{vendor_str}'), skipping {sysname}"
+            );
+            return Ok(devices);
+        }
+        let vid_upper = format!("{:04X}", vendor as u16);
+        let pid_upper = format!("{:04X}", product as u16);
+        let prod_id_str = pid_upper.to_lowercase();
+        info!(
+            "Found ASUS HID LampArray candidate: {sysname} VID={vid_upper} PID={pid_upper}"
+        );
+        info!("VID match: proceeding to open hidraw for {sysname}");
+        info!("Step1: about to query devnode for {sysname}");
+        let dev_node = match endpoint.devnode() {
+            Some(n) => n,
+            None => {
+                error!("I2C-HID probe: hidraw devnode missing for {sysname}");
+                return Err(RogError::MissingFunction(
+                    "I2C-HID hidraw devnode missing".to_string(),
+                ));
+            }
+        };
+        info!("Step2: devnode={dev_node:?} for {sysname}");
+        info!("I2C-HID probe: devnode={dev_node:?} for {sysname}");
+        let key = dev_node.to_string_lossy().to_string();
+        info!("Step3a: about to take handles map lock for cache lookup key={key}");
+        let cached = handles.lock().await.get(&key).cloned();
+        info!("Step3b: handles map lock released for {key} cached={}", cached.is_some());
+        let handle = if let Some(existing) = cached {
+            info!("I2C-HID probe: reusing existing hidraw handle for {key}");
+            existing
+        } else {
+            info!("Step3c: about to call HidRaw::from_i2c_device for {key} prod_id={prod_id_str}");
+            info!("I2C-HID probe: creating HidRaw::from_i2c_device for {key} prod_id={prod_id_str}");
+            // udev::Device contains a raw `*mut udev` and is !Send, so we
+            // cannot ship it into spawn_blocking. Instead we call the
+            // synchronous constructor here -- the actual blocking syscall is
+            // the OpenOptions::open in from_i2c_device, and we mitigate that
+            // separately by passing O_NONBLOCK there.
+            info!("Step3d: calling HidRaw::from_i2c_device synchronously for {key}");
+            let hidraw_res = HidRaw::from_i2c_device(endpoint.clone(), &prod_id_str);
+            let hidraw = match hidraw_res {
+                Ok(h) => h,
+                Err(e) => {
+                    error!(
+                        "I2C-HID probe: HidRaw::from_i2c_device FAILED for {key}: {e:?}"
+                    );
+                    return Err(e.into());
+                }
+            };
+            info!("Step4: hidraw handle created for {key}");
+            info!("I2C-HID probe: HidRaw::from_i2c_device returned OK for {key}");
+            let h = Arc::new(Mutex::new(hidraw));
+            info!("Step4b: about to insert handle into handles map key={key}");
+            handles.lock().await.insert(key.clone(), h.clone());
+            info!("Step4c: handle inserted into handles map key={key}");
+            h
+        };
+        info!("Step5: about to call DeviceHandle::maybe_lamparray for {sysname} prod_id={prod_id_str}");
+        info!("Calling DeviceHandle::maybe_lamparray for {sysname} prod_id={prod_id_str}");
+        let result = DeviceHandle::maybe_lamparray(handle, &prod_id_str).await;
+        info!("Step6: maybe_lamparray returned for {sysname}");
+        match result {
+            Ok(dev_type) => {
+                info!("maybe_lamparray OK for {sysname}");
+                if let DeviceHandle::Aura(aura) = dev_type.clone() {
+                    let path: OwnedObjectPath = ObjectPath::from_str_unchecked(&format!(
+                        "{ASUS_ZBUS_PATH}/{MOD_NAME}/lamparray_{prod_id_str}"
+                    ))
+                    .into();
+                    info!("Registering LampArray device on zbus at path={path:?}");
+                    let ctrl = AuraZbus::new(aura);
+                    match ctrl.start_tasks(connection, path.clone()).await {
+                        Ok(_) => info!("LampArray zbus start_tasks OK for {path:?}"),
+                        Err(e) => {
+                            error!(
+                                "LampArray zbus start_tasks FAILED for {path:?}: {e:?}"
+                            );
+                            return Ok(devices);
+                        }
+                    }
+                    devices.push(AsusDevice {
+                        device: dev_type,
+                        dbus_path: path.clone(),
+                        hid_key: Some(key),
+                    });
+                    info!("LampArray device added to manager at {path:?}");
+                } else {
+                    info!(
+                        "maybe_lamparray returned non-Aura variant for {sysname}, ignoring"
+                    );
+                }
+            }
+            Err(e) => {
+                error!("maybe_lamparray FAILED for {sysname}: {e:?}");
             }
         }
         Ok(devices)
