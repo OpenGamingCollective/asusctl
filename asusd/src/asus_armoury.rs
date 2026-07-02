@@ -368,21 +368,11 @@ impl AsusArmouryAttribute {
     #[zbus(property)]
     async fn current_value(&self) -> fdo::Result<i32> {
         if self.name().property_type() == FirmwareAttributeType::Ppt {
-            let profile: PlatformProfile = self.platform.get_platform_profile()?.into();
-            let power_plugged = self
-                .power
-                .get_online()
-                .map_err(|e| {
-                    error!("Could not get power status: {e:?}");
-                    e
-                })
-                .unwrap_or_default()
-                == 1;
-            let config = self.config.lock().await;
-            if let Some(tuning) = config.select_tunings_ref(power_plugged, profile) {
-                if let Some(tune) = tuning.group.get(&self.name()) {
-                    return Ok(*tune);
-                }
+            // Fix: report the real hardware value read from sysfs, not the cached
+            // per-profile config value. Returning the config value made tools show
+            // a PPT limit that may never have been written to the firmware.
+            if let Ok(AttrValue::Integer(i)) = self.attr.current_value() {
+                return Ok(i);
             }
             if let AttrValue::Integer(i) = self.attr.default_value() {
                 return Ok(*i);
@@ -443,6 +433,15 @@ impl AsusArmouryAttribute {
                 } else {
                     tuning.group.insert(self.name(), value);
                     debug!("Store tuning config for {name} = {:?}", value);
+                }
+
+                // Fix: an explicit user set implies intent to apply. On kernels
+                // without a `ppt_enabled` firmware attribute there is no other
+                // path to flip this per-profile flag, so enabling it here avoids
+                // silently discarding the write while the getter reports success.
+                if !tuning.enabled {
+                    info!("Auto-enabling PPT tuning for this profile on explicit set");
+                    tuning.enabled = true;
                 }
 
                 match tuning.enabled {
