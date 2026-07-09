@@ -1,37 +1,43 @@
 # `asusctl` for ASUS ROG
 
-[![Become a Patron!](https://github.com/codebard/patron-button-and-widgets-by-codebard/blob/master/images/become_a_patron_button.png?raw=true)](https://www.patreon.com/bePatron?u=7602281) [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/V7V5CLU67) - [Asus Linux Website](https://asus-linux.org/)
+## Links
+
+<p align="center"><a href="https://www.patreon.com/bePatron?u=7602281"><img src="extra/icons/patreon-button.svg" width="190" height="32" alt="Become a Patron" /></a> <a href="https://ko-fi.com/V7V5CLU67"><img src="extra/icons/ko-fi-button.svg" width="190" height="32" alt="Support me on Ko-fi" /></a> <a href="https://asus-linux.org/"><img src="extra/icons/rog-logo-button.svg" width="190" height="32" alt="Asus Linux Website" /></a> <a href="https://discord.gg/B8GftRW2Hd"><img src="extra/icons/discord-button.svg" width="190" height="32" alt="Discord" /></a></p>
 
 **WARNING:** Many features are developed in tandem with kernel patches. If you see a feature is missing you either need a patched kernel or latest release.
 
-`asusd` is a utility for Linux to control many aspects of various ASUS laptops
-but can also be used with non-asus laptops with reduced features.
+`asusctl` is a utility for Linux to control many aspects of various ASUS laptops but can also be used with non-asus laptops with reduced features.
 
-Now includes a GUI, `rog-control-center`.
+`asusctl` is made of 3 main components:
+- `asusd` - system wide daemon that can be interacted with via D-Bus
+- `rog-control-center` - GUI for `asusd`
+- `asusctl` - CLI client for `asusd`
 
 # OGC Migration
 
-This project has been migrated to the [OGC](https://github.com/opengamingcollective) on [GitHub](https://github.com/opengamingcollective/asusctl) and future development will happen there.
+This project has been migrated to the OpenGamingCollective, in short [OGC](https://github.com/opengamingcollective), on [GitHub](https://github.com/opengamingcollective/asusctl) and future development will happen there. The old [gitlab](https://gitlab.com/asus-linux/asusctl) page is maintained for historical purposes only.
 
 ## Kernel support
 
-Due to ongoing driver work, the minimum suggested kernel version is always **the latest*, as improvements and fixes are continuous.
+Due to ongoing driver work, the minimum suggested kernel version is always **the latest**, as improvements and fixes are continuous.
 
 Support for TDP is tied to the new asus-armoury driver: available mainline since Linux 6.19: everything older is not supported.
 
 ## X11 support
 
-X11 is not supported at all, as in I will not help you with X11 issues if there are any due to limited time and it being unmaintained itself. You can however build `rog-control-center` with it enabled `cargo build --features "rog-control-center/x11"`.
+X11 is not, and will not, supported by asusctl in any way. We will not help you with X11 issues if there are any due to limited time and it being unmaintained itself. You can however build `rog-control-center` with it enabled `cargo build --features "rog-control-center/x11"`.
+
+**Remember**: Using an unmaintained display server is your own choice and the responsibility falls on yourself. We cannot help you with this.
 
 ## Goals
 
 The main goal of this work is to provide a safe and easy to use abstraction over various laptop features via D-Bus, and to provide some helpful defaults and other behaviour such as toggling throttle/profile on AC/battery change.
 
-1. Provide safe D-Bus interface
-2. Respect the users resources: be small, light, and fast
+- Provide safe D-Bus interface
+- Respect the users resources: be small, light, and fast
 
-Point 4: asusd currently uses a tiny fraction of cpu time, and less than 1MB of RAM, the way
-a system-level daemon should. Languages such as JS and python should never be used for system level daemons (please stop).
+Note: asusd currently uses a tiny fraction of cpu time, and less than 1MB of RAM, the way a system-level daemon should.
+Languages such as JS and python should never be used for system level daemons (please stop).
 
 ## Keyboard LEDs
 
@@ -39,14 +45,9 @@ The level of support for laptops is dependent on folks submitting data to includ
 
 See the [rog-aura readme](./rog-aura/README.md) for more details.
 
-## Discord
-
-[![Discord](https://img.shields.io/badge/Discord-7289DA?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/B8GftRW2Hd)
-
 ## SUPPORTED LAPTOPS
 
-Most ASUS gaming laptops that have a USB keyboard. If `lsusb` shows something similar
-to this:
+Most ASUS gaming laptops that have a USB keyboard. If `lsusb` shows something similar to this:
 
 ```plain
 Bus 001 Device 002: ID 0b05:1866 ASUSTek Computer, Inc. N-KEY Device
@@ -58,8 +59,7 @@ or
 Bus 003 Device 002: ID 0b05:19b6 ASUSTek Computer, Inc. [unknown]
 ```
 
-then it may work without tweaks. Technically all other functions except the LED
-and AniMe parts should work regardless of your laptop make.
+then it may work without tweaks. Technically all other functions except the LED and AniMe parts should work regardless of your laptop make.
 
 ## Implemented
 
@@ -80,7 +80,7 @@ The list is a bit outdated as many features have been enabled in the Linux kerne
 
 A gui is now in the repo - ROG Control Center. At this time it is still a WIP, but it has almost all features in place already.
 
-**NOTE**: X11 is not supported.
+**NOTE**: As said before, X11 is not supported.
 
 ## BUILDING
 
@@ -88,10 +88,21 @@ Rust and cargo are required, they can be installed from [rustup.rs](https://rust
 
 Distro packaging should work with the stable toolchain. If your distro does not provide a recent Rust toolchain, install rustup and use the stable toolchain.
 
+**archlinux:**
+
+Our main supported OS
+
+```sh
+sudo pacman -S git cmake clang pkg-config libzip rust openssl
+
+make
+sudo make install
+```
+
 **fedora:**
 
 ```sh
-dnf install cmake clang-devel libxkbcommon-devel systemd-devel expat-devel pcre2-devel libzstd-devel gtk3-devel
+sudo dnf install cmake clang-devel libxkbcommon-devel systemd-devel expat-devel pcre2-devel libzstd-devel gtk3-devel
 make
 sudo make install
 ```
@@ -101,15 +112,15 @@ sudo make install
 Works with KDE Plasma (without GTK packages)
 
 ```sh
-zypper in -t pattern devel_basis
-zypper in rustup make cmake clang-devel libxkbcommon-devel systemd-devel expat-devel pcre2-devel libzstd-devel gtk3-devel
+sudo zypper in -t pattern devel_basis
+sudo zypper in rustup make cmake clang-devel libxkbcommon-devel systemd-devel expat-devel pcre2-devel libzstd-devel gtk3-devel
 make
 sudo make install
 ```
 
 **Debian (unsupported):**
 
-officially unsupported,but you can still try and test it by yourself (some features may not be available).
+Officially unsupported, but you can still try and test it by yourself (some features may not be available).
 
 ```sh
 sudo apt install libclang-dev libudev-dev libfontconfig-dev build-essential cmake libxkbcommon-dev
@@ -140,8 +151,7 @@ Some other distros may have asusctl packaged, we recommend checking before build
 
 =======
 
-The default init method is to use the udev rule, this ensures that the service is
-started when the device is initialised and ready.
+The default init method is to use the udev rule, this ensures that the service is started when the device is initialised and ready.
 
 You may also need to activate the service for debian install. If running Pop!\_OS, I suggest disabling `system76-power` gnome-shell extension and systemd service.
 
@@ -192,4 +202,4 @@ The use of ROG and ASUS trademarks within this website and associated tools and 
 
 ## AI Disclaimer
 
-Portions of this code have been written by various AI tools and reviewed by the maintainer exactly as with every other contribution.
+AI contributions are welcomed like any other contributions, as long as they are reviewed and tested by the human pushing them before being merged.
