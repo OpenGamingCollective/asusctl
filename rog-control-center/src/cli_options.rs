@@ -14,6 +14,10 @@ pub struct CliStart {
     pub windowed: bool,
     #[options(help = "show program version number")]
     pub version: bool,
+    #[options(help = "start in background (UI closed)")]
+    pub background: bool,
+    #[options(help = "indicate that the app was launched via autostart")]
+    pub autostart: bool,
     #[options(
         meta = "",
         help = "set board name for testing, this will make ROGCC show only the keyboard page"
