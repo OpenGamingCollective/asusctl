@@ -26,7 +26,7 @@ pub async fn spawn_effect_task(
 ) -> Result<JoinHandle<()>, RogError> {
     // Probe LampCount once, up-front, so the task doesn't need to touch
     // GET_FEATURE at 30 FPS.
-    let lamp_count = {
+    let (lamp_count, min_update_interval_ms) = {
         let hid = hid.lock().await;
         hid.set_feature_report(&[
             0x46, 0x00,
@@ -34,9 +34,14 @@ pub async fn spawn_effect_task(
         let mut attr = vec![0u8; 23];
         attr[0] = 0x41;
         hid.get_feature_report(&mut attr)?;
-        u16::from_le_bytes([
+        let count = u16::from_le_bytes([
             attr[1], attr[2],
-        ])
+        ]);
+        let min_interval_us = u32::from_le_bytes([
+            attr[19], attr[20], attr[21], attr[22],
+        ]);
+        let min_interval_ms = (min_interval_us as f64 / 1000.0).ceil() as u64;
+        (count, min_interval_ms)
     };
     if lamp_count == 0 {
         return Err(RogError::MissingFunction(
@@ -44,7 +49,7 @@ pub async fn spawn_effect_task(
         ));
     }
     let period_ms = speed_to_period_ms(mode.speed);
-    let frame_ms: u64 = 33; // ~30 FPS
+    let frame_ms: u64 = 33.max(min_update_interval_ms); // ~30 FPS, capped by device's MinUpdateInterval
     let total_frames: u32 = ((period_ms as f32) / (frame_ms as f32)).max(1.0) as u32;
     let mode_kind = mode.mode;
     let colour1 = mode.colour1;

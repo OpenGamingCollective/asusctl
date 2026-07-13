@@ -106,6 +106,7 @@ impl DeviceManager {
     async fn get_or_create_hid_handle(
         handles: &Arc<Mutex<HashMap<String, Arc<Mutex<HidRaw>>>>>,
         endpoint: &Device,
+        read: bool,
     ) -> Result<(Arc<Mutex<HidRaw>>, String), RogError> {
         let dev_node = endpoint
             .devnode()
@@ -116,7 +117,7 @@ impl DeviceManager {
             return Ok((existing, key));
         }
 
-        let hidraw = HidRaw::from_device(endpoint.clone())?;
+        let hidraw = HidRaw::from_device(endpoint.clone(), read)?;
         let handle = Arc::new(Mutex::new(hidraw));
         handles.lock().await.insert(key.clone(), handle.clone());
         Ok((handle, key))
@@ -146,10 +147,48 @@ impl DeviceManager {
                     // 1. Generate an interface path
                     // 2. Create the device
                     // Use the top-level endpoint, not the parent
+                    let usb_id_str = usb_id.to_str().unwrap_or_default();
+                    let iface_num = device
+                        .property_value("ID_USB_INTERFACE_NUM")
+                        .and_then(|v| v.to_str())
+                        .unwrap_or_default();
+
+                    if usb_id_str == "19b6" && iface_num == "02" {
+                        // Interface 02 of 19b6 is non-RGB/mouse interface, skip completely
+                        return Ok(devices);
+                    }
+
+                    let is_lamparray = usb_id_str == "19b6" && iface_num == "01";
+
                     if let Ok((dev, hid_key)) =
-                        Self::get_or_create_hid_handle(&handles, &device).await
+                        Self::get_or_create_hid_handle(&handles, &device, is_lamparray).await
                     {
                         debug!("Testing device {usb_id:?}");
+                        if is_lamparray {
+                            info!("Initializing USB LampArray device for {usb_id_str}");
+                            if let Ok(dev_type) =
+                                DeviceHandle::maybe_lamparray(dev.clone(), usb_id_str).await
+                            {
+                                if let DeviceHandle::LampArray(lamparray) = dev_type.clone() {
+                                    let path: OwnedObjectPath =
+                                        ObjectPath::from_str_unchecked(&format!(
+                                            "{ASUS_ZBUS_PATH}/{MOD_NAME}/lamparray_{usb_id_str}"
+                                        ))
+                                        .into();
+                                    info!(
+                                        "Registering USB LampArray device on zbus at path={path:?}"
+                                    );
+                                    let ctrl = LampArrayZbus::new(lamparray);
+                                    ctrl.start_tasks(connection, path.clone()).await.unwrap();
+                                    devices.push(AsusDevice {
+                                        device: dev_type,
+                                        dbus_path: path,
+                                        hid_key: Some(hid_key),
+                                    });
+                                    return Ok(devices);
+                                }
+                            }
+                        }
                         // SLASH DEVICE
                         if let Ok(dev_type) = DeviceHandle::new_slash_hid(
                             dev.clone(),
@@ -420,10 +459,14 @@ impl DeviceManager {
             if let Ok(Some(usb_parent)) = device.parent_with_subsystem_devtype("usb", "usb_device")
             {
                 if usb_parent.attribute_value("idVendor") == Some(std::ffi::OsStr::new("0b05")) {
-                    let syspath = usb_parent.syspath().to_string_lossy().to_string();
-                    if !seen_usb_parents.insert(syspath) {
-                        debug!("Skipping duplicate hidraw for USB parent already processed");
-                        continue;
+                    let is_19b6 = usb_parent.attribute_value("idProduct")
+                        == Some(std::ffi::OsStr::new("19b6"));
+                    if !is_19b6 {
+                        let syspath = usb_parent.syspath().to_string_lossy().to_string();
+                        if !seen_usb_parents.insert(syspath) {
+                            debug!("Skipping duplicate hidraw for USB parent already processed");
+                            continue;
+                        }
                     }
                 }
             }

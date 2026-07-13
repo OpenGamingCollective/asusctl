@@ -238,7 +238,8 @@ impl DeviceHandle {
         };
         let vid = (info.vendor as u16) as u32;
         let pid = (info.product as u16) as u32;
-        info!("LampArray init: HIDIOCGRAWINFO {dev_path:?} VID:{vid:04x} PID:{pid:04x}");
+        let bustype = info.bustype;
+        info!("LampArray init: HIDIOCGRAWINFO {dev_path:?} VID:{vid:04x} PID:{pid:04x} BUSTYPE:{bustype:04x}");
         if vid != 0x0b05 {
             return Err(RogError::NotFound(format!("Not ASUS: {vid:04x}")));
         }
@@ -247,6 +248,7 @@ impl DeviceHandle {
                 "PID {pid:04x} not on LampArray whitelist"
             )));
         }
+
         let aura_type = AuraDeviceType::from(prod_id);
         info!("Found HID LampArray ASUS keyboard 0b05:{pid:04x}");
         let mut config = AuraConfig::load_and_update_config(prod_id);

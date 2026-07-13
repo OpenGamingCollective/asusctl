@@ -155,7 +155,7 @@ impl HidRaw {
     }
 
     /// Make `HidRaw` device from a udev device
-    pub fn from_device(endpoint: Device) -> Result<Self> {
+    pub fn from_device(endpoint: Device, read: bool) -> Result<Self> {
         if let Some(parent) = endpoint
             .parent_with_subsystem_devtype("usb", "usb_device")
             .map_err(|e| {
@@ -164,8 +164,13 @@ impl HidRaw {
         {
             if let Some(dev_node) = endpoint.devnode() {
                 if let Some(id_product) = parent.attribute_value("idProduct") {
+                    let mut options = OpenOptions::new();
+                    if read {
+                        options.read(true);
+                    }
+                    options.write(true);
                     return Ok(Self {
-                        file: RefCell::new(OpenOptions::new().write(true).open(dev_node)?),
+                        file: RefCell::new(options.open(dev_node)?),
                         devfs_path: dev_node.to_owned(),
                         prod_id: id_product.to_string_lossy().into(),
                         syspath: endpoint.syspath().into(),

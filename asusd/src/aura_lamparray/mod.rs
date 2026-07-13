@@ -66,6 +66,10 @@ impl LampArray {
     }
 
     pub async fn do_initialization(&self) -> Result<(), RogError> {
+        let hid = self.hid.lock().await;
+        if let Err(e) = hid.set_use_leds_uapi(false) {
+            log::warn!("Failed to disable kernel LampArray LED UAPI: {e:?}");
+        }
         Ok(())
     }
 
@@ -314,6 +318,16 @@ impl LampArray {
             LedBrightness::Low => 64,
             LedBrightness::Med => 128,
             LedBrightness::High => 255,
+        }
+    }
+}
+
+impl Drop for LampArray {
+    fn drop(&mut self) {
+        if let Ok(hid) = self.hid.try_lock() {
+            if let Err(e) = hid.set_use_leds_uapi(true) {
+                log::warn!("Failed to re-enable kernel LampArray LED UAPI on drop: {e:?}");
+            }
         }
     }
 }
