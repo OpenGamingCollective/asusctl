@@ -161,12 +161,17 @@ async fn main() -> Result<()> {
         config.run_in_background = false;
         config.startup_in_background = false;
         config.start_fullscreen = true;
+        config.enable_autostart = false;
     }
 
     config.write();
 
     let enable_tray_icon = config.enable_tray_icon;
-    let startup_in_background = config.startup_in_background;
+    let startup_in_background = if cli_parsed.autostart {
+        cli_parsed.background
+    } else {
+        cli_parsed.background || config.startup_in_background
+    };
     let config = Arc::new(Mutex::new(config));
 
     start_notifications(config.clone(), &rt)?;
