@@ -53,6 +53,70 @@ pub struct Attribute {
     base_path: PathBuf,
 }
 
+fn is_intel_cpu() -> bool {
+    std::fs::read_to_string("/proc/cpuinfo")
+        .map(|content| content.contains("GenuineIntel"))
+        .unwrap_or(false)
+}
+
+fn write_intel_rapl_limit(constraint_name: &str, watts: i32) {
+    if !is_intel_cpu() || watts < 0 {
+        return;
+    }
+    let microwatts_str = ((watts as u64) * 1_000_000).to_string();
+    let Ok(entries) = read_dir("/sys/class/powercap") else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let zone_path = entry.path();
+        let zone = entry.file_name();
+        let zone = zone.to_string_lossy();
+        // A package zone name has exactly one ':' ("intel-rapl:0"). Sub-zones have two ("intel-rapl:0:0").
+        let is_package_zone = (zone.starts_with("intel-rapl:")
+            || zone.starts_with("intel-rapl-mmio:"))
+            && zone.matches(':').count() == 1;
+        if !is_package_zone {
+            continue;
+        }
+        let Ok(sub_entries) = read_dir(&zone_path) else {
+            continue;
+        };
+        for sub_entry in sub_entries.flatten() {
+            let file_name = sub_entry.file_name();
+            let file_name = file_name.to_string_lossy();
+            if file_name.starts_with("constraint_") && file_name.ends_with("_name") {
+                let name_path = sub_entry.path();
+                if let Ok(name) = std::fs::read_to_string(&name_path) {
+                    if name.trim() == constraint_name {
+                        let idx_str =
+                            &file_name["constraint_".len()..file_name.len() - "_name".len()];
+                        let limit_path =
+                            zone_path.join(format!("constraint_{}_power_limit_uw", idx_str));
+                        if limit_path.exists() {
+                            debug!("Writing {microwatts_str} to {}", limit_path.display());
+                            match OpenOptions::new().write(true).open(&limit_path) {
+                                Ok(mut file) => {
+                                    if let Err(e) = file.write_all(microwatts_str.as_bytes()) {
+                                        error!(
+                                            "Failed to write to {}: {}",
+                                            limit_path.display(),
+                                            e
+                                        );
+                                    }
+                                }
+                                Err(e) => {
+                                    error!("Failed to open {}: {}", limit_path.display(), e);
+                                }
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+}
+
 impl Attribute {
     pub fn name(&self) -> &str {
         &self.name
@@ -97,6 +161,20 @@ impl Attribute {
 
         let mut file = OpenOptions::new().write(true).open(&path)?;
         file.write_all(value_str.as_bytes())?;
+
+        let constraint_name = match self.name.as_str() {
+            "ppt_pl1_spl" => Some("long_term"),
+            "ppt_pl2_sppt" => Some("short_term"),
+            "ppt_pl3_fppt" => Some("peak_power"),
+            _ => None,
+        };
+
+        if let Some(c_name) = constraint_name {
+            if let Ok(watts) = value_str.parse::<i32>() {
+                write_intel_rapl_limit(c_name, watts);
+            }
+        }
+
         Ok(())
     }
 
