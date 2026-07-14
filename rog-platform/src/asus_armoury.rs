@@ -240,9 +240,14 @@ impl Attribute {
                 if let Ok(int) = val.parse::<i32>() {
                     AttrValue::Integer(int)
                 } else if val.contains(';') {
-                    AttrValue::EnumInt(val.split(';').filter_map(|s| s.parse().ok()).collect())
+                    let values: Vec<_> = val.split(';').collect();
+                    if values.iter().all(|v| v.parse::<i32>().is_ok()) {
+                        AttrValue::EnumInt(values.iter().map(|v| v.parse().unwrap()).collect())
+                    } else {
+                        AttrValue::EnumStr(values.iter().map(|s| s.to_string()).collect())
+                    }
                 } else {
-                    AttrValue::EnumStr(val.split(';').map(|s| s.to_string()).collect())
+                    AttrValue::EnumStr(vec![val])
                 }
             }
             Err(_) => AttrValue::None,
