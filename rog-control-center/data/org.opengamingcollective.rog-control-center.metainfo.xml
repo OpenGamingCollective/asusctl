@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>org.asus_linux.rog_control_center</id>
+  <id>org.opengamingcollective.rog-control-center</id>
   
   <name>Rog Control Center</name>
   <summary>A one-stop-shop GUI tool for asusd/asusctl</summary>
@@ -45,5 +45,5 @@
     <keyword>Armoury Crate</keyword>
   </keywords>
 
-  <launchable type="desktop-id">rog-control-center.desktop</launchable>
+  <launchable type="desktop-id">org.opengamingcollective.rog-control-center.desktop</launchable>
 </component>

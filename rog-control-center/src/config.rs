@@ -3,7 +3,7 @@ use std::fs::create_dir;
 use config_traits::{StdConfig, StdConfigLoad1};
 use serde::{Deserialize, Serialize};
 
-use crate::notify::EnabledNotifications;
+use crate::{notify::EnabledNotifications, APP_ID};
 
 const CFG_DIR: &str = "rog";
 const CFG_FILE_NAME: &str = "rog-control-center.cfg";
@@ -104,7 +104,7 @@ impl From<Config461> for Config {
 pub fn is_autostart_in_background() -> bool {
     let path = dirs::config_dir().map(|mut p| {
         p.push("autostart");
-        p.push("rog-control-center.desktop");
+        p.push(format!("{APP_ID}.desktop"));
         p
     });
     if let Some(path) = path {
@@ -140,7 +140,7 @@ fn update_autostart_with_dir(
         }
     };
 
-    let desktop_file = autostart_dir.join("rog-control-center.desktop");
+    let desktop_file = autostart_dir.join(format!("{APP_ID}.desktop"));
 
     if enable {
         if !autostart_dir.exists() {
@@ -193,7 +193,7 @@ mod tests {
         path.push(format!("rog-test-autostart-{}", std::process::id()));
         let _ = std::fs::create_dir_all(&path);
 
-        let file_path = path.join("rog-control-center.desktop");
+        let file_path = path.join(format!("{APP_ID}.desktop"));
 
         // Test enabling
         update_autostart_with_dir(true, true, Some(&path));

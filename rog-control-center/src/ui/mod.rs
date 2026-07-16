@@ -124,7 +124,7 @@ pub fn setup_window(
     prefetched_supported: std::sync::Arc<Option<Vec<i32>>>,
     is_tuf: bool,
 ) -> MainWindow {
-    slint::set_xdg_app_id("rog-control-center")
+    slint::set_xdg_app_id(crate::APP_ID)
         .map_err(|e| warn!("Couldn't set application ID: {e:?}"))
         .ok();
     let ui = MainWindow::new()

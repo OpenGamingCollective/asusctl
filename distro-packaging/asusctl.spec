@@ -119,7 +119,7 @@ install -D -m 0644 rog-aura/data/aura_support.ron %{buildroot}%{_datadir}/asusd/
 cp -r rog-anime/data/anime %{buildroot}%{_datadir}/asusd/
 
 # Install rog-gui data
-install -D -m 0644 rog-control-center/data/rog-control-center.desktop %{buildroot}%{_datadir}/applications/rog-control-center.desktop
+install -D -m 0644 rog-control-center/data/org.opengamingcollective.rog-control-center.desktop %{buildroot}%{_datadir}/applications/org.opengamingcollective.rog-control-center.desktop
 install -D -m 0644 rog-control-center/data/rog-control-center.png %{buildroot}%{_datadir}/icons/hicolor/512x512/apps/rog-control-center.png
 mkdir -p %{buildroot}%{_datadir}/rog-gui/layouts
 cp -r rog-aura/data/layouts/*.ron %{buildroot}%{_datadir}/rog-gui/layouts/
@@ -146,7 +146,7 @@ install -D -m 0644 rog-anime/data/diagonal-template.png %{buildroot}%{_docdir}/%
 # Install LICENSE to asusctl datadir
 install -D -m 0644 LICENSE %{buildroot}%{_datadir}/asusctl/LICENSE
 
-desktop-file-validate %{buildroot}%{_datadir}/applications/rog-control-center.desktop
+desktop-file-validate %{buildroot}%{_datadir}/applications/org.opengamingcollective.rog-control-center.desktop
 
 %post
 %systemd_post asusd.service
@@ -188,7 +188,7 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/rog-control-center.de
 
 %files rog-gui
 %{_bindir}/rog-control-center
-%{_datadir}/applications/rog-control-center.desktop
+%{_datadir}/applications/org.opengamingcollective.rog-control-center.desktop
 %{_datadir}/icons/hicolor/512x512/apps/rog-control-center.png
 %{_datadir}/rog-gui
 
