@@ -936,6 +936,15 @@
         power_zones: [Keyboard],
     ),
     (
+        device_name: "GU502GU",
+        product_id: "",
+        layout_name: "gx502",
+        basic_modes: [Static, Breathe, RainbowCycle, RainbowWave, Star, Rain, Highlight, Laser, Ripple, Pulse, Comet, Flash],
+        basic_zones: [],
+        advanced_type: PerKey,
+        power_zones: [Keyboard],
+    ),
+    (
         device_name: "GU603H",
         product_id: "",
         layout_name: "ga401q",
