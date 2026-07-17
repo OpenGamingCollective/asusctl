@@ -13,7 +13,8 @@ use log::{info, warn};
 use rog_platform::platform::Properties;
 
 use crate::config::Config;
-use crate::zbus_proxies::{AppState, GpuStatusProxyBlocking, ROGCCZbusProxyBlocking};
+use crate::window::{WindowCommand, WindowController};
+use crate::zbus_proxies::GpuStatusProxyBlocking;
 
 const TRAY_LABEL: &str = "ROG Control Center";
 const TRAY_ICON_PATH: &str = "/usr/share/icons/hicolor/512x512/apps/";
@@ -58,7 +59,7 @@ fn read_icon(file: &Path) -> Icon {
 struct AsusTray {
     current_title: String,
     current_icon: Icon,
-    proxy: ROGCCZbusProxyBlocking<'static>,
+    window: WindowController,
 }
 
 impl ksni::Tray for AsusTray {
@@ -85,7 +86,7 @@ impl ksni::Tray for AsusTray {
                 label: "Open ROGCC".into(),
                 icon_name: "rog-control-center".into(),
                 activate: Box::new(move |s: &mut AsusTray| {
-                    s.proxy.set_state(AppState::MainWindowShouldOpen).ok();
+                    s.window.request(WindowCommand::Show);
                 }),
                 ..Default::default()
             }
@@ -94,7 +95,9 @@ impl ksni::Tray for AsusTray {
             StandardItem {
                 label: "Quit ROGCC".into(),
                 icon_name: "application-exit".into(),
-                activate: Box::new(|_| std::process::exit(0)),
+                activate: Box::new(|s: &mut AsusTray| {
+                    s.window.request(WindowCommand::Quit);
+                }),
                 ..Default::default()
             }
             .into(),
@@ -122,18 +125,19 @@ fn map_power_to_icon(power_status: &str, mode: &str, icons: &Icons) -> (Icon, St
     (icon, title)
 }
 
-/// The tray is controlled somewhat by `Arc<Mutex<SystemState>>`
-pub fn init_tray(_supported_properties: Vec<Properties>, config: Arc<Mutex<Config>>) {
+/// Start the tray and route its window actions through `WindowController`.
+pub fn init_tray(
+    _supported_properties: Vec<Properties>,
+    config: Arc<Mutex<Config>>,
+    window: WindowController,
+) {
     tokio::spawn(async move {
-        let user_con = zbus::blocking::Connection::session().unwrap();
-        let proxy = ROGCCZbusProxyBlocking::new(&user_con).unwrap();
-
         let rog_red = read_icon(&PathBuf::from("asus_notif_red.png"));
 
         let tray_init = AsusTray {
             current_title: TRAY_LABEL.to_string(),
             current_icon: rog_red.clone(),
-            proxy,
+            window,
         };
 
         // TODO: return an error to the UI

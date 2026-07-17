@@ -13,13 +13,14 @@ use rog_control_center::cli_options::CliStart;
 use rog_control_center::config::Config;
 use rog_control_center::error::Result;
 use rog_control_center::notify::start_notifications;
+use rog_control_center::print_versions;
 use rog_control_center::slint::ComponentHandle;
 use rog_control_center::tray::init_tray;
 use rog_control_center::ui::setup_window;
+use rog_control_center::window::{WindowCommand, WindowController};
 use rog_control_center::zbus_proxies::{
     AppState, ROGCCZbus, ROGCCZbusProxyBlocking, ZBUS_IFACE, ZBUS_PATH,
 };
-use rog_control_center::{print_versions, MainWindow};
 use tokio::runtime::Runtime;
 
 #[tokio::main]
@@ -176,13 +177,6 @@ async fn main() -> Result<()> {
 
     start_notifications(config.clone(), &rt)?;
 
-    if enable_tray_icon {
-        init_tray(supported_properties, config.clone());
-    }
-
-    thread_local! { pub static UI: std::cell::RefCell<Option<MainWindow>> = Default::default()};
-    // i_slint_backend_selector::with_platform(|_| Ok(())).unwrap();
-
     if !startup_in_background {
         if let Ok(mut app_state) = app_state.lock() {
             *app_state = AppState::MainWindowShouldOpen;
@@ -203,6 +197,17 @@ async fn main() -> Result<()> {
     let prefetched_supported: std::sync::Arc<Option<Vec<i32>>> = std::sync::Arc::new(
         rog_control_center::ui::setup_aura::prefetch_supported_basic_modes().await,
     );
+
+    let window = WindowController::new(
+        config.clone(),
+        prefetched_supported.clone(),
+        app_state.clone(),
+        is_tuf,
+    );
+
+    if enable_tray_icon {
+        init_tray(supported_properties, config.clone(), window.clone());
+    }
 
     thread::spawn(move || {
         let mut state = AppState::StartingUp;
@@ -244,68 +249,15 @@ async fn main() -> Result<()> {
             // This sleep is required to give the event loop time to react
             sleep(Duration::from_millis(300));
             if state == AppState::MainWindowShouldOpen {
-                if let Ok(mut app_state) = app_state.lock() {
-                    *app_state = AppState::MainWindowOpen;
-                }
-
-                let config_copy = config.clone();
-                let app_state_copy = app_state.clone();
-                // Avoid moving the original `prefetched_supported` into the
-                // closure — clone an Arc for the closure to capture.
-                let pref_for_invoke = prefetched_supported.clone();
-                slint::invoke_from_event_loop(move || {
-                    UI.with(|ui| {
-                        let app_state_copy = app_state_copy.clone();
-                        let mut ui = ui.borrow_mut();
-                        if let Some(ui) = ui.as_mut() {
-                            ui.window().show().unwrap();
-                            ui.window().on_close_requested(move || {
-                                if let Ok(mut app_state) = app_state_copy.lock() {
-                                    *app_state = AppState::MainWindowClosed;
-                                }
-                                slint::CloseRequestResponse::HideWindow
-                            });
-                        } else {
-                            let config_copy_2 = config_copy.clone();
-                            let newui = setup_window(config_copy, pref_for_invoke.clone(), is_tuf);
-                            newui.window().on_close_requested(move || {
-                                if let Ok(mut app_state) = app_state_copy.lock() {
-                                    *app_state = AppState::MainWindowClosed;
-                                }
-                                slint::CloseRequestResponse::HideWindow
-                            });
-
-                            let ui_copy = newui.as_weak();
-                            newui
-                                .window()
-                                .set_rendering_notifier(move |s, _| {
-                                    if let slint::RenderingState::RenderingSetup = s {
-                                        let config = config_copy_2.clone();
-                                        ui_copy
-                                            .upgrade_in_event_loop(move |w| {
-                                                let fullscreen =
-                                                    config.lock().is_ok_and(|c| c.start_fullscreen);
-                                                if fullscreen && !w.window().is_fullscreen() {
-                                                    w.window().set_fullscreen(fullscreen);
-                                                }
-                                            })
-                                            .ok();
-                                    }
-                                })
-                                .ok();
-                            ui.replace(newui);
-                        }
-                    });
-                })
-                .unwrap();
+                window.request(WindowCommand::Show);
             } else if state == AppState::QuitApp {
-                slint::quit_event_loop().unwrap();
-                exit(0);
+                window.request(WindowCommand::Quit);
+                break;
             } else if state != AppState::MainWindowOpen {
                 if let Ok(config) = config.lock() {
                     if !config.run_in_background {
-                        slint::quit_event_loop().unwrap();
-                        exit(0);
+                        window.request(WindowCommand::Quit);
+                        break;
                     }
                 }
             }

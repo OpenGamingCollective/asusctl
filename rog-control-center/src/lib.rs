@@ -15,6 +15,7 @@ pub mod notify;
 pub mod tray;
 pub mod types;
 pub mod ui;
+pub mod window;
 pub mod zbus_proxies;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
