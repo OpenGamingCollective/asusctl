@@ -14,6 +14,7 @@ use rog_control_center::config::Config;
 use rog_control_center::error::Result;
 use rog_control_center::notify::start_notifications;
 use rog_control_center::print_versions;
+use rog_control_center::shortcuts::EnableMode;
 use rog_control_center::slint::ComponentHandle;
 use rog_control_center::tray::init_tray;
 use rog_control_center::ui::setup_window;
@@ -94,7 +95,7 @@ async fn main() -> Result<()> {
 
     let state_zbus = ROGCCZbus::new();
     let app_state = state_zbus.clone_state();
-    let _conn = zbus::connection::Builder::session()?
+    let conn = zbus::connection::Builder::session()?
         .name(ZBUS_IFACE)?
         .serve_at(ZBUS_PATH, state_zbus)?
         .build()
@@ -163,6 +164,7 @@ async fn main() -> Result<()> {
         config.startup_in_background = false;
         config.start_fullscreen = true;
         config.enable_autostart = false;
+        config.enable_global_shortcut = false;
     }
 
     config.write();
@@ -205,16 +207,34 @@ async fn main() -> Result<()> {
         is_tuf,
     );
 
+    let shortcut_service = if is_rog_ally {
+        None
+    } else {
+        let service =
+            rog_control_center::shortcuts::start(rt.handle(), conn.clone(), window.clone());
+        let handle = service.handle();
+        window.set_shortcuts(handle.clone());
+        if config.lock().is_ok_and(|c| c.enable_global_shortcut) {
+            let restore = handle.clone();
+            rt.spawn(async move {
+                restore.enable(EnableMode::Restore).await;
+            });
+        }
+        Some(service)
+    };
+
     if enable_tray_icon {
         init_tray(supported_properties, config.clone(), window.clone());
     }
 
+    let shortcuts = shortcut_service.as_ref().map(|service| service.handle());
     thread::spawn(move || {
         let mut state = AppState::StartingUp;
         loop {
             if is_rog_ally {
                 let config_copy_2 = config.clone();
-                let newui = setup_window(config.clone(), prefetched_supported.clone(), is_tuf);
+                let newui =
+                    setup_window(config.clone(), prefetched_supported.clone(), is_tuf, None);
                 newui.window().on_close_requested(move || {
                     exit(0);
                 });
@@ -255,7 +275,10 @@ async fn main() -> Result<()> {
                 break;
             } else if state != AppState::MainWindowOpen {
                 if let Ok(config) = config.lock() {
-                    if !config.run_in_background {
+                    let shortcut_alive = shortcuts
+                        .as_ref()
+                        .is_some_and(|s| s.status().keeps_alive(config.enable_global_shortcut));
+                    if !config.run_in_background && !shortcut_alive {
                         window.request(WindowCommand::Quit);
                         break;
                     }
@@ -265,6 +288,13 @@ async fn main() -> Result<()> {
     });
 
     slint::run_event_loop_until_quit().unwrap();
+    // Restore the outer Tokio context before awaiting a task owned by the
+    // application runtime, then stop that runtime only after the portal
+    // session has been closed.
+    drop(_enter);
+    if let Some(service) = shortcut_service {
+        service.shutdown().await;
+    }
     rt.shutdown_background();
     Ok(())
 }

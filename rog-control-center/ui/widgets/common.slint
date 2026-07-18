@@ -153,6 +153,7 @@ export component SystemSlider inherits RogItem {
 
 export component SystemToggle inherits RogItem {
     in property <string> text;
+    in property <bool> enabled: true;
     in-out property <bool> checked;
     callback toggled(bool);
     HorizontalLayout {
@@ -172,6 +173,7 @@ export component SystemToggle inherits RogItem {
             alignment: LayoutAlignment.end;
             padding-right: 20px;
             Switch {
+                enabled: root.enabled;
                 checked <=> root.checked;
                 toggled => {
                     root.toggled(root.checked)

@@ -15,6 +15,8 @@ pub struct Config {
     pub enable_tray_icon: bool,
     #[serde(default)]
     pub enable_autostart: bool,
+    #[serde(default)]
+    pub enable_global_shortcut: bool,
     pub ac_command: String,
     pub bat_command: String,
     pub dark_mode: bool,
@@ -33,6 +35,7 @@ impl Default for Config {
             startup_in_background: false,
             enable_tray_icon: true,
             enable_autostart: false,
+            enable_global_shortcut: false,
             dark_mode: true,
             start_fullscreen: false,
             fullscreen_width: 1920,
@@ -90,6 +93,7 @@ impl From<Config461> for Config {
             startup_in_background: c.startup_in_background,
             enable_tray_icon: true,
             enable_autostart: false,
+            enable_global_shortcut: false,
             ac_command: c.ac_command,
             bat_command: c.bat_command,
             dark_mode: true,
@@ -186,6 +190,15 @@ fn update_autostart_with_dir(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_config_without_global_shortcut_field_defaults_to_false() {
+        let serialized = config_traits::ron::to_string(&Config::default()).unwrap();
+        let without_field = serialized.replace("enable_global_shortcut:false,", "");
+        assert!(without_field.len() < serialized.len());
+        let parsed: Config = config_traits::ron::from_str(&without_field).unwrap();
+        assert!(!parsed.enable_global_shortcut);
+    }
 
     #[test]
     fn test_update_autostart() {

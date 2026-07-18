@@ -1,5 +1,13 @@
-import { Palette } from "std-widgets.slint";
+import { Palette, Button } from "std-widgets.slint";
 import { SystemToggle } from "../widgets/common.slint";
+
+export enum GlobalShortcutStatus {
+    disabled,
+    starting,
+    unassigned,
+    listening,
+    unavailable,
+}
 
 export global AppSettingsPageData {
     in-out property <bool> run_in_background;
@@ -14,6 +22,16 @@ export global AppSettingsPageData {
     callback set_enable_autostart(bool);
     in-out property <bool> autostart_in_background;
     callback set_autostart_in_background(bool);
+    // Whether the global shortcut controls are shown (false on ROG Ally).
+    in-out property <bool> show_global_shortcut_controls;
+    in-out property <bool> enable_global_shortcut;
+    callback set_enable_global_shortcut(bool);
+    in-out property <GlobalShortcutStatus> global_shortcut_status;
+    // Portal capability (interface version >= 2): the desktop's shortcut
+    // configuration UI can be opened from here.
+    in-out property <bool> global_shortcut_configurable;
+    // Routes by status: Bind on first use, Configure when active.
+    callback manage_global_shortcut();
 }
 
 export component PageAppSettings inherits VerticalLayout {
@@ -63,13 +81,58 @@ export component PageAppSettings inherits VerticalLayout {
                 }
             }
 
-            if AppSettingsPageData.enable_autostart : HorizontalLayout {
+            if AppSettingsPageData.enable_autostart: HorizontalLayout {
                 padding-left: 20px;
                 SystemToggle {
                     text: @tr("Start in background on startup");
                     checked <=> AppSettingsPageData.autostart_in_background;
                     toggled => {
                         AppSettingsPageData.set_autostart_in_background(AppSettingsPageData.autostart_in_background)
+                    }
+                }
+            }
+
+            if AppSettingsPageData.show_global_shortcut_controls: SystemToggle {
+                enabled: AppSettingsPageData.global_shortcut_status != GlobalShortcutStatus.starting;
+                text: @tr("Armory/ROG key to show/hide window (keep app running in background)");
+                checked <=> AppSettingsPageData.enable_global_shortcut;
+                toggled => {
+                    AppSettingsPageData.set_enable_global_shortcut(AppSettingsPageData.enable_global_shortcut)
+                }
+            }
+
+            if AppSettingsPageData.show_global_shortcut_controls && AppSettingsPageData.enable_global_shortcut: HorizontalLayout {
+                padding-left: 20px;
+                spacing: 10px;
+
+                Text {
+                    vertical-alignment: TextVerticalAlignment.center;
+                    color: Palette.control-foreground;
+                    text: {
+                        if AppSettingsPageData.global_shortcut_status == GlobalShortcutStatus.starting {
+                            @tr("Setting up…")
+                        } else if AppSettingsPageData.global_shortcut_status == GlobalShortcutStatus.listening {
+                            @tr("Shortcut active")
+                        } else if AppSettingsPageData.global_shortcut_status == GlobalShortcutStatus.unassigned {
+                            @tr("No shortcut assigned")
+                        } else if AppSettingsPageData.global_shortcut_status == GlobalShortcutStatus.unavailable {
+                            @tr("Global shortcuts unavailable")
+                        } else {
+                            ""
+                        }
+                    }
+                }
+
+                Button {
+                    visible: AppSettingsPageData.global_shortcut_status == GlobalShortcutStatus.unassigned
+                        || (AppSettingsPageData.global_shortcut_status == GlobalShortcutStatus.listening
+                        && AppSettingsPageData.global_shortcut_configurable);
+                    height: 30px;
+                    text: AppSettingsPageData.global_shortcut_status == GlobalShortcutStatus.unassigned
+                        ? @tr("Set up shortcut")
+                        : @tr("Configure shortcut");
+                    clicked => {
+                        AppSettingsPageData.manage_global_shortcut()
                     }
                 }
             }

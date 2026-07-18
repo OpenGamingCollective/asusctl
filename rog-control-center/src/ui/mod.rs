@@ -12,17 +12,18 @@ use std::time::Duration;
 static TOAST_SEQ: AtomicU64 = AtomicU64::new(0);
 
 use config_traits::StdConfig;
-use log::warn;
+use log::{error, warn};
 use rog_dbus::list_iface_blocking;
 use slint::{ComponentHandle, SharedString, Weak};
 
 use crate::config::Config;
+use crate::shortcuts::{EnableMode, ShortcutHandle, ShortcutStatus};
 use crate::ui::setup_anime::setup_anime_page;
 use crate::ui::setup_aura::setup_aura_page;
 use crate::ui::setup_fans::setup_fan_curve_page;
 use crate::ui::setup_slash::setup_slash_page;
 use crate::ui::setup_system::{setup_system_page, setup_system_page_callbacks};
-use crate::{AppSettingsPageData, MainWindow};
+use crate::{AppSettingsPageData, GlobalShortcutStatus, MainWindow};
 
 // this macro sets up:
 // - a link from UI callback -> dbus proxy property
@@ -123,6 +124,7 @@ pub fn setup_window(
     config: Arc<Mutex<Config>>,
     prefetched_supported: std::sync::Arc<Option<Vec<i32>>>,
     is_tuf: bool,
+    shortcuts: Option<ShortcutHandle>,
 ) -> MainWindow {
     slint::set_xdg_app_id(crate::APP_ID)
         .map_err(|e| warn!("Couldn't set application ID: {e:?}"))
@@ -157,7 +159,7 @@ pub fn setup_window(
         slint::quit_event_loop().unwrap();
     });
 
-    setup_app_settings_page(&ui, config.clone());
+    setup_app_settings_page(&ui, config.clone(), shortcuts);
     if available.contains(&"xyz.ljones.Platform".to_string()) {
         setup_system_page(&ui, config.clone());
         setup_system_page_callbacks(&ui, config.clone());
@@ -181,7 +183,21 @@ pub fn setup_window(
     ui
 }
 
-pub fn setup_app_settings_page(ui: &MainWindow, config: Arc<Mutex<Config>>) {
+fn ui_shortcut_status(status: ShortcutStatus) -> GlobalShortcutStatus {
+    match status {
+        ShortcutStatus::Disabled => GlobalShortcutStatus::Disabled,
+        ShortcutStatus::Starting => GlobalShortcutStatus::Starting,
+        ShortcutStatus::Unassigned => GlobalShortcutStatus::Unassigned,
+        ShortcutStatus::Listening => GlobalShortcutStatus::Listening,
+        ShortcutStatus::Unavailable => GlobalShortcutStatus::Unavailable,
+    }
+}
+
+pub fn setup_app_settings_page(
+    ui: &MainWindow,
+    config: Arc<Mutex<Config>>,
+    shortcuts: Option<ShortcutHandle>,
+) {
     let config_copy = config.clone();
     let global = ui.global::<AppSettingsPageData>();
     global.on_set_run_in_background(move |enable| {
@@ -235,5 +251,109 @@ pub fn setup_app_settings_page(ui: &MainWindow, config: Arc<Mutex<Config>>) {
         global.set_enable_dgpu_notifications(lock.notifications.enabled);
         global.set_enable_autostart(lock.enable_autostart);
         global.set_autostart_in_background(super::config::is_autostart_in_background());
+    }
+
+    global.set_show_global_shortcut_controls(shortcuts.is_some());
+    if let Some(handle) = shortcuts {
+        match config.lock() {
+            Ok(lock) => global.set_enable_global_shortcut(lock.enable_global_shortcut),
+            Err(err) => error!("Could not read config for global shortcut setting: {err}"),
+        }
+
+        // Subscribe before reading the current value so no transition is
+        // lost between the two.
+        let mut statuses = handle.status_receiver();
+        let initial_status = *statuses.borrow_and_update();
+        global.set_global_shortcut_status(ui_shortcut_status(initial_status));
+        global.set_global_shortcut_configurable(handle.can_configure());
+
+        let status_handle = handle.clone();
+        let weak = ui.as_weak();
+        tokio::spawn(async move {
+            while statuses.changed().await.is_ok() {
+                let status = *statuses.borrow();
+                let configurable = status_handle.can_configure();
+                weak.upgrade_in_event_loop(move |ui| {
+                    let global = ui.global::<AppSettingsPageData>();
+                    global.set_global_shortcut_status(ui_shortcut_status(status));
+                    global.set_global_shortcut_configurable(configurable);
+                })
+                .ok();
+            }
+        });
+
+        let toggle_handle = handle.clone();
+        let config_copy = config.clone();
+        let weak = ui.as_weak();
+        global.on_set_enable_global_shortcut(move |enable| {
+            if enable {
+                match config_copy.lock() {
+                    Ok(mut lock) => {
+                        lock.enable_global_shortcut = true;
+                        lock.write();
+                    }
+                    Err(err) => error!("Could not save global shortcut setting: {err}"),
+                }
+                let handle = toggle_handle.clone();
+                let config = config_copy.clone();
+                let weak = weak.clone();
+                tokio::spawn(async move {
+                    let status = handle.enable(EnableMode::Interactive).await;
+                    if status == ShortcutStatus::Unassigned {
+                        // The user cancelled the first-time bind dialog, so
+                        // the feature can do nothing: revert the intent.
+                        match config.lock() {
+                            Ok(mut lock) => {
+                                lock.enable_global_shortcut = false;
+                                lock.write();
+                            }
+                            Err(err) => {
+                                error!("Could not revert global shortcut setting: {err}")
+                            }
+                        }
+                        handle.disable().await;
+                        weak.upgrade_in_event_loop(|ui| {
+                            ui.global::<AppSettingsPageData>()
+                                .set_enable_global_shortcut(false);
+                        })
+                        .ok();
+                    }
+                    // `Unavailable` keeps the config: the failure may be
+                    // temporary and the next startup will retry the restore.
+                });
+            } else {
+                match config_copy.lock() {
+                    Ok(mut lock) => {
+                        lock.enable_global_shortcut = false;
+                        lock.write();
+                    }
+                    Err(err) => error!("Could not save global shortcut setting: {err}"),
+                }
+                let handle = toggle_handle.clone();
+                tokio::spawn(async move {
+                    handle.disable().await;
+                });
+            }
+        });
+
+        global.on_manage_global_shortcut(move || {
+            let handle = handle.clone();
+            tokio::spawn(async move {
+                match handle.status() {
+                    // First use opens the Bind dialog; an existing but
+                    // unassigned shortcut opens Configure (portal v2) via
+                    // the actor's interactive enable flow.
+                    ShortcutStatus::Unassigned => {
+                        handle.enable(EnableMode::Interactive).await;
+                    }
+                    // Reconfigure an active shortcut in the desktop's own
+                    // shortcut settings.
+                    ShortcutStatus::Listening => {
+                        handle.configure().await;
+                    }
+                    _ => {}
+                }
+            });
+        });
     }
 }

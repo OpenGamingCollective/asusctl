@@ -12,6 +12,7 @@ pub mod error;
 #[cfg(feature = "mocking")]
 pub mod mocking;
 pub mod notify;
+pub mod shortcuts;
 pub mod tray;
 pub mod types;
 pub mod ui;
