@@ -19,6 +19,8 @@
 - Add proper support for APU memory reservation
 - Add aura support for FA608UH: thanks @Igilq
 - Change CLI of slash
+- Improve aura support for Strix G16 G614PR: thanks @scardracs
+- Improve CI support: thanks @ayush123460
 
 ## [6.3.8]
 

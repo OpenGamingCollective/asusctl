@@ -56,12 +56,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 // Inner behind mutex required for thread safety
                 let inner = Arc::new(Mutex::new(
-                    CtrlAnimeInner::new(
-                        anime,
-                        anime_proxy_blocking.clone(),
-                        early_return.clone(),
-                    )
-                    .unwrap(),
+                    CtrlAnimeInner::new(anime, anime_proxy_blocking.clone(), early_return.clone())
+                        .unwrap(),
                 ));
                 // Need new client object for dbus control part
                 let anime_control = CtrlAnime::new(
@@ -72,13 +68,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 )
                 .unwrap();
                 anime_control.add_to_server(&mut connection).await;
-                tokio::task::spawn_blocking(move || {
-                    loop {
-                        if let Ok(inner) = inner.clone().try_lock() {
-                            inner.run().ok();
-                        }
+                tokio::task::spawn_blocking(move || loop {
+                    if let Ok(inner) = inner.clone().try_lock() {
+                        inner.run().ok();
                     }
-                }).await.unwrap();
+                })
+                .await
+                .unwrap();
             });
         }
     }
@@ -97,14 +93,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .unwrap_or_else(|_| KeyLayout::default_layout());
 
         let aura_proxy_blocking = AuraProxyBlocking::new(&conn).unwrap();
-        tokio::task::spawn_blocking(move || {
-            loop {
-                aura_config.aura.next_state(&layout);
-                let packets = aura_config.aura.create_packets();
+        tokio::task::spawn_blocking(move || loop {
+            aura_config.aura.next_state(&layout);
+            let packets = aura_config.aura.create_packets();
 
-                aura_proxy_blocking.direct_addressing_raw(packets).unwrap();
-                std::thread::sleep(std::time::Duration::from_millis(33));
-            }
+            aura_proxy_blocking.direct_addressing_raw(packets).unwrap();
+            std::thread::sleep(std::time::Duration::from_millis(33));
         });
     }
     // }

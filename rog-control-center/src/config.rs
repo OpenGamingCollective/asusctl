@@ -120,7 +120,11 @@ pub fn update_autostart(enable: bool, in_background: bool) {
     update_autostart_with_dir(enable, in_background, None);
 }
 
-fn update_autostart_with_dir(enable: bool, in_background: bool, custom_dir: Option<&std::path::Path>) {
+fn update_autostart_with_dir(
+    enable: bool,
+    in_background: bool,
+    custom_dir: Option<&std::path::Path>,
+) {
     let autostart_dir = if let Some(dir) = custom_dir {
         dir.to_path_buf()
     } else {
@@ -152,7 +156,8 @@ fn update_autostart_with_dir(enable: bool, in_background: bool, custom_dir: Opti
             "rog-control-center --autostart"
         };
 
-        let content = format!("[Desktop Entry]\n\
+        let content = format!(
+            "[Desktop Entry]\n\
                        Version=1.0\n\
                        Type=Application\n\
                        Name=ROG Control Center\n\
@@ -160,7 +165,9 @@ fn update_autostart_with_dir(enable: bool, in_background: bool, custom_dir: Opti
                        Categories=Settings;\n\
                        Icon=rog-control-center\n\
                        Exec={}\n\
-                       Terminal=false\n", exec_cmd);
+                       Terminal=false\n",
+            exec_cmd
+        );
 
         if let Err(e) = std::fs::write(&desktop_file, content) {
             log::error!("Failed to write autostart desktop file: {e}");
