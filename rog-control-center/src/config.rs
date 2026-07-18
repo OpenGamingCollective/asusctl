@@ -174,13 +174,11 @@ fn update_autostart_with_dir(
         } else {
             log::info!("Created autostart entry at {:?}", desktop_file);
         }
-    } else {
-        if desktop_file.exists() {
-            if let Err(e) = std::fs::remove_file(&desktop_file) {
-                log::error!("Failed to remove autostart desktop file: {e}");
-            } else {
-                log::info!("Removed autostart entry at {:?}", desktop_file);
-            }
+    } else if desktop_file.exists() {
+        if let Err(e) = std::fs::remove_file(&desktop_file) {
+            log::error!("Failed to remove autostart desktop file: {e}");
+        } else {
+            log::info!("Removed autostart entry at {:?}", desktop_file);
         }
     }
 }
