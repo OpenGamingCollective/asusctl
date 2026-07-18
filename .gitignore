@@ -27,3 +27,6 @@ AGENTS.md
 /reference
 
 *.log
+
+# Git should not follow this IN ANY CASE
+Cargo.lock
