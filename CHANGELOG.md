@@ -21,6 +21,13 @@
 - Change CLI of slash
 - Improve aura support for Strix G16 G614PR: thanks @scardracs
 - Improve CI support: thanks @ayush123460
+- Fix manual SIGTERM shutdown: thanks @scardracs
+- Improve README button alignment: @scardracs again
+- Add autostart feature: thanks again @scardracs
+- Add French translation: thanks @preference
+- Add aura support for GU503GU: thanks @vr-romero
+- Add lightbar support for G531G: thanks @emilijan-koteski
+- Add aura support for FX507VU: thanks @crimcode204
 
 ## [6.3.8]
 
