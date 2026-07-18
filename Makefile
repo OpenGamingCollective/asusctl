@@ -21,7 +21,7 @@ LEDCFG := aura_support.ron
 
 DESTDIR_REALPATH := $(if $(DESTDIR),$(shell realpath $(DESTDIR)),)
 
-SRC := Cargo.toml Cargo.lock Makefile $(shell find -type f -wholename '**/src/*.rs')
+SRC := Cargo.toml Makefile $(shell find -type f -wholename '**/src/*.rs')
 
 STRIP_BINARIES ?= 0
 
