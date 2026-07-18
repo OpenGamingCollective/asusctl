@@ -425,7 +425,7 @@
     (
         device_name: "G614PR",
         product_id: "",
-        layout_name: "g634j-per-key",
+        layout_name: "g614pr-per-key",
         basic_modes: [Static, Breathe, RainbowCycle, RainbowWave, Pulse],
         basic_zones: [Key1, Key2, Key3, Key4],
         advanced_type: PerKey,
@@ -936,7 +936,7 @@
         power_zones: [Keyboard],
     ),
     (
-        device_name: "GU502L",
+        device_name: "GU502GU",
         product_id: "",
         layout_name: "gx502",
         basic_modes: [Static, Breathe, RainbowCycle, RainbowWave, Star, Rain, Highlight, Laser, Ripple, Pulse, Comet, Flash],
@@ -945,7 +945,7 @@
         power_zones: [Keyboard],
     ),
     (
-        device_name: "GU502GU",
+        device_name: "GU502L",
         product_id: "",
         layout_name: "gx502",
         basic_modes: [Static, Breathe, RainbowCycle, RainbowWave, Star, Rain, Highlight, Laser, Ripple, Pulse, Comet, Flash],
