@@ -1,8 +1,11 @@
-name: Build & Publish Arch Packages
+name: Build Arch Packages
 
 on:
     release:
         types: [published]
+
+permissions:
+    contents: write
 
 jobs:
     build:
@@ -13,7 +16,7 @@ jobs:
             - name: Prepare container
               run: |
                   pacman-key --init && pacman-key --populate archlinux
-                  pacman -Syu --noconfirm git sudo aws-cli
+                  pacman -Syu --noconfirm git sudo
 
             - uses: actions/checkout@v4
               with:
@@ -24,27 +27,29 @@ jobs:
                   useradd -m builder
                   echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
-            - name: Import PGP Key
-              env:
-                  PGP_KEY: ${{ secrets.PGP_SIGNING_KEY }}
-              run: echo "$PGP_KEY" | gpg --import --batch
-
             - name: Install makedepends
               run: |
                   pacman -Syu --noconfirm rust llvm clang at-spi2-core cairo gtk3
 
             - name: Determine pkgrel
+              env:
+                  BUCKET_PUBLIC_URL: ${{ vars.BUCKET_PUBLIC_URL }}
+                  RELEASE_TAG: ${{ github.event.release.tag_name }}
               run: |
+                  git config --global --add safe.directory "$PWD"
                   PKGREL=1
-                  if curl -sf "${{ secrets.BUCKET_PUBLIC_URL }}/ogc.db.tar.gz" \
-                      -o "/tmp/ogc.db.tar.gz"; then
-                      LAST=$(bsdtar -xOzf /tmp/ogc.db.tar.gz 2>/dev/null \
-                          | strings \
-                          | grep -E "^${{ github.event.release.tag_name }}" \
-                          | sed 's/^.*-//' \
-                          | sort -n \
-                          | tail -1)
-                      [ -n "$LAST" ] && PKGREL=$((LAST + 1))
+                  if [ -n "$BUCKET_PUBLIC_URL" ] && curl -sf "$BUCKET_PUBLIC_URL/ogc.db.tar.gz" -o /tmp/ogc.db.tar.gz; then
+                      pkgver=$(git describe --long --tags "$RELEASE_TAG" | sed 's/\([^-]*-g\)/r\1/;s/-/./g')
+                      LAST=0
+                      for pkgname in asusctl rog-control-center; do
+                          rel=$(bsdtar -xOzf /tmp/ogc.db.tar.gz 2>/dev/null \
+                              | strings \
+                              | grep -E "^${pkgname}-${pkgver}-[0-9]+-x86_64\.pkg\.tar\.zst$" \
+                              | sed -E "s/^${pkgname}-${pkgver}-([0-9]+)-.*/\1/" \
+                              | sort -n | tail -1)
+                          [ -n "$rel" ] && [ "$rel" -gt "$LAST" ] && LAST=$rel
+                      done
+                      [ "$LAST" -gt 0 ] && PKGREL=$((LAST + 1))
                   fi
                   echo "PKGREL=$PKGREL" >> "$GITHUB_ENV"
 
@@ -61,25 +66,9 @@ jobs:
                       pkgrel="$PKGREL" \
                       makepkg -s --noconfirm
 
-            - name: Sign packages
-              run: |
-                  for pkg in asusctl-*.pkg.tar.zst rog-*.pkg.tar.zst; do
-                      [ -f "$pkg" ] && gpg --detach-sign --batch "$pkg"
-                  done
-
-            - name: Create repo db
-              run: |
-                  repo-add --sign ogc.db.tar.gz *.pkg.tar.zst
-
-            - name: Upload to bucket
-              env:
-                  AWS_ACCESS_KEY_ID: ${{ secrets.BUCKET_ACCESS_KEY }}
-                  AWS_SECRET_ACCESS_KEY: ${{ secrets.BUCKET_SECRET_KEY }}
-                  AWS_ENDPOINT_URL: ${{ secrets.BUCKET_ENDPOINT }}
-                  BUCKET: ${{ secrets.S3_BUCKET }}
-              run: |
-                  for f in asusctl-*.pkg.tar.zst asusctl-*.pkg.tar.zst.sig \
-                           rog-control-center-*.pkg.tar.zst rog-control-center-*.pkg.tar.zst.sig \
-                           ogc.*; do
-                      [ -f "$f" ] && aws s3 cp "$f" "s3://$BUCKET/$f"
-                  done
+            - name: Upload release assets
+              uses: softprops/action-gh-release@v3
+              with:
+                  files: |
+                      *.pkg.tar.zst
+                  fail_on_unmatched_files: true
