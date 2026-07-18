@@ -382,8 +382,7 @@ impl LedUsbPackets {
             LedCode::Return3_3 => (6, 18),
             LedCode::PgDn => (6, 21),
             LedCode::LShift => (6, 36),
-            // TODO: Find correct locations
-            LedCode::LShift3_1 => (6, 36),
+            LedCode::LShift3_1 => (6, 39),
             LedCode::LShift3_2 => (6, 36),
             LedCode::LShift3_3 => (6, 36),
             LedCode::Z => (6, 42),
