@@ -64,6 +64,14 @@ pub fn setup_system_page(ui: &MainWindow, config: Arc<Mutex<Config>>) {
     ui.global::<SystemPageData>()
         .set_ppt_enabled_available(false);
 
+    let has_dgpu = {
+        let devices = rog_platform::gpu_pci::Device::find().unwrap_or_default();
+        devices.iter().any(|d| d.is_dgpu())
+            || rog_platform::gpu_pci::asus_dgpu_disable_exists()
+            || rog_platform::gpu_pci::asus_gpu_mux_exists()
+    };
+    ui.global::<SystemPageData>().set_has_dgpu(has_dgpu);
+
     if let Ok(sys_props) = platform
         .supported_properties()
         .map_err(|e| log::error!("Failed to get supported properties: {}", e))
