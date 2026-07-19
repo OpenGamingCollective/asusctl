@@ -26,6 +26,10 @@ export global GPUPageData {
 export component PageGPU inherits Rectangle {
     clip: true;
 
+    property <[string]> modes_all: [@tr("Integrated"), @tr("Hybrid"), @tr("Ultimate")];
+    property <[string]> modes_dgpu: [@tr("Integrated"), @tr("Hybrid")];
+    property <[string]> modes_mux: [@tr("Hybrid"), @tr("Ultimate")];
+
     ScrollView {
         VerticalLayout {
             padding: 12px;
@@ -70,9 +74,11 @@ export component PageGPU inherits Rectangle {
             if GPUPageData.gpu_switchable: HorizontalLayout {
                 SystemDropdown {
                     text: @tr("GPU mode");
-                    model <=> GPUPageData.gpu_modes;
+                    model: GPUPageData.gpu_modes.length == 3 ? root.modes_all : (
+                        GPUPageData.gpu_modes.length == 2 && GPUPageData.gpu_modes[0] == "Integrated" ? root.modes_dgpu : root.modes_mux
+                    );
                     current_index <=> GPUPageData.gpu_mode_index;
-                    current_value: GPUPageData.gpu_modes[GPUPageData.gpu_mode_index];
+                    current_value: self.model[self.current_index];
                     enabled <=> GPUPageData.gpu_dropdown_enabled;
                     selected => {
                         GPUPageData.cb_set_gpu_mode(GPUPageData.gpu_mode_index)
