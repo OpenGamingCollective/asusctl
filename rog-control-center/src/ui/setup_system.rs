@@ -20,7 +20,7 @@ const MINMAX: AttrMinMax = AttrMinMax {
     current: -1.0,
 };
 
-pub fn setup_system_page(ui: &MainWindow, config: Arc<Mutex<Config>>) {
+pub fn setup_system_page(ui: &MainWindow, _config: Arc<Mutex<Config>>) {
     let conn = zbus::blocking::Connection::system()
         .map_err(|e| error!("DBus system connection failed: {e:?}"))
         .unwrap();
@@ -76,7 +76,7 @@ pub fn setup_system_page(ui: &MainWindow, config: Arc<Mutex<Config>>) {
         .supported_properties()
         .map_err(|e| log::error!("Failed to get supported properties: {}", e))
     {
-        log::debug!("Available system properties: {:?}", &sys_props);
+        log::debug!("Available system properties: {:?}", sys_props);
         if sys_props.contains(&Properties::ChargeControlEndThreshold) {
             ui.global::<SystemPageData>()
                 .set_charge_control_end_threshold(60.0);

@@ -71,7 +71,7 @@ fn start_dpu_status_mon(config: Arc<Mutex<Config>>) {
                                 .show()
                                 .unwrap()
                                 .on_close(|_| ());
-                            debug!("dGPU status changed: {:?}", &status);
+                            debug!("dGPU status changed: {:?}", status);
                         }
                         last_status = status;
                     }

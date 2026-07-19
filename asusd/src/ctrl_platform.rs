@@ -437,7 +437,7 @@ impl CtrlPlatform {
         }
 
         if !(20..=100).contains(&limit) {
-            return Err(RogError::ChargeLimit(limit))?;
+            return Err(RogError::ChargeLimit(limit).into());
         }
 
         self.power
