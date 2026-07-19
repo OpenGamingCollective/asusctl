@@ -20,7 +20,7 @@ const MINMAX: AttrMinMax = AttrMinMax {
     current: -1.0,
 };
 
-pub fn setup_system_page(ui: &MainWindow, _config: Arc<Mutex<Config>>) {
+pub fn setup_system_page(ui: &MainWindow, config: Arc<Mutex<Config>>) {
     let conn = zbus::blocking::Connection::system()
         .map_err(|e| error!("DBus system connection failed: {e:?}"))
         .unwrap();
@@ -37,6 +37,13 @@ pub fn setup_system_page(ui: &MainWindow, _config: Arc<Mutex<Config>>) {
         .set_charge_control_end_threshold(-1.0);
     ui.global::<SystemPageData>()
         .set_charge_control_enabled(false);
+    ui.global::<SystemPageData>().set_battery_health(-1);
+    ui.global::<SystemPageData>()
+        .set_battery_power_consumption(-1.0);
+    ui.global::<SystemPageData>()
+        .set_battery_status("Unknown".into());
+    ui.global::<SystemPageData>()
+        .set_battery_time_estimate("".into());
     ui.global::<SystemPageData>().set_platform_profile(-1);
     ui.global::<SystemPageData>().set_panel_overdrive(-1);
     ui.global::<SystemPageData>().set_boot_sound(-1);
@@ -69,6 +76,86 @@ pub fn setup_system_page(ui: &MainWindow, _config: Arc<Mutex<Config>>) {
                 .set_charge_control_enabled(true);
         }
     }
+
+    let handle = ui.as_weak();
+    tokio::spawn(async move {
+        let mut prev_ticks = read_cpu_ticks();
+        loop {
+            let power = rog_platform::power::AsusPower::new().ok();
+            let (has_bat, health, consumption, status, estimate_str) = if let Some(ref p) = power {
+                if p.has_battery() {
+                    let health = p.get_battery_health().unwrap_or(0) as i32;
+                    let consumption = p.get_battery_power_consumption().unwrap_or(-1.0);
+                    let status = p
+                        .get_battery_status()
+                        .unwrap_or_else(|_| "Unknown".to_string());
+                    let estimate = p.get_battery_time_estimate().ok().flatten();
+                    let est_str = if let Some((_, h, m)) = estimate {
+                        if h > 0 {
+                            format!("{}h {}m", h, m)
+                        } else {
+                            format!("{}m", m)
+                        }
+                    } else {
+                        "".to_string()
+                    };
+                    (true, health, consumption, status, est_str)
+                } else {
+                    (false, -1, -1.0, "Unknown".to_string(), "".to_string())
+                }
+            } else {
+                (false, -1, -1.0, "Unknown".to_string(), "".to_string())
+            };
+
+            let cpu_temp = get_cpu_temp();
+            let gpu_temp = get_gpu_temp();
+            let (cpu_fan, gpu_fan, mid_fan) = get_fan_rpms();
+            let cpu_freq = get_cpu_frequency_mhz();
+            let ram_usage = get_ram_usage_pct();
+            let gpu_usage = get_gpu_usage_pct();
+
+            let curr_ticks = read_cpu_ticks();
+            let cpu_usage = if let (Some(p), Some(c)) = (&prev_ticks, &curr_ticks) {
+                let idle_diff = c.idle.saturating_sub(p.idle) as f32;
+                let total_diff = c.total.saturating_sub(p.total) as f32;
+                if total_diff > 0.0 {
+                    ((1.0 - (idle_diff / total_diff)) * 100.0).clamp(0.0, 100.0)
+                } else {
+                    0.0
+                }
+            } else {
+                0.0
+            };
+            prev_ticks = curr_ticks;
+
+            let success = handle.upgrade_in_event_loop(move |ui| {
+                let data = ui.global::<SystemPageData>();
+                if has_bat {
+                    data.set_battery_health(health);
+                    data.set_battery_power_consumption(consumption);
+                    data.set_battery_status(status.into());
+                    data.set_battery_time_estimate(estimate_str.into());
+                } else {
+                    data.set_battery_health(-1);
+                }
+                data.set_cpu_temp_val(cpu_temp);
+                data.set_gpu_temp_val(gpu_temp);
+                data.set_cpu_usage_val(cpu_usage);
+                data.set_gpu_usage_val(gpu_usage);
+                data.set_ram_usage_val(ram_usage);
+                data.set_cpu_freq_mhz(cpu_freq);
+                data.set_cpu_fan_rpm(cpu_fan);
+                data.set_gpu_fan_rpm(gpu_fan);
+                data.set_mid_fan_rpm(mid_fan);
+            });
+
+            if success.is_err() {
+                break;
+            }
+
+            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        }
+    });
 }
 
 macro_rules! convert_value {
@@ -745,4 +832,176 @@ pub fn setup_system_page_callbacks(ui: &MainWindow, _states: Arc<Mutex<Config>>)
             })
             .ok();
     });
+}
+
+fn get_cpu_temp() -> f32 {
+    if let Ok(entries) = std::fs::read_dir("/sys/class/hwmon") {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if let Ok(name) = std::fs::read_to_string(path.join("name")) {
+                let name = name.trim();
+                if name == "k10temp" || name == "coretemp" || name == "zenpower" {
+                    if let Ok(temp_str) = std::fs::read_to_string(path.join("temp1_input")) {
+                        if let Ok(temp_val) = temp_str.trim().parse::<f32>() {
+                            return temp_val / 1000.0;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if let Ok(temp_str) = std::fs::read_to_string("/sys/class/thermal/thermal_zone0/temp") {
+        if let Ok(temp_val) = temp_str.trim().parse::<f32>() {
+            return temp_val / 1000.0;
+        }
+    }
+    0.0
+}
+
+fn get_gpu_temp() -> f32 {
+    if let Ok(entries) = std::fs::read_dir("/sys/class/hwmon") {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if let Ok(name) = std::fs::read_to_string(path.join("name")) {
+                let name = name.trim();
+                if name == "amdgpu" || name == "nouveau" || name == "nvidia" {
+                    if let Ok(temp_str) = std::fs::read_to_string(path.join("temp1_input")) {
+                        if let Ok(temp_val) = temp_str.trim().parse::<f32>() {
+                            return temp_val / 1000.0;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    0.0
+}
+
+fn get_fan_rpms() -> (i32, i32, i32) {
+    let mut cpu = 0;
+    let mut gpu = 0;
+    let mut mid = 0;
+    if let Ok(entries) = std::fs::read_dir("/sys/class/hwmon") {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if let Ok(name) = std::fs::read_to_string(path.join("name")) {
+                if name.trim() == "asus" {
+                    if let Ok(v) = std::fs::read_to_string(path.join("fan1_input")) {
+                        cpu = v.trim().parse().unwrap_or(0);
+                    }
+                    if let Ok(v) = std::fs::read_to_string(path.join("fan2_input")) {
+                        gpu = v.trim().parse().unwrap_or(0);
+                    }
+                    if let Ok(v) = std::fs::read_to_string(path.join("fan3_input")) {
+                        mid = v.trim().parse().unwrap_or(0);
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    (cpu, gpu, mid)
+}
+
+fn get_cpu_frequency_mhz() -> f32 {
+    let mut total_freq = 0.0;
+    let mut count = 0;
+    if let Ok(entries) = std::fs::read_dir("/sys/devices/system/cpu") {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if name.starts_with("cpu") && name[3..].chars().all(|c| c.is_ascii_digit()) {
+                let freq_path = entry.path().join("cpufreq/scaling_cur_freq");
+                if let Ok(freq_str) = std::fs::read_to_string(freq_path) {
+                    if let Ok(freq_khz) = freq_str.trim().parse::<f32>() {
+                        total_freq += freq_khz / 1000.0;
+                        count += 1;
+                    }
+                }
+            }
+        }
+    }
+    if count == 0 {
+        if let Ok(cpuinfo) = std::fs::read_to_string("/proc/cpuinfo") {
+            for line in cpuinfo.lines() {
+                if line.starts_with("cpu MHz") {
+                    if let Some(pos) = line.find(':') {
+                        if let Ok(val) = line[pos + 1..].trim().parse::<f32>() {
+                            total_freq += val;
+                            count += 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if count > 0 {
+        total_freq / count as f32
+    } else {
+        0.0
+    }
+}
+
+fn get_ram_usage_pct() -> f32 {
+    if let Ok(meminfo) = std::fs::read_to_string("/proc/meminfo") {
+        let mut total = 0.0;
+        let mut available = 0.0;
+        for line in meminfo.lines() {
+            if line.starts_with("MemTotal:") {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if let Some(val) = parts.get(1) {
+                    total = val.parse::<f32>().unwrap_or(0.0);
+                }
+            } else if line.starts_with("MemAvailable:") {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if let Some(val) = parts.get(1) {
+                    available = val.parse::<f32>().unwrap_or(0.0);
+                }
+            }
+        }
+        if total > 0.0 {
+            return ((total - available) / total) * 100.0;
+        }
+    }
+    0.0
+}
+
+struct CpuTicks {
+    idle: u64,
+    total: u64,
+}
+
+fn read_cpu_ticks() -> Option<CpuTicks> {
+    let stat = std::fs::read_to_string("/proc/stat").ok()?;
+    let first_line = stat.lines().next()?;
+    if first_line.starts_with("cpu ") {
+        let parts: Vec<&str> = first_line.split_whitespace().collect();
+        let mut total = 0u64;
+        let mut idle = 0u64;
+        for (i, part) in parts.iter().skip(1).enumerate() {
+            if let Ok(ticks) = part.parse::<u64>() {
+                total += ticks;
+                if i == 3 || i == 4 {
+                    idle += ticks;
+                }
+            }
+        }
+        return Some(CpuTicks { idle, total });
+    }
+    None
+}
+
+fn get_gpu_usage_pct() -> f32 {
+    if let Ok(entries) = std::fs::read_dir("/sys/class/drm") {
+        for entry in entries.flatten() {
+            let path = entry.path().join("device/gpu_busy_percent");
+            if path.exists() {
+                if let Ok(val_str) = std::fs::read_to_string(path) {
+                    if let Ok(val) = val_str.trim().parse::<f32>() {
+                        return val;
+                    }
+                }
+            }
+        }
+    }
+    0.0
 }
