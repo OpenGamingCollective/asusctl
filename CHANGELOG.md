@@ -24,7 +24,7 @@
 - Fix manual SIGTERM shutdown: thanks @scardracs
 - Improve README button alignment: @scardracs again
 - Add autostart feature: thanks again @scardracs
-- Add French translation: thanks @preference
+- Add French translation: thanks @Piedfer
 - Add aura support for GU503GU: thanks @vr-romero
 - Add lightbar support for G531G: thanks @emilijan-koteski
 - Add aura support for FX507VU: thanks @crimcode204
