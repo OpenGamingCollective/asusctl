@@ -166,7 +166,7 @@ export global SystemPageData {
     in-out property <int> cpu_fan_rpm: -1;
     in-out property <int> gpu_fan_rpm: -1;
     in-out property <int> mid_fan_rpm: -1;
-
+    in-out property <bool> has_dgpu: true;
 }
 
 export component PageSystem inherits Rectangle {
@@ -312,14 +312,14 @@ export component PageSystem inherits Rectangle {
                             width: 50%;
                             spacing: 8px;
                             
-                            Text {
+                            if SystemPageData.has_dgpu: Text {
                                 text: @tr("GPU Status");
                                 font-weight: 700;
                                 color: Palette.control-foreground;
                                 font-size: 12px;
                             }
                             
-                            HorizontalLayout {
+                            if SystemPageData.has_dgpu: HorizontalLayout {
                                 alignment: LayoutAlignment.space-between;
                                 Text {
                                     text: @tr("Temperature:");
@@ -332,7 +332,7 @@ export component PageSystem inherits Rectangle {
                                 }
                             }
                             
-                            HorizontalLayout {
+                            if SystemPageData.has_dgpu: HorizontalLayout {
                                 alignment: LayoutAlignment.space-between;
                                 Text {
                                     text: @tr("Usage:");
@@ -345,7 +345,7 @@ export component PageSystem inherits Rectangle {
                                 }
                             }
 
-                            Rectangle { height: 4px; } // divider spacer
+                            if SystemPageData.has_dgpu: Rectangle { height: 4px; } // divider spacer
 
                             Text {
                                 text: @tr("Fan Speeds");
@@ -367,7 +367,7 @@ export component PageSystem inherits Rectangle {
                                 }
                             }
                             
-                            HorizontalLayout {
+                            if SystemPageData.has_dgpu: HorizontalLayout {
                                 alignment: LayoutAlignment.space-between;
                                 Text {
                                     text: @tr("GPU Fan:");
