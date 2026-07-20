@@ -24,52 +24,53 @@ export component PageAbout inherits VerticalLayout {
 
                 Text {
                     wrap: TextWrap.word-wrap;
-                    text: "\nA powerful graphical interface for managing ASUS ROG, TUF, and ProArt laptops on Linux. It acts as the official GUI for the asusctl toolset, allowing for seamless hardware tuning without the command line.";
+                    text: @tr("\nA powerful graphical interface for managing ASUS ROG, TUF, and ProArt laptops on Linux. It acts as the official GUI for the asusctl toolset, allowing for seamless hardware tuning without the command line.");
                 }
 
                 Text {
                     font-weight: 900;
-                    text: "Key Features:";
+                    text: @tr("Key Features:");
                 }
 
                 Text {
-                    text: "      • Performance: Switch power profiles and customize fan curves.\n      • Aura Sync: Control keyboard backlighting and LED effects.\n      • Battery Health: Set charge limits to extend battery longevity.\n      • Display: Toggle Panel Overdrive and refresh rates.\n      • AniMe Matrix: Control AniMe Matrix displays.";
-                }
-
-                Text {
-                    font-weight: 900;
-                    text: "Requirements:";
-                }
-
-                Text {
-                    text: "      • This software requires kernel version 6.19.";
+                    text: @tr("      • Performance: Switch power profiles and customize fan curves.\n      • Aura Sync: Control keyboard backlighting and LED effects.\n      • Battery Health: Set charge limits to extend battery longevity.\n      • Display: Toggle Panel Overdrive and refresh rates.\n      • AniMe Matrix: Control AniMe Matrix displays.");
                 }
 
                 Text {
                     font-weight: 900;
-                    text: "Work in progress:";
+                    text: @tr("Requirements:");
                 }
 
                 Text {
-                    text: "      • Theme the widgets\n      • Add a cpu/gpu temp/fan speed info bar\n      • Include fan speeds, temps in a bottom bar\n      • Screenpad controls\n      • ROG Ally specific settings";
-                }
-
-                Text {
-                    font-weight: 900;
-                    text: "License:";
-                }
-
-                Text {
-                    text: "      This project is open-source software licensed under the Mozilla Public License 2.0 (MPL-2.0).";
+                    wrap: TextWrap.word-wrap;
+                    text: @tr("      This software requires kernel version 6.19.");
                 }
 
                 Text {
                     font-weight: 900;
-                    text: "Links:";
+                    text: @tr("Work in progress:");
                 }
 
                 Text {
-                    text: "      Source Code: https://gitlab.com/asus-linux/asusctl\n      Website: https://asus-linux.org/";
+                    text: @tr("      • Theme the widgets\n      • Add a cpu/gpu temp/fan speed info bar\n      • Include fan speeds, temps in a bottom bar\n      • Screenpad controls\n      • ROG Ally specific settings");
+                }
+
+                Text {
+                    font-weight: 900;
+                    text: @tr("License:");
+                }
+
+                Text {
+                    text: @tr("      This project is open-source software licensed under the Mozilla Public License 2.0 (MPL-2.0).");
+                }
+
+                Text {
+                    font-weight: 900;
+                    text: @tr("Links:");
+                }
+
+                Text {
+                    text: @tr("      Source Code: https://gitlab.com/asus-linux/asusctl\n      Website: https://asus-linux.org/");
                 }
             }
         }
