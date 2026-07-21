@@ -793,3 +793,13 @@ msgctxt "Aura speed"
 msgid "High"
 msgstr ""
 
+#: rog-control-center/ui/pages/system.slint:296
+msgctxt "SystemPageData"
+msgid "iGPU Status"
+msgstr ""
+
+#: rog-control-center/ui/pages/system.slint:359
+msgctxt "SystemPageData"
+msgid "dGPU Status"
+msgstr ""
+
