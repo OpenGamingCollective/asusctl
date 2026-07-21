@@ -257,6 +257,134 @@ impl From<CPUEPP> for i32 {
     }
 }
 
+pub fn get_cpu_model() -> String {
+    if let Ok(cpuinfo) = std::fs::read_to_string("/proc/cpuinfo") {
+        for line in cpuinfo.lines() {
+            if line.starts_with("model name") {
+                if let Some(pos) = line.find(':') {
+                    let model = line[pos + 1..].trim().to_string();
+                    if !model.is_empty() {
+                        return model;
+                    }
+                }
+            }
+        }
+    }
+    "CPU".to_string()
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct CpuTicks {
+    pub idle: u64,
+    pub total: u64,
+}
+
+pub fn read_cpu_ticks() -> Option<CpuTicks> {
+    let stat = std::fs::read_to_string("/proc/stat").ok()?;
+    let first_line = stat.lines().next()?;
+    if first_line.starts_with("cpu ") {
+        let parts: Vec<&str> = first_line.split_whitespace().collect();
+        let mut total = 0u64;
+        let mut idle = 0u64;
+        for (i, part) in parts.iter().skip(1).enumerate() {
+            if let Ok(ticks) = part.parse::<u64>() {
+                total += ticks;
+                if i == 3 || i == 4 {
+                    idle += ticks;
+                }
+            }
+        }
+        return Some(CpuTicks { idle, total });
+    }
+    None
+}
+
+pub fn get_cpu_temp() -> f32 {
+    if let Ok(entries) = std::fs::read_dir("/sys/class/hwmon") {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if let Ok(name) = std::fs::read_to_string(path.join("name")) {
+                let name = name.trim();
+                if name == "k10temp" || name == "coretemp" || name == "zenpower" {
+                    if let Ok(temp_str) = std::fs::read_to_string(path.join("temp1_input")) {
+                        if let Ok(temp_val) = temp_str.trim().parse::<f32>() {
+                            return temp_val / 1000.0;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if let Ok(temp_str) = std::fs::read_to_string("/sys/class/thermal/thermal_zone0/temp") {
+        if let Ok(temp_val) = temp_str.trim().parse::<f32>() {
+            return temp_val / 1000.0;
+        }
+    }
+    0.0
+}
+
+pub fn get_cpu_frequency_mhz() -> f32 {
+    let mut total_freq = 0.0;
+    let mut count = 0;
+    if let Ok(entries) = std::fs::read_dir("/sys/devices/system/cpu") {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if name.starts_with("cpu") && name[3..].chars().all(|c| c.is_ascii_digit()) {
+                let freq_path = entry.path().join("cpufreq/scaling_cur_freq");
+                if let Ok(freq_str) = std::fs::read_to_string(freq_path) {
+                    if let Ok(freq_khz) = freq_str.trim().parse::<f32>() {
+                        total_freq += freq_khz / 1000.0;
+                        count += 1;
+                    }
+                }
+            }
+        }
+    }
+    if count == 0 {
+        if let Ok(cpuinfo) = std::fs::read_to_string("/proc/cpuinfo") {
+            for line in cpuinfo.lines() {
+                if line.starts_with("cpu MHz") {
+                    if let Some(pos) = line.find(':') {
+                        if let Ok(val) = line[pos + 1..].trim().parse::<f32>() {
+                            total_freq += val;
+                            count += 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if count > 0 {
+        total_freq / count as f32
+    } else {
+        0.0
+    }
+}
+
+pub fn get_ram_usage_pct() -> f32 {
+    if let Ok(meminfo) = std::fs::read_to_string("/proc/meminfo") {
+        let mut total = 0.0;
+        let mut available = 0.0;
+        for line in meminfo.lines() {
+            if line.starts_with("MemTotal:") {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if let Some(val) = parts.get(1) {
+                    total = val.parse::<f32>().unwrap_or(0.0);
+                }
+            } else if line.starts_with("MemAvailable:") {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if let Some(val) = parts.get(1) {
+                    available = val.parse::<f32>().unwrap_or(0.0);
+                }
+            }
+        }
+        if total > 0.0 {
+            return ((total - available) / total) * 100.0;
+        }
+    }
+    0.0
+}
+
 #[cfg(test)]
 mod tests {
     use super::CPUControl;

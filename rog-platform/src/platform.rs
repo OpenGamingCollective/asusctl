@@ -326,3 +326,29 @@ pub enum Properties {
     EgpuEnable,
     ThrottlePolicy,
 }
+
+pub fn get_fan_rpms() -> (i32, i32, i32) {
+    let mut cpu = 0;
+    let mut gpu = 0;
+    let mut mid = 0;
+    if let Ok(entries) = std::fs::read_dir("/sys/class/hwmon") {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if let Ok(name) = std::fs::read_to_string(path.join("name")) {
+                if name.trim() == "asus" {
+                    if let Ok(v) = std::fs::read_to_string(path.join("fan1_input")) {
+                        cpu = v.trim().parse().unwrap_or(0);
+                    }
+                    if let Ok(v) = std::fs::read_to_string(path.join("fan2_input")) {
+                        gpu = v.trim().parse().unwrap_or(0);
+                    }
+                    if let Ok(v) = std::fs::read_to_string(path.join("fan3_input")) {
+                        mid = v.trim().parse().unwrap_or(0);
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    (cpu, gpu, mid)
+}

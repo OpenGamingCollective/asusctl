@@ -473,3 +473,191 @@ pub fn get_gpu_power_status() -> (GfxPower, GfxVendor) {
 
     (GfxPower::Unknown, GfxVendor::Unknown)
 }
+
+fn lookup_amdgpu_name(device_id: &str, revision: &str) -> Option<String> {
+    if let Ok(content) = std::fs::read_to_string("/usr/share/libdrm/amdgpu.ids") {
+        for line in content.lines() {
+            let line = line.trim();
+            if line.starts_with('#') || line.is_empty() {
+                continue;
+            }
+            let parts: Vec<&str> = line.split(',').collect();
+            if parts.len() >= 3 {
+                let d_id = parts[0].trim().to_lowercase();
+                let r_id = parts[1].trim().to_lowercase();
+                let name = parts[2].trim().to_string();
+                if d_id == device_id && r_id == revision && !name.is_empty() {
+                    return Some(name);
+                }
+            }
+        }
+    }
+    None
+}
+
+pub fn get_gpu_names() -> (String, String) {
+    let mut igpu = None;
+    let mut dgpu = None;
+
+    if let Ok(mut enumerator) = udev::Enumerator::new() {
+        if enumerator.match_subsystem("pci").is_ok() {
+            if let Ok(devices) = enumerator.scan_devices() {
+                for device in devices {
+                    if let Some(class) = device.property_value("PCI_CLASS") {
+                        let class_str = class.to_string_lossy();
+                        if class_str.starts_with("03") || class_str.starts_with("3") {
+                            let id_val = device
+                                .property_value("PCI_ID")
+                                .map(|s| s.to_string_lossy().into_owned())
+                                .unwrap_or_default();
+
+                            let mut parts = id_val.split(':');
+                            let vendor = parts.next().unwrap_or("").to_lowercase();
+                            let device_id = parts.next().unwrap_or("").to_lowercase();
+
+                            let mut model_name = String::new();
+                            if vendor == "1002" && !device_id.is_empty() {
+                                let revision_path = device.syspath().join("revision");
+                                let revision = std::fs::read_to_string(revision_path)
+                                    .unwrap_or_default()
+                                    .trim()
+                                    .trim_start_matches("0x")
+                                    .to_lowercase();
+                                if let Some(amd_name) = lookup_amdgpu_name(&device_id, &revision) {
+                                    model_name = amd_name;
+                                }
+                            }
+
+                            if model_name.is_empty() {
+                                if let Some(model) = device.property_value("ID_MODEL_FROM_DATABASE")
+                                {
+                                    model_name = model.to_string_lossy().into_owned();
+                                }
+                            }
+                            if model_name.is_empty() {
+                                model_name = id_val.clone();
+                            }
+                            if model_name.is_empty() {
+                                model_name = "Unknown GPU".to_string();
+                            }
+
+                            let is_dgpu = id_val.starts_with("10DE")
+                                || model_name.contains("GeForce")
+                                || model_name.contains("Radeon RX")
+                                || model_name.contains("Discrete");
+
+                            if is_dgpu {
+                                dgpu = Some(model_name);
+                            } else {
+                                igpu = Some(model_name);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    (
+        igpu.unwrap_or_else(|| "Integrated GPU".to_string()),
+        dgpu.unwrap_or_else(|| "Discrete GPU".to_string()),
+    )
+}
+
+pub fn get_igpu_temp() -> f32 {
+    if let Ok(entries) = std::fs::read_dir("/sys/class/hwmon") {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if let Ok(name) = std::fs::read_to_string(path.join("name")) {
+                let name = name.trim();
+                if name == "amdgpu" {
+                    if let Ok(temp_str) = std::fs::read_to_string(path.join("temp1_input")) {
+                        if let Ok(temp_val) = temp_str.trim().parse::<f32>() {
+                            return temp_val / 1000.0;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    -1.0
+}
+
+pub fn get_igpu_usage_pct() -> f32 {
+    if let Ok(entries) = std::fs::read_dir("/sys/class/drm") {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let name = path
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            if name.starts_with("card") {
+                let busy_path = path.join("device/gpu_busy_percent");
+                if busy_path.exists() {
+                    if let Ok(vendor_str) = std::fs::read_to_string(path.join("device/vendor")) {
+                        let vendor = vendor_str.trim();
+                        if vendor == "0x1002" {
+                            if let Ok(val_str) = std::fs::read_to_string(busy_path) {
+                                if let Ok(val) = val_str.trim().parse::<f32>() {
+                                    return val;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    -1.0
+}
+
+pub fn get_gpu_temp() -> f32 {
+    if let Ok(nvml) = nvml_wrapper::Nvml::init() {
+        if let Ok(device) = nvml.device_by_index(0) {
+            if let Ok(temp) =
+                device.temperature(nvml_wrapper::enum_wrappers::device::TemperatureSensor::Gpu)
+            {
+                return temp as f32;
+            }
+        }
+    }
+    if let Ok(entries) = std::fs::read_dir("/sys/class/hwmon") {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if let Ok(name) = std::fs::read_to_string(path.join("name")) {
+                let name = name.trim();
+                if name == "amdgpu" || name == "nouveau" {
+                    if let Ok(temp_str) = std::fs::read_to_string(path.join("temp1_input")) {
+                        if let Ok(temp_val) = temp_str.trim().parse::<f32>() {
+                            return temp_val / 1000.0;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    0.0
+}
+
+pub fn get_gpu_usage_pct() -> f32 {
+    if let Ok(nvml) = nvml_wrapper::Nvml::init() {
+        if let Ok(device) = nvml.device_by_index(0) {
+            if let Ok(rates) = device.utilization_rates() {
+                return rates.gpu as f32;
+            }
+        }
+    }
+    if let Ok(entries) = std::fs::read_dir("/sys/class/drm") {
+        for entry in entries.flatten() {
+            let path = entry.path().join("device/gpu_busy_percent");
+            if path.exists() {
+                if let Ok(val_str) = std::fs::read_to_string(path) {
+                    if let Ok(val) = val_str.trim().parse::<f32>() {
+                        return val;
+                    }
+                }
+            }
+        }
+    }
+    0.0
+}
