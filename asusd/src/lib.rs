@@ -79,19 +79,23 @@ macro_rules! task_watch_item {
                     Ok(watch) => {
                         tokio::spawn(async move {
                             let mut buffer = [0; 32];
-                            watch.into_event_stream(&mut buffer).unwrap().for_each(|_| async {
-                                if let Ok(value) = ctrl.$name() { // get new value from zbus method
-                                    if ctrl.config.lock().await.$name != value {
-                                        log::debug!("{} was changed to {} externally", $name_str, value);
-                                        concat_idents::concat_idents!(notif_fn = $name, _changed {
-                                            ctrl.notif_fn(&signal_ctxt).await.ok();
-                                        });
-                                        let mut lock = ctrl.config.lock().await;
-                                        lock.$name = value;
-                                        lock.write();
+                            if let Ok(stream) = watch.into_event_stream(&mut buffer) {
+                                stream.for_each(|_| async {
+                                    if let Ok(value) = ctrl.$name() { // get new value from zbus method
+                                        if ctrl.config.lock().await.$name != value {
+                                            log::debug!("{} was changed to {} externally", $name_str, value);
+                                            concat_idents::concat_idents!(notif_fn = $name, _changed {
+                                                ctrl.notif_fn(&signal_ctxt).await.ok();
+                                            });
+                                            let mut lock = ctrl.config.lock().await;
+                                            lock.$name = value;
+                                            lock.write();
+                                        }
                                     }
-                                }
-                            }).await;
+                                }).await;
+                            } else {
+                                log::error!("Failed to create event stream for {}", stringify!($name));
+                            }
                         });
                     }
                     Err(e) => info!("inotify watch failed: {}. You can ignore this if your device does not support the feature", e),
@@ -119,11 +123,15 @@ macro_rules! task_watch_item_notify {
                     Ok(watch) => {
                         tokio::spawn(async move {
                             let mut buffer = [0; 32];
-                            watch.into_event_stream(&mut buffer).unwrap().for_each(|_| async {
-                                concat_idents::concat_idents!(notif_fn = $name, _changed {
-                                    ctrl.notif_fn(&signal_ctxt).await.ok();
-                                });
-                            }).await;
+                            if let Ok(stream) = watch.into_event_stream(&mut buffer) {
+                                stream.for_each(|_| async {
+                                    concat_idents::concat_idents!(notif_fn = $name, _changed {
+                                        ctrl.notif_fn(&signal_ctxt).await.ok();
+                                    });
+                                }).await;
+                            } else {
+                                log::error!("Failed to create event stream for {}", stringify!($name));
+                            }
                         });
                     }
                     Err(e) => info!("inotify watch failed: {}. You can ignore this if your device does not support the feature", e),
