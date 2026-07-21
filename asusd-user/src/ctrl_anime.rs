@@ -4,6 +4,8 @@ use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
+use log::error;
+
 use config_traits::StdConfig;
 use rog_anime::error::AnimeError;
 use rog_anime::{ActionData, ActionLoader, AnimTime, Fade, Sequences, Vec2};
@@ -154,7 +156,7 @@ impl CtrlAnime<'static> {
             .at(&ObjectPath::from_str_unchecked("/xyz/ljones/Anime"), self)
             .await
             .map_err(|err| {
-                println!("CtrlAnime: add_to_server {}", err);
+                error!("CtrlAnime: add_to_server {}", err);
                 err
             })
             .ok();

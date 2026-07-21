@@ -31,6 +31,7 @@ rog_platform = { path = "../rog-platform" }
 config-traits = { path = "../config-traits" }
 
 zbus.workspace = true
+log.workspace = true
 env_logger.workspace = true
 thiserror.workspace = true
 
