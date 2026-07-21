@@ -56,10 +56,17 @@ fn main() {
 
     let parsed: CliStart = argh::from_env();
 
-    let conn = Connection::system().unwrap();
+    let conn = match Connection::system() {
+        Ok(c) => c,
+        Err(e) => {
+            error!("Error: failed to connect to D-Bus system bus: {e}");
+            error!("Please make sure the dbus daemon is running.");
+            std::process::exit(1);
+        }
+    };
     if let Ok(platform_proxy) = PlatformProxyBlocking::new(&conn).map_err(|e| {
         check_service("asusd");
-        println!("\nError: {e}\n");
+        error!("\nError: {e}\n");
         print_info();
     }) {
         let asusd_version = match platform_proxy.version() {
@@ -75,7 +82,7 @@ fn main() {
 
         let self_version = env!("CARGO_PKG_VERSION");
         if asusd_version != self_version {
-            println!("Version mismatch: asusctl = {self_version}, asusd = {asusd_version}");
+            error!("Version mismatch: asusctl = {self_version}, asusd = {asusd_version}");
             return;
         }
 
@@ -106,7 +113,7 @@ fn print_error_help(
     supported_properties: &[Properties],
 ) {
     check_service("asusd");
-    println!("\nError: {}\n", err);
+    error!("\nError: {}\n", err);
     print_info();
     println!();
     println!("Supported interfaces:\n\n{:#?}\n", supported_interfaces);
@@ -146,9 +153,9 @@ fn find_iface<T>(iface_name: &str) -> Result<Vec<T>, Box<dyn std::error::Error>>
 where
     T: ProxyImpl<'static> + From<zbus::Proxy<'static>>,
 {
-    let conn = zbus::blocking::Connection::system().unwrap();
-    let f = zbus::blocking::fdo::ObjectManagerProxy::new(&conn, "xyz.ljones.Asusd", "/").unwrap();
-    let interfaces = f.get_managed_objects().unwrap();
+    let conn = zbus::blocking::Connection::system()?;
+    let f = zbus::blocking::fdo::ObjectManagerProxy::new(&conn, "xyz.ljones.Asusd", "/")?;
+    let interfaces = f.get_managed_objects()?;
     let mut paths = Vec::new();
     for v in interfaces.iter() {
         // let o: Vec<zbus::names::OwnedInterfaceName> = v.1.keys().map(|e|
@@ -630,7 +637,16 @@ fn handle_led_mode(mode: &LedModeCommand) -> Result<(), Box<dyn std::error::Erro
         for aura in aura {
             let mode = aura.led_mode()?;
             let modes = aura.supported_basic_modes()?;
-            let mut pos = modes.iter().position(|m| *m == mode).unwrap() + 1;
+            let mut pos = match modes.iter().position(|m| *m == mode) {
+                Some(p) => p + 1,
+                None => {
+                    error!(
+                        "Error: current mode {:?} is not in supported basic modes",
+                        mode
+                    );
+                    return Ok(());
+                }
+            };
             if pos >= modes.len() {
                 pos = 0;
             }
@@ -640,7 +656,16 @@ fn handle_led_mode(mode: &LedModeCommand) -> Result<(), Box<dyn std::error::Erro
         for aura in aura {
             let mode = aura.led_mode()?;
             let modes = aura.supported_basic_modes()?;
-            let mut pos = modes.iter().position(|m| *m == mode).unwrap();
+            let mut pos = match modes.iter().position(|m| *m == mode) {
+                Some(p) => p,
+                None => {
+                    error!(
+                        "Error: current mode {:?} is not in supported basic modes",
+                        mode
+                    );
+                    return Ok(());
+                }
+            };
             if pos == 0 {
                 pos = modes.len() - 1;
             } else {
