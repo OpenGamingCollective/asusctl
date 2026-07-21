@@ -125,8 +125,20 @@ fn map_power_to_icon(power_status: &str, mode: &str, icons: &Icons) -> (Icon, St
 /// The tray is controlled somewhat by `Arc<Mutex<SystemState>>`
 pub fn init_tray(_supported_properties: Vec<Properties>, config: Arc<Mutex<Config>>) {
     tokio::spawn(async move {
-        let user_con = zbus::blocking::Connection::session().unwrap();
-        let proxy = ROGCCZbusProxyBlocking::new(&user_con).unwrap();
+        let user_con = match zbus::blocking::Connection::session() {
+            Ok(c) => c,
+            Err(e) => {
+                log::error!("Tray: failed to connect to session bus: {e}");
+                return;
+            }
+        };
+        let proxy = match ROGCCZbusProxyBlocking::new(&user_con) {
+            Ok(p) => p,
+            Err(e) => {
+                log::error!("Tray: failed to build ROGCCZbusProxyBlocking: {e}");
+                return;
+            }
+        };
 
         let rog_red = read_icon(&PathBuf::from("asus_notif_red.png"));
 
@@ -164,7 +176,19 @@ pub fn init_tray(_supported_properties: Vec<Properties>, config: Arc<Mutex<Confi
         });
 
         // Connect to asusd's GPU interface on the system bus
-        let sys_con = zbus::blocking::Connection::system().unwrap();
+        let sys_con = match zbus::blocking::Connection::system() {
+            Ok(c) => c,
+            Err(e) => {
+                log::warn!("Tray: failed to connect to D-Bus system bus: {e}");
+                let icons = ICONS.get().unwrap();
+                tray.update(|tray: &mut AsusTray| {
+                    tray.current_icon = icons.rog_red.clone();
+                    tray.current_title = "ROG: D-Bus system connection unavailable".to_string();
+                })
+                .await;
+                return;
+            }
+        };
         let gpu_proxy = match GpuStatusProxyBlocking::new(&sys_con) {
             Ok(p) => p,
             Err(e) => {
