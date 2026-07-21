@@ -21,13 +21,20 @@ const MINMAX: AttrMinMax = AttrMinMax {
 };
 
 pub fn setup_system_page(ui: &MainWindow, _config: Arc<Mutex<Config>>) {
-    let conn = zbus::blocking::Connection::system()
-        .map_err(|e| error!("DBus system connection failed: {e:?}"))
-        .unwrap();
-    let platform = PlatformProxyBlocking::builder(&conn)
-        .build()
-        .map_err(|e| error!("PlatformProxy failed: {e:?}"))
-        .unwrap();
+    let conn = match zbus::blocking::Connection::system() {
+        Ok(c) => c,
+        Err(e) => {
+            error!("DBus system connection failed: {e:?}");
+            return;
+        }
+    };
+    let platform = match PlatformProxyBlocking::builder(&conn).build() {
+        Ok(p) => p,
+        Err(e) => {
+            error!("PlatformProxy failed: {e:?}");
+            return;
+        }
+    };
     // let armoury_attrs =
     // find_iface::<AsusArmouryProxyBlocking>("xyz.ljones.AsusArmoury").unwrap();
 
@@ -208,9 +215,27 @@ macro_rules! init_minmax_property {
         let proxy_copy = $attr.clone();
         let handle_copy = $handle.as_weak();
         tokio::spawn(async move {
-            let min = proxy_copy.min_value().await.unwrap();
-            let max = proxy_copy.max_value().await.unwrap();
-            let current = proxy_copy.current_value().await.unwrap() as f32;
+            let min = match proxy_copy.min_value().await {
+                Ok(val) => val,
+                Err(e) => {
+                    log::error!("init_minmax_property: failed to get min value: {e:?}");
+                    return;
+                }
+            };
+            let max = match proxy_copy.max_value().await {
+                Ok(val) => val,
+                Err(e) => {
+                    log::error!("init_minmax_property: failed to get max value: {e:?}");
+                    return;
+                }
+            };
+            let current = match proxy_copy.current_value().await {
+                Ok(val) => val as f32,
+                Err(e) => {
+                    log::error!("init_minmax_property: failed to get current value: {e:?}");
+                    return;
+                }
+            };
             handle_copy
                 .upgrade_in_event_loop(move |handle| {
                     concat_idents!(setter = set_, $property {
@@ -335,9 +360,27 @@ macro_rules! setup_minmax_external {
             while let Some(e) = x.next().await {
                 if let Ok(_) = e.get().await {
                     debug!("receive_platform_profile_changed, getting new {}", stringify!(attr));
-                    let min = proxy_copy.min_value().await.unwrap();
-                    let max = proxy_copy.max_value().await.unwrap();
-                    let current = proxy_copy.current_value().await.unwrap() as f32;
+                    let min = match proxy_copy.min_value().await {
+                        Ok(val) => val,
+                        Err(e) => {
+                            log::error!("setup_minmax_external: failed to get min value: {e:?}");
+                            continue;
+                        }
+                    };
+                    let max = match proxy_copy.max_value().await {
+                        Ok(val) => val,
+                        Err(e) => {
+                            log::error!("setup_minmax_external: failed to get max value: {e:?}");
+                            continue;
+                        }
+                    };
+                    let current = match proxy_copy.current_value().await {
+                        Ok(val) => val as f32,
+                        Err(e) => {
+                            log::error!("setup_minmax_external: failed to get current value: {e:?}");
+                            continue;
+                        }
+                    };
                     handle_copy
                         .upgrade_in_event_loop(move |handle| {
                             concat_idents!(setter = set_, $property {
@@ -375,26 +418,27 @@ pub fn setup_system_page_callbacks(ui: &MainWindow, _states: Arc<Mutex<Config>>)
 
     tokio::spawn(async move {
         // Create the connections/proxies here to prevent future delays in process
-        let conn = zbus::Connection::system()
-            .await
-            .map_err(|e| {
-                log::error!("Failed to connect to system bus: {}", e);
-            })
-            .unwrap();
-        let platform = PlatformProxy::builder(&conn)
-            .build()
-            .await
-            .map_err(|e| {
-                log::error!("Failed to create platform proxy: {}", e);
-            })
-            .unwrap();
-        let backlight = BacklightProxy::builder(&conn)
-            .build()
-            .await
-            .map_err(|e| {
-                log::error!("Failed to create backlight proxy: {}", e);
-            })
-            .unwrap();
+        let conn = match zbus::Connection::system().await {
+            Ok(c) => c,
+            Err(e) => {
+                log::error!("Failed to connect to system bus: {e}");
+                return;
+            }
+        };
+        let platform = match PlatformProxy::builder(&conn).build().await {
+            Ok(p) => p,
+            Err(e) => {
+                log::error!("Failed to create platform proxy: {e}");
+                return;
+            }
+        };
+        let backlight = match BacklightProxy::builder(&conn).build().await {
+            Ok(b) => b,
+            Err(e) => {
+                log::error!("Failed to create backlight proxy: {e}");
+                return;
+            }
+        };
 
         debug!("Setting up system page profile callbacks");
         set_ui_props_async!(
