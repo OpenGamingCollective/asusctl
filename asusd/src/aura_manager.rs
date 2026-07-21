@@ -154,12 +154,15 @@ impl DeviceManager {
                                 let path =
                                     dbus_path_for_dev(&usb_device).unwrap_or(dbus_path_for_slash());
                                 let ctrl = SlashZbus::new(slash);
-                                ctrl.start_tasks(connection, path.clone()).await.unwrap();
-                                devices.push(AsusDevice {
-                                    device: dev_type,
-                                    dbus_path: path,
-                                    hid_key: Some(hid_key.clone()),
-                                });
+                                if let Err(e) = ctrl.start_tasks(connection, path.clone()).await {
+                                    error!("Failed to start Slash tasks: {e}");
+                                } else {
+                                    devices.push(AsusDevice {
+                                        device: dev_type,
+                                        dbus_path: path,
+                                        hid_key: Some(hid_key.clone()),
+                                    });
+                                }
                             }
                         }
                         // ANIME MATRIX DEVICE
@@ -173,12 +176,15 @@ impl DeviceManager {
                                 let path =
                                     dbus_path_for_dev(&usb_device).unwrap_or(dbus_path_for_anime());
                                 let ctrl = AniMeZbus::new(anime);
-                                ctrl.start_tasks(connection, path.clone()).await.unwrap();
-                                devices.push(AsusDevice {
-                                    device: dev_type,
-                                    dbus_path: path,
-                                    hid_key: Some(hid_key.clone()),
-                                });
+                                if let Err(e) = ctrl.start_tasks(connection, path.clone()).await {
+                                    error!("Failed to start AniMe tasks: {e}");
+                                } else {
+                                    devices.push(AsusDevice {
+                                        device: dev_type,
+                                        dbus_path: path,
+                                        hid_key: Some(hid_key.clone()),
+                                    });
+                                }
                             }
                         }
                         // AURA LAPTOP DEVICE
@@ -192,12 +198,15 @@ impl DeviceManager {
                                 let path =
                                     dbus_path_for_dev(&usb_device).unwrap_or(dbus_path_for_tuf());
                                 let ctrl = AuraZbus::new(aura);
-                                ctrl.start_tasks(connection, path.clone()).await.unwrap();
-                                devices.push(AsusDevice {
-                                    device: dev_type,
-                                    dbus_path: path,
-                                    hid_key: Some(hid_key),
-                                });
+                                if let Err(e) = ctrl.start_tasks(connection, path.clone()).await {
+                                    error!("Failed to start Aura tasks: {e}");
+                                } else {
+                                    devices.push(AsusDevice {
+                                        device: dev_type,
+                                        dbus_path: path,
+                                        hid_key: Some(hid_key),
+                                    });
+                                }
                             }
                         }
                     } else {
@@ -270,7 +279,10 @@ impl DeviceManager {
                 {
                     if let DeviceHandle::Scsi(scsi) = dev_type.clone() {
                         let ctrl = ScsiZbus::new(scsi);
-                        ctrl.start_tasks(connection, path.clone()).await.unwrap();
+                        if let Err(e) = ctrl.start_tasks(connection, path.clone()).await {
+                            error!("Failed to start SCSI tasks: {e}");
+                            return None;
+                        }
                         return Some(AsusDevice {
                             device: dev_type,
                             dbus_path: path,
@@ -352,12 +364,15 @@ impl DeviceManager {
                 if let DeviceHandle::Slash(slash) = dev_type.clone() {
                     let path = dbus_path_for_slash();
                     let ctrl = SlashZbus::new(slash);
-                    ctrl.start_tasks(connection, path.clone()).await.unwrap();
-                    devices.push(AsusDevice {
-                        device: dev_type,
-                        dbus_path: path,
-                        hid_key: None,
-                    });
+                    if let Err(e) = ctrl.start_tasks(connection, path.clone()).await {
+                        error!("Failed to start Slash tasks: {e}");
+                    } else {
+                        devices.push(AsusDevice {
+                            device: dev_type,
+                            dbus_path: path,
+                            hid_key: None,
+                        });
+                    }
                 }
             } else {
                 info!("Tested device was not Slash");
@@ -403,12 +418,15 @@ impl DeviceManager {
                     if let DeviceHandle::Aura(aura) = dev_type.clone() {
                         let path = dbus_path_for_tuf();
                         let ctrl = AuraZbus::new(aura);
-                        ctrl.start_tasks(connection, path.clone()).await.unwrap();
-                        devices.push(AsusDevice {
-                            device: dev_type,
-                            dbus_path: path,
-                            hid_key: None,
-                        });
+                        if let Err(e) = ctrl.start_tasks(connection, path.clone()).await {
+                            error!("Failed to start TUF Aura tasks: {e}");
+                        } else {
+                            devices.push(AsusDevice {
+                                device: dev_type,
+                                dbus_path: path,
+                                hid_key: None,
+                            });
+                        }
                     }
                 }
             }
