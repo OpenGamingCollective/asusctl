@@ -42,7 +42,7 @@ ProtectClock=true
 ProtectControlGroups=strict
 ProtectHostname=true
 ProtectKernelLogs=true
-ProtectKernelModules=true
+ProtectKernelModules=false
 ProtectKernelTunables=true
 
 RestrictAddressFamilies=AF_UNIX
