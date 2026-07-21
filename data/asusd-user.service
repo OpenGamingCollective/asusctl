@@ -1,10 +1,7 @@
 [Unit]
 Description=ASUS User Daemon
-StartLimitInterval=200
-StartLimitBurst=2
 
 [Service]
-ExecStartPre=/usr/bin/sleep 2
 ExecStart=/usr/bin/asusd-user
 Restart=on-failure
 RestartSec=1
