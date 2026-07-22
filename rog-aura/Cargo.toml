@@ -1,15 +1,14 @@
 [package]
 name = "rog_aura"
-license = "MPL-2.0"
+license.workspace = true
 version.workspace = true
-readme = "README.md"
-authors = ["Luke <luke@ljones.dev>"]
-repository = "https://gitlab.com/asus-linux/asusctl"
-homepage = "https://gitlab.com/asus-linux/asusctl"
-documentation = "https://docs.rs/rog-anime"
+readme.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+edition.workspace = true
 description = "Types useful for fancy keyboards on ASUS ROG laptops"
 keywords = ["ROG", "ASUS", "Aura"]
-edition = "2021"
 exclude = ["data"]
 
 [features]

@@ -7,8 +7,8 @@ authors = [
   "Luke <luke@ljones.dev>",
   "Denis Benato <benato.denis96@gmail.com>"
 ]
-repository = "https://gitlab.com/asus-linux/asusctl"
-homepage = "https://gitlab.com/asus-linux/asusctl"
+repository = "https://github.com/OpenGamingCollective/asusctl"
+homepage = "https://github.com/OpenGamingCollective/asusctl"
 description = "Laptop feature control for ASUS ROG laptops and others"
 edition = "2021"
 
