@@ -21,8 +21,8 @@
 //! …consequently `zbus-xmlgen` did not generate code for the above interfaces.
 
 use rog_platform::platform::PlatformProfile;
-use rog_profiles::fan_curve_set::CurveData;
 use rog_profiles::FanCurvePU;
+use rog_profiles::fan_curve_set::CurveData;
 use zbus::proxy;
 
 #[proxy(

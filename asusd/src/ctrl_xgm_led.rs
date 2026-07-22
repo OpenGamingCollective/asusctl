@@ -5,11 +5,11 @@ use log::{error, info, warn};
 use rog_platform::cled::CledDevice;
 use tokio::sync::Mutex;
 use zbus::fdo::Error as FdoErr;
-use zbus::{interface, Connection};
+use zbus::{Connection, interface};
 
+use crate::ASUS_ZBUS_PATH;
 use crate::config::Config;
 use crate::error::RogError;
-use crate::ASUS_ZBUS_PATH;
 
 /// Controller for the XG Mobile external GPU LED.
 ///

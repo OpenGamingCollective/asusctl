@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 
 use super::EffectState;
-use crate::keyboard::{KeyLayout, LedCode};
 use crate::Colour;
+use crate::keyboard::{KeyLayout, LedCode};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Static {

@@ -10,12 +10,12 @@ use futures_util::StreamExt;
 use log::{debug, error, info, warn};
 use logind_zbus::manager::{InhibitType, ManagerProxy};
 use rog_dbus::asus_armoury::AsusArmouryProxy;
-use tokio::signal::unix::{signal, SignalKind};
+use tokio::signal::unix::{SignalKind, signal};
 use tokio::sync::Mutex;
-use tokio::time::{sleep, Instant};
+use tokio::time::{Instant, sleep};
+use zbus::Connection;
 use zbus::proxy::CacheProperties;
 use zbus::zvariant::OwnedFd;
-use zbus::Connection;
 
 const SERVICE_NAME: &str = "asus-shutdown";
 const SHUTDOWN_REASON: &str = "defer risky ASUS GPU firmware writes until shutdown";

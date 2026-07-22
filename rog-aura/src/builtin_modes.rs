@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "dbus")]
 use zbus::zvariant::{OwnedValue, Type, Value};
 
-use crate::error::Error;
 use crate::AURA_LAPTOP_LED_MSG_LEN;
+use crate::error::Error;
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[cfg_attr(
@@ -547,7 +547,7 @@ impl From<&AuraEffect> for Vec<u8> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        AuraEffect, AuraModeNum, AuraZone, Colour, Direction, Speed, AURA_LAPTOP_LED_MSG_LEN,
+        AURA_LAPTOP_LED_MSG_LEN, AuraEffect, AuraModeNum, AuraZone, Colour, Direction, Speed,
     };
 
     #[test]

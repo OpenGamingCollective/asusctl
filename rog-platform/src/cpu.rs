@@ -49,7 +49,7 @@ impl CPUControl {
                     None => {
                         return Err(PlatformError::CPU(format!(
                             "{ATTR_AVAILABLE_GOVERNORS} not found"
-                        )))
+                        )));
                     }
                 }
                 match device.attribute_value(ATTR_GOVERNOR) {
@@ -61,7 +61,7 @@ impl CPUControl {
                     None => {
                         return Err(PlatformError::CPU(format!(
                             "{ATTR_AVAILABLE_EPP} not found"
-                        )))
+                        )));
                     }
                 }
                 match device.attribute_value(ATTR_EPP) {
@@ -260,7 +260,7 @@ impl From<CPUEPP> for i32 {
 #[cfg(test)]
 mod tests {
     use super::CPUControl;
-    use crate::cpu::{CPUGovernor, CPUEPP};
+    use crate::cpu::{CPUEPP, CPUGovernor};
 
     #[test]
     #[ignore = "Can't run this in a docker image"]

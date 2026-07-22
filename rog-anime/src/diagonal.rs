@@ -5,9 +5,9 @@ use std::time::Duration;
 
 use log::error;
 
+use crate::AnimeType;
 use crate::data::AnimeDataBuffer;
 use crate::error::{AnimeError, Result};
-use crate::AnimeType;
 
 /// Mostly intended to be used with ASUS gifs, but can be used for other
 /// purposes (like images)
@@ -412,20 +412,12 @@ impl AnimeDiagonal {
 
         // Helper: get row length for STRIX class (G635L/G835L)
         fn row_length(row: usize) -> usize {
-            if row < 28 {
-                row / 2 + 1
-            } else {
-                15
-            }
+            if row < 28 { row / 2 + 1 } else { 15 }
         }
 
         // Helper: starting X (in LED units) for the row
         fn first_x(row: usize) -> usize {
-            if row < 28 {
-                0
-            } else {
-                (row - 28) / 2
-            }
+            if row < 28 { 0 } else { (row - 28) / 2 }
         }
 
         // Process all 68 rows

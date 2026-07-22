@@ -28,7 +28,7 @@ use std::env;
 use std::fs::OpenOptions;
 use std::io::{self, BufRead, Write};
 
-use rog_anime::usb::{get_anime_type, Brightness};
+use rog_anime::usb::{Brightness, get_anime_type};
 use rog_anime::{AnimeDataBuffer, AnimeType};
 use rog_dbus::zbus_anime::AnimeProxyBlocking;
 use zbus::blocking::Connection;
@@ -399,7 +399,9 @@ fn main() {
             }
             "row" => {
                 if anime_type != AnimeType::G835L {
-                    println!("Warning: Row commands use G835L mapping (provisional). You can add to this code to support other types. `examples/anime-led-scan.rs[402:425]`");
+                    println!(
+                        "Warning: Row commands use G835L mapping (provisional). You can add to this code to support other types. `examples/anime-led-scan.rs[402:425]`"
+                    );
                 }
                 println!("Row stepping mode. Press Enter for next row, 'q' to quit.");
                 let total = g835l_total_rows();

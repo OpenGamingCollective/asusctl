@@ -6,7 +6,7 @@ use rog_aura::AuraDeviceType;
 use rog_scsi::{AuraEffect, AuraMode};
 use zbus::fdo::Error as ZbErr;
 use zbus::zvariant::OwnedObjectPath;
-use zbus::{interface, Connection};
+use zbus::{Connection, interface};
 
 use super::ScsiAura;
 use crate::error::RogError;

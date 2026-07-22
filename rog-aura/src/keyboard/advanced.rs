@@ -267,10 +267,10 @@ impl LedUsbPackets {
         pkt[3] = 0x01; // ??
         if !multizoned {
             pkt[4] = 0x00; // This doesn't actually seem to matter on this
-                           // keyboard?
+        // keyboard?
         } else {
             pkt[4] = 0x04; // ??, 4,5,6 are normally RGB for builtin mode
-                           // colours
+            // colours
         }
         Self {
             usb_packets: vec![pkt],
