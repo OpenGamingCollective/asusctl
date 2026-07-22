@@ -70,11 +70,9 @@ impl RogPlatform {
 
 impl Default for RogPlatform {
     fn default() -> Self {
-        unsafe {
-            Self {
-                path: PathBuf::from_str("/this_shouldNeVErr_exisid").unwrap_unchecked(),
-                pp_path: PathBuf::from_str("/this_shouldNeVErr_exisid").unwrap_unchecked(),
-            }
+        Self {
+            path: PathBuf::from("/this_shouldNeVErr_exisid"),
+            pp_path: PathBuf::from("/this_shouldNeVErr_exisid"),
         }
     }
 }

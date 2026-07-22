@@ -5,7 +5,7 @@ use log::{debug, info, warn};
 use rog_aura::aura_detection::LedSupportData;
 use rog_aura::keyboard::LaptopAuraPower;
 use rog_aura::{
-    AuraDeviceType, AuraEffect, AuraModeNum, AuraZone, Direction, LedBrightness, Speed, GRADIENT,
+    AuraDeviceType, AuraEffect, AuraModeNum, AuraZone, Direction, GRADIENT, LedBrightness, Speed,
 };
 use serde::{Deserialize, Serialize};
 
@@ -253,7 +253,10 @@ mod tests {
     #[test]
     fn set_multizone_4key_config() {
         let _guard = test_lock();
-        std::env::set_var("BOARD_NAME", "");
+        // SAFETY: Test lock mutex ensures single-threaded environment mutation
+        unsafe {
+            std::env::set_var("BOARD_NAME", "");
+        }
         let mut config = AuraConfig::new("19b6");
 
         let effect = AuraEffect {
@@ -345,7 +348,10 @@ mod tests {
     #[test]
     fn set_multizone_multimode_config() {
         let _guard = test_lock();
-        std::env::set_var("BOARD_NAME", "");
+        // SAFETY: Test lock mutex ensures single-threaded environment mutation
+        unsafe {
+            std::env::set_var("BOARD_NAME", "");
+        }
         let mut config = AuraConfig::new("19b6");
 
         let effect = AuraEffect {
@@ -394,7 +400,10 @@ mod tests {
     #[test]
     fn verify_0x1866_g531i() {
         let _guard = test_lock();
-        std::env::set_var("BOARD_NAME", "G513I");
+        // SAFETY: Test lock mutex ensures single-threaded environment mutation
+        unsafe {
+            std::env::set_var("BOARD_NAME", "G513I");
+        }
         let mut config = AuraConfig::new("1866");
 
         assert_eq!(config.brightness, LedBrightness::Med);
@@ -436,7 +445,10 @@ mod tests {
     #[test]
     fn verify_0x19b6_g634j() {
         let _guard = test_lock();
-        std::env::set_var("BOARD_NAME", "G634J");
+        // SAFETY: Test lock mutex ensures single-threaded environment mutation
+        unsafe {
+            std::env::set_var("BOARD_NAME", "G634J");
+        }
         let mut config = AuraConfig::new("19b6");
 
         assert_eq!(config.brightness, LedBrightness::Med);

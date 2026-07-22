@@ -8,7 +8,7 @@ use std::time::Duration;
 use config_traits::{StdConfig, StdConfigLoad1};
 use dmi_id::DMIID;
 use gumdrop::Options;
-use log::{debug, info, warn, LevelFilter};
+use log::{LevelFilter, debug, info, warn};
 use rog_control_center::cli_options::CliStart;
 use rog_control_center::config::Config;
 use rog_control_center::error::Result;
@@ -19,20 +19,15 @@ use rog_control_center::ui::setup_window;
 use rog_control_center::zbus_proxies::{
     AppState, ROGCCZbus, ROGCCZbusProxyBlocking, ZBUS_IFACE, ZBUS_PATH,
 };
-use rog_control_center::{print_versions, MainWindow};
+use rog_control_center::{MainWindow, print_versions};
 use tokio::runtime::Runtime;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Ensure tracing spans are quiet by default unless user overrides
-    if std::env::var_os("RUST_LOG").is_none() {
-        std::env::set_var("RUST_LOG", "warn,tracing=error,zbus=error");
-    }
-    let mut logger = env_logger::Builder::new();
+    let env = env_logger::Env::default().default_filter_or("warn,tracing=error,zbus=error");
+    let mut logger = env_logger::Builder::from_env(env);
     logger
-        .parse_default_env()
         .filter_level(LevelFilter::Info)
-        .parse_default_env()
         .target(env_logger::Target::Stderr)
         .format_timestamp(None)
         .init();
@@ -43,14 +38,20 @@ async fn main() -> Result<()> {
         debug!("Gamescope detected");
         if !gamescope.is_empty() {
             debug!("Setting WAYLAND_DISPLAY to {}", gamescope);
-            env::set_var("WAYLAND_DISPLAY", gamescope);
+            // SAFETY: Single-threaded initialization at startup
+            unsafe {
+                env::set_var("WAYLAND_DISPLAY", gamescope);
+            }
         }
         // gamescope-0
         else if let Ok(wayland) = env::var("WAYLAND_DISPLAY") {
             debug!("Wayland display detected");
             if wayland.is_empty() {
                 debug!("Setting WAYLAND_DISPLAY to gamescope-0");
-                env::set_var("WAYLAND_DISPLAY", "gamescope-0");
+                // SAFETY: Single-threaded initialization at startup
+                unsafe {
+                    env::set_var("WAYLAND_DISPLAY", "gamescope-0");
+                }
             }
         }
     }
@@ -58,13 +59,13 @@ async fn main() -> Result<()> {
     // Try to open a proxy and check for app state first
     {
         let user_con = zbus::blocking::Connection::session()?;
-        if let Ok(proxy) = ROGCCZbusProxyBlocking::new(&user_con) {
-            if let Ok(state) = proxy.state() {
-                info!("App is already running: {state:?}, opening the window");
-                // if there is a proxy connection assume the app is already running
-                proxy.set_state(AppState::MainWindowShouldOpen)?;
-                std::process::exit(0);
-            }
+        if let Ok(proxy) = ROGCCZbusProxyBlocking::new(&user_con)
+            && let Ok(state) = proxy.state()
+        {
+            info!("App is already running: {state:?}, opening the window");
+            // if there is a proxy connection assume the app is already running
+            proxy.set_state(AppState::MainWindowShouldOpen)?;
+            std::process::exit(0);
         }
     }
 
@@ -183,10 +184,8 @@ async fn main() -> Result<()> {
     thread_local! { pub static UI: std::cell::RefCell<Option<MainWindow>> = Default::default()};
     // i_slint_backend_selector::with_platform(|_| Ok(())).unwrap();
 
-    if !startup_in_background {
-        if let Ok(mut app_state) = app_state.lock() {
-            *app_state = AppState::MainWindowShouldOpen;
-        }
+    if !startup_in_background && let Ok(mut app_state) = app_state.lock() {
+        *app_state = AppState::MainWindowShouldOpen;
     }
 
     if std::env::var("RUST_TRANSLATIONS").is_ok() {
@@ -301,13 +300,12 @@ async fn main() -> Result<()> {
             } else if state == AppState::QuitApp {
                 slint::quit_event_loop().unwrap();
                 exit(0);
-            } else if state != AppState::MainWindowOpen {
-                if let Ok(config) = config.lock() {
-                    if !config.run_in_background {
-                        slint::quit_event_loop().unwrap();
-                        exit(0);
-                    }
-                }
+            } else if state != AppState::MainWindowOpen
+                && let Ok(config) = config.lock()
+                && !config.run_in_background
+            {
+                slint::quit_event_loop().unwrap();
+                exit(0);
             }
         }
     });

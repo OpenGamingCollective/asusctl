@@ -4,30 +4,15 @@ use udev::Device;
 #[cfg(feature = "dbus")]
 use zbus::zvariant::Type;
 
-use crate::error::ProfileError;
 use crate::FanCurvePU;
-
-fn set_sysfs_name(string: &mut [u8], fan: char, index: usize) {
-    string[3] = fan as u8;
-    string[15] = char::from_digit(index as u32 + 1, 10).unwrap() as u8;
-}
+use crate::error::ProfileError;
 
 pub(crate) fn pwm_str(fan: char, index: usize) -> String {
-    // The char 'X' is replaced via indexing
-    let mut string = "pwmX_auto_pointX_pwm".to_owned();
-    unsafe {
-        set_sysfs_name(string.as_bytes_mut(), fan, index);
-    }
-    string
+    format!("pwm{fan}_auto_point{}_pwm", index + 1)
 }
 
 pub(crate) fn temp_str(fan: char, index: usize) -> String {
-    // The char 'X' is replaced via indexing
-    let mut string = "pwmX_auto_pointX_temp".to_owned();
-    unsafe {
-        set_sysfs_name(string.as_bytes_mut(), fan, index);
-    }
-    string
+    format!("pwm{fan}_auto_point{}_temp", index + 1)
 }
 
 #[cfg_attr(feature = "dbus", derive(Type))]
@@ -198,8 +183,18 @@ mod tests {
                 .unwrap();
         curve.enabled = true;
         assert_eq!(curve.fan, FanCurvePU::CPU);
-        assert_eq!(curve.temp, [30, 49, 59, 69, 79, 89, 99, 109]);
-        assert_eq!(curve.pwm, [3, 5, 8, 10, 79, 125, 143, 148]);
+        assert_eq!(
+            curve.temp,
+            [
+                30, 49, 59, 69, 79, 89, 99, 109
+            ]
+        );
+        assert_eq!(
+            curve.pwm,
+            [
+                3, 5, 8, 10, 79, 125, 143, 148
+            ]
+        );
 
         let string: String = (&curve).into();
         // End result is slightly different due to type conversions and rounding errors
@@ -217,8 +212,18 @@ mod tests {
     fn curve_data_from_str_simple() {
         let curve = CurveData::from_str("30:1,49:2,59:3,69:4,79:31,89:49,99:56,109:58").unwrap();
         assert_eq!(curve.fan, FanCurvePU::CPU);
-        assert_eq!(curve.temp, [30, 49, 59, 69, 79, 89, 99, 109]);
-        assert_eq!(curve.pwm, [1, 2, 3, 4, 31, 49, 56, 58]);
+        assert_eq!(
+            curve.temp,
+            [
+                30, 49, 59, 69, 79, 89, 99, 109
+            ]
+        );
+        assert_eq!(
+            curve.pwm,
+            [
+                1, 2, 3, 4, 31, 49, 56, 58
+            ]
+        );
     }
 
     #[test]
