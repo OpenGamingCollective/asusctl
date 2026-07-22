@@ -23,11 +23,11 @@ env_logger.workspace = true
 
 ron.workspace = true
 zbus.workspace = true
-argh = "0.1"
+argh.workspace = true
 
 [dev-dependencies]
 rog_dbus = { path = "../rog-dbus" }
-png = "0.17"
+png.workspace = true
 
 [package.metadata.deb]
 license-file = ["../LICENSE", "4"]

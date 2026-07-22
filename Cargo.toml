@@ -44,18 +44,19 @@ tokio = { version = "^1.39.0", default-features = false, features = [
 ] }
 concat-idents = "^1.1"
 dirs = "^4.0"
-mio = "0.8.11"
+mio = "^0.8.11"
 
-futures-util = "0.3.31"
-zbus = "5.13.1"
-logind-zbus = { version = "5.2.0" } #, default-features = false, features = ["non_blocking"] }
+futures-util = "^0.3.31"
+zbus = "^5.13.1"
+logind-zbus = { version = "^5.2.0" }
 
 serde = { version = "^1.0", features = ["serde_derive"] }
+serde_json = "^1.0"
 ron = "*"
 
 log = "^0.4"
 env_logger = "^0.10.0"
-thiserror = "2"
+thiserror = "^2"
 
 glam = { version = "^0.22", features = ["serde"] }
 gumdrop = "^0.8"
@@ -67,32 +68,28 @@ png_pong = "^0.8"
 pix = "^0.13"
 gif = "^0.12"
 
-notify-rust = { version = "4.11.5", features = ["z", "async"] }
+notify-rust = { version = "^4.11.5", features = ["z", "async"] }
+ksni = { version = "^0.3", default-features = false, features = ["async-io"] }
+image = "^0.25.5"
+png = "^0.17"
+slint = { version = "^1.17.1", features = ["gettext"] }
+slint-build = "^1.17.1"
+argh = "^0.1"
+uhid-virt = "^0.0.8"
+sdl2 = { version = "^0.37", default-features = false }
 
 sg = { git = "https://github.com/flukejones/sg-rs.git" }
 
 [profile.release]
-# thin = 57s, asusd = 9.0M
-# fat = 72s, asusd = 6.4M
 lto = "fat"
 debug = false
 opt-level = 3
 panic = "abort"
-# codegen-units = 1
 
 [profile.dev]
 opt-level = 1
-# codegen-units = 1
-
-[profile.dev.package."*"]
-opt-level = 1
-# codegen-units = 1
-
-[profile.bench]
-debug = false
-opt-level = 3
 
 [workspace.dependencies.cargo-husky]
-version = "1"
+version = "^1"
 default-features = false
 features = ["user-hooks"]
