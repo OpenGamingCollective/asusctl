@@ -58,12 +58,11 @@ fn start_dpu_status_mon(config: Arc<Mutex<Config>>) {
                     std::thread::sleep(Duration::from_millis(1500));
                     if let Ok(status) = dev.get_runtime_status() {
                         if status != GfxPower::Unknown && status != last_status {
-                            if let Ok(config) = enabled_notifications_copy.lock() {
-                                if !config.notifications.receive_notify_gfx_status
-                                    || !config.notifications.enabled
-                                {
-                                    continue;
-                                }
+                            if let Ok(config) = enabled_notifications_copy.lock()
+                                && (!config.notifications.receive_notify_gfx_status
+                                    || !config.notifications.enabled)
+                            {
+                                continue;
                             }
                             // Required check because status cycles through
                             // active/unknown/suspended

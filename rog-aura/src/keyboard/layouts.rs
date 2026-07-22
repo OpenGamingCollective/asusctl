@@ -249,10 +249,10 @@ impl KeyLayout {
     pub fn keyboard_height(&self) -> f32 {
         let mut height = 0.0;
         for r in &self.key_rows {
-            if let Some(key) = r.row.first() {
-                if !key.0.is_lightbar_zone() {
-                    height += r.height();
-                }
+            if let Some(key) = r.row.first()
+                && !key.0.is_lightbar_zone()
+            {
+                height += r.height();
             }
         }
         height
@@ -282,7 +282,7 @@ impl KeyLayout {
         // TODO: locales
         let layout_name = if led_data.layout_name.is_empty() {
             "ga401q".to_owned() // Need some sort of default here due to ROGCC
-                                // expecting it
+        // expecting it
         } else {
             led_data.layout_name
         };

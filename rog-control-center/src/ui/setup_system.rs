@@ -12,7 +12,7 @@ use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 use super::show_toast;
 use crate::config::Config;
 use crate::zbus_proxies::find_iface_async;
-use crate::{set_ui_callbacks, AttrMinMax, MainWindow, SystemPageData};
+use crate::{AttrMinMax, MainWindow, SystemPageData, set_ui_callbacks};
 
 const MINMAX: AttrMinMax = AttrMinMax {
     min: 0,
@@ -180,11 +180,7 @@ macro_rules! convert_value {
 
 macro_rules! convert_to_dbus {
     (bool, $value:expr) => {
-        if $value {
-            1
-        } else {
-            0
-        }
+        if $value { 1 } else { 0 }
     };
     (i32, $value:expr) => {
         $value as i32
@@ -848,20 +844,19 @@ fn get_cpu_temp() -> f32 {
             let path = entry.path();
             if let Ok(name) = std::fs::read_to_string(path.join("name")) {
                 let name = name.trim();
-                if name == "k10temp" || name == "coretemp" || name == "zenpower" {
-                    if let Ok(temp_str) = std::fs::read_to_string(path.join("temp1_input")) {
-                        if let Ok(temp_val) = temp_str.trim().parse::<f32>() {
-                            return temp_val / 1000.0;
-                        }
-                    }
+                if (name == "k10temp" || name == "coretemp" || name == "zenpower")
+                    && let Ok(temp_str) = std::fs::read_to_string(path.join("temp1_input"))
+                    && let Ok(temp_val) = temp_str.trim().parse::<f32>()
+                {
+                    return temp_val / 1000.0;
                 }
             }
         }
     }
-    if let Ok(temp_str) = std::fs::read_to_string("/sys/class/thermal/thermal_zone0/temp") {
-        if let Ok(temp_val) = temp_str.trim().parse::<f32>() {
-            return temp_val / 1000.0;
-        }
+    if let Ok(temp_str) = std::fs::read_to_string("/sys/class/thermal/thermal_zone0/temp")
+        && let Ok(temp_val) = temp_str.trim().parse::<f32>()
+    {
+        return temp_val / 1000.0;
     }
     0.0
 }
@@ -872,12 +867,11 @@ fn get_gpu_temp() -> f32 {
             let path = entry.path();
             if let Ok(name) = std::fs::read_to_string(path.join("name")) {
                 let name = name.trim();
-                if name == "amdgpu" || name == "nouveau" || name == "nvidia" {
-                    if let Ok(temp_str) = std::fs::read_to_string(path.join("temp1_input")) {
-                        if let Ok(temp_val) = temp_str.trim().parse::<f32>() {
-                            return temp_val / 1000.0;
-                        }
-                    }
+                if (name == "amdgpu" || name == "nouveau" || name == "nvidia")
+                    && let Ok(temp_str) = std::fs::read_to_string(path.join("temp1_input"))
+                    && let Ok(temp_val) = temp_str.trim().parse::<f32>()
+                {
+                    return temp_val / 1000.0;
                 }
             }
         }
@@ -892,19 +886,19 @@ fn get_fan_rpms() -> (i32, i32, i32) {
     if let Ok(entries) = std::fs::read_dir("/sys/class/hwmon") {
         for entry in entries.flatten() {
             let path = entry.path();
-            if let Ok(name) = std::fs::read_to_string(path.join("name")) {
-                if name.trim() == "asus" {
-                    if let Ok(v) = std::fs::read_to_string(path.join("fan1_input")) {
-                        cpu = v.trim().parse().unwrap_or(0);
-                    }
-                    if let Ok(v) = std::fs::read_to_string(path.join("fan2_input")) {
-                        gpu = v.trim().parse().unwrap_or(0);
-                    }
-                    if let Ok(v) = std::fs::read_to_string(path.join("fan3_input")) {
-                        mid = v.trim().parse().unwrap_or(0);
-                    }
-                    break;
+            if let Ok(name) = std::fs::read_to_string(path.join("name"))
+                && name.trim() == "asus"
+            {
+                if let Ok(v) = std::fs::read_to_string(path.join("fan1_input")) {
+                    cpu = v.trim().parse().unwrap_or(0);
                 }
+                if let Ok(v) = std::fs::read_to_string(path.join("fan2_input")) {
+                    gpu = v.trim().parse().unwrap_or(0);
+                }
+                if let Ok(v) = std::fs::read_to_string(path.join("fan3_input")) {
+                    mid = v.trim().parse().unwrap_or(0);
+                }
+                break;
             }
         }
     }
@@ -919,26 +913,25 @@ fn get_cpu_frequency_mhz() -> f32 {
             let name = entry.file_name().to_string_lossy().into_owned();
             if name.starts_with("cpu") && name[3..].chars().all(|c| c.is_ascii_digit()) {
                 let freq_path = entry.path().join("cpufreq/scaling_cur_freq");
-                if let Ok(freq_str) = std::fs::read_to_string(freq_path) {
-                    if let Ok(freq_khz) = freq_str.trim().parse::<f32>() {
-                        total_freq += freq_khz / 1000.0;
-                        count += 1;
-                    }
+                if let Ok(freq_str) = std::fs::read_to_string(freq_path)
+                    && let Ok(freq_khz) = freq_str.trim().parse::<f32>()
+                {
+                    total_freq += freq_khz / 1000.0;
+                    count += 1;
                 }
             }
         }
     }
-    if count == 0 {
-        if let Ok(cpuinfo) = std::fs::read_to_string("/proc/cpuinfo") {
-            for line in cpuinfo.lines() {
-                if line.starts_with("cpu MHz") {
-                    if let Some(pos) = line.find(':') {
-                        if let Ok(val) = line[pos + 1..].trim().parse::<f32>() {
-                            total_freq += val;
-                            count += 1;
-                        }
-                    }
-                }
+    if count == 0
+        && let Ok(cpuinfo) = std::fs::read_to_string("/proc/cpuinfo")
+    {
+        for line in cpuinfo.lines() {
+            if line.starts_with("cpu MHz")
+                && let Some(pos) = line.find(':')
+                && let Ok(val) = line[pos + 1..].trim().parse::<f32>()
+            {
+                total_freq += val;
+                count += 1;
             }
         }
     }
@@ -1002,12 +995,11 @@ fn get_gpu_usage_pct() -> f32 {
     if let Ok(entries) = std::fs::read_dir("/sys/class/drm") {
         for entry in entries.flatten() {
             let path = entry.path().join("device/gpu_busy_percent");
-            if path.exists() {
-                if let Ok(val_str) = std::fs::read_to_string(path) {
-                    if let Ok(val) = val_str.trim().parse::<f32>() {
-                        return val;
-                    }
-                }
+            if path.exists()
+                && let Ok(val_str) = std::fs::read_to_string(path)
+                && let Ok(val) = val_str.trim().parse::<f32>()
+            {
+                return val;
             }
         }
     }

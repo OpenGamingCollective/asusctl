@@ -6,7 +6,7 @@
 use log::{error, info, warn};
 use rog_platform::gpu_pci::{GfxPower, GfxVendor};
 use zbus::object_server::SignalEmitter;
-use zbus::{interface, Connection};
+use zbus::{Connection, interface};
 
 use crate::error::RogError;
 
@@ -57,11 +57,7 @@ impl CtrlGpu {
                 let mut p = dgpu.dev_path().clone();
                 p.push("power");
                 p.push("runtime_status");
-                if p.exists() {
-                    Some(p)
-                } else {
-                    None
-                }
+                if p.exists() { Some(p) } else { None }
             };
             if let Ok(power) = dgpu.get_runtime_status() {
                 return (power, vendor, runtime_path);
@@ -70,19 +66,17 @@ impl CtrlGpu {
         }
 
         // No dGPU devices — check ASUS-specific attributes
-        if rog_platform::gpu_pci::asus_dgpu_disable_exists() {
-            if let Ok(disabled) = rog_platform::gpu_pci::asus_dgpu_disabled() {
-                if disabled {
-                    return (GfxPower::AsusDisabled, GfxVendor::AsusDgpuDisabled, None);
-                }
-            }
+        if rog_platform::gpu_pci::asus_dgpu_disable_exists()
+            && let Ok(disabled) = rog_platform::gpu_pci::asus_dgpu_disabled()
+            && disabled
+        {
+            return (GfxPower::AsusDisabled, GfxVendor::AsusDgpuDisabled, None);
         }
-        if rog_platform::gpu_pci::asus_gpu_mux_exists() {
-            if let Ok(discreet) = rog_platform::gpu_pci::asus_gpu_mux_discreet() {
-                if discreet {
-                    return (GfxPower::AsusMuxDiscreet, GfxVendor::Nvidia, None);
-                }
-            }
+        if rog_platform::gpu_pci::asus_gpu_mux_exists()
+            && let Ok(discreet) = rog_platform::gpu_pci::asus_gpu_mux_discreet()
+            && discreet
+        {
+            return (GfxPower::AsusMuxDiscreet, GfxVendor::Nvidia, None);
         }
 
         (GfxPower::Unknown, GfxVendor::Unknown, None)
@@ -132,19 +126,17 @@ impl CtrlGpu {
             asus_gpu_mux_exists,
         };
 
-        if asus_dgpu_disable_exists() {
-            if let Ok(disabled) = asus_dgpu_disabled() {
-                if disabled {
-                    return "Integrated".to_string();
-                }
-            }
+        if asus_dgpu_disable_exists()
+            && let Ok(disabled) = asus_dgpu_disabled()
+            && disabled
+        {
+            return "Integrated".to_string();
         }
-        if asus_gpu_mux_exists() {
-            if let Ok(discreet) = asus_gpu_mux_discreet() {
-                if discreet {
-                    return "Ultimate".to_string();
-                }
-            }
+        if asus_gpu_mux_exists()
+            && let Ok(discreet) = asus_gpu_mux_discreet()
+            && discreet
+        {
+            return "Ultimate".to_string();
         }
         // If a dGPU is active, it's in Optimus/hybrid mode
         match self.power_status {
@@ -230,21 +222,19 @@ impl CtrlGpu {
                                     .unwrap_or_default()
                                     .iter()
                                     .find(|d| d.is_dgpu())
+                                    && let Ok(new_power) = dgpu.get_runtime_status()
+                                    && new_power != ctrl.power_status
                                 {
-                                    if let Ok(new_power) = dgpu.get_runtime_status() {
-                                        if new_power != ctrl.power_status {
-                                            info!("CtrlGpu: power status changed to {new_power:?}");
-                                            ctrl.power_status = new_power;
-                                            let status_str: &str = (&ctrl.power_status).into();
-                                            let _ = signal_ctxt
-                                                .emit(
-                                                    "xyz.ljones.Gpu",
-                                                    "PowerStatusChanged",
-                                                    &(status_str,),
-                                                )
-                                                .await;
-                                        }
-                                    }
+                                    info!("CtrlGpu: power status changed to {new_power:?}");
+                                    ctrl.power_status = new_power;
+                                    let status_str: &str = (&ctrl.power_status).into();
+                                    let _ = signal_ctxt
+                                        .emit(
+                                            "xyz.ljones.Gpu",
+                                            "PowerStatusChanged",
+                                            &(status_str,),
+                                        )
+                                        .await;
                                 }
                             }
                             Err(e) => {

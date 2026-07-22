@@ -224,16 +224,16 @@ impl LaptopAuraPower {
     }
 
     pub fn to_bytes(&self, aura_type: AuraDeviceType) -> Vec<u8> {
-        if let Some(stuff) = self.states.first() {
-            if stuff.zone == PowerZones::Ally {
-                return vec![
-                    0x5d,
-                    0xd1,
-                    0x09,
-                    0x01,
-                    stuff.new_to_byte() as u8,
-                ];
-            }
+        if let Some(stuff) = self.states.first()
+            && stuff.zone == PowerZones::Ally
+        {
+            return vec![
+                0x5d,
+                0xd1,
+                0x09,
+                0x01,
+                stuff.new_to_byte() as u8,
+            ];
         }
         match aura_type {
             AuraDeviceType::LaptopKeyboard2021 | AuraDeviceType::Ally => self.new_to_bytes(),
@@ -339,7 +339,12 @@ mod test {
         };
         let bytes = power.to_bytes(AuraDeviceType::LaptopKeyboardPre2021);
         println!("{:08b}, {:08b}, {:08b}", bytes[0], bytes[1], bytes[2]);
-        assert_eq!(bytes, [0x08, 0x00, 0x02, 0x00]);
+        assert_eq!(
+            bytes,
+            [
+                0x08, 0x00, 0x02, 0x00
+            ]
+        );
 
         let power = LaptopAuraPower {
             states: vec![
@@ -354,7 +359,12 @@ mod test {
         };
         let bytes = power.to_bytes(AuraDeviceType::LaptopKeyboardPre2021);
         println!("{:08b}, {:08b}, {:08b}", bytes[0], bytes[1], bytes[2]);
-        assert_eq!(bytes, [0x04, 0x05, 0x02, 0x00]);
+        assert_eq!(
+            bytes,
+            [
+                0x04, 0x05, 0x02, 0x00
+            ]
+        );
 
         // let bytes = [
         //     OldAuraPower::Keyboard,
@@ -383,7 +393,12 @@ mod test {
         };
         let bytes = power.to_bytes(AuraDeviceType::LaptopKeyboardPre2021);
         println!("{:08b}, {:08b}, {:08b}", bytes[0], bytes[1], bytes[2]);
-        assert_eq!(bytes, [0xff, 0x1f, 0x000f, 0x00]);
+        assert_eq!(
+            bytes,
+            [
+                0xff, 0x1f, 0x000f, 0x00
+            ]
+        );
     }
 
     #[test]

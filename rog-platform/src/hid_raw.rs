@@ -43,33 +43,31 @@ impl HidRaw {
                 .map_err(|e| {
                     PlatformError::IoPath(endpoint.devpath().to_string_lossy().to_string(), e)
                 })?
+                && let Some(dev_node) = endpoint.devnode()
+                && let Some(this_id_product) = usb_device.attribute_value("idProduct")
             {
-                if let Some(dev_node) = endpoint.devnode() {
-                    if let Some(this_id_product) = usb_device.attribute_value("idProduct") {
-                        if this_id_product != id_product {
-                            continue;
-                        }
-                        let dev_path = endpoint.devpath().to_string_lossy();
-                        if dev_path.contains("virtual") {
-                            info!(
-                                "Using device at: {:?} for <TODO: label control> control",
-                                dev_node
-                            );
-                        }
-                        return Ok(Self {
-                            file: RefCell::new(OpenOptions::new().write(true).open(dev_node)?),
-                            devfs_path: dev_node.to_owned(),
-                            prod_id: this_id_product.to_string_lossy().into(),
-                            syspath: endpoint.syspath().into(),
-                            _device_bcd: usb_device
-                                .attribute_value("bcdDevice")
-                                .unwrap_or_default()
-                                .to_string_lossy()
-                                .parse()
-                                .unwrap_or_default(),
-                        });
-                    }
+                if this_id_product != id_product {
+                    continue;
                 }
+                let dev_path = endpoint.devpath().to_string_lossy();
+                if dev_path.contains("virtual") {
+                    info!(
+                        "Using device at: {:?} for <TODO: label control> control",
+                        dev_node
+                    );
+                }
+                return Ok(Self {
+                    file: RefCell::new(OpenOptions::new().write(true).open(dev_node)?),
+                    devfs_path: dev_node.to_owned(),
+                    prod_id: this_id_product.to_string_lossy().into(),
+                    syspath: endpoint.syspath().into(),
+                    _device_bcd: usb_device
+                        .attribute_value("bcdDevice")
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .parse()
+                        .unwrap_or_default(),
+                });
             }
         }
         Err(PlatformError::MissingFunction(format!(
@@ -85,23 +83,21 @@ impl HidRaw {
             .map_err(|e| {
                 PlatformError::IoPath(endpoint.devpath().to_string_lossy().to_string(), e)
             })?
+            && let Some(dev_node) = endpoint.devnode()
+            && let Some(id_product) = parent.attribute_value("idProduct")
         {
-            if let Some(dev_node) = endpoint.devnode() {
-                if let Some(id_product) = parent.attribute_value("idProduct") {
-                    return Ok(Self {
-                        file: RefCell::new(OpenOptions::new().write(true).open(dev_node)?),
-                        devfs_path: dev_node.to_owned(),
-                        prod_id: id_product.to_string_lossy().into(),
-                        syspath: endpoint.syspath().into(),
-                        _device_bcd: endpoint
-                            .attribute_value("bcdDevice")
-                            .unwrap_or_default()
-                            .to_string_lossy()
-                            .parse()
-                            .unwrap_or_default(),
-                    });
-                }
-            }
+            return Ok(Self {
+                file: RefCell::new(OpenOptions::new().write(true).open(dev_node)?),
+                devfs_path: dev_node.to_owned(),
+                prod_id: id_product.to_string_lossy().into(),
+                syspath: endpoint.syspath().into(),
+                _device_bcd: endpoint
+                    .attribute_value("bcdDevice")
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .parse()
+                    .unwrap_or_default(),
+            });
         }
         Err(PlatformError::MissingFunction(
             "hidraw dev no dev path".to_string(),

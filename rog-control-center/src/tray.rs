@@ -204,10 +204,10 @@ pub fn init_tray(_supported_properties: Vec<Properties>, config: Arc<Mutex<Confi
         loop {
             tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
-            if let Ok(lock) = config.try_lock() {
-                if !lock.enable_tray_icon {
-                    return;
-                }
+            if let Ok(lock) = config.try_lock()
+                && !lock.enable_tray_icon
+            {
+                return;
             }
 
             if let Ok(power) = gpu_proxy.power_status() {

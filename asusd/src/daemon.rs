@@ -2,9 +2,9 @@ use std::env;
 use std::error::Error;
 use std::sync::Arc;
 
-use ::zbus::object_server::SignalEmitter;
 use ::zbus::Connection;
-use asusd::asus_armoury::{start_attributes_zbus, ArmouryAttributeRegistry};
+use ::zbus::object_server::SignalEmitter;
+use asusd::asus_armoury::{ArmouryAttributeRegistry, start_attributes_zbus};
 use asusd::aura_manager::DeviceManager;
 use asusd::config::Config;
 use asusd::ctrl_backlight::CtrlBacklight;
@@ -12,7 +12,7 @@ use asusd::ctrl_fancurves::CtrlFanCurveZbus;
 use asusd::ctrl_gpu::CtrlGpu;
 use asusd::ctrl_platform::CtrlPlatform;
 use asusd::ctrl_xgm_led::CtrlXgmLed;
-use asusd::{print_board_info, start_tasks, CtrlTask, Reloadable, ZbusRun, DBUS_NAME};
+use asusd::{CtrlTask, DBUS_NAME, Reloadable, ZbusRun, print_board_info, start_tasks};
 use config_traits::{StdConfig, StdConfigLoad2};
 use log::{error, info, warn};
 use rog_platform::asus_armoury::FirmwareAttributes;
@@ -171,10 +171,10 @@ async fn start_daemon() -> Result<(), Box<dyn Error>> {
             .map_err(|e| error!("CtrlGpu: failed to create signal context: {e}"))
             .ok();
         gpu_ctrl.clone().add_to_server(&mut server).await;
-        if let Some(ctx) = sig_ctx {
-            if let Err(e) = gpu_ctrl.start_watcher(ctx).await {
-                error!("CtrlGpu: watcher failed: {e}");
-            }
+        if let Some(ctx) = sig_ctx
+            && let Err(e) = gpu_ctrl.start_watcher(ctx).await
+        {
+            error!("CtrlGpu: watcher failed: {e}");
         }
         info!("CtrlGpu: initialized");
     }
