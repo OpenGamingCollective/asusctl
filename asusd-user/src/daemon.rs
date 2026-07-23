@@ -157,6 +157,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             if let Err(e) = aura_proxy_blocking.direct_addressing_raw(packets) {
                 error!("Aura direct addressing error: {e}");
+                break;
             }
             std::thread::sleep(std::time::Duration::from_millis(33));
         });
