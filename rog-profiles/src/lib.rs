@@ -157,13 +157,11 @@ impl FanCurveProfiles {
         profile: PlatformProfile,
         device: &mut Device,
     ) -> Result<(), ProfileError> {
-        let fans = Self::supported_fans()?;
-        // Do reset for all
-        for fan in fans {
-            let pwm_num: char = fan.into();
-            let pwm = format!("pwm{pwm_num}_enable");
-            device.set_attribute_value(&pwm, "3")?;
-        }
+        // Writing "3" to pwm<N>_enable makes the kernel re-fetch factory
+        // defaults via the fan_curve_get_factory_default WMI call. On some
+        // boards (TUF FX608JMR, BIOS 306) that call blocks ~30s, stalls the EC
+        // (input freezes) and returns EIO, so read the curves the driver
+        // already reports instead of resetting first.
         self.read_from_dev_profile(profile, device)?;
         Ok(())
     }
