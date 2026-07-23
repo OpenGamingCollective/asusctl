@@ -468,6 +468,11 @@ msgctxt "PageSystem"
 msgid "Frequency:"
 msgstr "Frekans:"
 
+#: rog-control-center/ui/pages/system.slint:296
+msgctxt "PageSystem"
+msgid "iGPU Status"
+msgstr "iGPU Durumu"
+
 #: rog-control-center/ui/pages/system.slint:290
 msgctxt "PageSystem"
 msgid "Memory Status"
@@ -477,6 +482,11 @@ msgstr "Bellek Durumu"
 msgctxt "PageSystem"
 msgid "RAM Usage:"
 msgstr "RAM Kullanımı:"
+
+#: rog-control-center/ui/pages/system.slint:359
+msgctxt "PageSystem"
+msgid "dGPU Status"
+msgstr "dGPU Durumu"
 
 #: rog-control-center/ui/pages/system.slint:316
 msgctxt "PageSystem"

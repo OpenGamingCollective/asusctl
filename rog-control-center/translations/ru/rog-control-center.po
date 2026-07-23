@@ -473,6 +473,11 @@ msgctxt "PageSystem"
 msgid "Frequency:"
 msgstr "Частота:"
 
+#: rog-control-center/ui/pages/system.slint:296
+msgctxt "PageSystem"
+msgid "iGPU Status"
+msgstr "Статус iGPU"
+
 #: rog-control-center/ui/pages/system.slint:290
 msgctxt "PageSystem"
 msgid "Memory Status"
@@ -482,6 +487,11 @@ msgstr "Статус памяти"
 msgctxt "PageSystem"
 msgid "RAM Usage:"
 msgstr "Использование ОЗУ:"
+
+#: rog-control-center/ui/pages/system.slint:359
+msgctxt "PageSystem"
+msgid "dGPU Status"
+msgstr "Статус dGPU"
 
 #: rog-control-center/ui/pages/system.slint:316
 msgctxt "PageSystem"
