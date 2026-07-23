@@ -57,6 +57,7 @@ _package-asusctl() {
 	rm -rf $pkgdir/usr/share/rog-gui
 	rm -rf $pkgdir/usr/share/icons
 	rm -rf $pkgdir/usr/share/applications
+	rm -rf $pkgdir/usr/share/metainfo
 }
 
 _package-rog-control-center() {
