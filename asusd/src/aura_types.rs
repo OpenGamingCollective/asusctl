@@ -5,7 +5,10 @@ use log::{debug, error, info};
 use rog_anime::error::AnimeError;
 use rog_anime::usb::get_anime_type;
 use rog_anime::AnimeType;
-use rog_aura::AuraDeviceType;
+use rog_aura::aura_capabilities::{
+    parse_firmware_capabilities, parse_hardware_status, parse_power_state_readback,
+};
+use rog_aura::{AuraDeviceType, AuraModeNum};
 use rog_platform::hid_raw::HidRaw;
 use rog_platform::keyboard_led::KeyboardBacklight;
 use rog_platform::usb_raw::USBRaw;
@@ -197,8 +200,70 @@ impl DeviceHandle {
                 Some(Arc::new(Mutex::new(k)))
             });
 
+        // Modern 0x19b6/0x1a30 keyboards expose their real mode table and
+        // physical controller capabilities through read-only feature
+        // reports.  Probe before loading the config so newly discovered modes
+        // become ordinary D-Bus modes and retain saved colours where present.
+        let mut detected_modes: Option<Vec<AuraModeNum>> = None;
+        if aura_type.is_new_laptop() {
+            if let Some(hid) = device.as_ref() {
+                let hid = hid.lock().await;
+                match hid.query_aura_status_report() {
+                    Ok(Some(report)) => {
+                        if let Some(status) = parse_hardware_status(&report) {
+                            info!(
+                                "Aura firmware status: type={:#04x} year={:#04x} layout={:#04x} regions={:#04x} features={:#04x} family={:#04x}",
+                                status.keyboard_type,
+                                status.keyboard_year,
+                                status.layout,
+                                status.region_bits,
+                                status.feature_bits,
+                                status.model_family
+                            );
+                        } else {
+                            log::debug!("Aura firmware status response failed validation");
+                        }
+                    }
+                    Ok(None) => log::debug!("Aura firmware status report is unavailable"),
+                    Err(error) => log::debug!("Aura firmware status probe failed: {error}"),
+                }
+
+                match hid.query_aura_capability_report() {
+                    Ok(Some(report)) => {
+                        if let Some(capabilities) = parse_firmware_capabilities(&report) {
+                            info!(
+                                "Aura firmware modes: {:?} (mask={:#04x}{:#04x})",
+                                capabilities.modes,
+                                capabilities.mode_mask_high,
+                                capabilities.mode_mask_low
+                            );
+                            if let Some(power) = parse_power_state_readback(&report) {
+                                info!(
+                                    "Aura firmware power readback: keyboard={:#04x} logo={:#04x} lightbar={:#04x} aero={:#04x} vcut={:#04x} bump={:#04x} rearglow={:#04x} ac_dc={:?}",
+                                    power.keyboard,
+                                    power.logo,
+                                    power.lightbar,
+                                    power.aero,
+                                    power.vcut,
+                                    power.bump,
+                                    power.rear_glow,
+                                    power.awake_ac_dc
+                                );
+                            }
+                            detected_modes = Some(capabilities.modes);
+                        } else {
+                            log::debug!("Aura firmware capability response failed validation");
+                        }
+                    }
+                    Ok(None) => log::debug!("Aura firmware capability report is unavailable"),
+                    Err(error) => log::debug!("Aura firmware capability probe failed: {error}"),
+                }
+            }
+        }
+
         // Load saved mode, colours, brightness, power from disk; apply on reload
-        let mut config = AuraConfig::load_and_update_config(prod_id);
+        let mut config =
+            AuraConfig::load_and_update_config_with_modes(prod_id, detected_modes.as_deref());
         config.led_type = aura_type;
         let aura = Aura {
             hid: device,

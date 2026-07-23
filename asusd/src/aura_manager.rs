@@ -5,13 +5,15 @@
 // - If udev sees device removed then remove the zbus path
 
 use std::collections::{HashMap, HashSet};
+use std::fs;
 use std::sync::Arc;
 
 use dmi_id::DMIID;
 use log::{debug, error, info, warn};
 use mio::{Events, Interest, Poll, Token};
+use rog_aura::AuraDeviceType;
 use rog_platform::error::PlatformError;
-use rog_platform::hid_raw::HidRaw;
+use rog_platform::hid_raw::{feature_report_len, HidRaw};
 use tokio::sync::Mutex;
 use udev::{Device, MonitorBuilder};
 use zbus::zvariant::{ObjectPath, OwnedObjectPath};
@@ -85,6 +87,42 @@ fn dev_prop_matches(dev: &Device, prop: &str, value: &str) -> bool {
     false
 }
 
+/// Return whether a hidraw endpoint advertises the Aura feature report.
+///
+/// ASUS keyboards commonly expose several HID interfaces under one USB
+/// product ID (keyboard input, vendor control, mouse/gamepad, and Aura).  The
+/// first interface is not a stable contract, so the manager prefers the one
+/// whose report descriptor contains report ID `0x5d` before applying the
+/// existing one-interface-per-USB deduplication.
+fn has_feature_report_id(device: &Device, report_id: u8) -> bool {
+    let Some(hid_device) = device.parent() else {
+        return false;
+    };
+    let descriptor = hid_device.syspath().join("report_descriptor");
+    fs::read(descriptor)
+        .map(|bytes| descriptor_has_feature_report(&bytes, report_id))
+        .unwrap_or(false)
+}
+
+fn descriptor_has_feature_report(bytes: &[u8], report_id: u8) -> bool {
+    feature_report_len(bytes, report_id).is_some()
+}
+
+fn is_modern_aura_endpoint(device: &Device) -> bool {
+    let Ok(Some(usb_device)) = device.parent_with_subsystem_devtype("usb", "usb_device") else {
+        return false;
+    };
+    if usb_device.attribute_value("idVendor") != Some(std::ffi::OsStr::new("0b05")) {
+        return false;
+    }
+    let Some(product_id) = usb_device.attribute_value("idProduct") else {
+        return false;
+    };
+
+    AuraDeviceType::from(product_id.to_str().unwrap_or_default()).is_new_laptop()
+        && has_feature_report_id(device, 0x5d)
+}
+
 /// A device.
 ///
 /// Each controller within should track its dbus path so it can be removed if
@@ -134,6 +172,17 @@ impl DeviceManager {
                         debug!("Not ASUS vendor ID: {}", vendor_id.to_string_lossy());
                         return Ok(devices);
                     }
+                    let product_id = usb_id.to_str().unwrap_or_default();
+                    // Startup enumeration is sorted below, but hotplug/resume
+                    // events arrive one interface at a time.  Do not let an
+                    // input or gamepad interface register a modern Aura
+                    // keyboard before its 0x5d endpoint appears.
+                    if AuraDeviceType::from(product_id).is_new_laptop()
+                        && !has_feature_report_id(&device, 0x5d)
+                    {
+                        debug!("Skipping non-Aura hidraw interface for modern keyboard {usb_id:?}");
+                        return Ok(devices);
+                    }
                     // Almost all devices are identified by the productId.
                     // So let's see what we have and:
                     // 1. Generate an interface path
@@ -144,11 +193,8 @@ impl DeviceManager {
                     {
                         debug!("Testing device {usb_id:?}");
                         // SLASH DEVICE
-                        if let Ok(dev_type) = DeviceHandle::new_slash_hid(
-                            dev.clone(),
-                            usb_id.to_str().unwrap_or_default(),
-                        )
-                        .await
+                        if let Ok(dev_type) =
+                            DeviceHandle::new_slash_hid(dev.clone(), product_id).await
                         {
                             if let DeviceHandle::Slash(slash) = dev_type.clone() {
                                 let path =
@@ -163,11 +209,8 @@ impl DeviceManager {
                             }
                         }
                         // ANIME MATRIX DEVICE
-                        if let Ok(dev_type) = DeviceHandle::maybe_anime_hid(
-                            dev.clone(),
-                            usb_id.to_str().unwrap_or_default(),
-                        )
-                        .await
+                        if let Ok(dev_type) =
+                            DeviceHandle::maybe_anime_hid(dev.clone(), product_id).await
                         {
                             if let DeviceHandle::AniMe(anime) = dev_type.clone() {
                                 let path =
@@ -182,11 +225,8 @@ impl DeviceManager {
                             }
                         }
                         // AURA LAPTOP DEVICE
-                        if let Ok(dev_type) = DeviceHandle::maybe_laptop_aura(
-                            Some(dev),
-                            usb_id.to_str().unwrap_or_default(),
-                        )
-                        .await
+                        if let Ok(dev_type) =
+                            DeviceHandle::maybe_laptop_aura(Some(dev), product_id).await
                         {
                             if let DeviceHandle::Aura(aura) = dev_type.clone() {
                                 let path =
@@ -231,10 +271,16 @@ impl DeviceManager {
             PlatformError::Udev("match_subsystem failed".into(), err)
         })?;
 
-        for device in enumerator
+        let mut hid_devices: Vec<Device> = enumerator
             .scan_devices()
             .map_err(|e| PlatformError::IoPath("enumerator".to_owned(), e))?
-        {
+            .collect();
+        // Keep the udev order as a stable fallback, but process the Aura
+        // endpoint first for modern notebook controllers.  Do not reorder
+        // unrelated ASUS peripherals which may reuse report ID 0x5d.
+        hid_devices.sort_by_key(|device| !is_modern_aura_endpoint(device));
+
+        for device in hid_devices {
             // Only deduplicate ASUS devices; non-ASUS multi-interface devices are unaffected.
             if let Ok(Some(usb_parent)) = device.parent_with_subsystem_devtype("usb", "usb_device")
             {
@@ -629,5 +675,19 @@ impl DeviceManager {
             Ok::<(), RogError>(())
         });
         Ok(manager)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::descriptor_has_feature_report;
+
+    #[test]
+    fn selects_aura_report_id_from_descriptor() {
+        let descriptor = [
+            0x85, 0x5d, 0x75, 0x08, 0x95, 0x3f, 0xb1, 0x00,
+        ];
+        assert!(descriptor_has_feature_report(&descriptor, 0x5d));
+        assert!(!descriptor_has_feature_report(&descriptor, 0x01));
     }
 }
