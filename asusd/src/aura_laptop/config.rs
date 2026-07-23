@@ -54,13 +54,33 @@ impl StdConfigLoad for AuraConfig {}
 impl AuraConfig {
     /// Detect the keyboard type and load from default DB if data available
     pub fn new(prod_id: &str) -> Self {
+        Self::new_with_modes(prod_id, None)
+    }
+
+    /// Create the default config, optionally replacing the static mode list
+    /// with a validated firmware report.  The firmware list is authoritative
+    /// only after the HID decoder has checked its header and required Static
+    /// bit; callers can therefore pass `None` for older keyboards.
+    pub fn new_with_modes(prod_id: &str, detected_modes: Option<&[AuraModeNum]>) -> Self {
         info!("Setting up AuraConfig for {prod_id:?}");
         // create a default config here
         let device_type = AuraDeviceType::from(prod_id);
         if device_type == AuraDeviceType::Unknown {
             warn!("idProduct:{prod_id:?} is unknown");
         }
-        let support_data = LedSupportData::get_data(prod_id);
+        let mut support_data = LedSupportData::get_data(prod_id);
+        if let Some(detected_modes) = detected_modes {
+            let mut modes = detected_modes.to_vec();
+            modes.sort();
+            modes.dedup();
+            if modes.contains(&AuraModeNum::Static) {
+                info!(
+                    "Using {} firmware-reported Aura modes for {prod_id:?}",
+                    modes.len()
+                );
+                support_data.basic_modes = modes;
+            }
+        }
         let enabled = LaptopAuraPower::new(device_type, &support_data);
         let mut config = AuraConfig {
             led_type: device_type,
@@ -176,8 +196,16 @@ impl AuraConfig {
     /// Reload the config from disk then verify and update it if required.
     /// Always rewrites the file to disk.
     pub fn load_and_update_config(prod_id: &str) -> AuraConfig {
+        Self::load_and_update_config_with_modes(prod_id, None)
+    }
+
+    /// Reload the config while retaining a validated firmware mode list.
+    pub fn load_and_update_config_with_modes(
+        prod_id: &str,
+        detected_modes: Option<&[AuraModeNum]>,
+    ) -> AuraConfig {
         // New loads data from the DB also
-        let mut config_init = AuraConfig::new(prod_id);
+        let mut config_init = AuraConfig::new_with_modes(prod_id, detected_modes);
         // config_init.set_filename(prod_id);
         let mut config_loaded = config_init.clone().load();
         // update the initialised data with what we loaded from disk
@@ -189,9 +217,18 @@ impl AuraConfig {
         }
         // Then replace just incase the initialised data contains new modes added
         config_loaded.builtins = config_init.builtins;
-        config_loaded.support_data = config_init.support_data;
+        config_loaded.support_data = config_init.support_data.clone();
         config_loaded.led_type = config_init.led_type;
         config_loaded.ally_fix = config_init.ally_fix;
+
+        // A mode removed by a firmware readback must not remain selected from
+        // an older on-disk configuration.
+        if !config_loaded
+            .builtins
+            .contains_key(&config_loaded.current_mode)
+        {
+            config_loaded.current_mode = AuraModeNum::Static;
+        }
 
         for enabled_init in &mut config_init.enabled.states {
             for enabled in &mut config_loaded.enabled.states {
@@ -210,10 +247,9 @@ impl AuraConfig {
                 // update init values from loaded values if they exist
                 if let Some(loaded) = multizone_loaded.get(mode.0) {
                     let mut new_set = Vec::new();
-                    let data = LedSupportData::get_data(prod_id);
                     // only reuse a zone mode if the mode is supported
                     for mode in loaded {
-                        if data.basic_modes.contains(&mode.mode) {
+                        if config_init.support_data.basic_modes.contains(&mode.mode) {
                             new_set.push(mode.clone());
                         }
                     }
@@ -463,5 +499,20 @@ mod tests {
                 shutdown: true
             }
         );
+    }
+
+    #[test]
+    fn firmware_modes_replace_static_mode_table() {
+        let _guard = test_lock();
+        std::env::set_var("BOARD_NAME", "GV601VV");
+        let modes = [
+            AuraModeNum::Static,
+            AuraModeNum::RainbowCycle,
+        ];
+        let config = AuraConfig::new_with_modes("19b6", Some(&modes));
+
+        assert_eq!(config.support_data.basic_modes, modes);
+        assert!(config.builtins.contains_key(&AuraModeNum::RainbowCycle));
+        assert!(!config.builtins.contains_key(&AuraModeNum::Pulse));
     }
 }

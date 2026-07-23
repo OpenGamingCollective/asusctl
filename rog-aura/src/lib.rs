@@ -16,6 +16,7 @@ pub mod effects;
 mod builtin_modes;
 pub use builtin_modes::*;
 
+pub mod aura_capabilities;
 /// Helper for detecting what is available
 pub mod aura_detection;
 pub mod error;
