@@ -12,7 +12,7 @@ keywords = ["ROG", "ASUS", "Aura"]
 exclude = ["data"]
 
 [features]
-default = ["dbus", "ron"]
+default = ["dbus", "toml"]
 dbus = ["zbus"]
 
 [dependencies]
@@ -23,5 +23,5 @@ dmi_id = { path = "../dmi-id" }
 # cli and logging
 log.workspace = true
 
-ron = { version = "*", optional = true }
+toml = { workspace = true, optional = true }
 thiserror.workspace = true

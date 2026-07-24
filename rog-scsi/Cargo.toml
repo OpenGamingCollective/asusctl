@@ -11,7 +11,7 @@ description.workspace = true
 edition.workspace = true
 
 [features]
-default = ["dbus", "ron"]
+default = ["dbus", "toml"]
 dbus = ["zbus"]
 
 [dependencies]
@@ -21,5 +21,5 @@ zbus = { workspace = true, optional = true }
 
 # cli and logging
 
-ron = { version = "*", optional = true }
+toml = { workspace = true, optional = true }
 thiserror.workspace = true
