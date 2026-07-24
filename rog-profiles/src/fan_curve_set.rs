@@ -123,10 +123,16 @@ impl CurveData {
 
     fn set_val_from_attr(tmp: &str, device: &Device, buf: &mut [u8; 8]) {
         if let Some(n) = tmp.chars().nth(15) {
-            let i = n.to_digit(10).unwrap() as usize;
-            let d = device.attribute_value(tmp).unwrap();
-            let d: u8 = d.to_string_lossy().parse().unwrap();
-            buf[i - 1] = d;
+            if let Some(digit) = n.to_digit(10) {
+                let i = digit as usize;
+                if (1..=8).contains(&i) {
+                    if let Some(val_str) = device.attribute_value(tmp) {
+                        if let Ok(d) = val_str.to_string_lossy().trim().parse::<u8>() {
+                            buf[i - 1] = d;
+                        }
+                    }
+                }
+            }
         }
     }
 
