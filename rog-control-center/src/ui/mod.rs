@@ -23,7 +23,7 @@ use crate::ui::setup_aura::setup_aura_page;
 use crate::ui::setup_fans::setup_fan_curve_page;
 use crate::ui::setup_slash::setup_slash_page;
 use crate::ui::setup_system::{setup_system_page, setup_system_page_callbacks};
-use crate::{AppSettingsPageData, GlobalShortcutStatus, MainWindow};
+use crate::{AppSettingsPageData, GlobalShortcutStatus, MainWindow, Theme};
 
 // this macro sets up:
 // - a link from UI callback -> dbus proxy property
@@ -194,6 +194,18 @@ fn ui_shortcut_status(status: ShortcutStatus) -> GlobalShortcutStatus {
     }
 }
 
+fn parse_color_hex(hex: &str) -> Option<slint::Color> {
+    let hex = hex.trim_start_matches('#');
+    if hex.len() == 6 {
+        let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
+        let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
+        let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
+        Some(slint::Color::from_argb_u8(255, r, g, b))
+    } else {
+        None
+    }
+}
+
 pub fn setup_app_settings_page(
     ui: &MainWindow,
     config: Arc<Mutex<Config>>,
@@ -244,6 +256,44 @@ pub fn setup_app_settings_page(
             super::config::update_autostart(autostart, enable);
         }
     });
+    let config_copy = config.clone();
+    let ui_weak = ui.as_weak();
+    global.on_set_theme_preset(move |preset| {
+        let preset = preset.clamp(0, 4);
+        if let Ok(mut lock) = config_copy.try_lock() {
+            lock.theme_preset = preset;
+            lock.write();
+        }
+        if let Some(ui) = ui_weak.upgrade() {
+            ui.global::<Theme>().set_theme_preset(preset);
+        }
+    });
+    let config_copy = config.clone();
+    let ui_weak = ui.as_weak();
+    global.on_set_custom_accent_hex(move |hex| {
+        if let Ok(mut lock) = config_copy.try_lock() {
+            lock.custom_accent_hex = hex.to_string();
+            lock.write();
+        }
+        if let Some(ui) = ui_weak.upgrade() {
+            if let Some(color) = parse_color_hex(&hex) {
+                ui.global::<Theme>().set_custom_accent_color(color);
+            }
+        }
+    });
+    let config_copy = config.clone();
+    let ui_weak = ui.as_weak();
+    global.on_set_custom_secondary_hex(move |hex| {
+        if let Ok(mut lock) = config_copy.try_lock() {
+            lock.custom_secondary_hex = hex.to_string();
+            lock.write();
+        }
+        if let Some(ui) = ui_weak.upgrade() {
+            if let Some(color) = parse_color_hex(&hex) {
+                ui.global::<Theme>().set_custom_secondary_color(color);
+            }
+        }
+    });
 
     if let Ok(lock) = config.try_lock() {
         global.set_run_in_background(lock.run_in_background);
@@ -252,6 +302,17 @@ pub fn setup_app_settings_page(
         global.set_enable_dgpu_notifications(lock.notifications.enabled);
         global.set_enable_autostart(lock.enable_autostart);
         global.set_autostart_in_background(super::config::is_autostart_in_background());
+        let preset = lock.theme_preset.clamp(0, 4);
+        global.set_theme_preset(preset);
+        global.set_custom_accent_hex(lock.custom_accent_hex.clone().into());
+        global.set_custom_secondary_hex(lock.custom_secondary_hex.clone().into());
+        ui.global::<Theme>().set_theme_preset(preset);
+        if let Some(color) = parse_color_hex(&lock.custom_accent_hex) {
+            ui.global::<Theme>().set_custom_accent_color(color);
+        }
+        if let Some(color) = parse_color_hex(&lock.custom_secondary_hex) {
+            ui.global::<Theme>().set_custom_secondary_color(color);
+        }
     }
 
     global.set_show_global_shortcut_controls(shortcuts.is_some());

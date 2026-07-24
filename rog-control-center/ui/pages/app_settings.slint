@@ -1,5 +1,6 @@
-import { Palette, Button } from "std-widgets.slint";
-import { SystemToggle } from "../widgets/common.slint";
+import { Palette, Button, LineEdit } from "std-widgets.slint";
+import { SystemToggle, SystemDropdown } from "../widgets/common.slint";
+import { Theme } from "../globals.slint";
 
 export enum GlobalShortcutStatus {
     disabled,
@@ -22,6 +23,14 @@ export global AppSettingsPageData {
     callback set_enable_autostart(bool);
     in-out property <bool> autostart_in_background;
     callback set_autostart_in_background(bool);
+    // Theme preset properties
+    in-out property <int> theme_preset: 0;
+    in-out property <[string]> theme_choices: [@tr("Crimson"), @tr("Cyberpunk Cyan"), @tr("Electric Purple"), @tr("Emerald Green"), @tr("Custom Palette")];
+    callback set_theme_preset(int);
+    in-out property <string> custom_accent_hex: "#dc143c";
+    callback set_custom_accent_hex(string);
+    in-out property <string> custom_secondary_hex: "#161926";
+    callback set_custom_secondary_hex(string);
     // Whether the global shortcut controls are shown (false on ROG Ally).
     in-out property <bool> show_global_shortcut_controls;
     in-out property <bool> enable_global_shortcut;
@@ -34,6 +43,25 @@ export global AppSettingsPageData {
     callback manage_global_shortcut();
 }
 
+component ColorSwatch inherits Rectangle {
+    in property <color> swatch_color;
+    in property <bool> is_selected;
+    callback clicked();
+
+    width: 26px;
+    height: 26px;
+    border-radius: 13px;
+    background: swatch_color;
+    border-width: is_selected ? 2px : 1px;
+    border-color: is_selected ? #ffffff : Theme.card-border;
+    drop-shadow-color: is_selected ? swatch_color : transparent;
+    drop-shadow-blur: is_selected ? 6px : 0px;
+
+    TouchArea {
+        clicked => { root.clicked(); }
+    }
+}
+
 export component PageAppSettings inherits VerticalLayout {
     Rectangle {
         clip: true;
@@ -41,6 +69,126 @@ export component PageAppSettings inherits VerticalLayout {
         mainview := VerticalLayout {
             padding: 10px;
             spacing: 10px;
+
+            SystemDropdown {
+                text: @tr("UI Accent Theme");
+                current_index <=> AppSettingsPageData.theme_preset;
+                current_value: AppSettingsPageData.theme_choices[AppSettingsPageData.theme_preset];
+                model <=> AppSettingsPageData.theme_choices;
+                selected => {
+                    Theme.theme-preset = self.current-index;
+                    AppSettingsPageData.set_theme_preset(self.current-index);
+                }
+            }
+
+            if AppSettingsPageData.theme_preset == 4: Rectangle {
+                background: Theme.card-bg;
+                border-color: Theme.card-border;
+                border-width: 1px;
+                border-radius: Theme.border-radius-md;
+
+                VerticalLayout {
+                    padding: 14px;
+                    spacing: 12px;
+
+                    Text {
+                        text: @tr("Custom Color Palette");
+                        font-weight: 700;
+                        font-size: 14px;
+                        color: Theme.text-primary;
+                    }
+
+                    // Primary Accent Color Section
+                    VerticalLayout {
+                        spacing: 6px;
+                        Text {
+                            text: @tr("Primary Accent Color");
+                            font-size: 12px;
+                            color: Theme.text-secondary;
+                        }
+
+                        HorizontalLayout {
+                            spacing: 8px;
+                            alignment: LayoutAlignment.start;
+
+                            // Preview Box
+                            Rectangle {
+                                width: 32px;
+                                height: 32px;
+                                border-radius: 6px;
+                                background: Theme.custom-accent-color;
+                                border-width: 1px;
+                                border-color: Theme.card-border;
+                            }
+
+                            LineEdit {
+                                width: 100px;
+                                height: 32px;
+                                text <=> AppSettingsPageData.custom_accent_hex;
+                                accepted(val) => {
+                                    AppSettingsPageData.set_custom_accent_hex(val);
+                                }
+                            }
+
+                            // Preset Swatches
+                            ColorSwatch { swatch_color: #dc143c; is_selected: AppSettingsPageData.custom_accent_hex == "#dc143c"; clicked => { AppSettingsPageData.set_custom_accent_hex("#dc143c"); AppSettingsPageData.custom_accent_hex = "#dc143c"; } }
+                            ColorSwatch { swatch_color: #ffffff; is_selected: AppSettingsPageData.custom_accent_hex == "#ffffff"; clicked => { AppSettingsPageData.set_custom_accent_hex("#ffffff"); AppSettingsPageData.custom_accent_hex = "#ffffff"; } }
+                            ColorSwatch { swatch_color: #00f0ff; is_selected: AppSettingsPageData.custom_accent_hex == "#00f0ff"; clicked => { AppSettingsPageData.set_custom_accent_hex("#00f0ff"); AppSettingsPageData.custom_accent_hex = "#00f0ff"; } }
+                            ColorSwatch { swatch_color: #a855f7; is_selected: AppSettingsPageData.custom_accent_hex == "#a855f7"; clicked => { AppSettingsPageData.set_custom_accent_hex("#a855f7"); AppSettingsPageData.custom_accent_hex = "#a855f7"; } }
+                            ColorSwatch { swatch_color: #10b981; is_selected: AppSettingsPageData.custom_accent_hex == "#10b981"; clicked => { AppSettingsPageData.set_custom_accent_hex("#10b981"); AppSettingsPageData.custom_accent_hex = "#10b981"; } }
+                            ColorSwatch { swatch_color: #f59e0b; is_selected: AppSettingsPageData.custom_accent_hex == "#f59e0b"; clicked => { AppSettingsPageData.set_custom_accent_hex("#f59e0b"); AppSettingsPageData.custom_accent_hex = "#f59e0b"; } }
+                            ColorSwatch { swatch_color: #f43f5e; is_selected: AppSettingsPageData.custom_accent_hex == "#f43f5e"; clicked => { AppSettingsPageData.set_custom_accent_hex("#f43f5e"); AppSettingsPageData.custom_accent_hex = "#f43f5e"; } }
+                            ColorSwatch { swatch_color: #0284c7; is_selected: AppSettingsPageData.custom_accent_hex == "#0284c7"; clicked => { AppSettingsPageData.set_custom_accent_hex("#0284c7"); AppSettingsPageData.custom_accent_hex = "#0284c7"; } }
+                            ColorSwatch { swatch_color: #84cc16; is_selected: AppSettingsPageData.custom_accent_hex == "#84cc16"; clicked => { AppSettingsPageData.set_custom_accent_hex("#84cc16"); AppSettingsPageData.custom_accent_hex = "#84cc16"; } }
+                        }
+                    }
+
+                    // Secondary Background Color Section
+                    VerticalLayout {
+                        spacing: 6px;
+                        Text {
+                            text: @tr("Secondary Background Tint");
+                            font-size: 12px;
+                            color: Theme.text-secondary;
+                        }
+
+                        HorizontalLayout {
+                            spacing: 8px;
+                            alignment: LayoutAlignment.start;
+
+                            // Preview Box
+                            Rectangle {
+                                width: 32px;
+                                height: 32px;
+                                border-radius: 6px;
+                                background: Theme.custom-secondary-color;
+                                border-width: 1px;
+                                border-color: Theme.card-border;
+                            }
+
+                            LineEdit {
+                                width: 100px;
+                                height: 32px;
+                                text <=> AppSettingsPageData.custom_secondary_hex;
+                                accepted(val) => {
+                                    AppSettingsPageData.set_custom_secondary_hex(val);
+                                }
+                            }
+
+                            // Preset Swatches
+                            ColorSwatch { swatch_color: #ffffff; is_selected: AppSettingsPageData.custom_secondary_hex == "#ffffff"; clicked => { AppSettingsPageData.set_custom_secondary_hex("#ffffff"); AppSettingsPageData.custom_secondary_hex = "#ffffff"; } }
+                            ColorSwatch { swatch_color: #f8fafc; is_selected: AppSettingsPageData.custom_secondary_hex == "#f8fafc"; clicked => { AppSettingsPageData.set_custom_secondary_hex("#f8fafc"); AppSettingsPageData.custom_secondary_hex = "#f8fafc"; } }
+                            ColorSwatch { swatch_color: #161926; is_selected: AppSettingsPageData.custom_secondary_hex == "#161926"; clicked => { AppSettingsPageData.set_custom_secondary_hex("#161926"); AppSettingsPageData.custom_secondary_hex = "#161926"; } }
+                            ColorSwatch { swatch_color: #0f172a; is_selected: AppSettingsPageData.custom_secondary_hex == "#0f172a"; clicked => { AppSettingsPageData.set_custom_secondary_hex("#0f172a"); AppSettingsPageData.custom_secondary_hex = "#0f172a"; } }
+                            ColorSwatch { swatch_color: #1e1b4b; is_selected: AppSettingsPageData.custom_secondary_hex == "#1e1b4b"; clicked => { AppSettingsPageData.set_custom_secondary_hex("#1e1b4b"); AppSettingsPageData.custom_secondary_hex = "#1e1b4b"; } }
+                            ColorSwatch { swatch_color: #064e3b; is_selected: AppSettingsPageData.custom_secondary_hex == "#064e3b"; clicked => { AppSettingsPageData.set_custom_secondary_hex("#064e3b"); AppSettingsPageData.custom_secondary_hex = "#064e3b"; } }
+                            ColorSwatch { swatch_color: #18181b; is_selected: AppSettingsPageData.custom_secondary_hex == "#18181b"; clicked => { AppSettingsPageData.set_custom_secondary_hex("#18181b"); AppSettingsPageData.custom_secondary_hex = "#18181b"; } }
+                            ColorSwatch { swatch_color: #09090b; is_selected: AppSettingsPageData.custom_secondary_hex == "#09090b"; clicked => { AppSettingsPageData.set_custom_secondary_hex("#09090b"); AppSettingsPageData.custom_secondary_hex = "#09090b"; } }
+                        }
+                    }
+                }
+            }
+
             SystemToggle {
                 text: @tr("Run in background after closing");
                 checked <=> AppSettingsPageData.run_in_background;
@@ -107,7 +255,7 @@ export component PageAppSettings inherits VerticalLayout {
 
                 Text {
                     vertical-alignment: TextVerticalAlignment.center;
-                    color: Palette.control-foreground;
+                    color: Theme.text-primary;
                     text: {
                         if AppSettingsPageData.global_shortcut_status == GlobalShortcutStatus.starting {
                             @tr("Setting up…")
@@ -138,7 +286,7 @@ export component PageAppSettings inherits VerticalLayout {
             }
 
             Text {
-                color: Palette.accent-background;
+                color: Theme.accent;
                 text: " WIP: some features like notifications are not complete";
             }
         }
