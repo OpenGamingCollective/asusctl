@@ -1,4 +1,5 @@
 import { Palette } from "std-widgets.slint";
+import { Theme } from "../globals.slint";
 
 export struct Node { x: length, y: length}
 
@@ -44,7 +45,7 @@ export component Graph inherits Rectangle {
         for n in 11: Path {
             viewbox-width: self.width / 1px;
             viewbox-height: self.height / 1px;
-            stroke: Palette.alternate-foreground.darker(200%);
+            stroke: Theme.card-border;
             stroke-width: 1px;
             MoveTo {
                 x: scale_x_to_graph(n * 10px) / 1px;
@@ -60,17 +61,17 @@ export component Graph inherits Rectangle {
         }
 
         for n in 11: Text {
-            color: Palette.accent-background;
+            color: Theme.text-muted;
             font-size <=> root.axis_font_size;
             text: "\{n * 10}c";
             x: scale_x_to_graph(n * 10px) - self.width / 3;
-            y: graph.height + 2px;
+            y: graph.height + 4px;
         }
 
         for n in 11: Path {
             viewbox-width: self.width / 1px;
             viewbox-height: self.height / 1px;
-            stroke: Palette.alternate-foreground.darker(200%);
+            stroke: Theme.card-border;
             stroke-width: 1px;
             MoveTo {
                 x: 0;
@@ -86,10 +87,10 @@ export component Graph inherits Rectangle {
         }
 
         for n in 11: Text {
-            color: Palette.accent-background;
+            color: Theme.text-muted;
             font-size <=> root.axis_font_size;
             text: "\{n * 10}%";
-            x: - self.width;
+            x: - self.width - 4px;
             y: graph.height - scale_y_to_graph(n * 25.5px) - self.height / 2;
         }
 
@@ -97,8 +98,8 @@ export component Graph inherits Rectangle {
             if idx + 1 != nodes.length: Path {
                 viewbox-width: self.width / 1px;
                 viewbox-height: self.height / 1px;
-                stroke: Palette.control-foreground;
-                stroke-width: 2px;
+                stroke: Theme.accent;
+                stroke-width: 3px;
                 MoveTo {
                     x: scale_x_to_graph(nodes[idx].x) / 1px;
                     y: graph.height / 1px - scale_y_to_graph(nodes[idx].y) / 1px;
@@ -114,19 +115,19 @@ export component Graph inherits Rectangle {
         for n[idx] in nodes: Rectangle {
             states [
                 pressed when touch.pressed: {
-                    point.background: Palette.selection-background;
-                    tip.background: Palette.selection-background;
+                    point.background: Theme.accent-hover;
+                    tip.background: Theme.card-bg;
                     tip.opacity: 1.0;
                 }
                 hover when touch.has-hover: {
-                    point.background: Palette.accent-background;
-                    tip.background: Palette.accent-background;
+                    point.background: Theme.accent-hover;
+                    tip.background: Theme.card-bg;
                     tip.opacity: 1.0;
                 }
             ]
             //
             point := Rectangle {
-                background: Palette.control-foreground;
+                background: Theme.accent;
                 x: scale_x_to_graph(n.x) - self.width / 2;
                 y: graph.height - scale_y_to_graph(n.y) - self.height / 2;
                 width: 18px;
@@ -189,8 +190,8 @@ export component Graph inherits Rectangle {
             }
 
             tip := Rectangle {
-                background: Palette.control-foreground;
-                opacity: 0.3;
+                background: Theme.card-bg;
+                opacity: 0.9;
                 border-radius: 12px;
                 x: final_x_pos();
                 y: final_y_pos();
@@ -225,7 +226,7 @@ export component Graph inherits Rectangle {
                 }
                 //
                 label := Text {
-                    color: Palette.accent-foreground;
+                    color: Theme.text-primary;
                     font-size: 14px;
                     text: "\{Math.floor(n.x / 1px)}c, \{fan_pct()}%";
                 }

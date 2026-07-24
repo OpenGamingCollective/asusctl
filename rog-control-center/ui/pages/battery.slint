@@ -1,6 +1,7 @@
 import { SystemSlider, RogItem } from "../widgets/common.slint";
 import { Palette, VerticalBox, ScrollView } from "std-widgets.slint";
 import { SystemPageData } from "system.slint";
+import { Theme } from "../globals.slint";
 
 export component PageBattery inherits Rectangle {
     clip: true;
@@ -12,15 +13,17 @@ export component PageBattery inherits Rectangle {
             alignment: LayoutAlignment.start;
 
             Rectangle {
-                background: Palette.alternate-background;
-                border-color: Palette.border;
+                background: Theme.surface;
+                border-color: Theme.card-border;
                 border-width: 1px;
-                border-radius: 2px;
+                border-radius: Theme.border-radius-sm;
                 height: 36px;
                 Text {
-                    font-size: 16px;
-                    color: Palette.control-foreground;
+                    font-size: 15px;
+                    font-weight: 600;
+                    color: Theme.text-primary;
                     horizontal-alignment: TextHorizontalAlignment.center;
+                    vertical-alignment: TextVerticalAlignment.center;
                     text: @tr("Battery Information");
                 }
             }
@@ -39,10 +42,10 @@ export component PageBattery inherits Rectangle {
             }
 
             if SystemPageData.battery_health != -1: Rectangle {
-                background: Palette.alternate-background;
-                border-color: Palette.border;
+                background: Theme.card-bg;
+                border-color: Theme.card-border;
                 border-width: 1px;
-                border-radius: 4px;
+                border-radius: Theme.border-radius-md;
                 
                 VerticalLayout {
                     padding: 12px;
@@ -52,7 +55,7 @@ export component PageBattery inherits Rectangle {
                         alignment: LayoutAlignment.space-between;
                         Text {
                             text: @tr("Battery Health (Capacity):");
-                            color: Palette.control-foreground;
+                            color: Theme.text-primary;
                         }
                         Text {
                             text: SystemPageData.battery_health + "%";
@@ -65,12 +68,12 @@ export component PageBattery inherits Rectangle {
                         alignment: LayoutAlignment.space-between;
                         Text {
                             text: @tr("Status:");
-                            color: Palette.control-foreground;
+                            color: Theme.text-primary;
                         }
                         Text {
                             text: SystemPageData.battery_status;
                             font-weight: 700;
-                            color: Palette.control-foreground;
+                            color: Theme.text-primary;
                         }
                     }
 
@@ -78,7 +81,7 @@ export component PageBattery inherits Rectangle {
                         alignment: LayoutAlignment.space-between;
                         Text {
                             text: @tr("Power Draw:");
-                            color: Palette.control-foreground;
+                            color: Theme.text-primary;
                         }
                         Text {
                             text: Math.round(SystemPageData.battery_power_consumption * 10) / 10 + " W";
@@ -91,12 +94,12 @@ export component PageBattery inherits Rectangle {
                         alignment: LayoutAlignment.space-between;
                         Text {
                             text: SystemPageData.battery_status == "Charging" ? @tr("Time to Full:") : @tr("Time Remaining:");
-                            color: Palette.control-foreground;
+                            color: Theme.text-primary;
                         }
                         Text {
                             text: SystemPageData.battery_time_estimate;
                             font-weight: 700;
-                            color: Palette.control-foreground;
+                            color: Theme.text-primary;
                         }
                     }
                 }

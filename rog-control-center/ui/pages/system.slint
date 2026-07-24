@@ -1,6 +1,7 @@
 import { SystemSlider, SystemDropdown, SystemToggle, SystemToggleInt, RogItem } from "../widgets/common.slint";
 import { Palette, HorizontalBox , VerticalBox, ScrollView, Slider, Button, Switch, ComboBox, GroupBox, StandardButton} from "std-widgets.slint";
 import { FanPageData } from "../types/fan_types.slint";
+import { Theme } from "../globals.slint";
 
 export struct AttrMinMax {
   min: int,
@@ -201,28 +202,29 @@ export component PageSystem inherits Rectangle {
             spacing: 8px;
             alignment: LayoutAlignment.start;
             Rectangle {
-                background: Palette.alternate-background;
-                border-color: Palette.border;
+                background: Theme.surface;
+                border-color: Theme.card-border;
                 border-width: 1px;
-                border-radius: 2px;
+                border-radius: Theme.border-radius-sm;
                 height: 36px;
                 Text {
-                    font-size: 16px;
-                    color: Palette.control-foreground;
+                    font-size: 15px;
+                    font-weight: 600;
+                    color: Theme.text-primary;
                     horizontal-alignment: TextHorizontalAlignment.center;
+                    vertical-alignment: TextVerticalAlignment.center;
                     text: @tr("Power settings");
                 }
             }
 
-
             if SystemPageData.cpu_usage_val != -1.0: Rectangle {
-                background: Palette.alternate-background;
-                border-color: Palette.border;
+                background: Theme.card-bg;
+                border-color: Theme.card-border;
                 border-width: 1px;
-                border-radius: 4px;
+                border-radius: Theme.border-radius-md;
 
                 VerticalLayout {
-                    padding: 12px;
+                    padding: 14px;
                     spacing: 12px;
 
                     HorizontalLayout {
@@ -231,7 +233,7 @@ export component PageSystem inherits Rectangle {
                         Text {
                             font-size: 14px;
                             font-weight: 700;
-                            color: Palette.accent-background;
+                            color: Theme.accent;
                             text: @tr("Hardware Monitor");
                         }
                     }
@@ -247,7 +249,7 @@ export component PageSystem inherits Rectangle {
                             Text {
                                 text: SystemPageData.cpu_name != "" ? (@tr("CPU Status") + " | " + SystemPageData.cpu_name) : @tr("CPU Status");
                                 font-weight: 700;
-                                color: Palette.control-foreground;
+                                color: Theme.text-primary;
                                 font-size: 12px;
                             }
                             
@@ -255,7 +257,7 @@ export component PageSystem inherits Rectangle {
                                 alignment: LayoutAlignment.space-between;
                                 Text {
                                     text: @tr("Temperature:");
-                                    color: Palette.control-foreground;
+                                    color: Theme.text-secondary;
                                 }
                                 Text {
                                     text: Math.round(SystemPageData.cpu_temp_val) + " °C";
@@ -268,12 +270,12 @@ export component PageSystem inherits Rectangle {
                                 alignment: LayoutAlignment.space-between;
                                 Text {
                                     text: @tr("Usage:");
-                                    color: Palette.control-foreground;
+                                    color: Theme.text-secondary;
                                 }
                                 Text {
                                     text: Math.round(SystemPageData.cpu_usage_val) + "%";
                                     font-weight: 700;
-                                    color: Palette.control-foreground;
+                                    color: Theme.text-primary;
                                 }
                             }
                             
@@ -281,12 +283,12 @@ export component PageSystem inherits Rectangle {
                                 alignment: LayoutAlignment.space-between;
                                 Text {
                                     text: @tr("Frequency:");
-                                    color: Palette.control-foreground;
+                                    color: Theme.text-secondary;
                                 }
                                 Text {
                                     text: Math.round(SystemPageData.cpu_freq_mhz) + " MHz";
                                     font-weight: 700;
-                                    color: Palette.control-foreground;
+                                    color: Theme.text-primary;
                                 }
                             }
 
@@ -295,7 +297,7 @@ export component PageSystem inherits Rectangle {
                             if SystemPageData.has_igpu: Text {
                                 text: SystemPageData.igpu_name != "" ? (@tr("iGPU Status") + " | " + SystemPageData.igpu_name) : @tr("iGPU Status");
                                 font-weight: 700;
-                                color: Palette.control-foreground;
+                                color: Theme.text-primary;
                                 font-size: 12px;
                             }
                             
@@ -303,12 +305,12 @@ export component PageSystem inherits Rectangle {
                                 alignment: LayoutAlignment.space-between;
                                 Text {
                                     text: @tr("Temperature:");
-                                    color: Palette.control-foreground;
+                                    color: Theme.text-secondary;
                                 }
                                 Text {
                                     text: SystemPageData.igpu_temp_val > 0.0 ? (Math.round(SystemPageData.igpu_temp_val) + " °C") : @tr("N/A");
                                     font-weight: 700;
-                                    color: SystemPageData.igpu_temp_val > 80 ? #ef4444 : (SystemPageData.igpu_temp_val > 65 ? #eab308 : (SystemPageData.igpu_temp_val > 0.0 ? #22c55e : Palette.control-foreground));
+                                    color: SystemPageData.igpu_temp_val > 80 ? #ef4444 : (SystemPageData.igpu_temp_val > 65 ? #eab308 : (SystemPageData.igpu_temp_val > 0.0 ? #22c55e : Theme.text-secondary));
                                 }
                             }
                             
@@ -316,12 +318,12 @@ export component PageSystem inherits Rectangle {
                                 alignment: LayoutAlignment.space-between;
                                 Text {
                                     text: @tr("Usage:");
-                                    color: Palette.control-foreground;
+                                    color: Theme.text-secondary;
                                 }
                                 Text {
                                     text: SystemPageData.igpu_usage_val >= 0.0 ? (Math.round(SystemPageData.igpu_usage_val) + "%") : @tr("N/A");
                                     font-weight: 700;
-                                    color: Palette.control-foreground;
+                                    color: Theme.text-primary;
                                 }
                             }
 
@@ -330,7 +332,7 @@ export component PageSystem inherits Rectangle {
                             Text {
                                 text: @tr("Memory Status");
                                 font-weight: 700;
-                                color: Palette.control-foreground;
+                                color: Theme.text-primary;
                                 font-size: 12px;
                             }
                             
@@ -338,12 +340,12 @@ export component PageSystem inherits Rectangle {
                                 alignment: LayoutAlignment.space-between;
                                 Text {
                                     text: @tr("RAM Usage:");
-                                    color: Palette.control-foreground;
+                                    color: Theme.text-secondary;
                                 }
                                 Text {
                                     text: Math.round(SystemPageData.ram_usage_val) + "%";
                                     font-weight: 700;
-                                    color: Palette.control-foreground;
+                                    color: Theme.text-primary;
                                 }
                             }
                             // Elastic spacer to push all layout elements to the top when the columns have mismatched heights
@@ -358,7 +360,7 @@ export component PageSystem inherits Rectangle {
                             if SystemPageData.has_dgpu: Text {
                                 text: SystemPageData.dgpu_name != "" ? (@tr("dGPU Status") + " | " + SystemPageData.dgpu_name) : @tr("dGPU Status");
                                 font-weight: 700;
-                                color: Palette.control-foreground;
+                                color: Theme.text-primary;
                                 font-size: 12px;
                             }
                             
@@ -366,12 +368,12 @@ export component PageSystem inherits Rectangle {
                                 alignment: LayoutAlignment.space-between;
                                 Text {
                                     text: @tr("Temperature:");
-                                    color: Palette.control-foreground;
+                                    color: Theme.text-secondary;
                                 }
                                 Text {
                                     text: SystemPageData.gpu_temp_val > 0.0 ? (Math.round(SystemPageData.gpu_temp_val) + " °C") : @tr("N/A");
                                     font-weight: 700;
-                                    color: SystemPageData.gpu_temp_val > 80 ? #ef4444 : (SystemPageData.gpu_temp_val > 65 ? #eab308 : (SystemPageData.gpu_temp_val > 0.0 ? #22c55e : Palette.control-foreground));
+                                    color: SystemPageData.gpu_temp_val > 80 ? #ef4444 : (SystemPageData.gpu_temp_val > 65 ? #eab308 : (SystemPageData.gpu_temp_val > 0.0 ? #22c55e : Theme.text-secondary));
                                 }
                             }
                             
@@ -379,12 +381,12 @@ export component PageSystem inherits Rectangle {
                                 alignment: LayoutAlignment.space-between;
                                 Text {
                                     text: @tr("Usage:");
-                                    color: Palette.control-foreground;
+                                    color: Theme.text-secondary;
                                 }
                                 Text {
                                     text: SystemPageData.gpu_usage_val >= 0.0 ? (Math.round(SystemPageData.gpu_usage_val) + "%") : @tr("N/A");
                                     font-weight: 700;
-                                    color: Palette.control-foreground;
+                                    color: Theme.text-primary;
                                 }
                             }
 
@@ -393,7 +395,7 @@ export component PageSystem inherits Rectangle {
                             Text {
                                 text: @tr("Fan Speeds");
                                 font-weight: 700;
-                                color: Palette.control-foreground;
+                                color: Theme.text-primary;
                                 font-size: 12px;
                             }
                             
@@ -401,12 +403,12 @@ export component PageSystem inherits Rectangle {
                                 alignment: LayoutAlignment.space-between;
                                 Text {
                                     text: @tr("CPU Fan:");
-                                    color: Palette.control-foreground;
+                                    color: Theme.text-secondary;
                                 }
                                 Text {
                                     text: SystemPageData.cpu_fan_rpm + " RPM";
                                     font-weight: 700;
-                                    color: Palette.control-foreground;
+                                    color: Theme.text-primary;
                                 }
                             }
                             
@@ -414,12 +416,12 @@ export component PageSystem inherits Rectangle {
                                 alignment: LayoutAlignment.space-between;
                                 Text {
                                     text: @tr("GPU Fan:");
-                                    color: Palette.control-foreground;
+                                    color: Theme.text-secondary;
                                 }
                                 Text {
                                     text: SystemPageData.gpu_fan_rpm + " RPM";
                                     font-weight: 700;
-                                    color: Palette.control-foreground;
+                                    color: Theme.text-primary;
                                 }
                             }
 
@@ -427,12 +429,12 @@ export component PageSystem inherits Rectangle {
                                 alignment: LayoutAlignment.space-between;
                                 Text {
                                     text: @tr("Mid Fan:");
-                                    color: Palette.control-foreground;
+                                    color: Theme.text-secondary;
                                 }
                                 Text {
                                     text: SystemPageData.mid_fan_rpm + " RPM";
                                     font-weight: 700;
-                                    color: Palette.control-foreground;
+                                    color: Theme.text-primary;
                                 }
                             }
                             // Elastic spacer to push all layout elements to the top when the columns have mismatched heights
@@ -474,7 +476,7 @@ export component PageSystem inherits Rectangle {
                         Text {
                             font-size: 14px;
                             vertical-alignment: TextVerticalAlignment.center;
-                            color: Palette.control-foreground;
+                            color: Theme.text-primary;
                             text: @tr("Screenpad brightness");
                         }
                     }
@@ -510,15 +512,17 @@ export component PageSystem inherits Rectangle {
             }
 
             Rectangle {
-                background: Palette.alternate-background;
-                border-color: Palette.border;
+                background: Theme.surface;
+                border-color: Theme.card-border;
                 border-width: 1px;
-                border-radius: 2px;
+                border-radius: Theme.border-radius-sm;
                 height: 36px;
                 Text {
-                    font-size: 16px;
-                    color: Palette.control-foreground;
+                    font-size: 15px;
+                    font-weight: 600;
+                    color: Theme.text-primary;
                     horizontal-alignment: TextHorizontalAlignment.center;
+                    vertical-alignment: TextVerticalAlignment.center;
                     text: @tr("Armoury settings");
                 }
             }
@@ -802,7 +806,7 @@ export component PageSystem inherits Rectangle {
     if root.show_fade_cover: Rectangle {
         width: 100%;
         height: 100%;
-        background: Palette.background;
+        background: Theme.app-bg;
         opacity: 0.9;
         TouchArea {
             height: 100%;
@@ -818,10 +822,16 @@ export component PageSystem inherits Rectangle {
     }
 
     if root.show_throttle_advanced: Rectangle {
-        background: Palette.background;
+        background: Theme.app-bg;
         width: 100%;
         height: 100%;
         opacity: 1;
+
+        TouchArea {
+            // Consume clicks on empty background space so they don't pass through to show_fade_cover
+            clicked => {}
+        }
+
         ScrollView {
             VerticalLayout {
                 alignment: start;

@@ -1,11 +1,17 @@
 import { Palette, VerticalBox , StandardButton, Button, HorizontalBox, ComboBox, Switch, Slider} from "std-widgets.slint";
+import { Theme } from "../globals.slint";
 
 export component RogItem inherits Rectangle {
-    border-color: Palette.border;
+    in property <length> item-max-height: 48px;
+    border-color: Theme.card-border;
     border-width: 1px;
-    border-radius: 2px;
+    border-radius: Theme.border-radius-md;
+    background: Theme.card-bg;
     min-height: 44px;
-    max-height: 44px;
+    max-height: root.item-max-height;
+
+    animate background { duration: 180ms; easing: ease-in-out; }
+    animate border-color { duration: 180ms; easing: ease-in-out; }
 }
 
 export component SystemSlider inherits RogItem {
@@ -31,7 +37,7 @@ export component SystemSlider inherits RogItem {
                 Text {
                     font-size: 14px;
                     vertical-alignment: TextVerticalAlignment.center;
-                    color: Palette.control-foreground;
+                    color: Theme.text-primary;
                     text: root.text;
                 }
 
@@ -39,7 +45,7 @@ export component SystemSlider inherits RogItem {
                     font-size: 14px;
                     horizontal-alignment: TextHorizontalAlignment.right;
                     vertical-alignment: TextVerticalAlignment.center;
-                    color: Palette.control-foreground;
+                    color: Theme.text-primary;
                     text: "\{Math.round(root.value)}";
                 }
             }
@@ -65,8 +71,8 @@ export component SystemSlider inherits RogItem {
                 drop-shadow-blur: 10px;
                 drop-shadow-color: black;
                 border-radius: 10px;
-                border-color: Palette.accent-background;
-                background: Palette.background;
+                border-color: Theme.accent;
+                background: Theme.card-bg;
                 Dialog {
                     title: root.title;
                     VerticalBox {
@@ -80,8 +86,7 @@ export component SystemSlider inherits RogItem {
 
                         Rectangle {
                             height: 1px;
-                            border-color: black;
-                            border-width: 1px;
+                            background: Theme.card-border;
                         }
 
                         Text {
@@ -89,11 +94,12 @@ export component SystemSlider inherits RogItem {
                             font-size: 16px;
                             wrap: TextWrap.word-wrap;
                             text: root.help_text;
+                            color: Theme.text-primary;
                         }
-                    }
 
-                    StandardButton {
-                        kind: ok;
+                        StandardButton {
+                            kind: ok;
+                        }
                     }
                 }
             }
@@ -102,6 +108,7 @@ export component SystemSlider inherits RogItem {
         help := HorizontalBox {
             if (help_text != ""): StandardButton {
                 kind: StandardButtonKind.help;
+                enabled: root.enabled;
                 clicked => {
                     help_popup.show();
                 }
@@ -115,8 +122,8 @@ export component SystemSlider inherits RogItem {
                 drop-shadow-blur: 10px;
                 drop-shadow-color: black;
                 border-radius: 10px;
-                border-color: Palette.accent-background;
-                background: Palette.background;
+                border-color: Theme.accent;
+                background: Theme.card-bg;
                 Dialog {
                     Text {
                         max-width: 420px;
@@ -164,7 +171,7 @@ export component SystemToggle inherits RogItem {
             Text {
                 font-size: 14px;
                 vertical-alignment: TextVerticalAlignment.center;
-                color: Palette.control-foreground;
+                color: Theme.text-primary;
                 text: root.text;
             }
         }
@@ -196,7 +203,7 @@ export component SystemToggleInt inherits RogItem {
             Text {
                 font-size: 14px;
                 vertical-alignment: TextVerticalAlignment.center;
-                color: Palette.control-foreground;
+                color: Theme.text-primary;
                 text: root.text;
             }
         }
@@ -227,7 +234,7 @@ export component SystemToggleVert inherits RogItem {
             font-size: 14px;
             vertical-alignment: TextVerticalAlignment.bottom;
             horizontal-alignment: TextHorizontalAlignment.center;
-            color: Palette.control-foreground;
+            color: Theme.text-primary;
             text: root.text;
         }
 
@@ -260,7 +267,7 @@ export component SystemDropdown inherits RogItem {
             Text {
                 font-size: 14px;
                 vertical-alignment: TextVerticalAlignment.center;
-                color: Palette.control-foreground;
+                color: Theme.text-primary;
                 text: root.text;
             }
         }
@@ -295,8 +302,8 @@ export component PopupNotification {
         // TODO: add properties to display
         Rectangle {
             border-width: 2px;
-            border-color: Palette.accent-background;
-            background: Palette.background;
+            border-color: Theme.accent;
+            background: Theme.card-bg;
 
             VerticalLayout {
                 Dialog {
@@ -304,14 +311,14 @@ export component PopupNotification {
                         alignment: start;
                         Text {
                             text: heading;
-                            color: Palette.control-foreground;
+                            color: Theme.text-primary;
                             font-size: 32px;
                             font-weight: 900;
                         }
 
                         Text {
                             text: content;
-                            color: Palette.control-foreground;
+                            color: Theme.text-primary;
                             font-size: 18px;
                         }
                     }
