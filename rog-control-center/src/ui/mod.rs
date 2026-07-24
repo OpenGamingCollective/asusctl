@@ -24,7 +24,7 @@ use crate::ui::setup_fans::setup_fan_curve_page;
 use crate::ui::setup_slash::setup_slash_page;
 use crate::ui::setup_system::{setup_system_page, setup_system_page_callbacks};
 use crate::zbus_proxies::AppState;
-use crate::{AppSettingsPageData, GlobalShortcutStatus, MainWindow};
+use crate::{AppSettingsPageData, GlobalShortcutStatus, MainWindow, Theme};
 
 // this macro sets up:
 // - a link from UI callback -> dbus proxy property
@@ -252,6 +252,18 @@ pub fn setup_app_settings_page(
             super::config::update_autostart(autostart, enable);
         }
     });
+    let config_copy = config.clone();
+    let ui_weak = ui.as_weak();
+    global.on_set_theme_preset(move |preset| {
+        let preset = preset.clamp(0, 3);
+        if let Ok(mut lock) = config_copy.try_lock() {
+            lock.theme_preset = preset;
+            lock.write();
+        }
+        if let Some(ui) = ui_weak.upgrade() {
+            ui.global::<Theme>().set_theme_preset(preset);
+        }
+    });
 
     if let Ok(lock) = config.try_lock() {
         global.set_run_in_background(lock.run_in_background);
@@ -260,6 +272,9 @@ pub fn setup_app_settings_page(
         global.set_enable_dgpu_notifications(lock.notifications.enabled);
         global.set_enable_autostart(lock.enable_autostart);
         global.set_autostart_in_background(super::config::is_autostart_in_background());
+        let preset = lock.theme_preset.clamp(0, 3);
+        global.set_theme_preset(preset);
+        ui.global::<Theme>().set_theme_preset(preset);
     }
 
     global.set_show_global_shortcut_controls(shortcuts.is_some());

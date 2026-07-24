@@ -8,6 +8,14 @@ use crate::{notify::EnabledNotifications, APP_ID};
 const CFG_DIR: &str = "rog";
 const CFG_FILE_NAME: &str = "rog-control-center.cfg";
 
+fn default_accent_hex() -> String {
+    "#dc143c".to_string()
+}
+
+fn default_secondary_hex() -> String {
+    "#161926".to_string()
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
     pub run_in_background: bool,
@@ -17,6 +25,12 @@ pub struct Config {
     pub enable_autostart: bool,
     #[serde(default)]
     pub enable_global_shortcut: bool,
+    #[serde(default)]
+    pub theme_preset: i32,
+    #[serde(default = "default_accent_hex")]
+    pub custom_accent_hex: String,
+    #[serde(default = "default_secondary_hex")]
+    pub custom_secondary_hex: String,
     pub ac_command: String,
     pub bat_command: String,
     pub dark_mode: bool,
@@ -36,6 +50,9 @@ impl Default for Config {
             enable_tray_icon: true,
             enable_autostart: false,
             enable_global_shortcut: false,
+            theme_preset: 0,
+            custom_accent_hex: default_accent_hex(),
+            custom_secondary_hex: default_secondary_hex(),
             dark_mode: true,
             start_fullscreen: false,
             fullscreen_width: 1920,
@@ -94,6 +111,9 @@ impl From<Config461> for Config {
             enable_tray_icon: true,
             enable_autostart: false,
             enable_global_shortcut: false,
+            theme_preset: 0,
+            custom_accent_hex: default_accent_hex(),
+            custom_secondary_hex: default_secondary_hex(),
             ac_command: c.ac_command,
             bat_command: c.bat_command,
             dark_mode: true,

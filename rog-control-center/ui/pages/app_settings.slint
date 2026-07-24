@@ -1,5 +1,6 @@
-import { Palette, Button } from "std-widgets.slint";
-import { SystemToggle } from "../widgets/common.slint";
+import { Palette, Button, LineEdit } from "std-widgets.slint";
+import { SystemToggle, SystemDropdown } from "../widgets/common.slint";
+import { Theme } from "../globals.slint";
 
 export enum GlobalShortcutStatus {
     disabled,
@@ -22,6 +23,10 @@ export global AppSettingsPageData {
     callback set_enable_autostart(bool);
     in-out property <bool> autostart_in_background;
     callback set_autostart_in_background(bool);
+    // Theme preset properties
+    in-out property <int> theme_preset: 0;
+    in-out property <[string]> theme_choices: [@tr("Crimson"), @tr("Cyberpunk Cyan"), @tr("Electric Purple"), @tr("Emerald Green")];
+    callback set_theme_preset(int);
     // Whether the global shortcut controls are shown (false on ROG Ally).
     in-out property <bool> show_global_shortcut_controls;
     in-out property <bool> enable_global_shortcut;
@@ -37,10 +42,23 @@ export global AppSettingsPageData {
 export component PageAppSettings inherits VerticalLayout {
     Rectangle {
         clip: true;
+        background: Theme.app-bg;
 
         mainview := VerticalLayout {
             padding: 10px;
             spacing: 10px;
+
+            SystemDropdown {
+                text: @tr("UI Accent Theme");
+                current_index <=> AppSettingsPageData.theme_preset;
+                current_value: AppSettingsPageData.theme_choices[AppSettingsPageData.theme_preset];
+                model <=> AppSettingsPageData.theme_choices;
+                selected => {
+                    Theme.theme-preset = self.current-index;
+                    AppSettingsPageData.set_theme_preset(self.current-index);
+                }
+            }
+
             SystemToggle {
                 text: @tr("Run in background after closing");
                 checked <=> AppSettingsPageData.run_in_background;
@@ -107,7 +125,7 @@ export component PageAppSettings inherits VerticalLayout {
 
                 Text {
                     vertical-alignment: TextVerticalAlignment.center;
-                    color: Palette.control-foreground;
+                    color: Theme.text-primary;
                     text: {
                         if AppSettingsPageData.global_shortcut_status == GlobalShortcutStatus.starting {
                             @tr("Setting up…")
@@ -138,7 +156,7 @@ export component PageAppSettings inherits VerticalLayout {
             }
 
             Text {
-                color: Palette.accent-background;
+                color: Theme.accent;
                 text: " WIP: some features like notifications are not complete";
             }
         }
