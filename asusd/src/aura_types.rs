@@ -16,6 +16,7 @@ use tokio::sync::Mutex;
 
 use crate::aura_anime::config::AniMeConfig;
 use crate::aura_anime::AniMe;
+use crate::aura_lamparray::LampArray;
 use crate::aura_laptop::config::AuraConfig;
 use crate::aura_laptop::Aura;
 use crate::aura_scsi::config::ScsiConfig;
@@ -37,6 +38,7 @@ pub enum _DeviceHandle {
 #[derive(Clone)]
 pub enum DeviceHandle {
     Aura(Aura),
+    LampArray(LampArray),
     Slash(Slash),
     /// The AniMe devices require USBRaw as they are not HID devices
     AniMe(AniMe),
@@ -207,5 +209,53 @@ impl DeviceHandle {
         };
         aura.do_initialization().await?;
         Ok(Self::Aura(aura))
+    }
+
+    /// Try the HID LampArray (Microsoft HID LampArray usage page) path used by
+    /// I2C-HID controllers on newer ASUS TUF laptops (e.g. FA608WV / ITE5570).
+    /// We open the hidraw R/W, run HIDIOCGRAWINFO and only proceed if the
+    /// device declares ASUS VID 0x0b05 and a whitelisted LampArray PID.
+    pub async fn maybe_lamparray(
+        device: Arc<Mutex<HidRaw>>,
+        prod_id: &str,
+    ) -> Result<Self, RogError> {
+        let dev_path = {
+            let g = device.lock().await;
+            g.devfs_path().clone()
+        };
+        info!("LampArray init: device {dev_path:?} prod_id={prod_id:?}");
+        info!("LampArray init: about to call raw_info on {dev_path:?}");
+        let info_res = {
+            let g = device.lock().await;
+            g.raw_info()
+        };
+        let info = match info_res {
+            Ok(i) => i,
+            Err(e) => {
+                error!("LampArray init: raw_info FAILED on {dev_path:?}: {e:?}");
+                return Err(RogError::Platform(e));
+            }
+        };
+        let vid = (info.vendor as u16) as u32;
+        let pid = (info.product as u16) as u32;
+        let bustype = info.bustype;
+        info!("LampArray init: HIDIOCGRAWINFO {dev_path:?} VID:{vid:04x} PID:{pid:04x} BUSTYPE:{bustype:04x}");
+        if vid != 0x0b05 {
+            return Err(RogError::NotFound(format!("Not ASUS: {vid:04x}")));
+        }
+        if !matches!(pid, 0x19b6) {
+            return Err(RogError::NotFound(format!(
+                "PID {pid:04x} not on LampArray whitelist"
+            )));
+        }
+
+        let aura_type = AuraDeviceType::from(prod_id);
+        info!("Found HID LampArray ASUS keyboard 0b05:{pid:04x}");
+        let mut config = AuraConfig::load_and_update_config(prod_id);
+        config.led_type = aura_type;
+        let lamparray = LampArray::new(device, Arc::new(Mutex::new(config)));
+        lamparray.do_initialization().await?;
+        info!("LampArray ready: 0b05:{pid:04x} on {dev_path:?}");
+        Ok(Self::LampArray(lamparray))
     }
 }
