@@ -1,4 +1,4 @@
-use config_traits::ron;
+use config_traits::toml;
 use rog_anime::error::AnimeError;
 use rog_platform::error::PlatformError;
 use rog_profiles::error::ProfileError;
@@ -94,7 +94,7 @@ pub enum RogError {
     Command(String, #[source] std::io::Error),
 
     #[error("Parse config error: {0}")]
-    ParseRon(#[source] ron::Error),
+    ParseToml(#[source] toml::de::Error),
 }
 
 impl From<ProfileError> for RogError {
@@ -133,9 +133,9 @@ impl From<std::io::Error> for RogError {
     }
 }
 
-impl From<ron::Error> for RogError {
-    fn from(err: ron::Error) -> Self {
-        RogError::ParseRon(err)
+impl From<toml::de::Error> for RogError {
+    fn from(err: toml::de::Error) -> Self {
+        RogError::ParseToml(err)
     }
 }
 
