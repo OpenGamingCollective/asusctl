@@ -81,7 +81,7 @@ sdl2 = { version = "^0.37", default-features = false }
 sg = { git = "https://github.com/flukejones/sg-rs.git" }
 
 [profile.release]
-lto = "fat"
+lto = "thin"
 debug = false
 opt-level = 3
 panic = "abort"
