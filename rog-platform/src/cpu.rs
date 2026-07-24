@@ -58,15 +58,11 @@ impl CPUControl {
                 }
                 match device.attribute_value(ATTR_AVAILABLE_EPP) {
                     Some(g) => info!("{ATTR_AVAILABLE_EPP}: {g:?}"),
-                    None => {
-                        return Err(PlatformError::CPU(format!(
-                            "{ATTR_AVAILABLE_EPP} not found"
-                        )))
-                    }
+                    None => warn!("{ATTR_AVAILABLE_EPP} not found (EPP controls unsupported)"),
                 }
                 match device.attribute_value(ATTR_EPP) {
                     Some(g) => info!("{ATTR_EPP}: {g:?}"),
-                    None => return Err(PlatformError::CPU(format!("{ATTR_EPP} not found"))),
+                    None => warn!("{ATTR_EPP} not found (EPP preference setting unsupported)"),
                 }
                 supported = true;
             }
