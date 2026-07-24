@@ -1,6 +1,7 @@
 import { SystemDropdown, RogItem, SystemToggle, SystemToggleVert } from "../widgets/common.slint";
 import { Palette, Button, ComboBox, VerticalBox, GroupBox } from "std-widgets.slint";
 import { StyleMetrics, Slider, HorizontalBox, TextEdit, SpinBox, LineEdit, ScrollView } from "std-widgets.slint";
+import { Theme } from "../globals.slint";
 import { ColourSlider } from "../widgets/colour_picker.slint";
 import { AuraPageData, AuraDevType, PowerZones, LaptopAuraPower, AuraEffect } from "../types/aura_types.slint";
 import { AuraPowerGroup, AuraPowerGroupOld } from "../widgets/aura_power.slint";
@@ -113,10 +114,13 @@ export component PageAura inherits Rectangle {
 
             HorizontalLayout {
                 spacing: 10px;
-                min-height: 80px;
+                min-height: 90px;
                 max-height: 90px;
                 RogItem {
+                    item-max-height: 90px;
                     VerticalBox {
+                        padding: 6px;
+                        spacing: 4px;
                         Text { text: @tr("Zone"); vertical-alignment: TextVerticalAlignment.center; horizontal-alignment: TextHorizontalAlignment.center; }
                         ComboBox {
                             enabled: false;
@@ -137,7 +141,10 @@ export component PageAura inherits Rectangle {
                     }
                 }
                 RogItem {
+                    item-max-height: 90px;
                     VerticalBox {
+                        padding: 6px;
+                        spacing: 4px;
                         Text { text: @tr("Direction"); vertical-alignment: TextVerticalAlignment.center; horizontal-alignment: TextHorizontalAlignment.center; }
                         ComboBox {
                             enabled: AuraPageData.direction_enabled;
@@ -158,7 +165,10 @@ export component PageAura inherits Rectangle {
                     }
                 }
                 RogItem {
+                    item-max-height: 90px;
                     VerticalBox {
+                        padding: 6px;
+                        spacing: 4px;
                         Text { text: @tr("Speed"); vertical-alignment: TextVerticalAlignment.center; horizontal-alignment: TextHorizontalAlignment.center; }
                         ComboBox {
                             enabled: AuraPageData.speed_enabled;
@@ -192,7 +202,7 @@ export component PageAura inherits Rectangle {
         }
 
         if root.show_fade_cover: Rectangle {
-            background: Palette.background;
+            background: Theme.app-bg;
             opacity: 0.8;
             TouchArea {
                 height: 100%;
@@ -202,7 +212,7 @@ export component PageAura inherits Rectangle {
     }
 
     if root.show_aura_power && AuraPageData.device_type == AuraDevType.New: Rectangle {
-        background: Palette.background;
+        background: Theme.app-bg;
         width: 100%;
         height: 100%;
         opacity: 1;
@@ -246,7 +256,7 @@ export component PageAura inherits Rectangle {
     // appropriately for TUF devices. This ensures the Power Settings panel
     // reflects what the firmware reports for TUF models.
     if root.show_aura_power && AuraPageData.device_type == AuraDevType.Tuf: Rectangle {
-        background: Palette.background;
+        background: Theme.app-bg;
         width: 100%;
         height: 100%;
         opacity: 1;
@@ -285,7 +295,7 @@ export component PageAura inherits Rectangle {
     }
 
     if root.show_aura_power && AuraPageData.device_type == AuraDevType.Old: Rectangle {
-        background: Palette.background;
+        background: Theme.app-bg;
         width: 100%;
         height: 100%;
         opacity: 1;

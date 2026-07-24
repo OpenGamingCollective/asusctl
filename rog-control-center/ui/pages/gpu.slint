@@ -2,6 +2,7 @@ import { Palette, TabWidget, Button, CheckBox, ScrollView } from "std-widgets.sl
 import { Graph, Node } from "../widgets/graph.slint";
 import { SystemToggle, SystemDropdown } from "../widgets/common.slint";
 import { Profile, FanType, FanPageData } from "../types/fan_types.slint";
+import { Theme } from "../globals.slint";
 
 export global GPUPageData {
     in-out property <int> gpu_mode_index: 0; // index into gpu_modes
@@ -36,15 +37,17 @@ export component PageGPU inherits Rectangle {
             spacing: 8px;
 
             Rectangle {
-                background: Palette.alternate-background;
-                border-color: Palette.border;
+                background: Theme.surface;
+                border-color: Theme.card-border;
                 border-width: 1px;
-                border-radius: 2px;
+                border-radius: Theme.border-radius-sm;
                 height: 36px;
                 Text {
-                    font-size: 16px;
-                    color: Palette.control-foreground;
+                    font-size: 15px;
+                    font-weight: 600;
+                    color: Theme.text-primary;
                     horizontal-alignment: TextHorizontalAlignment.center;
+                    vertical-alignment: TextVerticalAlignment.center;
                     text: @tr("Internal/Discrete GPU");
                 }
             }

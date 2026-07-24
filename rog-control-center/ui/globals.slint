@@ -1,8 +1,62 @@
+import { Palette } from "std-widgets.slint";
+
 export global AppSize {
-    out property <length> width: 900px;
-    out property <length> height: 500px;
+    out property <length> width: 960px;
+    out property <length> height: 580px;
+}
+
+export global Theme {
+    in-out property <int> theme-preset: 0; // 0: Crimson, 1: Cyan, 2: Purple, 3: Green, 4: Custom
+    in-out property <color> custom-accent-color: #dc143c;
+    in-out property <color> custom-secondary-color: is-light ? #ffffff : #161926;
+
+    out property <bool> is-light: Palette.color-scheme == ColorScheme.light;
+
+    out property <color> app-bg: is-light ?
+        (theme-preset == 0 ? #f4f6fb : (theme-preset == 1 ? #edf8ff : (theme-preset == 2 ? #f7f4fe : (theme-preset == 3 ? #edfcf5 : #f8fafc.mix(custom-secondary-color, 0.06))))) :
+        (theme-preset == 0 ? #0e1017 : (theme-preset == 1 ? #07111e : (theme-preset == 2 ? #100b1a : (theme-preset == 3 ? #071610 : #090b10.mix(custom-secondary-color, 0.4)))));
+
+    out property <color> surface: is-light ?
+        (theme-preset == 0 ? #ffffff : (theme-preset == 1 ? #f0f7ff : (theme-preset == 2 ? #f5efff : (theme-preset == 3 ? #ecfdf5 : #ffffff.mix(custom-secondary-color, 0.04))))) :
+        (theme-preset == 0 ? #161926 : (theme-preset == 1 ? #0f1c2e : (theme-preset == 2 ? #1a142b : (theme-preset == 3 ? #0f241a : #121622.mix(custom-secondary-color, 0.5)))));
+
+    out property <color> surface-hover: is-light ?
+        (theme-preset == 0 ? #e2e8f0 : (theme-preset == 1 ? #e0f2fe : (theme-preset == 2 ? #f3e8ff : (theme-preset == 3 ? #d1fae5 : #e2e8f0.mix(custom-secondary-color, 0.1))))) :
+        (theme-preset == 0 ? #202436 : (theme-preset == 1 ? #18283f : (theme-preset == 2 ? #261f3e : (theme-preset == 3 ? #173326 : #1b2133.mix(custom-secondary-color, 0.55)))));
+
+    out property <color> card-bg: is-light ?
+        (theme-preset == 0 ? #ffffff : (theme-preset == 1 ? #ffffff : (theme-preset == 2 ? #ffffff : (theme-preset == 3 ? #ffffff : #ffffff)))) :
+        (theme-preset == 0 ? #1c2032 : (theme-preset == 1 ? #132238 : (theme-preset == 2 ? #201a35 : (theme-preset == 3 ? #132c20 : #181d2c.mix(custom-secondary-color, 0.5)))));
+
+    out property <color> card-border: is-light ?
+        (theme-preset == 0 ? #cbd5e1 : (theme-preset == 1 ? #bae6fd : (theme-preset == 2 ? #e9d5ff : (theme-preset == 3 ? #a7f3d0 : #cbd5e1.mix(custom-secondary-color, 0.15))))) :
+        (theme-preset == 0 ? #2a2f45 : (theme-preset == 1 ? #1d3352 : (theme-preset == 2 ? #30274c : (theme-preset == 3 ? #1c4230 : #262d45.mix(custom-secondary-color, 0.6)))));
+
+    out property <color> card-border-hover: is-light ?
+        (theme-preset == 0 ? #94a3b8 : (theme-preset == 1 ? #7dd3fc : (theme-preset == 2 ? #d8b4fe : (theme-preset == 3 ? #6ee7b7 : #94a3b8.mix(custom-accent-color, 0.3))))) :
+        (theme-preset == 0 ? #3d4566 : (theme-preset == 1 ? #294773 : (theme-preset == 2 ? #45376d : (theme-preset == 3 ? #285e44 : #384366.mix(custom-accent-color, 0.4)))));
+
+    out property <color> accent: is-light ?
+        (theme-preset == 0 ? #dc143c : (theme-preset == 1 ? #0284c7 : (theme-preset == 2 ? #9333ea : (theme-preset == 3 ? #059669 : custom-accent-color)))) :
+        (theme-preset == 0 ? #dc143c : (theme-preset == 1 ? #00f0ff : (theme-preset == 2 ? #a855f7 : (theme-preset == 3 ? #10b981 : custom-accent-color))));
+
+    out property <color> accent-hover: is-light ?
+        (theme-preset == 0 ? #b80f32 : (theme-preset == 1 ? #0369a1 : (theme-preset == 2 ? #7e22ce : (theme-preset == 3 ? #047857 : custom-accent-color.darker(0.15))))) :
+        (theme-preset == 0 ? #f01e48 : (theme-preset == 1 ? #33f3ff : (theme-preset == 2 ? #b866ff : (theme-preset == 3 ? #34d399 : custom-accent-color.brighter(0.2)))));
+
+    out property <color> accent-glow: is-light ?
+        (theme-preset == 0 ? #dc143c22 : (theme-preset == 1 ? #0284c722 : (theme-preset == 2 ? #9333ea22 : (theme-preset == 3 ? #05966922 : custom-accent-color.with-alpha(0.18))))) :
+        (theme-preset == 0 ? #dc143c33 : (theme-preset == 1 ? #00f0ff33 : (theme-preset == 2 ? #a855f733 : (theme-preset == 3 ? #10b98133 : custom-accent-color.with-alpha(0.25)))));
+
+    in-out property <color> text-primary: is-light ? #0f172a : #f0f2f8;
+    in-out property <color> text-secondary: is-light ? #475569 : #9aa2b8;
+    in-out property <color> text-muted: is-light ? #94a3b8 : #626b82;
+    in-out property <length> border-radius-sm: 6px;
+    in-out property <length> border-radius-md: 10px;
+    in-out property <length> border-radius-lg: 14px;
 }
 
 export global IconImages {
     //out property <image> two_t: @image-url("images/parameters/2t.png");
 }
+

@@ -1,4 +1,5 @@
 import { Palette, VerticalBox, HorizontalBox, GroupBox } from "std-widgets.slint";
+import { Theme } from "../globals.slint";
 import { SystemToggleVert, SystemDropdown } from "common.slint";
 import { PowerZones } from "../types/aura_types.slint";
 
@@ -19,7 +20,7 @@ export component AuraPowerGroup inherits Rectangle {
         spacing: 10px;
         Text {
             font-size: 18px;
-            color: Palette.alternate-foreground;
+            color: Theme.text-secondary;
             horizontal-alignment: TextHorizontalAlignment.center;
             text <=> root.group-title;
         }
@@ -88,7 +89,7 @@ export component AuraPowerGroupOld inherits Rectangle {
         spacing: 10px;
         Text {
             font-size: 18px;
-            color: Palette.alternate-foreground;
+            color: Theme.text-secondary;
             horizontal-alignment: TextHorizontalAlignment.center;
             text <=> root.group-title;
         }

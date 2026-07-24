@@ -1,5 +1,5 @@
 import { Palette, Button, VerticalBox } from "std-widgets.slint";
-import { AppSize } from "globals.slint";
+import { AppSize, Theme } from "globals.slint";
 import { PageSystem, SystemPageData, AttrMinMax } from "pages/system.slint";
 import { SideBar } from "widgets/sidebar.slint";
 import { PageAbout } from "pages/about.slint";
@@ -18,7 +18,7 @@ import { AuraPageData, AuraDevType, LaptopAuraPower, AuraPowerState, PowerZones,
 export { AuraPageData, AuraDevType, LaptopAuraPower, AuraPowerState, PowerZones, AuraEffect }
 import { PageAppSettings, AppSettingsPageData, GlobalShortcutStatus } from "pages/app_settings.slint";
 
-export { AppSize, AttrMinMax, SystemPageData, AnimePageData, SlashPageData, AppSettingsPageData, GlobalShortcutStatus, GPUPageData }
+export { AppSize, Theme, AttrMinMax, SystemPageData, AnimePageData, SlashPageData, AppSettingsPageData, GlobalShortcutStatus, GPUPageData }
 
 export component MainWindow inherits Window {
     title: "ROG Control";
@@ -69,7 +69,7 @@ export component MainWindow inherits Window {
     }
     min-height: AppSize.height;
     min-width: AppSize.width;
-    background: Palette.alternate-background;
+    background: Theme.app-bg;
 
     HorizontalLayout {
         padding: 0px;
@@ -102,7 +102,7 @@ export component MainWindow inherits Window {
         }
 
         Rectangle {
-            background: Palette.background;
+            background: Theme.app-bg;
             if(side-bar.current-item == 0): page := PageSystem {
                 width: root.width - side-bar.width;
                 height: root.height + 12px;
@@ -162,7 +162,7 @@ export component MainWindow inherits Window {
                 width: root.width - side-bar.width;
                 height: 40px;
                 opacity: 1.0;
-                background: Palette.selection-background;
+                background: Theme.accent;
                 clip: true;
                 TouchArea {
                     height: 100%;
@@ -175,9 +175,9 @@ export component MainWindow inherits Window {
                 Rectangle {
                     height: 100%;
                     width: 100%;
-                    background: Palette.control-background;
+                    background: Theme.surface;
                     Text {
-                        color: Palette.control-foreground;
+                        color: Theme.text-primary;
                         text: root.toast_text;
                     }
                 }
@@ -205,7 +205,6 @@ export component MainWindow inherits Window {
         }
     }
 
-
     // // TODO: or use Dialogue
     if show_notif: Rectangle {
         x: root.width / 8;
@@ -225,7 +224,7 @@ export component MainWindow inherits Window {
         Rectangle {
             height: 100%;
             width: 100%;
-            background: Palette.background;
+            background: Theme.app-bg;
             Text {
                 text: "Click here to exit";
             }
@@ -237,8 +236,8 @@ export component MainWindow inherits Window {
         y: 0px;
         width: root.width;
         height: root.height;
-        background: Palette.background;
-        border-color: Palette.border;
+        background: Theme.app-bg;
+        border-color: Theme.card-border;
         border-width: 3px;
         border-radius: 10px;
 

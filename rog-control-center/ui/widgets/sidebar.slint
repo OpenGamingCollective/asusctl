@@ -2,44 +2,45 @@
 // SPDX-License-Identifier: MIT
 
 import { Palette, HorizontalBox, VerticalBox } from "std-widgets.slint";
+import { Theme } from "../globals.slint";
 
 component SideBarItem inherits Rectangle {
     in property <bool> selected;
     in property <bool> has-focus;
     in-out property <string> text <=> label.text;
     callback clicked <=> touch.clicked;
-    min-height: self.visible ? l.preferred-height + 10px : 0px;
-    // min-width: self.visible ? l.preferred-width + 10px : 0px;
-    states [
-        pressed when touch.pressed: {
-            state.opacity: 0.8;
-        }
-        hover when touch.has-hover: {
-            state.opacity: 0.6;
-        }
-        selected when root.selected: {
-            state.opacity: 1;
-        }
-        focused when root.has-focus: {
-            state.opacity: 0.8;
-        }
-    ]
+    min-height: self.visible ? 38px : 0px;
+    border-radius: Theme.border-radius-sm;
 
-    state := Rectangle {
-        opacity: 0;
-        background: Palette.selection-background;
-        animate opacity { duration: 150ms; }
-        height: l.preferred-height;
+    background: selected ? Theme.accent-glow : (touch.has-hover ? Theme.surface-hover : transparent);
+
+    animate background { duration: 180ms; easing: ease-in-out; }
+
+    // Active selection indicator bar on the left
+    indicator := Rectangle {
+        x: 2px;
+        y: (parent.height - self.height) / 2;
+        width: selected ? 4px : 0px;
+        height: selected ? 22px : 0px;
+        border-radius: 2px;
+        background: Theme.accent;
+        drop-shadow-color: Theme.accent-glow;
+        drop-shadow-blur: selected ? 8px : 0px;
+
+        animate width, height, opacity { duration: 200ms; easing: ease-out; }
     }
 
     l := HorizontalBox {
-        x: 4px;
+        x: 12px;
         y: (parent.height - self.height) / 2;
         spacing: 0px;
         label := Text {
-            color: Palette.foreground;
+            color: root.selected ? Theme.text-primary : (touch.has-hover ? Theme.text-primary : Theme.text-secondary);
             vertical-alignment: center;
-            font-size: 14px;
+            font-size: 13px;
+            font-weight: root.selected ? 700 : 500;
+
+            animate color { duration: 180ms; easing: ease-in-out; }
         }
     }
 
@@ -62,7 +63,7 @@ export component SideBar inherits Rectangle {
     accessible-role: tab;
     accessible-delegate-focus: root.current-focused >= 0 ? root.current-focused : root.current-item;
     Rectangle {
-        background: Palette.alternate-background;
+        background: Theme.surface;
         fs := FocusScope {
             key-pressed(event) => {
                 if (event.text == "\n") {
@@ -94,12 +95,15 @@ export component SideBar inherits Rectangle {
     }
 
     VerticalBox {
-        spacing: 4px;
-        padding: 0px;
+        spacing: 6px;
+        padding-left: 6px;
+        padding-right: 6px;
+        padding-top: 8px;
+        padding-bottom: 8px;
         alignment: start;
 
         Image {
-            height: 100px;
+            height: 90px;
             // TODO: change if TUF on the logo in the menu on the main page
             // If running on a TUF model, replace the ROG red with TUF orange
             // (add data/tuf-control-center.png and switch here when available)
@@ -110,11 +114,11 @@ export component SideBar inherits Rectangle {
 
         Rectangle {
             height: 1px;
-            background: Palette.border;
+            background: Theme.card-border;
         }
 
         navigation := VerticalLayout {
-            spacing: -6px;
+            spacing: 3px;
             alignment: start;
             vertical-stretch: 0;
             for item[index] in root.model: SideBarItem {
