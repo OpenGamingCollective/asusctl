@@ -1,4 +1,4 @@
-use std::fs::create_dir;
+use std::fs::create_dir_all;
 
 use config_traits::{StdConfig, StdConfigLoad1};
 use serde::{Deserialize, Serialize};
@@ -63,7 +63,7 @@ impl StdConfig for Config {
 
         path.push(CFG_DIR);
         if !path.exists() {
-            create_dir(path.clone())
+            create_dir_all(path.clone())
                 .map_err(|e| log::error!("Could not create config dir: {e}"))
                 .ok();
             log::info!("Created {path:?}");

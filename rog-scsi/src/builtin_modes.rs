@@ -26,7 +26,7 @@ impl FromStr for Colour {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.len() < 6 {
+        if s.len() < 6 || !s.chars().take(6).all(|c| c.is_ascii_hexdigit()) {
             return Err(Error::ParseColour);
         }
         let r = u8::from_str_radix(&s[0..2], 16).or(Err(Error::ParseColour))?;

@@ -7,27 +7,12 @@ use zbus::zvariant::Type;
 use crate::error::ProfileError;
 use crate::FanCurvePU;
 
-fn set_sysfs_name(string: &mut [u8], fan: char, index: usize) {
-    string[3] = fan as u8;
-    string[15] = char::from_digit(index as u32 + 1, 10).unwrap() as u8;
-}
-
 pub(crate) fn pwm_str(fan: char, index: usize) -> String {
-    // The char 'X' is replaced via indexing
-    let mut string = "pwmX_auto_pointX_pwm".to_owned();
-    unsafe {
-        set_sysfs_name(string.as_bytes_mut(), fan, index);
-    }
-    string
+    format!("pwm{fan}_auto_point{}_pwm", index + 1)
 }
 
 pub(crate) fn temp_str(fan: char, index: usize) -> String {
-    // The char 'X' is replaced via indexing
-    let mut string = "pwmX_auto_pointX_temp".to_owned();
-    unsafe {
-        set_sysfs_name(string.as_bytes_mut(), fan, index);
-    }
-    string
+    format!("pwm{fan}_auto_point{}_temp", index + 1)
 }
 
 #[cfg_attr(feature = "dbus", derive(Type))]
@@ -138,10 +123,16 @@ impl CurveData {
 
     fn set_val_from_attr(tmp: &str, device: &Device, buf: &mut [u8; 8]) {
         if let Some(n) = tmp.chars().nth(15) {
-            let i = n.to_digit(10).unwrap() as usize;
-            let d = device.attribute_value(tmp).unwrap();
-            let d: u8 = d.to_string_lossy().parse().unwrap();
-            buf[i - 1] = d;
+            if let Some(digit) = n.to_digit(10) {
+                let i = digit as usize;
+                if (1..=8).contains(&i) {
+                    if let Some(val_str) = device.attribute_value(tmp) {
+                        if let Ok(d) = val_str.to_string_lossy().trim().parse::<u8>() {
+                            buf[i - 1] = d;
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -192,10 +183,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn curve_data_from_str_to_str() {
+    fn curve_data_from_str_to_str() -> Result<(), Box<dyn std::error::Error>> {
         let mut curve =
-            CurveData::from_str("30c:1%,49c:2%,59c:3%,69c:4%,79c:31%,89c:49%,99c:56%,109c:58%")
-                .unwrap();
+            CurveData::from_str("30c:1%,49c:2%,59c:3%,69c:4%,79c:31%,89c:49%,99c:56%,109c:58%")?;
         curve.enabled = true;
         assert_eq!(curve.fan, FanCurvePU::CPU);
         assert_eq!(curve.temp, [30, 49, 59, 69, 79, 89, 99, 109]);
@@ -211,14 +201,16 @@ mod tests {
         let curve = CurveData::from_str("30c:1%,49c:2%,59c:3%,69c:4%,79c:31%,89c:49%,99c:56%");
 
         assert!(curve.is_err());
+        Ok(())
     }
 
     #[test]
-    fn curve_data_from_str_simple() {
-        let curve = CurveData::from_str("30:1,49:2,59:3,69:4,79:31,89:49,99:56,109:58").unwrap();
+    fn curve_data_from_str_simple() -> Result<(), Box<dyn std::error::Error>> {
+        let curve = CurveData::from_str("30:1,49:2,59:3,69:4,79:31,89:49,99:56,109:58")?;
         assert_eq!(curve.fan, FanCurvePU::CPU);
         assert_eq!(curve.temp, [30, 49, 59, 69, 79, 89, 99, 109]);
         assert_eq!(curve.pwm, [1, 2, 3, 4, 31, 49, 56, 58]);
+        Ok(())
     }
 
     #[test]

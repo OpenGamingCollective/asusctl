@@ -254,14 +254,18 @@ fn handle_info(
         );
         if let Ok(aura) = find_iface::<AuraProxyBlocking>("xyz.ljones.Aura") {
             // TODO: multiple RGB check
-            let bright = aura.first().unwrap().supported_brightness()?;
-            let modes = aura.first().unwrap().supported_basic_modes()?;
-            let zones = aura.first().unwrap().supported_basic_zones()?;
-            let power = aura.first().unwrap().supported_power_zones()?;
-            println!("Supported Keyboard Brightness:\n{:#?}", bright);
-            println!("Supported Aura Modes:\n{:#?}", modes);
-            println!("Supported Aura Zones:\n{:#?}", zones);
-            println!("Supported Aura Power Zones:\n{:#?}", power);
+            if let Some(first_aura) = aura.first() {
+                let bright = first_aura.supported_brightness()?;
+                let modes = first_aura.supported_basic_modes()?;
+                let zones = first_aura.supported_basic_zones()?;
+                let power = first_aura.supported_power_zones()?;
+                println!("Supported Keyboard Brightness:\n{:#?}", bright);
+                println!("Supported Aura Modes:\n{:#?}", modes);
+                println!("Supported Aura Zones:\n{:#?}", zones);
+                println!("Supported Aura Power Zones:\n{:#?}", power);
+            } else {
+                println!("No aura interface found");
+            }
         } else {
             println!("No aura interface found");
         }
@@ -612,10 +616,12 @@ fn handle_led_mode(mode: &LedModeCommand) -> Result<(), Box<dyn std::error::Erro
         println!("Missing arg or command; run 'asusctl aura --help' for usage");
         // print available modes when possible
         if let Ok(aura) = find_iface::<AuraProxyBlocking>("xyz.ljones.Aura") {
-            let modes = aura.first().unwrap().supported_basic_modes()?;
-            println!("Available modes:");
-            for m in modes {
-                println!("  {:?}", m);
+            if let Some(first_aura) = aura.first() {
+                let modes = first_aura.supported_basic_modes()?;
+                println!("Available modes:");
+                for m in modes {
+                    println!("  {:?}", m);
+                }
             }
         }
         return Ok(());
@@ -1003,17 +1009,23 @@ fn handle_armoury_command(cmd: &ArmouryCommand) -> Result<(), Box<dyn std::error
             Ok(())
         }
         ArmourySubCommand::Get(g) => {
+            let mut found = false;
             if let Ok(attrs) = find_iface::<AsusArmouryProxyBlocking>("xyz.ljones.AsusArmoury") {
                 for attr in attrs.iter() {
                     let name = attr.name()?;
                     if <&str>::from(name) == g.property {
                         print_firmware_attr(attr)?;
+                        found = true;
                     }
                 }
+            }
+            if !found {
+                return Err(format!("Firmware attribute '{}' not found", g.property).into());
             }
             Ok(())
         }
         ArmourySubCommand::Set(s) => {
+            let mut found = false;
             if let Ok(attrs) = find_iface::<AsusArmouryProxyBlocking>("xyz.ljones.AsusArmoury") {
                 for attr in attrs.iter() {
                     let name = attr.name()?;
@@ -1025,8 +1037,12 @@ fn handle_armoury_command(cmd: &ArmouryCommand) -> Result<(), Box<dyn std::error
                         }
                         attr.set_current_value(value)?;
                         print_firmware_attr(attr)?;
+                        found = true;
                     }
                 }
+            }
+            if !found {
+                return Err(format!("Firmware attribute '{}' not found", s.property).into());
             }
             Ok(())
         }

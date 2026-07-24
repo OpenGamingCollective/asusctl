@@ -58,15 +58,11 @@ impl CPUControl {
                 }
                 match device.attribute_value(ATTR_AVAILABLE_EPP) {
                     Some(g) => info!("{ATTR_AVAILABLE_EPP}: {g:?}"),
-                    None => {
-                        return Err(PlatformError::CPU(format!(
-                            "{ATTR_AVAILABLE_EPP} not found"
-                        )))
-                    }
+                    None => warn!("{ATTR_AVAILABLE_EPP} not found (EPP controls unsupported)"),
                 }
                 match device.attribute_value(ATTR_EPP) {
                     Some(g) => info!("{ATTR_EPP}: {g:?}"),
-                    None => return Err(PlatformError::CPU(format!("{ATTR_EPP} not found"))),
+                    None => warn!("{ATTR_EPP} not found (EPP preference setting unsupported)"),
                 }
                 supported = true;
             }
@@ -392,20 +388,20 @@ mod tests {
 
     #[test]
     #[ignore = "Can't run this in a docker image"]
-    fn check_cpu() {
-        let cpu = CPUControl::new().unwrap();
-        assert_eq!(cpu.get_governor().unwrap(), CPUGovernor::Powersave);
+    fn check_cpu() -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let cpu = CPUControl::new()?;
+        assert_eq!(cpu.get_governor()?, CPUGovernor::Powersave);
         assert_eq!(
-            cpu.get_available_governors().unwrap(),
+            cpu.get_available_governors()?,
             vec![
                 CPUGovernor::Performance,
                 CPUGovernor::Powersave
             ]
         );
 
-        assert_eq!(cpu.get_epp().unwrap(), CPUEPP::BalancePower);
+        assert_eq!(cpu.get_epp()?, CPUEPP::BalancePower);
         assert_eq!(
-            cpu.get_available_epp().unwrap(),
+            cpu.get_available_epp()?,
             vec![
                 CPUEPP::Default,
                 CPUEPP::Performance,
@@ -414,5 +410,6 @@ mod tests {
                 CPUEPP::Power,
             ]
         );
+        Ok(())
     }
 }

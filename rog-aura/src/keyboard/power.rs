@@ -218,8 +218,9 @@ impl LaptopAuraPower {
             AuraDeviceType::LaptopKeyboardTuf => Self {
                 states: vec![AuraPowerState::default_for(PowerZones::Keyboard)],
             },
-            AuraDeviceType::ScsiExtDisk => todo!(),
-            AuraDeviceType::AnimeOrSlash => todo!(),
+            AuraDeviceType::ScsiExtDisk | AuraDeviceType::AnimeOrSlash => {
+                Self { states: Vec::new() }
+            }
         }
     }
 
@@ -266,8 +267,13 @@ impl LaptopAuraPower {
                 warn!("Trying to create bytes for an unknown device");
                 self.new_to_bytes()
             }
-            AuraDeviceType::ScsiExtDisk => todo!("scsi disk not implemented yet"),
-            AuraDeviceType::AnimeOrSlash => todo!("anime/slash not implemented yet"),
+            AuraDeviceType::ScsiExtDisk | AuraDeviceType::AnimeOrSlash => {
+                warn!(
+                    "Power state bytes not implemented for device type: {:?}",
+                    aura_type
+                );
+                Vec::new()
+            }
         }
     }
 }

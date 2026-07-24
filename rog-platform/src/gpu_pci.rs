@@ -408,6 +408,9 @@ pub fn find_connected_displays(gpu_path: &Path) -> Result<Vec<String>> {
 pub fn find_slot_power(address: &str) -> Result<PathBuf> {
     let mut buf = Vec::new();
     let path = PathBuf::from(SLOTS);
+    if !path.exists() {
+        return Err(PlatformError::NotSupported);
+    }
     for path in path.read_dir().map_err(PlatformError::Io)? {
         let path = path.map_err(PlatformError::Io)?.path();
 
