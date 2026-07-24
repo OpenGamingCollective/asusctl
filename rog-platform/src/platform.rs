@@ -1,6 +1,5 @@
 use std::fmt::Display;
 use std::path::PathBuf;
-use std::str::FromStr;
 
 use log::{info, warn};
 use serde::{Deserialize, Serialize};
@@ -59,7 +58,7 @@ impl RogPlatform {
             info!("Found platform support at {:?}", device.sysname());
             return Ok(Self {
                 path: device.syspath().to_owned(),
-                pp_path: PathBuf::from_str("/sys/firmware/acpi").unwrap(),
+                pp_path: PathBuf::from("/sys/firmware/acpi"),
             });
         }
         Err(PlatformError::MissingFunction(

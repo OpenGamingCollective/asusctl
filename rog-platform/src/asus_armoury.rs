@@ -219,7 +219,10 @@ impl FirmwareAttributes {
         if let Ok(dir) = read_dir(BASE_DIR) {
             for entry in dir.flatten() {
                 let base_path = entry.path();
-                let name = base_path.file_name().unwrap().to_string_lossy().to_string();
+                let Some(name_os) = base_path.file_name() else {
+                    continue;
+                };
+                let name = name_os.to_string_lossy().to_string();
                 if name == "pending_reboot" {
                     continue;
                 }
