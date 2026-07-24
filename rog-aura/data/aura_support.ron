@@ -1,5 +1,14 @@
 ([
     (
+        device_name: "FA401WU",
+        product_id: "",
+        layout_name: "ga401q",
+        basic_modes: [Static, Breathe, RainbowCycle, RainbowWave, Pulse],
+        basic_zones: [],
+        advanced_type: r#None,
+        power_zones: [Keyboard],
+    ),
+    (
         device_name: "FA506I",
         product_id: "",
         layout_name: "fa506i",
