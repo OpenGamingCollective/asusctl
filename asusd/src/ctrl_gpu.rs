@@ -4,6 +4,7 @@
 //! and exposes it over D-Bus for the tray icon and other clients.
 
 use log::{error, info, warn};
+use mio::{Events, Interest, Poll, Token};
 use rog_platform::gpu_pci::{GfxPower, GfxVendor};
 use zbus::object_server::SignalEmitter;
 use zbus::{interface, Connection};
@@ -49,6 +50,14 @@ impl CtrlGpu {
     fn detect_gpu() -> (GfxPower, GfxVendor, Option<std::path::PathBuf>) {
         use rog_platform::gpu_pci::Device;
 
+        // Check ASUS dgpu_disable first. If the dGPU is disabled, it won't appear on the PCI bus.
+        if rog_platform::gpu_pci::asus_dgpu_disable_exists() {
+            if let Ok(true) = rog_platform::gpu_pci::asus_dgpu_disabled() {
+                return (GfxPower::AsusDisabled, GfxVendor::AsusDgpuDisabled, None);
+            }
+        }
+
+        // dGPU is not disabled, scan PCI bus to find it
         let devices = Device::find().unwrap_or_default();
 
         if let Some(dgpu) = devices.iter().find(|d| d.is_dgpu()) {
@@ -69,14 +78,7 @@ impl CtrlGpu {
             return (GfxPower::Unknown, vendor, runtime_path);
         }
 
-        // No dGPU devices — check ASUS-specific attributes
-        if rog_platform::gpu_pci::asus_dgpu_disable_exists() {
-            if let Ok(disabled) = rog_platform::gpu_pci::asus_dgpu_disabled() {
-                if disabled {
-                    return (GfxPower::AsusDisabled, GfxVendor::AsusDgpuDisabled, None);
-                }
-            }
-        }
+        // No dGPU found, check if we're in MUX discreet mode
         if rog_platform::gpu_pci::asus_gpu_mux_exists() {
             if let Ok(discreet) = rog_platform::gpu_pci::asus_gpu_mux_discreet() {
                 if discreet {
@@ -164,27 +166,26 @@ impl CtrlGpu {
     /// Spawn the inotify watcher for GPU power status changes.
     ///
     /// This watches the dGPU's `runtime_status` sysfs file. If no dGPU path
-    /// is available (e.g. dGPU disabled via ASUS attribute), we fall back to
-    /// periodic re-detection every 3 seconds to handle hotplug scenarios.
+    /// is available (e.g. dGPU disabled via ASUS attribute), the watcher will
+    /// wait for a PCI hotplug event via udev to re-detect the GPU.
     pub async fn start_watcher(&self, signal_ctxt: SignalEmitter<'static>) -> Result<(), RogError> {
-        let ctrl_inotify = self.clone();
-        let ctrl_fallback = self.clone();
-        let path = self.dgpu_runtime_status_path.clone();
+        let ctrl = self.clone();
 
         tokio::spawn(async move {
-            if let Some(runtime_path) = path {
-                // inotify-based monitoring of the runtime_status sysfs file
-                info!("CtrlGpu: starting inotify watcher on {:?}", runtime_path);
-                let mut ctrl = ctrl_inotify;
-                let mut buffer = [0u8; 32];
+            let mut ctrl = ctrl;
 
-                loop {
+            loop {
+                if let Some(runtime_path) = ctrl.dgpu_runtime_status_path.clone() {
+                    // inotify-based monitoring of the runtime_status sysfs file
+                    info!("CtrlGpu: starting inotify watcher on {:?}", runtime_path);
+                    let mut buffer = [0u8; 32];
+
                     let inotify = match inotify::Inotify::init() {
                         Ok(i) => i,
                         Err(e) => {
                             error!("CtrlGpu: failed to init inotify: {e}");
-                            // Fall back to polling
-                            break;
+                            tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                            continue;
                         }
                     };
 
@@ -203,7 +204,6 @@ impl CtrlGpu {
                                 .emit("xyz.ljones.Gpu", "PowerStatusChanged", &(status_str,))
                                 .await;
                         }
-                        // Wait a bit before retrying
                         tokio::time::sleep(std::time::Duration::from_secs(3)).await;
                         continue;
                     }
@@ -225,26 +225,22 @@ impl CtrlGpu {
                                     warn!("CtrlGpu: runtime_status deleted, re-detecting");
                                     break;
                                 }
-                                // Read new power status
-                                if let Some(dgpu) = rog_platform::gpu_pci::Device::find()
-                                    .unwrap_or_default()
-                                    .iter()
-                                    .find(|d| d.is_dgpu())
-                                {
-                                    if let Ok(new_power) = dgpu.get_runtime_status() {
-                                        if new_power != ctrl.power_status {
-                                            info!("CtrlGpu: power status changed to {new_power:?}");
-                                            ctrl.power_status = new_power;
-                                            let status_str: &str = (&ctrl.power_status).into();
-                                            let _ = signal_ctxt
-                                                .emit(
-                                                    "xyz.ljones.Gpu",
-                                                    "PowerStatusChanged",
-                                                    &(status_str,),
-                                                )
-                                                .await;
-                                        }
-                                    }
+                                // Read new power status directly from sysfs
+                                let new_power = std::fs::read_to_string(&runtime_path)
+                                    .ok()
+                                    .and_then(|s| s.parse::<GfxPower>().ok())
+                                    .unwrap_or(GfxPower::Unknown);
+                                if new_power != ctrl.power_status {
+                                    info!("CtrlGpu: power status changed to {new_power:?}");
+                                    ctrl.power_status = new_power;
+                                    let status_str: &str = (&ctrl.power_status).into();
+                                    let _ = signal_ctxt
+                                        .emit(
+                                            "xyz.ljones.Gpu",
+                                            "PowerStatusChanged",
+                                            &(status_str,),
+                                        )
+                                        .await;
                                 }
                             }
                             Err(e) => {
@@ -253,20 +249,87 @@ impl CtrlGpu {
                             }
                         }
                     }
-                }
-            }
 
-            // Fallback: periodic re-detection (for when no inotify path is available,
-            // or when inotify loop exited)
-            info!("CtrlGpu: starting periodic re-detection (every 3s)");
-            let mut ctrl = ctrl_fallback;
-            loop {
-                tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-                if ctrl.redetect() {
-                    let status_str: &str = (&ctrl.power_status).into();
-                    let _ = signal_ctxt
-                        .emit("xyz.ljones.Gpu", "PowerStatusChanged", &(status_str,))
-                        .await;
+                    if ctrl.redetect() {
+                        let status_str: &str = (&ctrl.power_status).into();
+                        let _ = signal_ctxt
+                            .emit("xyz.ljones.Gpu", "PowerStatusChanged", &(status_str,))
+                            .await;
+                    }
+                    continue;
+                }
+
+                // No dGPU path available, wait for PCI hotplug event via udev
+                info!("CtrlGpu: waiting for PCI hotplug event via udev...");
+                let hotplugged = tokio::task::spawn_blocking(|| {
+                    let mut monitor = match udev::MonitorBuilder::new() {
+                        Ok(builder) => match builder.match_subsystem("pci") {
+                            Ok(builder) => match builder.listen() {
+                                Ok(m) => m,
+                                Err(e) => {
+                                    error!("CtrlGpu: failed to listen to udev: {e}");
+                                    return false;
+                                }
+                            },
+                            Err(e) => {
+                                error!("CtrlGpu: failed to match subsystem: {e}");
+                                return false;
+                            }
+                        },
+                        Err(e) => {
+                            error!("CtrlGpu: failed to create MonitorBuilder: {e}");
+                            return false;
+                        }
+                    };
+
+                    // Block until the kernel signals that a udev event is available
+                    let mut poll = match Poll::new() {
+                        Ok(p) => p,
+                        Err(e) => {
+                            error!("CtrlGpu: failed to create mio::Poll: {e}");
+                            return false;
+                        }
+                    };
+                    let mut events = Events::with_capacity(1);
+                    const UDEV: Token = Token(0);
+
+                    if let Err(e) = poll.registry().register(
+                        &mut monitor,
+                        UDEV,
+                        Interest::READABLE,
+                    ) {
+                        error!("CtrlGpu: failed to register udev monitor with mio: {e}");
+                        return false;
+                    }
+
+                    loop {
+                        if let Err(e) = poll.poll(&mut events, None) {
+                            error!("CtrlGpu: mio poll failed: {e}");
+                            return false;
+                        }
+                        for event in monitor.iter() {
+                            if let Some(action) = event.action() {
+                                if action.to_str() == Some("add") {
+                                    info!("CtrlGpu: PCI device added via hotplug");
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                })
+                .await
+                .unwrap_or(false);
+
+                if hotplugged {
+                    if ctrl.redetect() {
+                        let status_str: &str = (&ctrl.power_status).into();
+                        let _ = signal_ctxt
+                            .emit("xyz.ljones.Gpu", "PowerStatusChanged", &(status_str,))
+                            .await;
+                    }
+                } else {
+                    // udev monitor setup failed, back off before retrying
+                    tokio::time::sleep(std::time::Duration::from_secs(30)).await;
                 }
             }
         });
