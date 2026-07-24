@@ -2,7 +2,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
-"POT-Creation-Date: 2026-07-24 15:15+0000\n"
+"POT-Creation-Date: 2026-07-24 15:02+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -82,71 +82,6 @@ msgctxt "PageAbout"
 msgid ""
 "      Source Code: https://github.com/OpenGamingCollective/asusctl\n      "
 "Website: https://asus-linux.org/"
-msgstr ""
-
-#: rog-control-center/ui/pages/app_settings.slint:45
-msgctxt "PageAppSettings"
-msgid "Run in background after closing"
-msgstr ""
-
-#: rog-control-center/ui/pages/app_settings.slint:53
-msgctxt "PageAppSettings"
-msgid "Start app in background (UI closed)"
-msgstr ""
-
-#: rog-control-center/ui/pages/app_settings.slint:61
-msgctxt "PageAppSettings"
-msgid "Enable system tray icon"
-msgstr ""
-
-#: rog-control-center/ui/pages/app_settings.slint:69
-msgctxt "PageAppSettings"
-msgid "Enable dGPU notifications"
-msgstr ""
-
-#: rog-control-center/ui/pages/app_settings.slint:77
-msgctxt "PageAppSettings"
-msgid "Start app on system startup"
-msgstr ""
-
-#: rog-control-center/ui/pages/app_settings.slint:87
-msgctxt "PageAppSettings"
-msgid "Start in background on startup"
-msgstr ""
-
-#: rog-control-center/ui/pages/app_settings.slint:97
-msgctxt "PageAppSettings"
-msgid "Armory/ROG key to show/hide window (keep app running in background)"
-msgstr ""
-
-#: rog-control-center/ui/pages/app_settings.slint:113
-msgctxt "PageAppSettings"
-msgid "Setting up…"
-msgstr ""
-
-#: rog-control-center/ui/pages/app_settings.slint:115
-msgctxt "PageAppSettings"
-msgid "Shortcut active"
-msgstr ""
-
-#: rog-control-center/ui/pages/app_settings.slint:117
-msgctxt "PageAppSettings"
-msgid "No shortcut assigned"
-msgstr ""
-
-#: rog-control-center/ui/pages/app_settings.slint:119
-msgctxt "PageAppSettings"
-msgid "Global shortcuts unavailable"
-msgstr ""
-
-#: rog-control-center/ui/pages/app_settings.slint:132
-msgctxt "PageAppSettings"
-msgid "Set up shortcut"
-msgstr ""
-
-#: rog-control-center/ui/pages/app_settings.slint:133
-msgctxt "PageAppSettings"
-msgid "Configure shortcut"
 msgstr ""
 
 #: rog-control-center/ui/pages/anime.slint:7
@@ -934,6 +869,116 @@ msgstr ""
 #: rog-control-center/ui/pages/system.slint:927
 msgctxt "PageSystem"
 msgid "Throttle Policy on AC"
+msgstr ""
+
+#: rog-control-center/ui/pages/app_settings.slint:28
+msgctxt "AppSettingsPageData"
+msgid "Crimson"
+msgstr ""
+
+#: rog-control-center/ui/pages/app_settings.slint:28
+msgctxt "AppSettingsPageData"
+msgid "Cyberpunk Cyan"
+msgstr ""
+
+#: rog-control-center/ui/pages/app_settings.slint:28
+msgctxt "AppSettingsPageData"
+msgid "Electric Purple"
+msgstr ""
+
+#: rog-control-center/ui/pages/app_settings.slint:28
+msgctxt "AppSettingsPageData"
+msgid "Emerald Green"
+msgstr ""
+
+#: rog-control-center/ui/pages/app_settings.slint:28
+msgctxt "AppSettingsPageData"
+msgid "Custom Palette"
+msgstr ""
+
+#: rog-control-center/ui/pages/app_settings.slint:74
+msgctxt "PageAppSettings"
+msgid "UI Accent Theme"
+msgstr ""
+
+#: rog-control-center/ui/pages/app_settings.slint:95
+msgctxt "PageAppSettings"
+msgid "Custom Color Palette"
+msgstr ""
+
+#: rog-control-center/ui/pages/app_settings.slint:105
+msgctxt "PageAppSettings"
+msgid "Primary Accent Color"
+msgstr ""
+
+#: rog-control-center/ui/pages/app_settings.slint:150
+msgctxt "PageAppSettings"
+msgid "Secondary Background Tint"
+msgstr ""
+
+#: rog-control-center/ui/pages/app_settings.slint:193
+msgctxt "PageAppSettings"
+msgid "Run in background after closing"
+msgstr ""
+
+#: rog-control-center/ui/pages/app_settings.slint:201
+msgctxt "PageAppSettings"
+msgid "Start app in background (UI closed)"
+msgstr ""
+
+#: rog-control-center/ui/pages/app_settings.slint:209
+msgctxt "PageAppSettings"
+msgid "Enable system tray icon"
+msgstr ""
+
+#: rog-control-center/ui/pages/app_settings.slint:217
+msgctxt "PageAppSettings"
+msgid "Enable dGPU notifications"
+msgstr ""
+
+#: rog-control-center/ui/pages/app_settings.slint:225
+msgctxt "PageAppSettings"
+msgid "Start app on system startup"
+msgstr ""
+
+#: rog-control-center/ui/pages/app_settings.slint:235
+msgctxt "PageAppSettings"
+msgid "Start in background on startup"
+msgstr ""
+
+#: rog-control-center/ui/pages/app_settings.slint:245
+msgctxt "PageAppSettings"
+msgid "Armory/ROG key to show/hide window (keep app running in background)"
+msgstr ""
+
+#: rog-control-center/ui/pages/app_settings.slint:261
+msgctxt "PageAppSettings"
+msgid "Setting up…"
+msgstr ""
+
+#: rog-control-center/ui/pages/app_settings.slint:263
+msgctxt "PageAppSettings"
+msgid "Shortcut active"
+msgstr ""
+
+#: rog-control-center/ui/pages/app_settings.slint:265
+msgctxt "PageAppSettings"
+msgid "No shortcut assigned"
+msgstr ""
+
+#: rog-control-center/ui/pages/app_settings.slint:267
+msgctxt "PageAppSettings"
+msgid "Global shortcuts unavailable"
+msgstr ""
+
+#: rog-control-center/ui/pages/app_settings.slint:280
+msgctxt "PageAppSettings"
+msgid "Set up shortcut"
+msgstr ""
+
+#: rog-control-center/ui/pages/app_settings.slint:281
+msgctxt "PageAppSettings"
+msgid "Configure shortcut"
 msgstr ""
 
 #: rog-control-center/ui/types/aura_types.slint:54
