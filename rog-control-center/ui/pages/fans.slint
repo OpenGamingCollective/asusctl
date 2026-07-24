@@ -1,4 +1,5 @@
 import { Palette, TabWidget, Button, CheckBox } from "std-widgets.slint";
+import { Theme } from "../globals.slint";
 import { Graph, Node } from "../widgets/graph.slint";
 import { SystemToggle } from "../widgets/common.slint";
 import { Profile, FanType, FanPageData } from "../types/fan_types.slint";
@@ -30,7 +31,7 @@ component FanTab inherits Rectangle {
         }
 
         Rectangle {
-            background: Palette.border;
+            background: Theme.card-border;
             height: 1px;
         }
 
