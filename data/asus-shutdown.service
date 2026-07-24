@@ -20,7 +20,7 @@ SendSIGKILL=no
 TimeoutStopSec=45
 
 AmbientCapabilities=
-CapabilityBoundingSet=
+CapabilityBoundingSet=CAP_SYS_MODULE CAP_SYS_ADMIN
 MemoryDenyWriteExecute=true
 NoNewPrivileges=true
 LockPersonality=true
@@ -55,8 +55,8 @@ ReadOnlyPaths=/
 RemoveIPC=true
 
 SystemCallArchitectures=native
-SystemCallFilter=@system-service
-SystemCallFilter=~@privileged @resources
+SystemCallFilter=@system-service @module
+SystemCallFilter=~@resources
 
 IPAddressDeny=any
 SocketBindDeny=any

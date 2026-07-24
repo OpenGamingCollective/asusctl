@@ -22,15 +22,12 @@ const SHUTDOWN_REASON: &str = "defer risky ASUS GPU firmware writes until shutdo
 const WAIT_FOR_GPU_IDLE: Duration = Duration::from_secs(15);
 const GPU_IDLE_POLL_INTERVAL: Duration = Duration::from_millis(500);
 const GPU_IDLE_STABLE_FOR: Duration = Duration::from_secs(2);
-const WAIT_FOR_NVIDIA_POWERD_EXIT: Duration = Duration::from_secs(10);
-const WAIT_FOR_LOGIND_EXIT: Duration = Duration::from_secs(20);
 const ASUSD_BUS_NAME: &str = "xyz.ljones.Asusd";
 const ASUSD_ARMOURY_IFACE: &str = "xyz.ljones.AsusArmoury";
 const SYSTEMD1_BUS_NAME: &str = "org.freedesktop.systemd1";
 const SYSTEMD1_MANAGER_PATH: &str = "/org/freedesktop/systemd1";
 const SYSTEMD1_MANAGER_IFACE: &str = "org.freedesktop.systemd1.Manager";
 const SYSTEMD1_UNIT_IFACE: &str = "org.freedesktop.systemd1.Unit";
-const LOGIND_SERVICE: &str = "systemd-logind.service";
 const NVIDIA_POWERD_SERVICE: &str = "nvidia-powerd.service";
 const NVIDIA_SERVICES: &[&str] = &[
     NVIDIA_POWERD_SERVICE,
@@ -231,16 +228,10 @@ async fn apply_shutdown_settings() -> Result<(), Box<dyn std::error::Error>> {
     info!("[phase 3/6] Waiting for discrete GPU to become idle before applying settings...");
     wait_for_discrete_gpu_idle().await;
 
-    info!(
-        "[phase 4/6] Waiting for {} to exit before firmware writes...",
-        LOGIND_SERVICE
-    );
-    let _ = wait_for_unit_to_exit(LOGIND_SERVICE, WAIT_FOR_LOGIND_EXIT).await;
-
-    info!("[phase 5/6] Preparing NVIDIA stack safety gates before firmware writes...");
+    info!("[phase 4/6] Preparing NVIDIA stack safety gates before firmware writes...");
     prepare_nvidia_for_gpu_firmware_writes().await;
 
-    info!("[phase 6/6] Proceeding with applying deferred GPU settings");
+    info!("[phase 5/6] Proceeding with applying deferred GPU settings");
 
     let conn = Connection::system().await?;
     for action in queued {
@@ -268,51 +259,58 @@ async fn prepare_nvidia_for_gpu_firmware_writes() {
         .iter()
         .any(|path| Path::new(path).exists());
 
-    let mut saw_loaded_or_active_service = false;
+    if !has_nvidia_modules {
+        info!("No NVIDIA modules detected, skipping NVIDIA-specific shutdown preparation");
+        return;
+    }
 
     for unit in NVIDIA_SERVICES {
-        let exited = wait_for_unit_to_exit(unit, WAIT_FOR_NVIDIA_POWERD_EXIT).await;
-        if !exited {
-            saw_loaded_or_active_service = true;
-        }
-    }
-
-    if !has_nvidia_modules && !saw_loaded_or_active_service {
-        info!("No NVIDIA modules/services detected, skipping NVIDIA-specific shutdown preparation");
-        return;
-    }
-
-    if !has_nvidia_modules {
-        info!("NVIDIA modules are not loaded, skipping module unload step");
-        return;
+        info!("Stopping {} before firmware attribute apply...", unit);
+        let _ = Command::new("systemctl")
+            .args([
+                "stop", unit,
+            ])
+            .output();
+        wait_for_unit_to_exit(unit, Duration::from_secs(3)).await;
     }
 
     info!("Preparing NVIDIA driver stack for firmware attribute apply");
-    let output = Command::new("modprobe")
-        .args([
-            "-r", "nvidia_drm", "nvidia_modeset", "nvidia_uvm", "nvidia",
-        ])
-        .output();
+    let mut success = false;
+    for attempt in 1..=5 {
+        let output = Command::new("modprobe")
+            .args([
+                "-r", "nvidia_drm", "nvidia_modeset", "nvidia_uvm", "nvidia",
+            ])
+            .output();
 
-    match output {
-        Ok(out) if out.status.success() => {
-            info!("Successfully unloaded NVIDIA modules before firmware attribute apply");
+        match output {
+            Ok(out) if out.status.success() => {
+                info!("Successfully unloaded NVIDIA modules before firmware attribute apply (attempt {attempt})");
+                success = true;
+                break;
+            }
+            Ok(out) => {
+                let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
+                debug!(
+                    "modprobe -r attempt {attempt} failed (status {}): {}",
+                    out.status,
+                    if stderr.is_empty() {
+                        "no stderr output"
+                    } else {
+                        stderr.as_str()
+                    }
+                );
+            }
+            Err(err) => {
+                warn!("Failed to execute modprobe -r for NVIDIA modules: {err}");
+                break;
+            }
         }
-        Ok(out) => {
-            let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
-            warn!(
-                "Failed to unload NVIDIA modules before firmware attribute apply (status {}): {}",
-                out.status,
-                if stderr.is_empty() {
-                    "no stderr output"
-                } else {
-                    stderr.as_str()
-                }
-            );
-        }
-        Err(err) => {
-            warn!("Failed to execute modprobe -r for NVIDIA modules: {err}");
-        }
+        sleep(Duration::from_millis(500)).await;
+    }
+
+    if !success {
+        warn!("Failed to unload NVIDIA modules after 5 attempts before firmware attribute apply");
     }
 }
 
@@ -623,7 +621,7 @@ fn busy_gpu_nodes() -> Result<HashSet<PathBuf>, Box<dyn std::error::Error>> {
                 continue;
             };
 
-            if target.starts_with("/dev/dri/") {
+            if target.starts_with("/dev/dri/") || target.starts_with("/dev/nvidia") {
                 nodes.insert(target);
             }
         }
