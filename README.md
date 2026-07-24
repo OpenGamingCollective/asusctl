@@ -41,7 +41,7 @@ Languages such as JS and python should never be used for system level daemons (p
 
 ## Keyboard LEDs
 
-The level of support for laptops is dependent on folks submitting data to include in [`./rog-aura/data/layouts/aura_support.ron`](./rog-aura/data/layouts/aura_support.ron), typically installed in `/usr/share/asusd/aura_support.ron`. This is because the controller used for keyboards and LEDs is used across many years and many laptop models, all with different firmware configurations - the only way to track this is with the file mentioned above. Why not just enable all by default? Because it confuses people.
+The level of support for laptops is dependent on folks submitting data to include in [`./rog-aura/data/aura_support.toml`](./rog-aura/data/aura_support.toml), typically installed in `/usr/share/asusd/aura_support.toml`. This is because the controller used for keyboards and LEDs is used across many years and many laptop models, all with different firmware configurations - the only way to track this is with the file mentioned above. Why not just enable all by default? Because it confuses people.
 
 See the [rog-aura readme](./rog-aura/README.md) for more details.
 

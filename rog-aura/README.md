@@ -27,19 +27,20 @@ It also includes layouts for some laptops. Also heavily dependant on contributio
 
 # Support list
 
-`aura_support.ron` is the support listing file. It functions as a database of which models support which features.
+`aura_support.toml` is the support listing file. It functions as a database of which models support which features.
 
-```ron
-    (
-        board_name: "G513QR",
-        layout_name: "g513i-per-key",
-        basic_modes: [Static, Breathe, Strobe, Rainbow, Star, Rain, Highlight, Laser, Ripple, Pulse, Comet, Flash],
-        basic_zones: [],
-        advanced_type: PerKey,
-    ),
+```toml
+[[device]]
+device_name = "FA506I"
+product_id = ""
+layout_name = "fa506i"
+basic_modes = ["Static", "Breathe", "RainbowCycle", "RainbowWave", "Pulse"]
+basic_zones = []
+advanced_type = "None"
+power_zones = ["Keyboard"]
 ```
 
-in the above example the board name is found from `cat /sys/devices/virtual/dmi/id/board_name`. In some model ranges the last letter (which is likely the dGPU/feature variant) can be omitted. `layout_name` is the first part of a related filename for the layout as described in the next section - the filename should be postfixed with a locale such as `g513i_US.ron`.
+in the above example the board name is found from `cat /sys/devices/virtual/dmi/id/board_name`. In some model ranges the last letter (which is likely the dGPU/feature variant) can be omitted. `layout_name` is the first part of a related filename for the layout as described in the next section - the filename should be postfixed with a locale such as `g513i_US.toml`.
 
 `basic_modes` are the default inbuilt modes the keyboard supports. Not all keyboards have the same set of modes. `basic_zones` is a secondary part of `basic_modes` where this lists which zones can be set as part of the basic mode. Each zone requires a full basic mode setting. The zones supported here are
 
@@ -73,16 +74,19 @@ note that the zone support seems to have changed with new generations of keyboar
 
 # Layouts
 
-The layout structure is kept in a `.ron`, which is "rusty object notation". The way this works is best demonstrated:
+The layout structure is kept in a `.toml`. The way this works is best demonstrated:
 
-```ron
-(
-    locale: "US",
-    key_shapes: {
-        // This is a regular LED spot, it has a size (width x height), and padding around each edge.
-        // The final size should be (width + pad_left + pad_right, height + pad_top + pad_bottom)
-        "regular": Led(
-            width: 1.0,
+```toml
+locale = "US"
+
+[key_shapes.regular.Led]
+width = 1.0
+height = 1.0
+pad_left = 0.1
+pad_right = 0.1
+pad_top = 0.1
+pad_bottom = 0.1
+```
             height: 1.0,
             pad_left: 0.1,
             pad_right: 0.1,

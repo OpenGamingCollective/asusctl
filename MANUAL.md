@@ -120,7 +120,7 @@ I'm unsure of how many laptops this works on, so please try it.
 
 An Aura config itself is a file with contents:
 
-```ron
+```toml
 (
     name: "aura-default",
     aura: (
@@ -195,7 +195,7 @@ If your laptop supports multizone, `"led"` can also be `"Zone": <one of the foll
 
 Single zone example:
 
-```ron
+```toml
 (
     name: "aura-default",
     aura: (
