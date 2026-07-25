@@ -154,12 +154,13 @@ impl DeviceManager {
                                 let path =
                                     dbus_path_for_dev(&usb_device).unwrap_or(dbus_path_for_slash());
                                 let ctrl = SlashZbus::new(slash);
-                                ctrl.start_tasks(connection, path.clone()).await.unwrap();
-                                devices.push(AsusDevice {
-                                    device: dev_type,
-                                    dbus_path: path,
-                                    hid_key: Some(hid_key.clone()),
-                                });
+                                if ctrl.start_tasks(connection, path.clone()).await.is_ok() {
+                                    devices.push(AsusDevice {
+                                        device: dev_type,
+                                        dbus_path: path,
+                                        hid_key: Some(hid_key.clone()),
+                                    });
+                                }
                             }
                         }
                         // ANIME MATRIX DEVICE
@@ -173,12 +174,13 @@ impl DeviceManager {
                                 let path =
                                     dbus_path_for_dev(&usb_device).unwrap_or(dbus_path_for_anime());
                                 let ctrl = AniMeZbus::new(anime);
-                                ctrl.start_tasks(connection, path.clone()).await.unwrap();
-                                devices.push(AsusDevice {
-                                    device: dev_type,
-                                    dbus_path: path,
-                                    hid_key: Some(hid_key.clone()),
-                                });
+                                if ctrl.start_tasks(connection, path.clone()).await.is_ok() {
+                                    devices.push(AsusDevice {
+                                        device: dev_type,
+                                        dbus_path: path,
+                                        hid_key: Some(hid_key.clone()),
+                                    });
+                                }
                             }
                         }
                         // AURA LAPTOP DEVICE
@@ -192,12 +194,13 @@ impl DeviceManager {
                                 let path =
                                     dbus_path_for_dev(&usb_device).unwrap_or(dbus_path_for_tuf());
                                 let ctrl = AuraZbus::new(aura);
-                                ctrl.start_tasks(connection, path.clone()).await.unwrap();
-                                devices.push(AsusDevice {
-                                    device: dev_type,
-                                    dbus_path: path,
-                                    hid_key: Some(hid_key),
-                                });
+                                if ctrl.start_tasks(connection, path.clone()).await.is_ok() {
+                                    devices.push(AsusDevice {
+                                        device: dev_type,
+                                        dbus_path: path,
+                                        hid_key: Some(hid_key),
+                                    });
+                                }
                             }
                         }
                     } else {
@@ -265,17 +268,18 @@ impl DeviceManager {
                     .property_value("ID_MODEL_ID")
                     .unwrap_or_default()
                     .to_string_lossy();
-                if let Ok(dev_type) =
-                    DeviceHandle::maybe_scsi(dev_node.as_os_str().to_str().unwrap(), &prod_id).await
-                {
-                    if let DeviceHandle::Scsi(scsi) = dev_type.clone() {
-                        let ctrl = ScsiZbus::new(scsi);
-                        ctrl.start_tasks(connection, path.clone()).await.unwrap();
-                        return Some(AsusDevice {
-                            device: dev_type,
-                            dbus_path: path,
-                            hid_key: None,
-                        });
+                if let Some(dev_str) = dev_node.as_os_str().to_str() {
+                    if let Ok(dev_type) = DeviceHandle::maybe_scsi(dev_str, &prod_id).await {
+                        if let DeviceHandle::Scsi(scsi) = dev_type.clone() {
+                            let ctrl = ScsiZbus::new(scsi);
+                            if ctrl.start_tasks(connection, path.clone()).await.is_ok() {
+                                return Some(AsusDevice {
+                                    device: dev_type,
+                                    dbus_path: path,
+                                    hid_key: None,
+                                });
+                            }
+                        }
                     }
                 }
             }
@@ -352,12 +356,13 @@ impl DeviceManager {
                 if let DeviceHandle::Slash(slash) = dev_type.clone() {
                     let path = dbus_path_for_slash();
                     let ctrl = SlashZbus::new(slash);
-                    ctrl.start_tasks(connection, path.clone()).await.unwrap();
-                    devices.push(AsusDevice {
-                        device: dev_type,
-                        dbus_path: path,
-                        hid_key: None,
-                    });
+                    if ctrl.start_tasks(connection, path.clone()).await.is_ok() {
+                        devices.push(AsusDevice {
+                            device: dev_type,
+                            dbus_path: path,
+                            hid_key: None,
+                        });
+                    }
                 }
             } else {
                 info!("Tested device was not Slash");
@@ -403,12 +408,13 @@ impl DeviceManager {
                     if let DeviceHandle::Aura(aura) = dev_type.clone() {
                         let path = dbus_path_for_tuf();
                         let ctrl = AuraZbus::new(aura);
-                        ctrl.start_tasks(connection, path.clone()).await.unwrap();
-                        devices.push(AsusDevice {
-                            device: dev_type,
-                            dbus_path: path,
-                            hid_key: None,
-                        });
+                        if ctrl.start_tasks(connection, path.clone()).await.is_ok() {
+                            devices.push(AsusDevice {
+                                device: dev_type,
+                                dbus_path: path,
+                                hid_key: None,
+                            });
+                        }
                     }
                 }
             }

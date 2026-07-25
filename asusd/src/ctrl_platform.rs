@@ -91,7 +91,14 @@ impl CtrlPlatform {
             let mut buffer = [0; 32];
             loop {
                 // vi and vim do stupid shit causing the file watch to be removed
-                let inotify = inotify::Inotify::init().unwrap();
+                let inotify = match inotify::Inotify::init() {
+                    Ok(i) => i,
+                    Err(e) => {
+                        error!("Failed to initialize inotify for config watch: {e}");
+                        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                        continue;
+                    }
+                };
                 inotify
                     .watches()
                     .add(
@@ -109,7 +116,14 @@ impl CtrlPlatform {
                         }
                     })
                     .ok();
-                let mut events = inotify.into_event_stream(&mut buffer).unwrap();
+                let mut events = match inotify.into_event_stream(&mut buffer) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        error!("Failed to create event stream for config watch: {e}");
+                        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                        continue;
+                    }
+                };
 
                 while let Some(ev) = events.next().await {
                     if let Ok(ev) = ev {
@@ -124,10 +138,12 @@ impl CtrlPlatform {
 
                     let res = config1.lock().await.read_new();
                     if let Some(new_cfg) = res {
-                        inotify_self
+                        if let Err(e) = inotify_self
                             .reload_and_notify(&signal_context, new_cfg)
                             .await
-                            .unwrap();
+                        {
+                            error!("Failed to reload and notify config: {e:?}");
+                        }
                     }
                 }
             }
