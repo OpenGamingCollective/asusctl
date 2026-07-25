@@ -127,7 +127,7 @@ fn main() {
         *n = 250;
     }
     matrix.data_mut()[1244] = 100; // end
-    println!("{:?}", &matrix);
+    println!("{:?}", matrix);
 
     proxy.write(matrix).unwrap();
 }

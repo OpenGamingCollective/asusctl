@@ -123,22 +123,22 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     let anime_type = AnimeType::from_str(&args[1])?;
 
-    let sdl_context = sdl2::init().unwrap();
-    let video_subsystem = sdl_context.video().unwrap();
+    let sdl_context = sdl2::init().map_err(|e| e.to_string())?;
+    let video_subsystem = sdl_context.video().map_err(|e| e.to_string())?;
 
     let window = video_subsystem
         .window("rust-sdl2 demo", 1260, 760)
         .position_centered()
         .build()
-        .unwrap();
+        .map_err(|e| e.to_string())?;
 
-    let mut canvas = window.into_canvas().build().unwrap();
+    let mut canvas = window.into_canvas().build().map_err(|e| e.to_string())?;
 
     let mut dev = VirtAnimeMatrix::new(anime_type);
 
     canvas.set_draw_color(Color::RGB(0, 0, 0));
     canvas.clear();
-    let mut event_pump = sdl_context.event_pump().unwrap();
+    let mut event_pump = sdl_context.event_pump().map_err(|e| e.to_string())?;
     'running: loop {
         dev.read(); // it's blocking, and damned hard to sync with arc/mutex
                     // let one = dev.buffer[0..7] != USB_PREFIX2;
@@ -170,9 +170,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         }
                         + row.3 * w;
                     let y = y_count as i32 * h - y_offset * h;
-                    canvas
-                        .fill_rect(Rect::new(x, y, w as u32, h as u32))
-                        .unwrap();
+                    let _ = canvas.fill_rect(Rect::new(x, y, w as u32, h as u32));
                 }
             }
         }
