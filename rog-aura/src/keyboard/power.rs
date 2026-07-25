@@ -218,8 +218,12 @@ impl LaptopAuraPower {
             AuraDeviceType::LaptopKeyboardTuf => Self {
                 states: vec![AuraPowerState::default_for(PowerZones::Keyboard)],
             },
-            AuraDeviceType::ScsiExtDisk => todo!(),
-            AuraDeviceType::AnimeOrSlash => todo!(),
+            AuraDeviceType::ScsiExtDisk | AuraDeviceType::AnimeOrSlash => {
+                unreachable!(
+                    "Power state initialization is unreachable for non-keyboard device type: {:?}",
+                    aura_type
+                );
+            }
         }
     }
 
@@ -238,22 +242,29 @@ impl LaptopAuraPower {
         match aura_type {
             AuraDeviceType::LaptopKeyboard2021 | AuraDeviceType::Ally => self.new_to_bytes(),
             AuraDeviceType::LaptopKeyboardPre2021 => {
-                if self.states.len() == 1 {
-                    self.states
-                        .first()
-                        .cloned()
-                        .unwrap_or_default()
-                        .old_to_bytes()
+                if self.states.is_empty() {
+                    vec![
+                        0x00, 0x00, 0x00, 0x00,
+                    ]
+                } else if self.states.len() == 1 {
+                    self.states[0].old_to_bytes()
                 } else {
                     let mut bytes: Vec<Vec<u8>> =
                         self.states.iter().map(|s| s.old_to_bytes()).collect();
-                    let mut b = bytes.pop().unwrap();
-                    for i in bytes {
-                        for (i, n) in i.iter().enumerate() {
-                            b[i] |= n;
+                    if let Some(mut b) = bytes.pop() {
+                        for i in bytes {
+                            for (idx, n) in i.iter().enumerate() {
+                                if idx < b.len() {
+                                    b[idx] |= n;
+                                }
+                            }
                         }
+                        b
+                    } else {
+                        vec![
+                            0x00, 0x00, 0x00, 0x00,
+                        ]
                     }
-                    b
                 }
             }
             AuraDeviceType::LaptopKeyboardTuf => self
@@ -266,8 +277,12 @@ impl LaptopAuraPower {
                 warn!("Trying to create bytes for an unknown device");
                 self.new_to_bytes()
             }
-            AuraDeviceType::ScsiExtDisk => todo!("scsi disk not implemented yet"),
-            AuraDeviceType::AnimeOrSlash => todo!("anime/slash not implemented yet"),
+            AuraDeviceType::ScsiExtDisk | AuraDeviceType::AnimeOrSlash => {
+                unreachable!(
+                    "Power state bytes calculation is unreachable for non-keyboard device type: {:?}",
+                    aura_type
+                );
+            }
         }
     }
 }
