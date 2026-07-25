@@ -8,7 +8,7 @@ use std::time::Duration;
 use config_traits::{StdConfig, StdConfigLoad1};
 use dmi_id::DMIID;
 use gumdrop::Options;
-use log::{debug, info, warn, LevelFilter};
+use log::{debug, error, info, warn, LevelFilter};
 use rog_control_center::cli_options::CliStart;
 use rog_control_center::config::Config;
 use rog_control_center::error::Result;
@@ -74,12 +74,13 @@ async fn main() -> Result<()> {
     let self_version = env!("CARGO_PKG_VERSION");
     let zbus_con = zbus::blocking::Connection::system()?;
     let platform_proxy = rog_dbus::zbus_platform::PlatformProxyBlocking::new(&zbus_con)?;
-    let asusd_version = platform_proxy
-        .version()
-        .map_err(|e| {
-            println!("Could not get asusd version: {e:?}\nIs asusd.service running?");
-        })
-        .unwrap();
+    let asusd_version = match platform_proxy.version() {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("Could not get asusd version: {e:?}\nIs asusd.service running?");
+            std::process::exit(1);
+        }
+    };
     if asusd_version != self_version {
         println!("Version mismatch: asusctl = {self_version}, asusd = {asusd_version}");
         // return Ok(());
@@ -287,7 +288,9 @@ async fn main() -> Result<()> {
         }
     });
 
-    slint::run_event_loop_until_quit().unwrap();
+    if let Err(e) = slint::run_event_loop_until_quit() {
+        error!("Slint event loop error: {e:?}");
+    }
     // Restore the outer Tokio context before awaiting a task owned by the
     // application runtime, then stop that runtime only after the portal
     // session has been closed.

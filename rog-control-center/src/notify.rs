@@ -67,10 +67,11 @@ fn start_dpu_status_mon(config: Arc<Mutex<Config>>) {
                             }
                             // Required check because status cycles through
                             // active/unknown/suspended
-                            do_gpu_status_notif("dGPU status changed:", &status)
-                                .show()
-                                .unwrap()
-                                .on_close(|_| ());
+                            if let Err(e) =
+                                do_gpu_status_notif("dGPU status changed:", &status).show()
+                            {
+                                warn!("Could not show dGPU status notification: {e}");
+                            }
                             debug!("dGPU status changed: {:?}", status);
                         }
                         last_status = status;
@@ -93,12 +94,13 @@ pub fn start_notifications(
     // Setup the AC/BAT commands that will run on power status change
     let config_copy = config.clone();
     let blocking = rt.spawn_blocking(move || {
-        let power = AsusPower::new()
-            .map_err(|e| {
-                error!("AsusPower: {e}");
-                e
-            })
-            .unwrap();
+        let power = match AsusPower::new() {
+            Ok(p) => p,
+            Err(e) => {
+                error!("AsusPower failed to initialize: {e}");
+                return;
+            }
+        };
 
         let mut last_state = power.get_online().unwrap_or_default();
         loop {

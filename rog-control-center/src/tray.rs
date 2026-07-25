@@ -3,8 +3,6 @@
 //! The tray icon color reflects the GPU power status, sourced from asusd's
 //! D-Bus interface (`xyz.ljones.Gpu`).
 
-use std::fs::OpenOptions;
-use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 
@@ -33,16 +31,30 @@ static ICONS: OnceLock<Icons> = OnceLock::new();
 fn read_icon(file: &Path) -> Icon {
     let mut path = PathBuf::from(TRAY_ICON_PATH);
     path.push(file);
-    let mut file = OpenOptions::new()
-        .read(true)
-        .open(&path)
-        .unwrap_or_else(|_| panic!("Missing icon: {:?}", path));
-    let mut bytes = Vec::new();
-    file.read_to_end(&mut bytes).unwrap();
+    let bytes = match std::fs::read(&path) {
+        Ok(b) => b,
+        Err(e) => {
+            log::warn!("Could not read icon {:?}: {e}, using fallback", path);
+            return Icon {
+                width: 16,
+                height: 16,
+                data: vec![255; 16 * 16 * 4],
+            };
+        }
+    };
 
-    let mut img = image::load_from_memory_with_format(&bytes, image::ImageFormat::Png)
-        .expect("icon not found")
-        .to_rgba8();
+    let mut img = match image::load_from_memory_with_format(&bytes, image::ImageFormat::Png) {
+        Ok(i) => i.to_rgba8(),
+        Err(e) => {
+            log::warn!("Could not decode icon {:?}: {e}, using fallback", path);
+            return Icon {
+                width: 16,
+                height: 16,
+                data: vec![255; 16 * 16 * 4],
+            };
+        }
+    };
+
     for image::Rgba(pixel) in img.pixels_mut() {
         // (╯°□°）╯︵ ┻━┻
         *pixel = u32::from_be_bytes(*pixel).rotate_right(8).to_be_bytes();
@@ -168,7 +180,13 @@ pub fn init_tray(
         });
 
         // Connect to asusd's GPU interface on the system bus
-        let sys_con = zbus::blocking::Connection::system().unwrap();
+        let sys_con = match zbus::blocking::Connection::system() {
+            Ok(c) => c,
+            Err(e) => {
+                warn!("Could not connect to system bus: {e}");
+                return;
+            }
+        };
         let gpu_proxy = match GpuStatusProxyBlocking::new(&sys_con) {
             Ok(p) => p,
             Err(e) => {
@@ -176,12 +194,13 @@ pub fn init_tray(
                     "Could not connect to asusd GPU interface: {e}. \
                      Is asusd running?"
                 );
-                let icons = ICONS.get().unwrap();
-                tray.update(|tray: &mut AsusTray| {
-                    tray.current_icon = icons.rog_red.clone();
-                    tray.current_title = "ROG: GPU status unavailable".to_string();
-                })
-                .await;
+                if let Some(icons) = ICONS.get() {
+                    tray.update(|tray: &mut AsusTray| {
+                        tray.current_icon = icons.rog_red.clone();
+                        tray.current_title = "ROG: GPU status unavailable".to_string();
+                    })
+                    .await;
+                }
                 return;
             }
         };

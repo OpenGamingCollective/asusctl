@@ -94,9 +94,9 @@ pub fn find_iface<T>(iface_name: &str) -> Result<Vec<T>, Box<dyn std::error::Err
 where
     T: ProxyImpl<'static> + From<zbus::Proxy<'static>>,
 {
-    let conn = Connection::system().unwrap();
-    let f = fdo::ObjectManagerProxy::new(&conn, "xyz.ljones.Asusd", "/").unwrap();
-    let interfaces = f.get_managed_objects().unwrap();
+    let conn = Connection::system()?;
+    let f = fdo::ObjectManagerProxy::new(&conn, "xyz.ljones.Asusd", "/")?;
+    let interfaces = f.get_managed_objects()?;
     let mut paths = Vec::new();
     for v in interfaces.iter() {
         // let o: Vec<zbus::names::OwnedInterfaceName> = v.1.keys().map(|e|
@@ -132,11 +132,9 @@ pub async fn find_iface_async<T>(iface_name: &str) -> Result<Vec<T>, Box<dyn std
 where
     T: zbus::proxy::ProxyImpl<'static> + From<zbus::Proxy<'static>>,
 {
-    let conn = zbus::Connection::system().await.unwrap();
-    let f = zbus::fdo::ObjectManagerProxy::new(&conn, "xyz.ljones.Asusd", "/")
-        .await
-        .unwrap();
-    let interfaces = f.get_managed_objects().await.unwrap();
+    let conn = zbus::Connection::system().await?;
+    let f = zbus::fdo::ObjectManagerProxy::new(&conn, "xyz.ljones.Asusd", "/").await?;
+    let interfaces = f.get_managed_objects().await?;
     let mut paths = Vec::new();
     for v in interfaces.iter() {
         // let o: Vec<zbus::names::OwnedInterfaceName> = v.1.keys().map(|e|
