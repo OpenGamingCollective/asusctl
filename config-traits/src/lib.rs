@@ -5,7 +5,7 @@
 //!
 //! The end canonical file format is `.ron` as this supports rust types well
 
-use std::fs::{self, create_dir, File, OpenOptions};
+use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::PathBuf;
 
@@ -34,7 +34,7 @@ where
     fn file_path(&self) -> PathBuf {
         let mut config = Self::config_dir();
         if !config.exists() {
-            create_dir(config.as_path())
+            fs::create_dir_all(config.as_path())
                 .unwrap_or_else(|e| panic!("Could not create {:?} {e}", Self::config_dir()));
         }
         config.push(self.file_name());
@@ -123,25 +123,37 @@ where
 
     /// Write the config file data to pretty ron format
     fn write(&self) {
-        let mut file = match File::create(self.file_path()) {
-            Ok(data) => data,
-            Err(e) => {
-                error!(
-                    "Couldn't overwrite config {:?}, error: {e}",
-                    self.file_path()
-                );
-                return;
-            }
-        };
+        let path = self.file_path();
         let ron = match ron::ser::to_string_pretty(&self, PrettyConfig::new().depth_limit(4)) {
             Ok(data) => data,
             Err(e) => {
-                error!("Parse {:?} to RON failed, error: {e}", self.file_path());
+                error!("Parse {:?} to RON failed, error: {e}", path);
                 return;
             }
         };
-        file.write_all(ron.as_bytes())
-            .unwrap_or_else(|err| error!("Could not write config: {}", err));
+
+        let tmp_path = path.with_extension("ron.tmp");
+        let mut file = match File::create(&tmp_path) {
+            Ok(data) => data,
+            Err(e) => {
+                error!("Couldn't create temp config {:?}, error: {e}", tmp_path);
+                return;
+            }
+        };
+
+        if let Err(e) = file.write_all(ron.as_bytes()) {
+            error!("Could not write temp config {:?}: {e}", tmp_path);
+            let _ = fs::remove_file(&tmp_path);
+            return;
+        }
+
+        if let Err(e) = fs::rename(&tmp_path, &path) {
+            error!(
+                "Could not rename temp config {:?} to {:?}: {e}",
+                tmp_path, path
+            );
+            let _ = fs::remove_file(&tmp_path);
+        }
     }
 
     /// Renames the existing file to `<file>-old`
