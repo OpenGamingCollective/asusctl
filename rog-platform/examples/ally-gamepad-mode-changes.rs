@@ -15,11 +15,9 @@ pub fn main() -> Result<(), Box<dyn Error>> {
         Err(err) => println!("Looked for keyboard controller: {err}"),
     }
 
-    if usb_node.is_none() {
+    let Some(node) = usb_node else {
         return Err("RogError::NoAuraKeyboard".into());
-    }
-
-    let node = usb_node.unwrap();
+    };
 
     // node.write_bytes(&[0x5a, 0xd1, 0x0a, 0x01])?; // TODO: need to CHECK
     println!("Set mouse mode for 10 seconds");

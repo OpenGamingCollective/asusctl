@@ -361,17 +361,17 @@ mod tests {
     use std::path::PathBuf;
 
     #[test]
-    fn test_battery_methods() {
+    fn test_battery_methods() -> std::result::Result<(), Box<dyn std::error::Error>> {
         let temp_dir = std::env::temp_dir().join("fake_battery");
-        fs::create_dir_all(&temp_dir).unwrap();
+        fs::create_dir_all(&temp_dir)?;
 
         // Write fake files
-        fs::write(temp_dir.join("cycle_count"), "42\n").unwrap();
-        fs::write(temp_dir.join("energy_full"), "80000000\n").unwrap();
-        fs::write(temp_dir.join("energy_full_design"), "100000000\n").unwrap();
-        fs::write(temp_dir.join("energy_now"), "45000000\n").unwrap();
-        fs::write(temp_dir.join("power_now"), "15000000\n").unwrap();
-        fs::write(temp_dir.join("status"), "Discharging\n").unwrap();
+        fs::write(temp_dir.join("cycle_count"), "42\n")?;
+        fs::write(temp_dir.join("energy_full"), "80000000\n")?;
+        fs::write(temp_dir.join("energy_full_design"), "100000000\n")?;
+        fs::write(temp_dir.join("energy_now"), "45000000\n")?;
+        fs::write(temp_dir.join("power_now"), "15000000\n")?;
+        fs::write(temp_dir.join("status"), "Discharging\n")?;
 
         let power = AsusPower {
             mains: PathBuf::new(),
@@ -380,25 +380,20 @@ mod tests {
         };
 
         assert!(power.has_battery());
-        assert_eq!(power.get_battery_cycle_count().unwrap(), 42);
-        assert_eq!(power.get_battery_health().unwrap(), 80);
-        assert_eq!(power.get_battery_power_consumption().unwrap(), 15.0);
-        assert_eq!(power.get_battery_status().unwrap(), "Discharging");
-        assert_eq!(power.get_battery_remaining_energy_wh().unwrap(), 45.0);
-        assert_eq!(power.get_battery_full_energy_wh().unwrap(), 80.0);
-        assert_eq!(
-            power.get_battery_time_estimate().unwrap(),
-            Some((false, 3, 0))
-        );
+        assert_eq!(power.get_battery_cycle_count()?, 42);
+        assert_eq!(power.get_battery_health()?, 80);
+        assert_eq!(power.get_battery_power_consumption()?, 15.0);
+        assert_eq!(power.get_battery_status()?, "Discharging");
+        assert_eq!(power.get_battery_remaining_energy_wh()?, 45.0);
+        assert_eq!(power.get_battery_full_energy_wh()?, 80.0);
+        assert_eq!(power.get_battery_time_estimate()?, Some((false, 3, 0)));
 
         // Test charging estimation
-        fs::write(temp_dir.join("status"), "Charging\n").unwrap();
-        assert_eq!(
-            power.get_battery_time_estimate().unwrap(),
-            Some((true, 2, 20))
-        );
+        fs::write(temp_dir.join("status"), "Charging\n")?;
+        assert_eq!(power.get_battery_time_estimate()?, Some((true, 2, 20)));
 
         // Clean up
-        fs::remove_dir_all(&temp_dir).ok();
+        let _ = fs::remove_dir_all(temp_dir);
+        Ok(())
     }
 }

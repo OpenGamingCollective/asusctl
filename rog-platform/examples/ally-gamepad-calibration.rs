@@ -13,11 +13,9 @@ pub fn main() -> Result<(), Box<dyn Error>> {
         Err(err) => println!("Looked for keyboard controller: {err}"),
     }
 
-    if usb_node.is_none() {
+    let Some(node) = usb_node else {
         return Err("RogError::NoAuraKeyboard".into());
-    }
-
-    let node = usb_node.unwrap();
+    };
 
     let mut packet: [u8; 64] = [
         0x5a, 0xd1, 0x0d, 0x0e, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

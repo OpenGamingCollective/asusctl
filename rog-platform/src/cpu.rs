@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use log::{info, warn};
+use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
 use zbus::zvariant::{OwnedValue, Type, Value};
 
@@ -56,17 +56,16 @@ impl CPUControl {
                     Some(g) => info!("{ATTR_GOVERNOR}: {g:?}"),
                     None => return Err(PlatformError::CPU(format!("{ATTR_GOVERNOR} not found"))),
                 }
+                // EPP attributes (energy_performance_available_preferences and energy_performance_preference)
+                // are optional depending on the cpufreq driver and kernel version. Missing EPP attributes
+                // are logged as warnings rather than hard errors to support broader hardware configurations.
                 match device.attribute_value(ATTR_AVAILABLE_EPP) {
                     Some(g) => info!("{ATTR_AVAILABLE_EPP}: {g:?}"),
-                    None => {
-                        return Err(PlatformError::CPU(format!(
-                            "{ATTR_AVAILABLE_EPP} not found"
-                        )))
-                    }
+                    None => warn!("{ATTR_AVAILABLE_EPP} not found (EPP controls unsupported)"),
                 }
                 match device.attribute_value(ATTR_EPP) {
                     Some(g) => info!("{ATTR_EPP}: {g:?}"),
-                    None => return Err(PlatformError::CPU(format!("{ATTR_EPP} not found"))),
+                    None => warn!("{ATTR_EPP} not found (EPP preference setting unsupported)"),
                 }
                 supported = true;
             }
@@ -124,18 +123,33 @@ impl CPUControl {
         }
     }
 
+    /// Returns available EPP (Energy Performance Preference) options.
+    /// EPP sysfs attributes are optional as not all CPU scaling drivers expose them.
     pub fn get_available_epp(&self) -> Result<Vec<CPUEPP>> {
         if let Some(path) = self.paths.first() {
-            read_attr_string(&to_device(path)?, ATTR_AVAILABLE_EPP)
-                .map(|s| s.split_whitespace().map(|s| s.into()).collect())
-            // TODO: check cpu are sync
+            match read_attr_string(&to_device(path)?, ATTR_AVAILABLE_EPP) {
+                Ok(s) => Ok(s.split_whitespace().map(|s| s.into()).collect()),
+                Err(err) => {
+                    debug!("Reading {ATTR_AVAILABLE_EPP} failed or attribute not present: {err}");
+                    Err(err)
+                }
+            }
         } else {
             Err(PlatformError::CPU("No CPU's?".to_string()))
         }
     }
 
+    /// Sets EPP (Energy Performance Preference) for all CPUs.
+    /// Checks available preferences first; if unsupported or invalid, returns an error early.
     pub fn set_epp(&self, epp: CPUEPP) -> Result<()> {
-        if !self.get_available_epp()?.contains(&epp) {
+        let available = match self.get_available_epp() {
+            Ok(avail) => avail,
+            Err(err) => {
+                debug!("EPP preference setting unsupported on this system: {err}");
+                return Err(err);
+            }
+        };
+        if !available.contains(&epp) {
             return Err(PlatformError::CPU(format!("{epp:?} is not available")));
         }
         for path in &self.paths {
@@ -392,20 +406,20 @@ mod tests {
 
     #[test]
     #[ignore = "Can't run this in a docker image"]
-    fn check_cpu() {
-        let cpu = CPUControl::new().unwrap();
-        assert_eq!(cpu.get_governor().unwrap(), CPUGovernor::Powersave);
+    fn check_cpu() -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let cpu = CPUControl::new()?;
+        assert_eq!(cpu.get_governor()?, CPUGovernor::Powersave);
         assert_eq!(
-            cpu.get_available_governors().unwrap(),
+            cpu.get_available_governors()?,
             vec![
                 CPUGovernor::Performance,
                 CPUGovernor::Powersave
             ]
         );
 
-        assert_eq!(cpu.get_epp().unwrap(), CPUEPP::BalancePower);
+        assert_eq!(cpu.get_epp()?, CPUEPP::BalancePower);
         assert_eq!(
-            cpu.get_available_epp().unwrap(),
+            cpu.get_available_epp()?,
             vec![
                 CPUEPP::Default,
                 CPUEPP::Performance,
@@ -414,5 +428,6 @@ mod tests {
                 CPUEPP::Power,
             ]
         );
+        Ok(())
     }
 }
