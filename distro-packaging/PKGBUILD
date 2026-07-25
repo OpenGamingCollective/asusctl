@@ -16,7 +16,6 @@ depends=('libusb' 'udev')
 optdepends=(
 	'ASUS-WMI-FAN-CONTROL: custom fan curve support'
 	'linux-rog: deprecated name for custom fan curve capability'
-	'supergfxctl: graphics swithing for iGPU + dGPU laptops'
 	)
 makedepends=('git' 'rust' 'llvm' 'clang' 'at-spi2-core' 'cairo' 'gtk3')
 provides=()

@@ -4,10 +4,9 @@ post_upgrade() {
     if [[ $2 == 3* ]]; then
         echo -e "\033[0;34m"
         echo "-> Upgrading from asusctl 3.X.X"
-        echo "-> Enabling power-profiles-daemon and supergfxd services"
+        echo "-> Enabling power-profiles-daemon service"
         echo -e "\033[0m"
         systemctl enable --now power-profiles-daemon.service
-        systemctl enable --now supergfxd.service
         
         if [[ -f "/etc/asusd/asusd.conf" ]]; then
             echo -e "\033[0;33m"
