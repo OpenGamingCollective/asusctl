@@ -7,27 +7,12 @@ use zbus::zvariant::Type;
 use crate::error::ProfileError;
 use crate::FanCurvePU;
 
-fn set_sysfs_name(string: &mut [u8], fan: char, index: usize) {
-    string[3] = fan as u8;
-    string[15] = char::from_digit(index as u32 + 1, 10).unwrap() as u8;
-}
-
 pub(crate) fn pwm_str(fan: char, index: usize) -> String {
-    // The char 'X' is replaced via indexing
-    let mut string = "pwmX_auto_pointX_pwm".to_owned();
-    unsafe {
-        set_sysfs_name(string.as_bytes_mut(), fan, index);
-    }
-    string
+    format!("pwm{fan}_auto_point{}_pwm", index + 1)
 }
 
 pub(crate) fn temp_str(fan: char, index: usize) -> String {
-    // The char 'X' is replaced via indexing
-    let mut string = "pwmX_auto_pointX_temp".to_owned();
-    unsafe {
-        set_sysfs_name(string.as_bytes_mut(), fan, index);
-    }
-    string
+    format!("pwm{fan}_auto_point{}_temp", index + 1)
 }
 
 #[cfg_attr(feature = "dbus", derive(Type))]

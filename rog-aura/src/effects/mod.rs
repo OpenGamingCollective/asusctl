@@ -15,8 +15,9 @@ pub use static_::*;
 use crate::keyboard::{AuraLaptopUsbPackets, KeyLayout, LedCode, LedUsbPackets};
 use crate::Colour;
 
+use std::sync::atomic::{AtomicUsize, Ordering};
 // static mut RNDINDEX: usize = 0;
-static mut PRNDINDEX: usize = 0;
+static PRNDINDEX: AtomicUsize = AtomicUsize::new(0);
 
 /// Pseudo random table ripped straight out of room4doom
 pub const RNDTABLE: [i32; 256] = [
@@ -36,10 +37,8 @@ pub const RNDTABLE: [i32; 256] = [
 ];
 
 pub fn p_random() -> i32 {
-    unsafe {
-        PRNDINDEX = (PRNDINDEX + 1) & 0xff;
-        RNDTABLE[PRNDINDEX]
-    }
+    let idx = (PRNDINDEX.fetch_add(1, Ordering::Relaxed) + 1) & 0xff;
+    RNDTABLE[idx]
 }
 
 pub trait InputForEffect {
