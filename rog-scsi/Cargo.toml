@@ -15,12 +15,12 @@ default = ["dbus", "ron"]
 dbus = ["zbus"]
 
 [dependencies]
-libc = "^0.2"
-nix = { version = "^0.29", features = ["uio"] }
+libc.workspace = true
+nix.workspace = true
 serde.workspace = true
 zbus = { workspace = true, optional = true }
 
 # cli and logging
 
-ron = { version = "*", optional = true }
+ron = { workspace = true, optional = true }
 thiserror.workspace = true
