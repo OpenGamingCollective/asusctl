@@ -715,3 +715,143 @@ pub fn get_gpu_usage_pct() -> f32 {
     }
     0.0
 }
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use super::*;
+
+    /// A scratch directory unique to this test and process, removed on drop so
+    /// nothing is left behind even when the test panics.
+    struct TestDir(PathBuf);
+
+    impl TestDir {
+        fn new(name: &str) -> Self {
+            let dir = std::env::temp_dir().join(format!("{name}_{}", std::process::id()));
+            fs::create_dir_all(&dir).expect("failed to create test dir");
+            Self(dir)
+        }
+
+        fn join(&self, path: &str) -> PathBuf {
+            self.0.join(path)
+        }
+    }
+
+    impl Drop for TestDir {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn fake_device(dev_path: PathBuf) -> Device {
+        Device {
+            dev_path,
+            vendor: GfxVendor::Nvidia,
+            is_dgpu: true,
+            name: "0000:01:00.0".to_string(),
+            pci_id: "10DE:2820".to_string(),
+        }
+    }
+
+    #[test]
+    fn gpu_vendor_matching() {
+        assert!(is_gpu_vendor("10DE:2820"));
+        assert!(is_gpu_vendor("1002:1638"));
+        assert!(!is_gpu_vendor("8086:A7A0"));
+        assert!(!is_gpu_vendor(""));
+        // udev reports PCI_ID in uppercase hex, lowercase is not a valid input
+        assert!(!is_gpu_vendor("10de:2820"));
+    }
+
+    #[test]
+    fn display_class_matching() {
+        assert!(is_display_class("30000")); // VGA controller
+        assert!(is_display_class("30200")); // 3D controller
+        assert!(is_display_class("38000")); // other display controller
+        assert!(!is_display_class("20000")); // network controller
+        assert!(!is_display_class("c0330")); // USB controller
+        assert!(!is_display_class("3")); // base class alone is not a class code
+        assert!(!is_display_class(""));
+        assert!(!is_display_class("not-hex"));
+    }
+
+    #[test]
+    fn first_existing_returns_first_present_path(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let dir = TestDir::new("asusctl_test_first_existing");
+        let real = dir.join("present");
+        fs::write(&real, "1")?;
+        let missing = dir.join("missing").to_string_lossy().to_string();
+        let real_str = real.to_string_lossy().to_string();
+
+        assert_eq!(
+            first_existing(&[
+                missing.as_str(),
+                real_str.as_str()
+            ]),
+            Some(real.clone())
+        );
+        assert_eq!(
+            first_existing(&[
+                real_str.as_str(),
+                missing.as_str()
+            ]),
+            Some(real)
+        );
+        assert_eq!(first_existing(&[missing.as_str()]), None);
+        assert_eq!(first_existing(&[]), None);
+        Ok(())
+    }
+
+    #[test]
+    fn read_digit_reads_first_byte() -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let dir = TestDir::new("asusctl_test_read_digit");
+        let attr = dir.join("current_value");
+
+        fs::write(&attr, "1\n")?;
+        assert_eq!(read_digit(&attr)?, b'1');
+        fs::write(&attr, "0")?;
+        assert_eq!(read_digit(&attr)?, b'0');
+
+        fs::write(&attr, "")?;
+        assert!(read_digit(&attr).is_err());
+        assert!(read_digit(&dir.join("missing")).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn unreadable_runtime_status_is_unknown_not_off(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let dir = TestDir::new("asusctl_test_runtime_status");
+        fs::create_dir_all(dir.join("power"))?;
+        let device = fake_device(dir.0.clone());
+
+        // no runtime_status file at all: the device is gone, not powered off
+        assert_eq!(device.get_runtime_status()?, GfxPower::Unknown);
+
+        fs::write(dir.join("power/runtime_status"), "active\n")?;
+        assert_eq!(device.get_runtime_status()?, GfxPower::Active);
+
+        fs::write(dir.join("power/runtime_status"), "suspended\n")?;
+        assert_eq!(device.get_runtime_status()?, GfxPower::Suspended);
+
+        fs::write(dir.join("power/runtime_status"), "unsupported\n")?;
+        assert_eq!(device.get_runtime_status()?, GfxPower::Unknown);
+        Ok(())
+    }
+
+    #[test]
+    #[ignore = "requires ASUS hardware with a dGPU"]
+    fn live_dgpu_detection() -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let devices = Device::find()?;
+        let dgpu = devices.iter().find(|d| d.is_dgpu()).expect("no dGPU found");
+        assert_ne!(dgpu.vendor(), GfxVendor::Unknown);
+        println!(
+            "dGPU {} runtime status: {:?}",
+            dgpu.pci_id(),
+            dgpu.get_runtime_status()?
+        );
+        Ok(())
+    }
+}
