@@ -25,6 +25,12 @@ desktop-extensions/gnome*/*.zip
 CLAUDE.md
 AGENTS.md
 /reference
+.opencode
+
+# .agents is a universal standard for AI tools (Claude, Cursor, opencode, antigravity).
+.agents/*
+!.agents/AGENTS.md
+!.agents/CONTRIBUTING_AGENTS.md
 
 *.log
 
