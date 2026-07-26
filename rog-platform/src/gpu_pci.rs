@@ -149,6 +149,28 @@ impl Display for GfxVendor {
     }
 }
 
+// --- PCI GPU identification ---
+
+/// Nvidia PCI vendor ID, as it appears in the udev `PCI_ID` property.
+const NVIDIA_PCI_VENDOR: &str = "10DE";
+/// AMD PCI vendor ID, as it appears in the udev `PCI_ID` property.
+const AMD_PCI_VENDOR: &str = "1002";
+
+/// True if a udev `PCI_ID` property (`vendor:device`) belongs to a GPU vendor
+/// that is handled here.
+pub fn is_gpu_vendor(pci_id: &str) -> bool {
+    pci_id.starts_with(NVIDIA_PCI_VENDOR) || pci_id.starts_with(AMD_PCI_VENDOR)
+}
+
+/// True if a udev `PCI_CLASS` property is a display controller (base class
+/// `0x03`).
+///
+/// `PCI_CLASS` is the 24-bit class code in hex without leading zeros, e.g.
+/// `30000` for a VGA controller and `30200` for a 3D controller.
+pub fn is_display_class(pci_class: &str) -> bool {
+    u32::from_str_radix(pci_class, 16).is_ok_and(|class| class >> 16 == 0x03)
+}
+
 // --- Device ---
 
 /// A PCI GPU device.
@@ -246,7 +268,7 @@ impl Device {
                     let id = id.to_string_lossy();
                     let class = class.to_string_lossy();
                     // Match only Nvidia or AMD
-                    if id.starts_with("10DE") || id.starts_with("1002") {
+                    if is_gpu_vendor(&id) {
                         if let Some(vendor) = id.split(':').next() {
                             let mut dgpu = false;
                             // Check connected displays to distinguish dGPU from iGPU.
@@ -258,15 +280,14 @@ impl Device {
                                     "Matched dGPU {id} at {:?} by checking display connections",
                                     device.sysname()
                                 );
-                                dgpu = class.starts_with("30")
-                                    && (id.starts_with("10DE") || id.starts_with("1002"));
+                                dgpu = is_display_class(&class);
                             } else {
                                 trace!(
                                     "Device {id} at {:?} appears to be the iGPU",
                                     device.sysname()
                                 );
                             }
-                            if !dgpu && id.starts_with("1002") {
+                            if !dgpu && id.starts_with(AMD_PCI_VENDOR) {
                                 trace!(
                                     "Found dGPU Device {id} without boot_vga attribute at {:?}",
                                     device.sysname()
