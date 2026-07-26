@@ -27,6 +27,25 @@ use crate::ASUS_ZBUS_PATH;
 
 const MOD_NAME: &str = "aura";
 
+fn register_device_zbus(
+    devices: &mut Vec<AsusDevice>,
+    dev_type: DeviceHandle,
+    path: OwnedObjectPath,
+    start_result: Result<(), RogError>,
+    dev_name: &str,
+) {
+    if start_result
+        .map_err(|e| error!("Failed to start {dev_name} tasks: {e:?}, not adding this device"))
+        .is_ok()
+    {
+        devices.push(AsusDevice {
+            device: dev_type,
+            dbus_path: path,
+            hid_key: None,
+        });
+    }
+}
+
 /// Returns only the Device details concatenated in a form usable for
 /// adding/appending to a filename
 pub fn filename_partial(parent: &Device) -> Option<OwnedObjectPath> {
@@ -385,21 +404,10 @@ impl DeviceManager {
             if let Ok(dev_type) = DeviceHandle::new_slash_usb().await {
                 if let DeviceHandle::Slash(slash) = dev_type.clone() {
                     let path = dbus_path_for_slash();
-                    let ctrl = SlashZbus::new(slash);
-                    if ctrl
+                    let res = SlashZbus::new(slash)
                         .start_tasks(connection, path.clone())
-                        .await
-                        .map_err(|e| {
-                            error!("Failed to start Slash tasks: {e:?}, not adding this device")
-                        })
-                        .is_ok()
-                    {
-                        devices.push(AsusDevice {
-                            device: dev_type,
-                            dbus_path: path,
-                            hid_key: None,
-                        });
-                    }
+                        .await;
+                    register_device_zbus(&mut devices, dev_type, path, res, "Slash");
                 }
             } else {
                 info!("Tested device was not Slash");
@@ -408,22 +416,12 @@ impl DeviceManager {
 
         if do_anime {
             if let Ok(dev_type) = DeviceHandle::maybe_anime_usb().await {
-                // TODO: this is copy/pasted
                 if let DeviceHandle::AniMe(anime) = dev_type.clone() {
                     let path = dbus_path_for_anime();
-                    let ctrl = AniMeZbus::new(anime);
-                    if ctrl
+                    let res = AniMeZbus::new(anime)
                         .start_tasks(connection, path.clone())
-                        .await
-                        .map_err(|e| error!("Failed to start tasks: {e:?}, not adding this device"))
-                        .is_ok()
-                    {
-                        devices.push(AsusDevice {
-                            device: dev_type,
-                            dbus_path: path,
-                            hid_key: None,
-                        });
-                    }
+                        .await;
+                    register_device_zbus(&mut devices, dev_type, path, res, "AniMe Matrix");
                 }
             } else {
                 info!("Tested device was not AniMe Matrix");
@@ -444,23 +442,10 @@ impl DeviceManager {
                 if let Ok(dev_type) = DeviceHandle::maybe_laptop_aura(None, "tuf").await {
                     if let DeviceHandle::Aura(aura) = dev_type.clone() {
                         let path = dbus_path_for_tuf();
-                        let ctrl = AuraZbus::new(aura);
-                        if ctrl
+                        let res = AuraZbus::new(aura)
                             .start_tasks(connection, path.clone())
-                            .await
-                            .map_err(|e| {
-                                error!(
-                                    "Failed to start TUF Aura tasks: {e:?}, not adding this device"
-                                )
-                            })
-                            .is_ok()
-                        {
-                            devices.push(AsusDevice {
-                                device: dev_type,
-                                dbus_path: path,
-                                hid_key: None,
-                            });
-                        }
+                            .await;
+                        register_device_zbus(&mut devices, dev_type, path, res, "TUF Aura");
                     }
                 }
             }
