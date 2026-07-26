@@ -154,7 +154,14 @@ impl DeviceManager {
                                 let path =
                                     dbus_path_for_dev(&usb_device).unwrap_or(dbus_path_for_slash());
                                 let ctrl = SlashZbus::new(slash);
-                                if ctrl.start_tasks(connection, path.clone()).await.is_ok() {
+                                if ctrl
+                                    .start_tasks(connection, path.clone())
+                                    .await
+                                    .map_err(|e| {
+                                        error!("Failed to start Slash tasks: {e:?}, not adding this device")
+                                    })
+                                    .is_ok()
+                                {
                                     devices.push(AsusDevice {
                                         device: dev_type,
                                         dbus_path: path,
@@ -174,7 +181,14 @@ impl DeviceManager {
                                 let path =
                                     dbus_path_for_dev(&usb_device).unwrap_or(dbus_path_for_anime());
                                 let ctrl = AniMeZbus::new(anime);
-                                if ctrl.start_tasks(connection, path.clone()).await.is_ok() {
+                                if ctrl
+                                    .start_tasks(connection, path.clone())
+                                    .await
+                                    .map_err(|e| {
+                                        error!("Failed to start AniMe tasks: {e:?}, not adding this device")
+                                    })
+                                    .is_ok()
+                                {
                                     devices.push(AsusDevice {
                                         device: dev_type,
                                         dbus_path: path,
@@ -194,7 +208,14 @@ impl DeviceManager {
                                 let path =
                                     dbus_path_for_dev(&usb_device).unwrap_or(dbus_path_for_tuf());
                                 let ctrl = AuraZbus::new(aura);
-                                if ctrl.start_tasks(connection, path.clone()).await.is_ok() {
+                                if ctrl
+                                    .start_tasks(connection, path.clone())
+                                    .await
+                                    .map_err(|e| {
+                                        error!("Failed to start Aura tasks: {e:?}, not adding this device")
+                                    })
+                                    .is_ok()
+                                {
                                     devices.push(AsusDevice {
                                         device: dev_type,
                                         dbus_path: path,
@@ -272,7 +293,16 @@ impl DeviceManager {
                     if let Ok(dev_type) = DeviceHandle::maybe_scsi(dev_str, &prod_id).await {
                         if let DeviceHandle::Scsi(scsi) = dev_type.clone() {
                             let ctrl = ScsiZbus::new(scsi);
-                            if ctrl.start_tasks(connection, path.clone()).await.is_ok() {
+                            if ctrl
+                                .start_tasks(connection, path.clone())
+                                .await
+                                .map_err(|e| {
+                                    error!(
+                                        "Failed to start SCSI tasks: {e:?}, not adding this device"
+                                    )
+                                })
+                                .is_ok()
+                            {
                                 return Some(AsusDevice {
                                     device: dev_type,
                                     dbus_path: path,
@@ -356,7 +386,14 @@ impl DeviceManager {
                 if let DeviceHandle::Slash(slash) = dev_type.clone() {
                     let path = dbus_path_for_slash();
                     let ctrl = SlashZbus::new(slash);
-                    if ctrl.start_tasks(connection, path.clone()).await.is_ok() {
+                    if ctrl
+                        .start_tasks(connection, path.clone())
+                        .await
+                        .map_err(|e| {
+                            error!("Failed to start Slash tasks: {e:?}, not adding this device")
+                        })
+                        .is_ok()
+                    {
                         devices.push(AsusDevice {
                             device: dev_type,
                             dbus_path: path,
@@ -408,7 +445,16 @@ impl DeviceManager {
                     if let DeviceHandle::Aura(aura) = dev_type.clone() {
                         let path = dbus_path_for_tuf();
                         let ctrl = AuraZbus::new(aura);
-                        if ctrl.start_tasks(connection, path.clone()).await.is_ok() {
+                        if ctrl
+                            .start_tasks(connection, path.clone())
+                            .await
+                            .map_err(|e| {
+                                error!(
+                                    "Failed to start TUF Aura tasks: {e:?}, not adding this device"
+                                )
+                            })
+                            .is_ok()
+                        {
                             devices.push(AsusDevice {
                                 device: dev_type,
                                 dbus_path: path,
