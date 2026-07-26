@@ -1023,13 +1023,13 @@ fn handle_armoury_command(cmd: &ArmouryCommand) -> Result<(), Box<dyn std::error
         }
         ArmourySubCommand::Get(g) => {
             let mut found = false;
-            if let Ok(attrs) = find_iface::<AsusArmouryProxyBlocking>("xyz.ljones.AsusArmoury") {
-                for attr in attrs.iter() {
-                    let name = attr.name()?;
-                    if <&str>::from(name) == g.property {
-                        print_firmware_attr(attr)?;
-                        found = true;
-                    }
+            let attrs = find_iface::<AsusArmouryProxyBlocking>("xyz.ljones.AsusArmoury")
+                .map_err(|e| format!("Could not reach asusd armoury interface: {e}"))?;
+            for attr in attrs.iter() {
+                let name = attr.name()?;
+                if <&str>::from(name) == g.property {
+                    print_firmware_attr(attr)?;
+                    found = true;
                 }
             }
             if !found {
@@ -1039,19 +1039,19 @@ fn handle_armoury_command(cmd: &ArmouryCommand) -> Result<(), Box<dyn std::error
         }
         ArmourySubCommand::Set(s) => {
             let mut found = false;
-            if let Ok(attrs) = find_iface::<AsusArmouryProxyBlocking>("xyz.ljones.AsusArmoury") {
-                for attr in attrs.iter() {
-                    let name = attr.name()?;
-                    if <&str>::from(name) == s.property {
-                        let mut value: i32 = s.value;
-                        if value == -1 {
-                            info!("Setting to default");
-                            value = attr.default_value()?;
-                        }
-                        attr.set_current_value(value)?;
-                        print_firmware_attr(attr)?;
-                        found = true;
+            let attrs = find_iface::<AsusArmouryProxyBlocking>("xyz.ljones.AsusArmoury")
+                .map_err(|e| format!("Could not reach asusd armoury interface: {e}"))?;
+            for attr in attrs.iter() {
+                let name = attr.name()?;
+                if <&str>::from(name) == s.property {
+                    let mut value: i32 = s.value;
+                    if value == -1 {
+                        info!("Setting to default");
+                        value = attr.default_value()?;
                     }
+                    attr.set_current_value(value)?;
+                    print_firmware_attr(attr)?;
+                    found = true;
                 }
             }
             if !found {
