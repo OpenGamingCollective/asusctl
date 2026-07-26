@@ -258,7 +258,9 @@ impl Device {
         trace!("get_runtime_status: {path:?}");
         match Self::read_file(path) {
             Ok(inner) => GfxPower::from_str(inner.as_str()),
-            Err(_) => Ok(GfxPower::Off),
+            // The device is gone or its runtime PM state is unreadable. `off` is
+            // not a value runtime_status ever reports, so don't invent it.
+            Err(_) => Ok(GfxPower::Unknown),
         }
     }
 
