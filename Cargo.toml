@@ -77,6 +77,11 @@ slint-build = "^1.17.1"
 argh = "^0.1"
 uhid-virt = "^0.0.8"
 sdl2 = { version = "^0.37", default-features = false }
+libc = "^0.2"
+nix = { version = "^0.29", features = ["uio"] }
+nvml-wrapper = "^0.12.0"
+ashpd = { version = "^0.13", default-features = false, features = ["async-io", "global_shortcuts"] }
+console-subscriber = "^0.4"
 
 [profile.release]
 lto = "thin"

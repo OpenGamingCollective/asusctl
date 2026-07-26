@@ -17,7 +17,7 @@ udev.workspace = true
 inotify.workspace = true
 rusb.workspace = true
 thiserror.workspace = true
-nvml-wrapper = "0.12.0"
+nvml-wrapper.workspace = true
 
 [dev-dependencies]
 serde_json = { workspace = true, features = ["preserve_order"] }

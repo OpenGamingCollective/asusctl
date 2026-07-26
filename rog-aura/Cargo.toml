@@ -23,5 +23,5 @@ dmi_id = { path = "../dmi-id" }
 # cli and logging
 log.workspace = true
 
-ron = { version = "*", optional = true }
+ron = { workspace = true, optional = true }
 thiserror.workspace = true
