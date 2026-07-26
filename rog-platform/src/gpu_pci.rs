@@ -22,42 +22,70 @@ const SLOTS: &str = "/sys/bus/pci/slots";
 
 // --- ASUS-specific sysfs paths (reused from rog-platform) ---
 
-const ASUS_DGPU_DISABLE_PATH: &str = "/sys/devices/platform/asus-nb-wmi/dgpu_disable";
-const ASUS_GPU_MUX_PATH: &str = "/sys/devices/platform/asus-nb-wmi/gpu_mux_mode";
+// Both locations read the same WMI devstate and report the same values. The
+// `asus-nb-wmi` attributes are deprecated in the kernel and are compiled out
+// with CONFIG_ASUS_WMI_DEPRECATED_ATTRS=n, so firmware-attributes comes first.
+const ASUS_DGPU_DISABLE_PATHS: [&str; 2] = [
+    "/sys/class/firmware-attributes/asus-armoury/attributes/dgpu_disable/current_value",
+    "/sys/devices/platform/asus-nb-wmi/dgpu_disable",
+];
+const ASUS_GPU_MUX_PATHS: [&str; 2] = [
+    "/sys/class/firmware-attributes/asus-armoury/attributes/gpu_mux_mode/current_value",
+    "/sys/devices/platform/asus-nb-wmi/gpu_mux_mode",
+];
+
+/// The first of `paths` that this machine actually has.
+fn first_existing(paths: &[&str]) -> Option<PathBuf> {
+    paths
+        .iter()
+        .map(Path::new)
+        .find(|path| path.exists())
+        .map(Path::to_path_buf)
+}
+
+/// Read an attribute whose value is a single digit.
+fn read_digit(path: &Path) -> Result<u8> {
+    let mut file = OpenOptions::new()
+        .read(true)
+        .open(path)
+        .map_err(|e| PlatformError::Read(path.to_string_lossy().to_string(), e))?;
+    let mut buf = [0u8; 1];
+    file.read_exact(&mut buf)
+        .map_err(|e| PlatformError::Read(path.to_string_lossy().to_string(), e))?;
+    Ok(buf[0])
+}
+
+/// Path of the ASUS dgpu_disable attribute, if this machine has one.
+pub fn asus_dgpu_disable_path() -> Option<PathBuf> {
+    first_existing(&ASUS_DGPU_DISABLE_PATHS)
+}
+
+/// Path of the ASUS gpu_mux_mode attribute, if this machine has one.
+pub fn asus_gpu_mux_path() -> Option<PathBuf> {
+    first_existing(&ASUS_GPU_MUX_PATHS)
+}
 
 /// Check if the ASUS dgpu_disable attribute exists.
 pub fn asus_dgpu_disable_exists() -> bool {
-    Path::new(ASUS_DGPU_DISABLE_PATH).exists()
+    asus_dgpu_disable_path().is_some()
 }
 
 /// Read the ASUS dgpu_disable value.
 pub fn asus_dgpu_disabled() -> Result<bool> {
-    let mut file = OpenOptions::new()
-        .read(true)
-        .open(ASUS_DGPU_DISABLE_PATH)
-        .map_err(|e| PlatformError::Read(ASUS_DGPU_DISABLE_PATH.into(), e))?;
-    let mut buf = [0u8; 1];
-    file.read_exact(&mut buf)
-        .map_err(|e| PlatformError::Read(ASUS_DGPU_DISABLE_PATH.into(), e))?;
-    Ok(buf[0] == b'1')
+    let path = asus_dgpu_disable_path().ok_or(PlatformError::NotSupported)?;
+    Ok(read_digit(&path)? == b'1')
 }
 
 /// Check if the ASUS gpu_mux_mode attribute exists.
 pub fn asus_gpu_mux_exists() -> bool {
-    Path::new(ASUS_GPU_MUX_PATH).exists()
+    asus_gpu_mux_path().is_some()
 }
 
 /// Read the ASUS gpu_mux_mode value. Returns true if in discreet (dGPU) mode.
 pub fn asus_gpu_mux_discreet() -> Result<bool> {
-    let mut file = OpenOptions::new()
-        .read(true)
-        .open(ASUS_GPU_MUX_PATH)
-        .map_err(|e| PlatformError::Read(ASUS_GPU_MUX_PATH.into(), e))?;
-    let mut buf = [0u8; 1];
-    file.read_exact(&mut buf)
-        .map_err(|e| PlatformError::Read(ASUS_GPU_MUX_PATH.into(), e))?;
+    let path = asus_gpu_mux_path().ok_or(PlatformError::NotSupported)?;
     // gpu_mux_mode: 0 = dGPU (discreet), 1 = Optimus (hybrid)
-    Ok(buf[0] == b'0')
+    Ok(read_digit(&path)? == b'0')
 }
 
 // --- GfxPower ---
