@@ -59,36 +59,86 @@ where
     T: ProxyImpl<'static> + From<zbus::Proxy<'static>>,
 {
     let conn = zbus::Connection::system().await?;
-    let f = zbus::fdo::ObjectManagerProxy::new(&conn, "xyz.ljones.Asusd", "/").await?;
-    let interfaces = f.get_managed_objects().await?;
-    let mut paths = Vec::new();
-    for v in interfaces.iter() {
-        // let o: Vec<zbus::names::OwnedInterfaceName> = v.1.keys().map(|e|
-        // e.to_owned()).collect(); println!("{}, {:?}", v.0, o);
-        for k in v.1.keys() {
-            if k.as_str() == iface_name {
-                // println!("Found {iface_name} device at {}, {}", v.0, k);
-                paths.push(v.0.clone());
-            }
-        }
-    }
-    if paths.len() > 1 {
-        println!("Multiple asusd interfaces devices found");
-    }
-    if !paths.is_empty() {
-        let mut ctrl = Vec::new();
-        paths.sort_by(|a, b| a.cmp(b));
-        for path in paths {
-            ctrl.push(
-                T::builder(&conn)
-                    .path(path.clone())?
-                    .destination("xyz.ljones.Asusd")?
-                    .build()
-                    .await?,
-            );
-        }
-        return Ok(ctrl);
+    let manager = zbus::fdo::ObjectManagerProxy::builder(&conn)
+        .destination(DBUS_NAME)?
+        .path("/")?
+        .build()
+        .await?;
+
+    let managed_objects = manager.get_managed_objects().await?;
+
+    let mut paths: Vec<_> = managed_objects
+        .iter()
+        .filter(|(_, interfaces)| interfaces.contains_key(iface_name))
+        .map(|(path, _)| path.clone())
+        .collect();
+
+    if paths.is_empty() {
+        return Err(format!("Interface not found: {iface_name}").into());
     }
 
-    Err(format!("Did not find {iface_name}").into())
+    if paths.len() > 1 {
+        log::warn!("Multiple asusd interface devices found for: {iface_name}");
+    }
+
+    paths.sort_by(|a, b| a.cmp(b));
+
+    let mut controllers = Vec::with_capacity(paths.len());
+    for path in paths {
+        let proxy = T::builder(&conn)
+            .destination(DBUS_NAME)?
+            .path(path)?
+            .build()
+            .await?;
+        controllers.push(proxy);
+    }
+
+    Ok(controllers)
+}
+
+pub fn find_iface_blocking<T>(iface_name: &str) -> Result<Vec<T>, Box<dyn std::error::Error>>
+where
+    T: zbus::blocking::proxy::ProxyImpl<'static> + From<zbus::Proxy<'static>>,
+{
+    // Connect to the D-Bus system bus
+    let conn = zbus::blocking::Connection::system()?;
+
+    // Initialize the standard Object Manager for asusd
+    let manager = zbus::blocking::fdo::ObjectManagerProxy::builder(&conn)
+        .destination(DBUS_NAME)?
+        .path("/")?
+        .build()?;
+
+    let managed_objects = manager.get_managed_objects()?;
+
+    // Extract and clone valid object paths using a functional approach
+    let mut paths: Vec<_> = managed_objects
+        .iter()
+        .filter(|(_, interfaces)| interfaces.contains_key(iface_name))
+        .map(|(path, _)| path.clone())
+        .collect();
+
+    // Early return if no matching interfaces are found
+    if paths.is_empty() {
+        return Err(format!("Interface not found: {iface_name}").into());
+    }
+
+    if paths.len() > 1 {
+        log::warn!("Multiple asusd interface devices found for: {iface_name}");
+    }
+
+    // Sort paths using ObjectPath::cmp
+    paths.sort_by(|a, b| a.cmp(b));
+
+    // Pre-allocate vector capacity to maximize performance
+    let mut controllers = Vec::with_capacity(paths.len());
+    for path in paths {
+        let proxy = T::builder(&conn)
+            .destination(DBUS_NAME)?
+            .path(path)?
+            .build()?;
+        controllers.push(proxy);
+    }
+
+    Ok(controllers)
 }
