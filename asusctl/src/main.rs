@@ -564,7 +564,6 @@ fn handle_scsi(cmd: &ScsiCommand) -> Result<(), Box<dyn std::error::Error>> {
         }
 
         if let Some(mode) = cmd.mode {
-            dbg!(mode as u8);
             scsi.set_led_mode(mode)?;
         }
 

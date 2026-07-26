@@ -240,8 +240,6 @@ fn fan_data_for(fan: FanType, enabled: bool, data: Vec<Node>) -> CurveData {
         pwm[i] = n.y as u8;
     }
 
-    dbg!(&fan, enabled);
-
     CurveData {
         fan: fan.into(),
         pwm,
