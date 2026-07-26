@@ -31,6 +31,10 @@ pub fn asus_dgpu_disable_exists() -> bool {
 }
 
 /// Read the ASUS dgpu_disable value.
+///
+/// **Note:** Changes to `dgpu_disable` take effect upon system shutdown or reboot
+/// to allow clean ACPI/WMI hardware reconfiguration and prevent application crashes
+/// caused by live PCI driver unbinding during an active session.
 pub fn asus_dgpu_disabled() -> Result<bool> {
     let mut file = OpenOptions::new()
         .read(true)
