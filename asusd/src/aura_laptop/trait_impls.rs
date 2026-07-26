@@ -242,39 +242,26 @@ impl CtrlTask for AuraZbus {
         self.create_sys_event_tasks(
             move |sleeping| {
                 let inner1 = inner1.clone();
-                // unwrap as we want to bomb out of the task
                 async move {
                     if !sleeping {
                         info!("CtrlKbdLedTask reloading brightness and modes");
                         if let Some(backlight) = &inner1.backlight {
-                            backlight
+                            if let Err(e) = backlight
                                 .lock()
                                 .await
                                 .set_brightness(inner1.config.lock().await.brightness.into())
-                                .map_err(|e| {
-                                    error!("CtrlKbdLedTask: {e}");
-                                    e
-                                })
-                                .unwrap();
+                            {
+                                error!("CtrlKbdLedTask brightness error: {e}");
+                            }
                         }
                         let mut config = inner1.config.lock().await;
-                        inner1
-                            .write_current_config_mode(&mut config)
-                            .await
-                            .map_err(|e| {
-                                error!("CtrlKbdLedTask: {e}");
-                                e
-                            })
-                            .unwrap();
-                    } else if sleeping {
-                        inner1
-                            .update_config()
-                            .await
-                            .map_err(|e| {
-                                error!("CtrlKbdLedTask: {e}");
-                                e
-                            })
-                            .unwrap();
+                        if let Err(e) = inner1.write_current_config_mode(&mut config).await {
+                            error!("CtrlKbdLedTask config mode error: {e}");
+                        }
+                    } else {
+                        if let Err(e) = inner1.update_config().await {
+                            error!("CtrlKbdLedTask update config error: {e}");
+                        }
                     }
                 }
             },
@@ -283,16 +270,13 @@ impl CtrlTask for AuraZbus {
                 async move {
                     info!("CtrlKbdLedTask reloading brightness and modes");
                     if let Some(backlight) = &inner3.backlight {
-                        // unwrap as we want to bomb out of the task
-                        backlight
+                        if let Err(e) = backlight
                             .lock()
                             .await
                             .set_brightness(inner3.config.lock().await.brightness.into())
-                            .map_err(|e| {
-                                error!("CtrlKbdLedTask: {e}");
-                                e
-                            })
-                            .unwrap();
+                        {
+                            error!("CtrlKbdLedTask brightness error: {e}");
+                        }
                     }
                 }
             },
