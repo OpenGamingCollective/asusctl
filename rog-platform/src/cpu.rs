@@ -86,9 +86,8 @@ impl CPUControl {
         if let Some(path) = self.paths.first() {
             let s = read_attr_string(&to_device(path)?, ATTR_GOVERNOR)?;
             Ok(s.as_str().into())
-            // TODO: check cpu are sync
         } else {
-            Err(PlatformError::CPU("No CPU's?".to_string()))
+            Err(PlatformError::CPU("No CPUs found".to_string()))
         }
     }
 
@@ -96,9 +95,8 @@ impl CPUControl {
         if let Some(path) = self.paths.first() {
             read_attr_string(&to_device(path)?, ATTR_AVAILABLE_GOVERNORS)
                 .map(|s| s.split_whitespace().map(|s| s.into()).collect())
-            // TODO: check cpu are sync
         } else {
-            Err(PlatformError::CPU("No CPU's?".to_string()))
+            Err(PlatformError::CPU("No CPUs found".to_string()))
         }
     }
 
@@ -117,9 +115,8 @@ impl CPUControl {
         if let Some(path) = self.paths.first() {
             let s = read_attr_string(&to_device(path)?, ATTR_EPP)?;
             Ok(s.as_str().into())
-            // TODO: check cpu are sync
         } else {
-            Err(PlatformError::CPU("No CPU's?".to_string()))
+            Err(PlatformError::CPU("No CPUs found".to_string()))
         }
     }
 
@@ -135,7 +132,7 @@ impl CPUControl {
                 }
             }
         } else {
-            Err(PlatformError::CPU("No CPU's?".to_string()))
+            Err(PlatformError::CPU("No CPUs found".to_string()))
         }
     }
 
