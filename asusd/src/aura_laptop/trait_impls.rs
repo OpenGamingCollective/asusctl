@@ -39,8 +39,10 @@ impl AuraZbus {
             .object_server()
             .at(path.clone(), self)
             .await
-            .map_err(|e| error!("Couldn't add server at path: {path}, {e:?}"))
-            .ok();
+            .map_err(|e| {
+                error!("Couldn't add server at path: {path}, {e:?}");
+                e
+            })?;
         // TODO: skip this until we keep handles to tasks so they can be killed
         // task.create_tasks(signal_ctx).await
         Ok(())
