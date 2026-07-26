@@ -117,7 +117,7 @@ async fn main() -> Result<()> {
         Ok(p) => p,
         Err(err) => {
             eprintln!("Error parsing command line arguments: {err}");
-            return Ok(());
+            std::process::exit(1);
         }
     };
 
