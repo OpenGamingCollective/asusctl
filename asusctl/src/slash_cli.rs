@@ -1,4 +1,5 @@
 use argh::FromArgs;
+use log::warn;
 use rog_dbus::zbus_slash::SlashProxyBlocking;
 use rog_slash::SlashMode;
 use zbus::blocking::Connection;
@@ -78,7 +79,7 @@ pub fn handle_slash_set(cmd: &SlashSetCommand) -> Result<(), Box<dyn std::error:
         && !cmd.enable
         && !cmd.disable
     {
-        println!("Missing arg; run 'asusctl slash set --help' for usage");
+        warn!("Missing arg; run 'asusctl slash set --help' for usage");
     }
 
     let conn = Connection::system()?;
@@ -138,14 +139,14 @@ pub fn handle_slash_get() -> Result<(), Box<dyn std::error::Error>> {
         "Slash LED: {}",
         if enabled { "enabled" } else { "disabled" }
     );
-    println!("Brightness: {}", brightness);
-    println!("Interval: {}", interval);
-    println!("Mode: {}", mode);
-    println!("Show on boot: {}", show_on_boot);
-    println!("Show on shutdown: {}", show_on_shutdown);
-    println!("Show on sleep: {}", show_on_sleep);
-    println!("Show on battery: {}", show_on_battery);
-    println!("Show battery warning: {}", show_battery_warning);
+    println!("Brightness: {brightness}");
+    println!("Interval: {interval}");
+    println!("Mode: {mode}");
+    println!("Show on boot: {show_on_boot}");
+    println!("Show on shutdown: {show_on_shutdown}");
+    println!("Show on sleep: {show_on_sleep}");
+    println!("Show on battery: {show_on_battery}");
+    println!("Show battery warning: {show_battery_warning}");
 
     Ok(())
 }
