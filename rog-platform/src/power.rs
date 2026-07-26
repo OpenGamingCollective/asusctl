@@ -5,6 +5,10 @@ use log::{info, warn};
 use crate::error::{PlatformError, Result};
 use crate::{attr_num, to_device};
 
+/// sysfs power_supply attributes are reported in micro-units (uW, uWh, uA,
+/// uAh, uV)
+const MICRO: f64 = 1_000_000.0;
+
 /// The "platform" device provides access to things like:
 /// - `dgpu_disable`
 /// - `egpu_enable`
@@ -136,29 +140,15 @@ impl AsusPower {
     }
 
     pub fn get_battery_health(&self) -> Result<u8> {
-        let full = if self.battery.join("energy_full").exists() {
-            let content = std::fs::read_to_string(self.battery.join("energy_full"))
-                .map_err(|e| PlatformError::Read("energy_full".into(), e))?;
-            content.trim().parse::<f64>().ok()
-        } else if self.battery.join("charge_full").exists() {
-            let content = std::fs::read_to_string(self.battery.join("charge_full"))
-                .map_err(|e| PlatformError::Read("charge_full".into(), e))?;
-            content.trim().parse::<f64>().ok()
-        } else {
-            None
-        };
-
-        let design = if self.battery.join("energy_full_design").exists() {
-            let content = std::fs::read_to_string(self.battery.join("energy_full_design"))
-                .map_err(|e| PlatformError::Read("energy_full_design".into(), e))?;
-            content.trim().parse::<f64>().ok()
-        } else if self.battery.join("charge_full_design").exists() {
-            let content = std::fs::read_to_string(self.battery.join("charge_full_design"))
-                .map_err(|e| PlatformError::Read("charge_full_design".into(), e))?;
-            content.trim().parse::<f64>().ok()
-        } else {
-            None
-        };
+        // Ratio of raw values; energy vs charge units cancel out
+        let full = self
+            .read_battery_attr("energy_full")
+            .or_else(|_| self.read_battery_attr("charge_full"))
+            .ok();
+        let design = self
+            .read_battery_attr("energy_full_design")
+            .or_else(|_| self.read_battery_attr("charge_full_design"))
+            .ok();
 
         match (full, design) {
             (Some(f), Some(d)) if d > 0.0 => {
@@ -175,46 +165,42 @@ impl AsusPower {
         }
     }
 
-    pub fn get_battery_power_consumption(&self) -> Result<f32> {
-        if self.battery.join("power_now").exists() {
-            let content = std::fs::read_to_string(self.battery.join("power_now"))
-                .map_err(|e| PlatformError::Read("power_now".into(), e))?;
-            let power = content.trim().parse::<f32>().map_err(|e| {
-                PlatformError::Read(
-                    "power_now".into(),
-                    std::io::Error::new(std::io::ErrorKind::InvalidData, e),
-                )
-            })?;
-            Ok(power / 1_000_000.0)
-        } else if self.battery.join("current_now").exists()
-            && self.battery.join("voltage_now").exists()
-        {
-            let current_str = std::fs::read_to_string(self.battery.join("current_now"))
-                .map_err(|e| PlatformError::Read("current_now".into(), e))?;
-            let voltage_str = std::fs::read_to_string(self.battery.join("voltage_now"))
-                .map_err(|e| PlatformError::Read("voltage_now".into(), e))?;
-            let current = current_str.trim().parse::<f32>().map_err(|e| {
-                PlatformError::Read(
-                    "current_now".into(),
-                    std::io::Error::new(std::io::ErrorKind::InvalidData, e),
-                )
-            })?;
-            let voltage = voltage_str.trim().parse::<f32>().map_err(|e| {
-                PlatformError::Read(
-                    "voltage_now".into(),
-                    std::io::Error::new(std::io::ErrorKind::InvalidData, e),
-                )
-            })?;
-            Ok((current * voltage) / 1_000_000_000.0)
+    fn read_battery_attr(&self, attr: &str) -> Result<f64> {
+        let content = std::fs::read_to_string(self.battery.join(attr))
+            .map_err(|e| PlatformError::Read(attr.into(), e))?;
+        content.trim().parse::<f64>().map_err(|e| {
+            PlatformError::Read(
+                attr.into(),
+                std::io::Error::new(std::io::ErrorKind::InvalidData, e),
+            )
+        })
+    }
+
+    /// Batteries report either in power units (`direct` attr, uW/uWh) or in
+    /// charge units (`charge` attr, uA/uAh) which must be multiplied by
+    /// `voltage_now` (uV). Returns plain watts/watt-hours either way.
+    fn read_direct_or_charge_based(&self, direct: &str, charge: &str) -> Result<f64> {
+        if self.battery.join(direct).exists() {
+            Ok(self.read_battery_attr(direct)? / MICRO)
+        } else if self.battery.join(charge).exists() && self.battery.join("voltage_now").exists() {
+            Ok(
+                self.read_battery_attr(charge)? * self.read_battery_attr("voltage_now")?
+                    / (MICRO * MICRO),
+            )
         } else {
             Err(PlatformError::Read(
                 self.battery.to_string_lossy().into(),
                 std::io::Error::new(
                     std::io::ErrorKind::NotFound,
-                    "power/current/voltage attributes not found",
+                    format!("{direct}/{charge} attributes not found"),
                 ),
             ))
         }
+    }
+
+    pub fn get_battery_power_consumption(&self) -> Result<f32> {
+        self.read_direct_or_charge_based("power_now", "current_now")
+            .map(|w| w as f32)
     }
 
     pub fn get_battery_status(&self) -> Result<String> {
@@ -231,87 +217,11 @@ impl AsusPower {
     }
 
     pub fn get_battery_remaining_energy_wh(&self) -> Result<f64> {
-        if self.battery.join("energy_now").exists() {
-            let content = std::fs::read_to_string(self.battery.join("energy_now"))
-                .map_err(|e| PlatformError::Read("energy_now".into(), e))?;
-            let val = content.trim().parse::<f64>().map_err(|e| {
-                PlatformError::Read(
-                    "energy_now".into(),
-                    std::io::Error::new(std::io::ErrorKind::InvalidData, e),
-                )
-            })?;
-            Ok(val / 1_000_000.0)
-        } else if self.battery.join("charge_now").exists()
-            && self.battery.join("voltage_now").exists()
-        {
-            let charge_str = std::fs::read_to_string(self.battery.join("charge_now"))
-                .map_err(|e| PlatformError::Read("charge_now".into(), e))?;
-            let voltage_str = std::fs::read_to_string(self.battery.join("voltage_now"))
-                .map_err(|e| PlatformError::Read("voltage_now".into(), e))?;
-            let charge = charge_str.trim().parse::<f64>().map_err(|e| {
-                PlatformError::Read(
-                    "charge_now".into(),
-                    std::io::Error::new(std::io::ErrorKind::InvalidData, e),
-                )
-            })?;
-            let voltage = voltage_str.trim().parse::<f64>().map_err(|e| {
-                PlatformError::Read(
-                    "voltage_now".into(),
-                    std::io::Error::new(std::io::ErrorKind::InvalidData, e),
-                )
-            })?;
-            Ok((charge * voltage) / 1_000_000_000.0)
-        } else {
-            Err(PlatformError::Read(
-                self.battery.to_string_lossy().into(),
-                std::io::Error::new(
-                    std::io::ErrorKind::NotFound,
-                    "energy_now/charge_now attributes not found",
-                ),
-            ))
-        }
+        self.read_direct_or_charge_based("energy_now", "charge_now")
     }
 
     pub fn get_battery_full_energy_wh(&self) -> Result<f64> {
-        if self.battery.join("energy_full").exists() {
-            let content = std::fs::read_to_string(self.battery.join("energy_full"))
-                .map_err(|e| PlatformError::Read("energy_full".into(), e))?;
-            let val = content.trim().parse::<f64>().map_err(|e| {
-                PlatformError::Read(
-                    "energy_full".into(),
-                    std::io::Error::new(std::io::ErrorKind::InvalidData, e),
-                )
-            })?;
-            Ok(val / 1_000_000.0)
-        } else if self.battery.join("charge_full").exists()
-            && self.battery.join("voltage_now").exists()
-        {
-            let charge_str = std::fs::read_to_string(self.battery.join("charge_full"))
-                .map_err(|e| PlatformError::Read("charge_full".into(), e))?;
-            let voltage_str = std::fs::read_to_string(self.battery.join("voltage_now"))
-                .map_err(|e| PlatformError::Read("voltage_now".into(), e))?;
-            let charge = charge_str.trim().parse::<f64>().map_err(|e| {
-                PlatformError::Read(
-                    "charge_full".into(),
-                    std::io::Error::new(std::io::ErrorKind::InvalidData, e),
-                )
-            })?;
-            let voltage = voltage_str.trim().parse::<f64>().map_err(|e| {
-                PlatformError::Read(
-                    "voltage_now".into(),
-                    std::io::Error::new(std::io::ErrorKind::InvalidData, e),
-                )
-            })?;
-            Ok((charge * voltage) / 1_000_000_000.0)
-        } else {
-            Err(PlatformError::Read(
-                self.battery.to_string_lossy().into(),
-                std::io::Error::new(
-                    std::io::ErrorKind::NotFound,
-                    "energy_full/charge_full attributes not found",
-                ),
-            ))
-        }
+        self.read_direct_or_charge_based("energy_full", "charge_full")
     }
 
     pub fn get_battery_time_estimate(&self) -> Result<Option<(bool, i32, i32)>> {
@@ -395,5 +305,37 @@ mod tests {
         // Clean up
         let _ = fs::remove_dir_all(temp_dir);
         Ok(())
+    }
+
+    #[test]
+    fn test_charge_based_battery_methods() {
+        let temp_dir = std::env::temp_dir().join("fake_battery_charge");
+        fs::create_dir_all(&temp_dir).unwrap();
+
+        // Charge-unit battery (mA/mAh firmware): no power_now/energy_* attrs
+        fs::write(temp_dir.join("current_now"), "2870000\n").unwrap();
+        fs::write(temp_dir.join("voltage_now"), "15811000\n").unwrap();
+        fs::write(temp_dir.join("charge_now"), "3322000\n").unwrap();
+        fs::write(temp_dir.join("charge_full"), "4700000\n").unwrap();
+        fs::write(temp_dir.join("status"), "Discharging\n").unwrap();
+
+        let power = AsusPower {
+            mains: PathBuf::new(),
+            battery: temp_dir.clone(),
+            usb: None,
+        };
+
+        // 2.87 A * 15.811 V = 45.377... W
+        let watts = power.get_battery_power_consumption().unwrap();
+        assert!((watts - 45.377).abs() < 0.01, "got {watts} W");
+
+        // 3.322 Ah * 15.811 V = 52.524... Wh
+        let wh = power.get_battery_remaining_energy_wh().unwrap();
+        assert!((wh - 52.524).abs() < 0.01, "got {wh} Wh");
+
+        let full_wh = power.get_battery_full_energy_wh().unwrap();
+        assert!((full_wh - 74.311).abs() < 0.01, "got {full_wh} Wh");
+
+        fs::remove_dir_all(&temp_dir).ok();
     }
 }
