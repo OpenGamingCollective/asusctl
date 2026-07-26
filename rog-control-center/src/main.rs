@@ -83,12 +83,12 @@ async fn main() -> Result<()> {
     let asusd_version = match platform_proxy.version() {
         Ok(v) => v,
         Err(e) => {
-            eprintln!("Could not get asusd version: {e:?}\nIs asusd.service running?");
+            error!("Could not get asusd version: {e:?}\nIs asusd.service running?");
             std::process::exit(1);
         }
     };
     if asusd_version != self_version {
-        println!("Version mismatch: asusctl = {self_version}, asusd = {asusd_version}");
+        warn!("Version mismatch: asusctl = {self_version}, asusd = {asusd_version}");
         // return Ok(());
     }
 
