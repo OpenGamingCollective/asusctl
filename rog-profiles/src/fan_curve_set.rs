@@ -26,27 +26,14 @@ pub struct CurveData {
 
 impl From<&CurveData> for String {
     fn from(c: &CurveData) -> Self {
-        format!(
-            "{:?}: enabled: {}, {}c:{}%,{}c:{}%,{}c:{}%,{}c:{}%,{}c:{}%,{}c:{}%,{}c:{}%,{}c:{}%",
-            c.fan,
-            c.enabled,
-            c.temp[0],
-            (c.pwm[0] as u32) * 100 / 255,
-            c.temp[1],
-            (c.pwm[1] as u32) * 100 / 255,
-            c.temp[2],
-            (c.pwm[2] as u32) * 100 / 255,
-            c.temp[3],
-            (c.pwm[3] as u32) * 100 / 255,
-            c.temp[4],
-            (c.pwm[4] as u32) * 100 / 255,
-            c.temp[5],
-            (c.pwm[5] as u32) * 100 / 255,
-            c.temp[6],
-            (c.pwm[6] as u32) * 100 / 255,
-            c.temp[7],
-            (c.pwm[7] as u32) * 100 / 255,
-        )
+        let points = c
+            .temp
+            .iter()
+            .zip(&c.pwm)
+            .map(|(t, p)| format!("{t}c:{}%", (*p as u32) * 100 / 255))
+            .collect::<Vec<_>>()
+            .join(",");
+        format!("{:?}: enabled: {}, {points}", c.fan, c.enabled)
     }
 }
 
