@@ -34,12 +34,13 @@ pub struct AuraConfig {
 
 impl StdConfig for AuraConfig {
     fn new() -> Self {
-        panic!("This should not be used");
+        Self::default()
     }
 
     fn file_name(&self) -> String {
         if self.config_name.is_empty() {
-            panic!("Config file name should not be empty");
+            log::warn!("Config file name is empty, falling back to aura.ron");
+            return "aura.ron".to_string();
         }
         self.config_name.to_owned()
     }

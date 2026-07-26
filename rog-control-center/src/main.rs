@@ -116,7 +116,8 @@ async fn main() -> Result<()> {
     let cli_parsed = match CliStart::parse_args_default(&args) {
         Ok(p) => p,
         Err(err) => {
-            panic!("source {}", err);
+            eprintln!("Error parsing command line arguments: {err}");
+            return Ok(());
         }
     };
 
