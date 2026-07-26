@@ -21,8 +21,6 @@ use zbus::fdo::ObjectManager;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("Starting asusd daemon...");
-
     // console_subscriber::init();
     let mut logger = env_logger::Builder::new();
     logger
@@ -32,17 +30,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .filter_level(log::LevelFilter::Debug)
         .init();
 
+    info!("Starting asusd daemon...");
+
     let is_service = match env::var_os("IS_SERVICE") {
         Some(val) => val == "1",
         None => true,
     };
 
     if !is_service {
-        println!("asusd schould be only run from the right systemd service");
-        println!(
-            "do not run in your terminal, if you need an logs please use journalctl -b -u asusd"
-        );
-        println!("asusd will now exit");
+        warn!("asusd should only be run from the right systemd service");
+        warn!("do not run in your terminal; if you need logs please use journalctl -b -u asusd");
+        warn!("asusd will now exit");
         return Ok(());
     }
 
@@ -59,9 +57,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 /// The actual main loop for the daemon
 async fn start_daemon() -> Result<(), Box<dyn Error>> {
-    // let supported = SupportedFunctions::get_supported();
     print_board_info();
-    // println!("{:?}", supported.supported_functions());
 
     // Start zbus server
     let mut server = Connection::system().await?;
@@ -162,12 +158,12 @@ async fn start_daemon() -> Result<(), Box<dyn Error>> {
         Err(e) => error!("XG Mobile LED: {e}"),
     }
 
-    // Request dbus name after finishing initalizing all functions
+    // Request dbus name after finishing initializing all functions
     server.request_name(DBUS_NAME).await?;
 
-    info!("Startup success on dbus name {DBUS_NAME}: begining dbus server loop");
+    info!("Startup success on dbus name {DBUS_NAME}: beginning dbus server loop");
     loop {
-        // This is just a blocker to idle and ensure the reator reacts
+        // This is just a blocker to idle and ensure the reactor reacts
         server.executor().tick().await;
     }
 }
