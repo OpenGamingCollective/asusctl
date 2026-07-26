@@ -1,6 +1,4 @@
-extern crate sg;
-
-pub use sg::Task;
+use crate::sg::{Direction, Task};
 
 static ENE_APPLY_VAL: u8 = 0x01; // Value for Apply Changes Register
 static ENE_SAVE_VAL: u8 = 0xaa;
@@ -37,7 +35,7 @@ fn data(reg: u32, arg_count: u8) -> [u8; 16] {
 pub(crate) fn rgb_task(led: u32, rgb: &[u8; 3]) -> Task {
     let mut task = Task::new();
     task.set_cdb(data(led * 3 + ENE_REG_COLORS_EFFECT_V2, 3).as_slice());
-    task.set_data(rgb, sg::Direction::ToDevice);
+    task.set_data(rgb, Direction::ToDevice);
     task
 }
 
@@ -45,7 +43,7 @@ pub(crate) fn rgb_task(led: u32, rgb: &[u8; 3]) -> Task {
 pub(crate) fn mode_task(mode: u8) -> Task {
     let mut task = Task::new();
     task.set_cdb(data(ENE_REG_MODE, 1).as_slice());
-    task.set_data(&[mode.min(13)], sg::Direction::ToDevice);
+    task.set_data(&[mode.min(13)], Direction::ToDevice);
     task
 }
 
@@ -53,7 +51,7 @@ pub(crate) fn mode_task(mode: u8) -> Task {
 pub(crate) fn speed_task(speed: u8) -> Task {
     let mut task = Task::new();
     task.set_cdb(data(ENE_REG_SPEED, 1).as_slice());
-    task.set_data(&[speed.min(4)], sg::Direction::ToDevice);
+    task.set_data(&[speed.min(4)], Direction::ToDevice);
     task
 }
 
@@ -61,20 +59,20 @@ pub(crate) fn speed_task(speed: u8) -> Task {
 pub(crate) fn dir_task(mode: u8) -> Task {
     let mut task = Task::new();
     task.set_cdb(data(ENE_REG_DIRECTION, 1).as_slice());
-    task.set_data(&[mode.min(1)], sg::Direction::ToDevice);
+    task.set_data(&[mode.min(1)], Direction::ToDevice);
     task
 }
 
 pub(crate) fn apply_task() -> Task {
     let mut task = Task::new();
     task.set_cdb(data(ENE_REG_APPLY, 1).as_slice());
-    task.set_data(&[ENE_APPLY_VAL], sg::Direction::ToDevice);
+    task.set_data(&[ENE_APPLY_VAL], Direction::ToDevice);
     task
 }
 
 pub(crate) fn save_task() -> Task {
     let mut task = Task::new();
     task.set_cdb(data(ENE_REG_APPLY, 1).as_slice());
-    task.set_data(&[ENE_SAVE_VAL], sg::Direction::ToDevice);
+    task.set_data(&[ENE_SAVE_VAL], Direction::ToDevice);
     task
 }

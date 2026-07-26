@@ -15,7 +15,8 @@ default = ["dbus", "ron"]
 dbus = ["zbus"]
 
 [dependencies]
-sg.workspace = true
+libc = "^0.2"
+nix = { version = "^0.29", features = ["uio"] }
 serde.workspace = true
 zbus = { workspace = true, optional = true }
 
