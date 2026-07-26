@@ -84,14 +84,19 @@ pub fn show_toast(
         Ok(_) => {
             let delayed_handle = handle.clone();
             let delayed_text = success.clone();
-            slint::invoke_from_event_loop(move || handle.unwrap().invoke_show_toast(success)).ok();
+            slint::invoke_from_event_loop(move || {
+                if let Some(h) = handle.upgrade() {
+                    h.invoke_show_toast(success);
+                }
+            })
+            .ok();
             tokio::spawn(async move {
                 tokio::time::sleep(Duration::from_secs(5)).await;
                 if TOAST_SEQ.load(Ordering::SeqCst) == seq {
                     slint::invoke_from_event_loop(move || {
-                        delayed_handle
-                            .unwrap()
-                            .invoke_clear_toast_if_matches(delayed_text)
+                        if let Some(h) = delayed_handle.upgrade() {
+                            h.invoke_clear_toast_if_matches(delayed_text);
+                        }
                     })
                     .ok();
                 }
@@ -102,16 +107,18 @@ pub fn show_toast(
             let delayed_text = fail.clone();
             slint::invoke_from_event_loop(move || {
                 log::warn!("{fail}: {e}");
-                handle.unwrap().invoke_show_toast(fail)
+                if let Some(h) = handle.upgrade() {
+                    h.invoke_show_toast(fail);
+                }
             })
             .ok();
             tokio::spawn(async move {
                 tokio::time::sleep(Duration::from_secs(5)).await;
                 if TOAST_SEQ.load(Ordering::SeqCst) == seq {
                     slint::invoke_from_event_loop(move || {
-                        delayed_handle
-                            .unwrap()
-                            .invoke_clear_toast_if_matches(delayed_text)
+                        if let Some(h) = delayed_handle.upgrade() {
+                            h.invoke_clear_toast_if_matches(delayed_text);
+                        }
                     })
                     .ok();
                 }
@@ -129,15 +136,12 @@ pub fn setup_window(
     slint::set_xdg_app_id(crate::APP_ID)
         .map_err(|e| warn!("Couldn't set application ID: {e:?}"))
         .ok();
-    let ui = MainWindow::new()
-        .map_err(|e| warn!("Couldn't create main window: {e:?}"))
-        .unwrap();
+    let ui = MainWindow::new().expect("Couldn't create main window");
     // propagate TUF flag to the UI so the sidebar can swap logo branding
     ui.set_is_tuf(is_tuf);
-    ui.window()
-        .show()
-        .map_err(|e| warn!("Couldn't show main window: {e:?}"))
-        .unwrap();
+    if let Err(e) = ui.window().show() {
+        warn!("Couldn't show main window: {e:?}");
+    }
 
     let available = list_iface_blocking().unwrap_or_default();
     ui.set_sidebar_items_avilable(
@@ -157,7 +161,9 @@ pub fn setup_window(
     );
 
     ui.on_exit_app(move || {
-        slint::quit_event_loop().unwrap();
+        if let Err(e) = slint::quit_event_loop() {
+            log::warn!("Failed to quit event loop: {e:?}");
+        }
     });
 
     setup_app_settings_page(&ui, config.clone(), shortcuts);

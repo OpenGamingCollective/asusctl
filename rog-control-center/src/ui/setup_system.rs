@@ -223,9 +223,27 @@ macro_rules! init_minmax_property {
         let proxy_copy = $attr.clone();
         let handle_copy = $handle.as_weak();
         tokio::spawn(async move {
-            let min = proxy_copy.min_value().await.unwrap();
-            let max = proxy_copy.max_value().await.unwrap();
-            let current = proxy_copy.current_value().await.unwrap() as f32;
+            let min = match proxy_copy.min_value().await {
+                Ok(m) => m,
+                Err(e) => {
+                    log::error!("Failed to read min value for property {}: {}", stringify!($property), e);
+                    return;
+                }
+            };
+            let max = match proxy_copy.max_value().await {
+                Ok(m) => m,
+                Err(e) => {
+                    log::error!("Failed to read max value for property {}: {}", stringify!($property), e);
+                    return;
+                }
+            };
+            let current = match proxy_copy.current_value().await {
+                Ok(c) => c as f32,
+                Err(e) => {
+                    log::error!("Failed to read current value for property {}: {}", stringify!($property), e);
+                    return;
+                }
+            };
             handle_copy
                 .upgrade_in_event_loop(move |handle| {
                     concat_idents!(setter = set_, $property {
@@ -350,9 +368,27 @@ macro_rules! setup_minmax_external {
             while let Some(e) = x.next().await {
                 if let Ok(_) = e.get().await {
                     debug!("receive_platform_profile_changed, getting new {}", stringify!(attr));
-                    let min = proxy_copy.min_value().await.unwrap();
-                    let max = proxy_copy.max_value().await.unwrap();
-                    let current = proxy_copy.current_value().await.unwrap() as f32;
+                    let min = match proxy_copy.min_value().await {
+                        Ok(m) => m,
+                        Err(e) => {
+                            log::error!("Failed to get min value on profile change: {e}");
+                            continue;
+                        }
+                    };
+                    let max = match proxy_copy.max_value().await {
+                        Ok(m) => m,
+                        Err(e) => {
+                            log::error!("Failed to get max value on profile change: {e}");
+                            continue;
+                        }
+                    };
+                    let current = match proxy_copy.current_value().await {
+                        Ok(c) => c as f32,
+                        Err(e) => {
+                            log::error!("Failed to get current value on profile change: {e}");
+                            continue;
+                        }
+                    };
                     handle_copy
                         .upgrade_in_event_loop(move |handle| {
                             concat_idents!(setter = set_, $property {
@@ -390,26 +426,27 @@ pub fn setup_system_page_callbacks(ui: &MainWindow, _states: Arc<Mutex<Config>>)
 
     tokio::spawn(async move {
         // Create the connections/proxies here to prevent future delays in process
-        let conn = zbus::Connection::system()
-            .await
-            .map_err(|e| {
-                log::error!("Failed to connect to system bus: {}", e);
-            })
-            .unwrap();
-        let platform = PlatformProxy::builder(&conn)
-            .build()
-            .await
-            .map_err(|e| {
-                log::error!("Failed to create platform proxy: {}", e);
-            })
-            .unwrap();
-        let backlight = BacklightProxy::builder(&conn)
-            .build()
-            .await
-            .map_err(|e| {
-                log::error!("Failed to create backlight proxy: {}", e);
-            })
-            .unwrap();
+        let conn = match zbus::Connection::system().await {
+            Ok(c) => c,
+            Err(e) => {
+                log::error!("Failed to connect to system bus: {e}");
+                return;
+            }
+        };
+        let platform = match PlatformProxy::builder(&conn).build().await {
+            Ok(p) => p,
+            Err(e) => {
+                log::error!("Failed to create platform proxy: {e}");
+                return;
+            }
+        };
+        let backlight = match BacklightProxy::builder(&conn).build().await {
+            Ok(b) => b,
+            Err(e) => {
+                log::error!("Failed to create backlight proxy: {e}");
+                return;
+            }
+        };
 
         debug!("Setting up system page profile callbacks");
         set_ui_props_async!(
