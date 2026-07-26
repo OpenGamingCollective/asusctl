@@ -25,8 +25,8 @@ impl ScsiAura {
     }
 
     pub async fn write_effect(&self, effect: &AuraEffect) -> Result<(), RogError> {
-        let tasks: Vec<Task> = effect.into();
-        for task in &tasks {
+        let mut tasks: Vec<Task> = effect.into();
+        for task in &mut tasks {
             self.device.lock().await.perform(task).ok();
         }
         Ok(())

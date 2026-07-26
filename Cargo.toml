@@ -52,7 +52,6 @@ libc = "^0.2"
 log = "^0.4"
 logind-zbus = { version = "^5.2.0" }
 mio = "^0.8.11"
-nix = { version = "^0.29", features = ["uio"] }
 notify-rust = { version = "^4.11.5", features = ["z", "async"] }
 nvml-wrapper = "^0.12.0"
 pix = "^0.13"

@@ -1,6 +1,6 @@
 use std::ffi::c_void;
 use std::fs::{File, OpenOptions};
-use std::io::{self, IoSlice, IoSliceMut};
+use std::io;
 use std::os::unix::fs::OpenOptionsExt;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::path::Path;
@@ -13,7 +13,6 @@ pub const SG_DXFER_TO_FROM_DEV: i32 = -4;
 
 pub const SG_INFO_OK_MASK: u32 = 0x1;
 pub const SG_INFO_OK: u32 = 0x0;
-pub const SG_MAX_QUEUE: usize = 16;
 pub const SG_IO: u64 = 0x2285;
 
 #[repr(C)]
@@ -122,7 +121,7 @@ impl Task {
     }
 
     /// Prepares raw internal pointers in SgIoHdr to match current buffer memory addresses.
-    pub fn sync_pointers(&mut self) {
+    fn sync_pointers(&mut self) {
         if !self.cmd.is_empty() {
             self.inner.cmdp = self.cmd.as_mut_ptr();
             self.inner.cmd_len = self.cmd.len() as u8;
@@ -239,91 +238,21 @@ impl Device {
         ))
     }
 
-    /// Sends multiple tasks to the SCSI device queue.
-    pub fn send(&self, tasks: &mut [Task]) -> io::Result<usize> {
-        if tasks.is_empty() {
-            return Ok(0);
-        }
-
-        for task in tasks.iter_mut() {
-            task.sync_pointers();
-        }
-
-        // SAFETY: SgIoHdr is a repr(C) struct with standard byte layout. We create a read-only
-        // slice over the byte buffer of each SgIoHdr for writev.
-        let iovecs: Vec<IoSlice> = tasks
-            .iter()
-            .map(|task| {
-                IoSlice::new(unsafe {
-                    std::slice::from_raw_parts(
-                        &task.inner as *const SgIoHdr as *const u8,
-                        std::mem::size_of::<SgIoHdr>(),
-                    )
-                })
-            })
-            .collect();
-
-        loop {
-            match nix::sys::uio::writev(&self.0, &iovecs[..tasks.len()]) {
-                Ok(n) => break Ok(n / std::mem::size_of::<SgIoHdr>()),
-                Err(nix::errno::Errno::EINTR) => {}
-                Err(e) => break Err(e.into()),
-            }
-        }
-    }
-
-    /// Receives completed tasks from the SCSI device queue.
-    pub fn receive(&self, tasks: &mut Vec<Task>) -> io::Result<usize> {
-        let mut hdrs = [SgIoHdr::default(); SG_MAX_QUEUE];
-
-        // SAFETY: SgIoHdr is a repr(C) struct. We create a mutable byte slice over each header
-        // buffer to allow readv to populate header data.
-        let mut iovecs: Vec<IoSliceMut> = hdrs
-            .iter_mut()
-            .map(|hdr| {
-                IoSliceMut::new(unsafe {
-                    std::slice::from_raw_parts_mut(
-                        hdr as *mut SgIoHdr as *mut u8,
-                        std::mem::size_of::<SgIoHdr>(),
-                    )
-                })
-            })
-            .collect();
-
-        let bytes_read = loop {
-            match nix::sys::uio::readv(&self.0, iovecs.as_mut_slice()) {
-                Ok(n) => break n,
-                Err(e) if e == nix::errno::Errno::EINTR || e == nix::errno::Errno::EAGAIN => {}
-                Err(e) => return Err(e.into()),
-            }
-        };
-
-        if bytes_read == 0 {
-            return Ok(0);
-        }
-
-        let tasks_read = bytes_read / std::mem::size_of::<SgIoHdr>();
-        for hdr in hdrs.iter().take(tasks_read) {
-            let mut task = Task::new();
-            task.inner = *hdr;
-            tasks.push(task);
-        }
-        Ok(tasks_read)
-    }
-
-    /// Performs a synchronous SCSI IO operation via ioctl.
-    pub fn perform(&self, task: &Task) -> io::Result<()> {
-        let mut task_copy = task.clone();
-        task_copy.sync_pointers();
+    /// Performs a synchronous SCSI IO operation via ioctl. On success the kernel
+    /// has written command status, sense data and any FromDevice payload back
+    /// into `task`, so results can be read via its accessors.
+    pub fn perform(&self, task: &mut Task) -> io::Result<()> {
+        task.sync_pointers();
 
         #[cfg(target_env = "musl")]
         let request = SG_IO as i32;
         #[cfg(not(target_env = "musl"))]
         let request: u64 = SG_IO;
 
-        // SAFETY: The raw file descriptor is open and valid, and task_copy has valid synced
-        // buffer pointers matching the initialized memory of task_copy.inner.
-        let ret = unsafe { libc::ioctl(self.0.as_raw_fd(), request, &task_copy.inner) };
+        // SAFETY: The raw file descriptor is open and valid, and task has valid synced
+        // pointers into its own buffers, which stay alive for the duration of the
+        // synchronous ioctl.
+        let ret = unsafe { libc::ioctl(self.0.as_raw_fd(), request, &mut task.inner) };
         if ret == -1 {
             Err(io::Error::last_os_error())
         } else {
