@@ -17,5 +17,6 @@ rog_scsi = { path = "../rog-scsi", features = ["dbus"] }
 rog_aura = { path = "../rog-aura" }
 rog_profiles = { path = "../rog-profiles" }
 rog_platform = { path = "../rog-platform" }
+log.workspace = true
 zbus.workspace = true
 
