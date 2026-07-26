@@ -58,7 +58,7 @@ nvml-wrapper = "^0.12.0"
 pix = "^0.13"
 png = "^0.17"
 png_pong = "^0.8"
-ron = "*"
+ron = "^0.12.2"
 rusb = "^0.9"
 sdl2 = { version = "^0.37", default-features = false }
 serde = { version = "^1.0", features = ["serde_derive"] }
