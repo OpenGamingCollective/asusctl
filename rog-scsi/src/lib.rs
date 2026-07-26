@@ -1,6 +1,7 @@
 mod builtin_modes;
 mod error;
 mod scsi;
+pub mod sg;
 
 pub use builtin_modes::*;
 pub use error::*;

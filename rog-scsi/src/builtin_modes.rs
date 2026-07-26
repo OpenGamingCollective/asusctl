@@ -7,6 +7,7 @@ use zbus::zvariant::{OwnedValue, Type, Value};
 
 use crate::error::Error;
 use crate::scsi::{apply_task, dir_task, mode_task, rgb_task, save_task, speed_task};
+use crate::sg::Task;
 
 #[cfg_attr(feature = "dbus", derive(Type, Value, OwnedValue))]
 #[derive(Debug, Clone, PartialEq, Eq, Copy, Deserialize, Serialize)]
@@ -366,7 +367,7 @@ impl Display for AuraEffect {
     }
 }
 
-impl From<&AuraEffect> for Vec<sg::Task> {
+impl From<&AuraEffect> for Vec<Task> {
     fn from(effect: &AuraEffect) -> Self {
         let mut tasks = Vec::new();
 
