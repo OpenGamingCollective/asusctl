@@ -495,10 +495,20 @@ pub fn rescan_pci_bus() -> Result<()> {
 /// Get the current GPU power status, using all available detection methods.
 ///
 /// This is the main entry point for determining dGPU power state. It tries:
-/// 1. Direct PCI device detection (if dGPU devices are found)
-/// 2. ASUS dgpu_disable attribute
+/// 1. ASUS dgpu_disable attribute — writing 1 does not remove the device from
+///    the PCI bus, so in integrated mode it must win over a still-enumerated
+///    dGPU
+/// 2. Direct PCI device detection (if dGPU devices are found)
 /// 3. ASUS gpu_mux_mode attribute
 pub fn get_gpu_power_status() -> (GfxPower, GfxVendor) {
+    if asus_dgpu_disable_exists() {
+        if let Ok(disabled) = asus_dgpu_disabled() {
+            if disabled {
+                return (GfxPower::AsusDisabled, GfxVendor::AsusDgpuDisabled);
+            }
+        }
+    }
+
     let devices = Device::find().unwrap_or_default();
 
     if let Some(dgpu) = devices.iter().find(|d| d.is_dgpu()) {
@@ -509,14 +519,7 @@ pub fn get_gpu_power_status() -> (GfxPower, GfxVendor) {
         return (GfxPower::Unknown, vendor);
     }
 
-    // No dGPU devices found — check ASUS-specific attributes
-    if asus_dgpu_disable_exists() {
-        if let Ok(disabled) = asus_dgpu_disabled() {
-            if disabled {
-                return (GfxPower::AsusDisabled, GfxVendor::AsusDgpuDisabled);
-            }
-        }
-    }
+    // No dGPU devices found — check the MUX attribute
     if asus_gpu_mux_exists() {
         if let Ok(discreet) = asus_gpu_mux_discreet() {
             if discreet {
