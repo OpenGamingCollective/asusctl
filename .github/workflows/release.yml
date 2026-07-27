@@ -19,7 +19,7 @@ jobs:
                   pacman-key --init && pacman-key --populate archlinux
                   pacman -Syu --noconfirm git sudo rust llvm clang mold lld at-spi2-core cairo gtk3
 
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v7
               with:
                   fetch-depth: 0
 
