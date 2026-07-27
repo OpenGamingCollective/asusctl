@@ -35,46 +35,46 @@ members = [
 default-members = ["asusctl", "asusd", "asus-shutdown", "asusd-user", "rog-control-center"]
 
 [workspace.dependencies]
-argh = "^0.1"
-ashpd = { version = "^0.13", default-features = false, features = ["async-io", "global_shortcuts"] }
-concat-idents = "^1.1"
-console-subscriber = "^0.4"
-dirs = "^4.0"
-env_logger = "^0.10.0"
-futures-util = "^0.3.31"
-gif = "^0.12"
-glam = { version = "^0.22", features = ["serde"] }
-gumdrop = "^0.8"
-image = "^0.25.5"
-inotify = "^0.10"
-ksni = { version = "^0.3", default-features = false, features = ["async-io"] }
-libc = "^0.2"
-log = "^0.4"
-logind-zbus = { version = "^5.2.0" }
-mio = "^0.8.11"
-notify-rust = { version = "^4.11.5", features = ["z", "async"] }
-nvml-wrapper = "^0.12.0"
-pix = "^0.13"
-png = "^0.17"
-png_pong = "^0.8"
+argh = "^0.1.19"
+ashpd = { version = "^0.13.13", default-features = false, features = ["async-io", "global_shortcuts"] }
+concat-idents = "^1.1.5"
+console-subscriber = "^0.5.0"
+dirs = "^6.0.0"
+env_logger = "^0.11.11"
+futures-util = "^0.3.33"
+gif = "^0.14.2"
+glam = { version = "^0.33.2", features = ["serde"] }
+gumdrop = "^0.8.1"
+image = "^0.25.10"
+inotify = "^0.11.4"
+ksni = { version = "^0.3.6", default-features = false, features = ["async-io"] }
+libc = "^0.2.189"
+log = "^0.4.33"
+logind-zbus = { version = "^5.3.2" }
+mio = "^1.2.2"
+notify-rust = { version = "^4.18.0", features = ["z", "async"] }
+nvml-wrapper = "^0.12.1"
+pix = "^1.0.1"
+png = "^0.18.1"
+png_pong = "^0.12.0"
 ron = "^0.12.2"
-rusb = "^0.9"
-sdl2 = { version = "^0.37", default-features = false }
-serde = { version = "^1.0", features = ["serde_derive"] }
-serde_json = "^1.0"
+rusb = "^0.9.4"
+sdl2 = { version = "^0.38.0", default-features = false }
+serde = { version = "^1.0.229", features = ["serde_derive"] }
+serde_json = "^1.0.151"
 slint = { version = "^1.17.1", features = ["gettext"] }
 slint-build = "^1.17.1"
-thiserror = "^2"
-tokio = { version = "^1.39.0", default-features = false, features = [
+thiserror = "^2.0.19"
+tokio = { version = "^1.53.1", default-features = false, features = [
   "macros",
   "sync",
   "time",
   "rt",
   "rt-multi-thread",
 ] }
-udev = { version = "^0.8", features = ["mio"] }
+udev = { version = "^0.9.3", features = ["mio"] }
 uhid-virt = "^0.0.8"
-zbus = "^5.13.1"
+zbus = "^5.18.0"
 
 [profile.release]
 lto = "thin"
@@ -86,6 +86,6 @@ panic = "abort"
 opt-level = 1
 
 [workspace.dependencies.cargo-husky]
-version = "^1"
+version = "^1.5.0"
 default-features = false
 features = ["user-hooks"]

@@ -549,11 +549,11 @@ impl AnimeImage {
             .iter()
             .map(|px| crate::image::Pixel {
                 color: if grey {
-                    <u8>::from(px.one()) as u32
+                    <u8>::from(px.get::<0>()) as u32
                 } else {
-                    (<u8>::from(px.one()) / 3) as u32
-                        + (<u8>::from(px.two()) / 3) as u32
-                        + (<u8>::from(px.three()) / 3) as u32
+                    (<u8>::from(px.get::<0>()) / 3) as u32
+                        + (<u8>::from(px.get::<1>()) / 3) as u32
+                        + (<u8>::from(px.get::<2>()) / 3) as u32
                 },
                 alpha: <f32>::from(px.alpha()),
             })
@@ -568,11 +568,11 @@ impl AnimeImage {
             .iter()
             .map(|px| crate::image::Pixel {
                 color: if grey {
-                    (<u16>::from(px.one()) >> 8) as u32
+                    (<u16>::from(px.get::<0>()) >> 8) as u32
                 } else {
-                    ((<u16>::from(px.one()) / 3) >> 8) as u32
-                        + ((<u16>::from(px.two()) / 3) >> 8) as u32
-                        + ((<u16>::from(px.three()) / 3) >> 8) as u32
+                    ((<u16>::from(px.get::<0>()) / 3) >> 8) as u32
+                        + ((<u16>::from(px.get::<1>()) / 3) >> 8) as u32
+                        + ((<u16>::from(px.get::<2>()) / 3) >> 8) as u32
                 },
                 alpha: <f32>::from(px.alpha()),
             })
