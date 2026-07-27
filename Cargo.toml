@@ -44,7 +44,6 @@ env_logger = "^0.11.11"
 futures-util = "^0.3.33"
 gif = "^0.14.2"
 glam = { version = "^0.33.2", features = ["serde"] }
-gumdrop = "^0.8.1"
 image = "^0.25.10"
 inotify = "^0.11.4"
 ksni = { version = "^0.3.6", default-features = false, features = ["async-io"] }
