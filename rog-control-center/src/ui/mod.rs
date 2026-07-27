@@ -18,12 +18,12 @@ use slint::{ComponentHandle, SharedString, Weak};
 
 use crate::config::Config;
 use crate::shortcuts::{EnableMode, ShortcutHandle, ShortcutStatus};
-use crate::zbus_proxies::AppState;
 use crate::ui::setup_anime::setup_anime_page;
 use crate::ui::setup_aura::setup_aura_page;
 use crate::ui::setup_fans::setup_fan_curve_page;
 use crate::ui::setup_slash::setup_slash_page;
 use crate::ui::setup_system::{setup_system_page, setup_system_page_callbacks};
+use crate::zbus_proxies::AppState;
 use crate::{AppSettingsPageData, GlobalShortcutStatus, MainWindow};
 
 // this macro sets up:

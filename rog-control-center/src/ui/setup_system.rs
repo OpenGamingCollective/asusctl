@@ -20,7 +20,11 @@ const MINMAX: AttrMinMax = AttrMinMax {
     current: -1.0,
 };
 
-pub fn setup_system_page(ui: &MainWindow, _config: Arc<Mutex<Config>>, app_state: Arc<Mutex<AppState>>) {
+pub fn setup_system_page(
+    ui: &MainWindow,
+    _config: Arc<Mutex<Config>>,
+    app_state: Arc<Mutex<AppState>>,
+) {
     let conn = zbus::blocking::Connection::system()
         .map_err(|e| error!("DBus system connection failed: {e:?}"))
         .unwrap();
@@ -99,6 +103,7 @@ pub fn setup_system_page(ui: &MainWindow, _config: Arc<Mutex<Config>>, app_state
     let handle = ui.as_weak();
     tokio::spawn(async move {
         let mut prev_ticks = rog_platform::cpu::read_cpu_ticks();
+        let mut power = rog_platform::power::AsusPower::new().ok();
         loop {
             let visible = app_state
                 .try_lock()
@@ -109,7 +114,9 @@ pub fn setup_system_page(ui: &MainWindow, _config: Arc<Mutex<Config>>, app_state
                 continue;
             }
 
-            let power = rog_platform::power::AsusPower::new().ok();
+            if power.is_none() {
+                power = rog_platform::power::AsusPower::new().ok();
+            }
             let (has_bat, health, consumption, status, estimate_str) = if let Some(ref p) = power {
                 if p.has_battery() {
                     let health = p.get_battery_health().unwrap_or(0) as i32;
