@@ -38,6 +38,13 @@ async fn main() -> Result<()> {
         .format_timestamp(None)
         .init();
 
+    let cli_parsed: CliStart = argh::from_env();
+
+    if cli_parsed.version {
+        print_versions();
+        return Ok(());
+    }
+
     // If we're running under gamescope we have to set WAYLAND_DISPLAY for winit to
     // use
     if let Ok(gamescope) = env::var("GAMESCOPE_WAYLAND_DISPLAY") {
@@ -109,13 +116,6 @@ async fn main() -> Result<()> {
     let board_name = dmi.board_name;
     let prod_family = dmi.product_family;
     info!("Running on {board_name}, product: {prod_family}");
-
-    let cli_parsed: CliStart = argh::from_env();
-
-    if cli_parsed.version {
-        print_versions();
-        return Ok(());
-    }
 
     let supported_properties = platform_proxy.supported_properties().unwrap_or_default();
 
