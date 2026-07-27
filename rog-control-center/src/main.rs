@@ -236,7 +236,7 @@ async fn main() -> Result<()> {
             if is_rog_ally {
                 let config_copy_2 = config.clone();
                 let newui =
-                    setup_window(config.clone(), prefetched_supported.clone(), is_tuf, None);
+                    setup_window(config.clone(), prefetched_supported.clone(), app_state.clone(), is_tuf, None);
                 newui.window().on_close_requested(move || {
                     exit(0);
                 });

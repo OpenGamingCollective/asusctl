@@ -108,6 +108,7 @@ impl WindowController {
             let ui = setup_window(
                 self.0.config.clone(),
                 self.0.prefetched_supported.clone(),
+                self.0.app_state.clone(),
                 self.0.is_tuf,
                 self.0.shortcuts.get().cloned(),
             );

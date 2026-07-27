@@ -11,7 +11,7 @@ use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
 use super::show_toast;
 use crate::config::Config;
-use crate::zbus_proxies::find_iface_async;
+use crate::zbus_proxies::{find_iface_async, AppState};
 use crate::{set_ui_callbacks, AttrMinMax, MainWindow, SystemPageData};
 
 const MINMAX: AttrMinMax = AttrMinMax {
@@ -20,7 +20,7 @@ const MINMAX: AttrMinMax = AttrMinMax {
     current: -1.0,
 };
 
-pub fn setup_system_page(ui: &MainWindow, _config: Arc<Mutex<Config>>) {
+pub fn setup_system_page(ui: &MainWindow, _config: Arc<Mutex<Config>>, app_state: Arc<Mutex<AppState>>) {
     let conn = zbus::blocking::Connection::system()
         .map_err(|e| error!("DBus system connection failed: {e:?}"))
         .unwrap();
@@ -100,6 +100,15 @@ pub fn setup_system_page(ui: &MainWindow, _config: Arc<Mutex<Config>>) {
     tokio::spawn(async move {
         let mut prev_ticks = rog_platform::cpu::read_cpu_ticks();
         loop {
+            let visible = app_state
+                .try_lock()
+                .map(|s| *s == AppState::MainWindowOpen)
+                .unwrap_or(false);
+            if !visible {
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                continue;
+            }
+
             let power = rog_platform::power::AsusPower::new().ok();
             let (has_bat, health, consumption, status, estimate_str) = if let Some(ref p) = power {
                 if p.has_battery() {

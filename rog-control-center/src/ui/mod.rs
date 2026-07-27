@@ -18,6 +18,7 @@ use slint::{ComponentHandle, SharedString, Weak};
 
 use crate::config::Config;
 use crate::shortcuts::{EnableMode, ShortcutHandle, ShortcutStatus};
+use crate::zbus_proxies::AppState;
 use crate::ui::setup_anime::setup_anime_page;
 use crate::ui::setup_aura::setup_aura_page;
 use crate::ui::setup_fans::setup_fan_curve_page;
@@ -130,6 +131,7 @@ pub fn show_toast(
 pub fn setup_window(
     config: Arc<Mutex<Config>>,
     prefetched_supported: std::sync::Arc<Option<Vec<i32>>>,
+    app_state: Arc<Mutex<AppState>>,
     is_tuf: bool,
     shortcuts: Option<ShortcutHandle>,
 ) -> MainWindow {
@@ -168,7 +170,7 @@ pub fn setup_window(
 
     setup_app_settings_page(&ui, config.clone(), shortcuts);
     if available.contains(&"xyz.ljones.Platform".to_string()) {
-        setup_system_page(&ui, config.clone());
+        setup_system_page(&ui, config.clone(), app_state.clone());
         setup_system_page_callbacks(&ui, config.clone());
     }
     if available.contains(&"xyz.ljones.Aura".to_string()) {
