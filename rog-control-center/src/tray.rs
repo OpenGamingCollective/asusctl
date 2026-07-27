@@ -22,9 +22,7 @@ const TRAY_ICON_PATH: &str = "/usr/share/icons/hicolor/512x512/apps/";
 struct Icons {
     rog_blue: Icon,
     rog_red: Icon,
-    rog_green: Icon,
     rog_white: Icon,
-    rog_yellow: Icon,
     gpu_integrated: Icon,
 }
 
@@ -139,7 +137,7 @@ fn gpu_mode_for(dgpu_disabled: bool, mux_discreet: bool, power_status: GfxPower)
     }
     // If a dGPU is present, it's in Optimus/hybrid mode
     match power_status {
-        GfxPower::Active | GfxPower::Suspended | GfxPower::Off => "Optimus",
+        GfxPower::Active | GfxPower::Suspended => "Optimus",
         _ => "Unknown",
     }
 }
@@ -148,13 +146,6 @@ fn gpu_mode_for(dgpu_disabled: bool, mux_discreet: bool, power_status: GfxPower)
 fn map_power_to_icon(power_status: GfxPower, mode: &str, icons: &Icons) -> (Icon, String) {
     let icon = match power_status {
         GfxPower::Suspended => icons.rog_blue.clone(),
-        GfxPower::Off => {
-            if mode == "Vfio" {
-                icons.rog_yellow.clone()
-            } else {
-                icons.rog_green.clone()
-            }
-        }
         GfxPower::AsusDisabled => icons.rog_white.clone(),
         GfxPower::AsusMuxDiscreet | GfxPower::Active => icons.rog_red.clone(),
         GfxPower::Unknown => icons.gpu_integrated.clone(),
@@ -194,16 +185,12 @@ pub fn init_tray(
 
         info!("Tray started");
         let rog_blue = read_icon(&PathBuf::from("asus_notif_blue.png"));
-        let rog_green = read_icon(&PathBuf::from("asus_notif_green.png"));
         let rog_white = read_icon(&PathBuf::from("asus_notif_white.png"));
-        let rog_yellow = read_icon(&PathBuf::from("asus_notif_yellow.png"));
         let gpu_integrated = read_icon(&PathBuf::from("rog-control-center.png"));
         ICONS.get_or_init(|| Icons {
             rog_blue,
             rog_red: rog_red.clone(),
-            rog_green,
             rog_white,
-            rog_yellow,
             gpu_integrated,
         });
 

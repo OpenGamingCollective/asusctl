@@ -4,8 +4,6 @@ pub mod config;
 pub mod ctrl_backlight;
 /// Control platform profiles + fan-curves if available
 pub mod ctrl_fancurves;
-/// GPU power status monitoring and D-Bus exposure
-pub mod ctrl_gpu;
 /// Control ASUS bios function such as boot sound, Optimus/Dedicated gfx mode
 pub mod ctrl_platform;
 pub mod ctrl_xgm_led;

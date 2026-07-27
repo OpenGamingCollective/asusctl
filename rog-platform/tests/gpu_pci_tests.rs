@@ -32,11 +32,6 @@ fn gfx_power_from_str_suspended() {
 }
 
 #[test]
-fn gfx_power_from_str_off() {
-    assert_eq!(GfxPower::from_str("off").unwrap(), GfxPower::Off);
-}
-
-#[test]
 fn gfx_power_from_str_dgpu_disabled() {
     assert_eq!(
         GfxPower::from_str("dgpu_disabled").unwrap(),
@@ -65,7 +60,10 @@ fn gfx_power_from_str_unknown_fallback() {
 #[test]
 fn gfx_power_from_str_handles_whitespace() {
     assert_eq!(GfxPower::from_str("  active  ").unwrap(), GfxPower::Active);
-    assert_eq!(GfxPower::from_str("\toff\n").unwrap(), GfxPower::Off);
+    assert_eq!(
+        GfxPower::from_str("\tsuspended\n").unwrap(),
+        GfxPower::Suspended
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -77,7 +75,6 @@ fn gfx_power_display_roundtrip() {
     let variants = [
         (GfxPower::Active, "active"),
         (GfxPower::Suspended, "suspended"),
-        (GfxPower::Off, "off"),
         (GfxPower::AsusDisabled, "dgpu_disabled"),
         (GfxPower::AsusMuxDiscreet, "asus_mux_discreet"),
         (GfxPower::Unknown, "unknown"),
@@ -240,7 +237,6 @@ fn gfx_power_serde_roundtrip() {
     let variants = [
         GfxPower::Active,
         GfxPower::Suspended,
-        GfxPower::Off,
         GfxPower::AsusDisabled,
         GfxPower::AsusMuxDiscreet,
         GfxPower::Unknown,

@@ -256,7 +256,6 @@ fn do_gpu_status_notif(message: &str, data: &GfxPower) -> Notification {
     let mut notif = base_notification(message, &<&str>::from(data).to_owned());
     let icon = match data {
         GfxPower::Suspended => "asus_notif_blue",
-        GfxPower::Off => "asus_notif_green",
         GfxPower::AsusDisabled => "asus_notif_white",
         GfxPower::AsusMuxDiscreet | GfxPower::Active => "asus_notif_red",
         GfxPower::Unknown => "gpu-integrated",

@@ -71,26 +71,6 @@ pub trait ROGCCZbus {
     fn set_state(&self, state: AppState) -> zbus::Result<()>;
 }
 
-/// D-Bus proxy for asusd's GPU power status interface (`xyz.ljones.Gpu`).
-#[proxy(
-    interface = "xyz.ljones.Gpu",
-    default_service = "xyz.ljones.Asusd",
-    default_path = "/xyz/ljones/Gpu"
-)]
-pub trait GpuStatus {
-    /// Current GPU power status (e.g. "active", "suspended", "off").
-    #[zbus(property)]
-    fn power_status(&self) -> zbus::Result<String>;
-
-    /// GPU vendor name.
-    #[zbus(property)]
-    fn vendor(&self) -> zbus::Result<String>;
-
-    /// Current GPU mode (e.g. "Optimus", "Integrated", "Vfio", "Ultimate").
-    #[zbus(property)]
-    fn mode(&self) -> zbus::Result<String>;
-}
-
 pub fn find_iface<T>(iface_name: &str) -> Result<Vec<T>, Box<dyn std::error::Error>>
 where
     T: ProxyImpl<'static> + From<zbus::Proxy<'static>>,

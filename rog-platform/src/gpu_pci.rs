@@ -1,8 +1,8 @@
 //! GPU PCI device detection and power status monitoring.
 //!
 //! This module provides functionality to detect discrete GPUs via udev/PCI
-//! and read their runtime power status from sysfs. It is used by asusd to
-//! expose GPU power status over D-Bus for the tray icon color.
+//! and read their runtime power status from sysfs. It is used by
+//! rog-control-center to color the tray icon and send status notifications.
 
 use std::fmt::Display;
 use std::fs::{self, OpenOptions};
@@ -97,7 +97,6 @@ pub fn asus_gpu_mux_discreet() -> Result<bool> {
 pub enum GfxPower {
     Active,
     Suspended,
-    Off,
     AsusDisabled,
     AsusMuxDiscreet,
     #[default]
@@ -111,7 +110,6 @@ impl FromStr for GfxPower {
         Ok(match s.to_lowercase().trim() {
             "active" => GfxPower::Active,
             "suspended" => GfxPower::Suspended,
-            "off" => GfxPower::Off,
             "dgpu_disabled" => GfxPower::AsusDisabled,
             "asus_mux_discreet" => GfxPower::AsusMuxDiscreet,
             _ => GfxPower::Unknown,
@@ -124,7 +122,6 @@ impl From<&GfxPower> for &str {
         match gfx {
             GfxPower::Active => "active",
             GfxPower::Suspended => "suspended",
-            GfxPower::Off => "off",
             GfxPower::AsusDisabled => "dgpu_disabled",
             GfxPower::AsusMuxDiscreet => "asus_mux_discreet",
             GfxPower::Unknown => "unknown",
