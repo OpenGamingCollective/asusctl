@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use log::error;
+use log::{error, info};
 use rog_dbus::asus_armoury::AsusArmouryProxy;
 use rog_dbus::zbus_platform::PlatformProxy;
 use rog_dbus::zbus_xgm_led::XgmLedProxy;
@@ -293,7 +293,7 @@ pub fn setup_gpu_page(ui: &MainWindow) {
         // --- XG Mobile LED ---
         let xgm_results: Option<(XgmLedProxy<'static>, bool)> = async {
             let Ok(mut proxies) = find_iface_async::<XgmLedProxy>("xyz.ljones.XgmLed").await else {
-                error!("setup_gpu: no XG Mobile LED interface");
+                info!("setup_gpu: no XG Mobile LED interface");
                 return None;
             };
             let xgm_proxy = proxies.pop()?;
