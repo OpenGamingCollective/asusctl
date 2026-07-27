@@ -171,7 +171,12 @@ async fn main() -> Result<()> {
     };
     let config = Arc::new(Mutex::new(config));
 
-    start_notifications(config.clone(), &rt)?;
+    // GPU power status channel: written by the dGPU status monitor in
+    // notify.rs, read by the tray to color its icon
+    let (gpu_status_tx, gpu_status_rx) =
+        tokio::sync::watch::channel(rog_platform::gpu_pci::get_gpu_power_status().0);
+
+    start_notifications(config.clone(), &rt, gpu_status_tx)?;
 
     if !startup_in_background {
         if let Ok(mut app_state) = app_state.lock() {
@@ -218,7 +223,12 @@ async fn main() -> Result<()> {
     };
 
     if enable_tray_icon {
-        init_tray(supported_properties, config.clone(), window.clone());
+        init_tray(
+            supported_properties,
+            config.clone(),
+            window.clone(),
+            gpu_status_rx,
+        );
     }
 
     let shortcuts = shortcut_service.as_ref().map(|service| service.handle());

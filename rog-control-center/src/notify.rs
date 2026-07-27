@@ -15,6 +15,7 @@ use rog_platform::gpu_pci::GfxPower;
 use rog_platform::power::AsusPower;
 use serde::{Deserialize, Serialize};
 use tokio::runtime::Runtime;
+use tokio::sync::watch;
 use tokio::task::JoinHandle;
 
 use crate::config::Config;
@@ -40,56 +41,108 @@ impl Default for EnabledNotifications {
     }
 }
 
-fn start_dpu_status_mon(config: Arc<Mutex<Config>>) {
-    use rog_platform::gpu_pci::Device;
-    let dev = Device::find().unwrap_or_default();
-    let mut found_dgpu = false; // just for logging
-    for dev in dev {
-        if dev.is_dgpu() {
-            info!(
+/// Decide what to report for one poll tick of the dGPU status monitor, or
+/// `None` to skip the tick.
+///
+/// Writing dgpu_disable=1 does not remove the device from the PCI bus, so the
+/// attribute must win over the runtime status of a still-enumerated dGPU.
+///
+/// An unknown status from a present device is transitional (runtime PM cycles
+/// through "suspending"/"resuming", which parse as unknown) and is skipped.
+/// Unknown with no device on the bus is real information — reported, so that
+/// listeners fall back instead of keeping a stale state.
+fn dgpu_status_for_tick(
+    dgpu_disabled: bool,
+    runtime_status: Option<GfxPower>,
+    mux_discreet: bool,
+) -> Option<GfxPower> {
+    if dgpu_disabled {
+        return Some(GfxPower::AsusDisabled);
+    }
+    match runtime_status {
+        Some(GfxPower::Unknown) => None,
+        Some(status) => Some(status),
+        // No dGPU on the bus: report the ASUS mux state instead
+        None => Some(if mux_discreet {
+            GfxPower::AsusMuxDiscreet
+        } else {
+            GfxPower::Unknown
+        }),
+    }
+}
+
+fn start_dpu_status_mon(config: Arc<Mutex<Config>>, gpu_status_tx: watch::Sender<GfxPower>) {
+    use rog_platform::gpu_pci::{asus_dgpu_disabled, asus_gpu_mux_discreet, Device};
+
+    let find_dgpu = || {
+        Device::find()
+            .unwrap_or_default()
+            .into_iter()
+            .find(|d| d.is_dgpu())
+    };
+
+    let enabled_notifications_copy = config.clone();
+    // Plain old thread is perfectly fine since most of this is potentially blocking
+    std::thread::spawn(move || {
+        let mut dgpu = find_dgpu();
+        match &dgpu {
+            Some(dev) => info!(
                 "Found dGPU: {}, starting status notifications",
                 dev.pci_id()
-            );
-            let enabled_notifications_copy = config.clone();
-            // Plain old thread is perfectly fine since most of this is potentially blocking
-            std::thread::spawn(move || {
-                let mut last_status = GfxPower::Unknown;
-                loop {
-                    std::thread::sleep(Duration::from_millis(1500));
-                    if let Ok(status) = dev.get_runtime_status() {
-                        if status != GfxPower::Unknown && status != last_status {
-                            if let Ok(config) = enabled_notifications_copy.lock() {
-                                if !config.notifications.receive_notify_gfx_status
-                                    || !config.notifications.enabled
-                                {
-                                    continue;
-                                }
-                            }
-                            // Required check because status cycles through
-                            // active/unknown/suspended
-                            if let Err(e) =
-                                do_gpu_status_notif("dGPU status changed:", &status).show()
-                            {
-                                warn!("Could not show dGPU status notification: {e}");
-                            }
-                            debug!("dGPU status changed: {:?}", status);
-                        }
-                        last_status = status;
+            ),
+            None => warn!("Did not find a dGPU on this system, will keep watching for one"),
+        }
+
+        let mut last_status = GfxPower::Unknown;
+        let mut ticks: u32 = 0;
+        loop {
+            std::thread::sleep(Duration::from_millis(1500));
+            ticks = ticks.wrapping_add(1);
+
+            let disabled = asus_dgpu_disabled().unwrap_or(false);
+            if !disabled {
+                // Drop the cached device if it vanished (e.g. unbound/removed
+                // from the PCI bus)
+                if dgpu.as_ref().is_some_and(|d| !d.dev_path().exists()) {
+                    info!("dGPU device is gone, re-detecting");
+                    dgpu = None;
+                }
+                // Re-detection is a full udev scan, so do it sparingly
+                if dgpu.is_none() && ticks.is_multiple_of(4) {
+                    dgpu = find_dgpu();
+                }
+            }
+
+            let Some(status) = dgpu_status_for_tick(
+                disabled,
+                dgpu.as_ref()
+                    .map(|dev| dev.get_runtime_status().unwrap_or(GfxPower::Unknown)),
+                asus_gpu_mux_discreet().unwrap_or(false),
+            ) else {
+                continue;
+            };
+
+            if status != last_status {
+                debug!("dGPU status changed: {:?}", status);
+                gpu_status_tx.send_replace(status);
+                let notify = enabled_notifications_copy.lock().is_ok_and(|config| {
+                    config.notifications.enabled && config.notifications.receive_notify_gfx_status
+                });
+                if notify {
+                    if let Err(e) = do_gpu_status_notif("dGPU status changed:", &status).show() {
+                        warn!("Could not show dGPU status notification: {e}");
                     }
                 }
-            });
-            found_dgpu = true;
-            break;
+            }
+            last_status = status;
         }
-    }
-    if !found_dgpu {
-        warn!("Did not find a dGPU on this system, dGPU status won't be avilable");
-    }
+    });
 }
 
 pub fn start_notifications(
     config: Arc<Mutex<Config>>,
     rt: &Runtime,
+    gpu_status_tx: watch::Sender<GfxPower>,
 ) -> Result<Vec<JoinHandle<()>>> {
     // Setup the AC/BAT commands that will run on power status change
     let config_copy = config.clone();
@@ -144,7 +197,7 @@ pub fn start_notifications(
     });
 
     info!("Attempting to start plain dgpu status monitor");
-    start_dpu_status_mon(config.clone());
+    start_dpu_status_mon(config.clone(), gpu_status_tx);
 
     // GPU MUX Mode notif
     // TODO: need to get armoury attrs and iter to find

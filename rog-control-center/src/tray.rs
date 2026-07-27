@@ -1,18 +1,20 @@
 //! A self-contained tray icon with menus.
 //!
-//! The tray icon color reflects the GPU power status, sourced from asusd's
-//! D-Bus interface (`xyz.ljones.Gpu`).
+//! The tray icon color reflects the GPU power status, published by the
+//! dGPU status monitor in `notify.rs` (the same source as the
+//! "dGPU status changed" notifications).
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 
 use ksni::{Icon, TrayMethods};
-use log::{info, warn};
+use log::info;
+use rog_platform::gpu_pci::GfxPower;
 use rog_platform::platform::Properties;
+use tokio::sync::watch;
 
 use crate::config::Config;
 use crate::window::{WindowCommand, WindowController};
-use crate::zbus_proxies::GpuStatusProxyBlocking;
 
 const TRAY_LABEL: &str = "ROG Control Center";
 const TRAY_ICON_PATH: &str = "/usr/share/icons/hicolor/512x512/apps/";
@@ -117,20 +119,45 @@ impl ksni::Tray for AsusTray {
     }
 }
 
+/// Derive the GPU mode from platform sysfs attributes and the power status.
+fn gpu_mode(power_status: GfxPower) -> &'static str {
+    use rog_platform::gpu_pci::{asus_dgpu_disabled, asus_gpu_mux_discreet};
+
+    gpu_mode_for(
+        asus_dgpu_disabled().unwrap_or(false),
+        asus_gpu_mux_discreet().unwrap_or(false),
+        power_status,
+    )
+}
+
+fn gpu_mode_for(dgpu_disabled: bool, mux_discreet: bool, power_status: GfxPower) -> &'static str {
+    if dgpu_disabled {
+        return "Integrated";
+    }
+    if mux_discreet {
+        return "Ultimate";
+    }
+    // If a dGPU is present, it's in Optimus/hybrid mode
+    match power_status {
+        GfxPower::Active | GfxPower::Suspended | GfxPower::Off => "Optimus",
+        _ => "Unknown",
+    }
+}
+
 /// Map GPU power status and mode to the appropriate tray icon and title.
-fn map_power_to_icon(power_status: &str, mode: &str, icons: &Icons) -> (Icon, String) {
+fn map_power_to_icon(power_status: GfxPower, mode: &str, icons: &Icons) -> (Icon, String) {
     let icon = match power_status {
-        "suspended" => icons.rog_blue.clone(),
-        "off" => {
+        GfxPower::Suspended => icons.rog_blue.clone(),
+        GfxPower::Off => {
             if mode == "Vfio" {
                 icons.rog_yellow.clone()
             } else {
                 icons.rog_green.clone()
             }
         }
-        "dgpu_disabled" => icons.rog_white.clone(),
-        "asus_mux_discreet" | "active" => icons.rog_red.clone(),
-        _ => icons.gpu_integrated.clone(),
+        GfxPower::AsusDisabled => icons.rog_white.clone(),
+        GfxPower::AsusMuxDiscreet | GfxPower::Active => icons.rog_red.clone(),
+        GfxPower::Unknown => icons.gpu_integrated.clone(),
     };
 
     let title = format!("ROG: gpu mode = {mode}, gpu power = {power_status}");
@@ -142,6 +169,7 @@ pub fn init_tray(
     _supported_properties: Vec<Properties>,
     config: Arc<Mutex<Config>>,
     window: WindowController,
+    mut gpu_status: watch::Receiver<GfxPower>,
 ) {
     tokio::spawn(async move {
         let rog_red = read_icon(&PathBuf::from("asus_notif_red.png"));
@@ -179,72 +207,47 @@ pub fn init_tray(
             gpu_integrated,
         });
 
-        // Connect to asusd's GPU interface on the system bus
-        let sys_con = match zbus::blocking::Connection::system() {
-            Ok(c) => c,
-            Err(e) => {
-                warn!("Could not connect to system bus: {e}");
-                return;
-            }
-        };
-        let gpu_proxy = match GpuStatusProxyBlocking::new(&sys_con) {
-            Ok(p) => p,
-            Err(e) => {
-                warn!(
-                    "Could not connect to asusd GPU interface: {e}. \
-                     Is asusd running?"
-                );
-                if let Some(icons) = ICONS.get() {
-                    tray.update(|tray: &mut AsusTray| {
-                        tray.current_icon = icons.rog_red.clone();
-                        tray.current_title = "ROG: GPU status unavailable".to_string();
-                    })
-                    .await;
-                }
-                return;
-            }
-        };
+        info!("Started ROGTray with local GPU status monitor");
 
-        info!("Started ROGTray with asusd GPU interface");
-
-        // Read initial state
-        let mut last_power = String::new();
-        if let Ok(power) = gpu_proxy.power_status() {
-            let mode = gpu_proxy.mode().unwrap_or_default();
-            if let Some(icons) = ICONS.get() {
-                let (icon, title) = map_power_to_icon(&power, &mode, icons);
-                tray.update(|tray: &mut AsusTray| {
-                    tray.current_icon = icon;
-                    tray.current_title = title;
-                })
-                .await;
-            }
-            last_power = power;
+        // Set initial state from the channel's current value
+        let power = *gpu_status.borrow_and_update();
+        if let Some(icons) = ICONS.get() {
+            let (icon, title) = map_power_to_icon(power, gpu_mode(power), icons);
+            tray.update(|tray: &mut AsusTray| {
+                tray.current_icon = icon;
+                tray.current_title = title;
+            })
+            .await;
         }
 
-        // Poll loop: check GPU power status periodically and update tray icon.
-        // This runs alongside the async tray event loop.
+        // Update the tray icon whenever the dGPU status monitor publishes a
+        // change. The timer wakes the loop even when the GPU status is
+        // steady, so disabling the tray icon in the UI takes effect promptly.
+        let mut config_check = tokio::time::interval(std::time::Duration::from_secs(2));
+        config_check.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         loop {
-            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-
-            if let Ok(lock) = config.try_lock() {
-                if !lock.enable_tray_icon {
-                    return;
-                }
-            }
-
-            if let Ok(power) = gpu_proxy.power_status() {
-                let mode = gpu_proxy.mode().unwrap_or_default();
-                if power != last_power {
+            tokio::select! {
+                changed = gpu_status.changed() => {
+                    if changed.is_err() {
+                        // Monitor is gone; nothing left to watch
+                        return;
+                    }
+                    let power = *gpu_status.borrow_and_update();
                     if let Some(icons) = ICONS.get() {
-                        let (icon, title) = map_power_to_icon(&power, &mode, icons);
+                        let (icon, title) = map_power_to_icon(power, gpu_mode(power), icons);
                         tray.update(|tray: &mut AsusTray| {
                             tray.current_icon = icon;
                             tray.current_title = title;
                         })
                         .await;
                     }
-                    last_power = power;
+                }
+                _ = config_check.tick() => {}
+            }
+
+            if let Ok(lock) = config.try_lock() {
+                if !lock.enable_tray_icon {
+                    return;
                 }
             }
         }
