@@ -1,31 +1,33 @@
-use gumdrop::Options;
+use argh::FromArgs;
 
-#[derive(Default, Options)]
+#[derive(Default, FromArgs)]
+/// ROG Control Center
 pub struct CliStart {
-    #[options(help_flag, help = "print help message")]
-    pub help: bool,
-    #[options(help = "start fullscreen, if used the option is saved")]
+    /// start fullscreen, if used the option is saved
+    #[argh(switch)]
     pub fullscreen: bool,
-    #[options(help = "fullscreen width")]
+    /// fullscreen width
+    #[argh(option, default = "0")]
     pub width_fullscreen: u32,
-    #[options(help = "fullscreen height")]
+    /// fullscreen height
+    #[argh(option, default = "0")]
     pub height_fullscreen: u32,
-    #[options(help = "start windowed, if used the option is saved")]
+    /// start windowed, if used the option is saved
+    #[argh(switch)]
     pub windowed: bool,
-    #[options(help = "show program version number")]
+    /// show program version number
+    #[argh(switch)]
     pub version: bool,
-    #[options(help = "start in background (UI closed)")]
+    /// start in background (UI closed)
+    #[argh(switch)]
     pub background: bool,
-    #[options(help = "indicate that the app was launched via autostart")]
+    /// indicate that the app was launched via autostart
+    #[argh(switch)]
     pub autostart: bool,
-    #[options(
-        meta = "",
-        help = "set board name for testing, this will make ROGCC show only the keyboard page"
-    )]
+    /// set board name for testing, this will make ROGCC show only the keyboard page
+    #[argh(option)]
     pub board_name: Option<String>,
-    #[options(
-        help = "put ROGCC in layout viewing mode - this is helpful for finding existing layouts \
-                that might match your laptop"
-    )]
+    /// put ROGCC in layout viewing mode - this is helpful for finding existing layouts that might match your laptop
+    #[argh(switch)]
     pub layout_viewing: bool,
 }

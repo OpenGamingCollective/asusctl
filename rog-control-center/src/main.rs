@@ -1,4 +1,4 @@
-use std::env::{self, args};
+use std::env;
 use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::sync::{Arc, Mutex};
@@ -7,7 +7,6 @@ use std::time::Duration;
 
 use config_traits::{StdConfig, StdConfigLoad1};
 use dmi_id::DMIID;
-use gumdrop::Options;
 use log::{debug, error, info, warn, LevelFilter};
 use rog_control_center::cli_options::CliStart;
 use rog_control_center::config::Config;
@@ -111,17 +110,10 @@ async fn main() -> Result<()> {
     let prod_family = dmi.product_family;
     info!("Running on {board_name}, product: {prod_family}");
 
-    let args: Vec<String> = args().skip(1).collect();
+    let cli_parsed: CliStart = argh::from_env();
 
-    let cli_parsed = match CliStart::parse_args_default(&args) {
-        Ok(p) => p,
-        Err(err) => {
-            eprintln!("Error parsing command line arguments: {err}");
-            std::process::exit(1);
-        }
-    };
-
-    if do_cli_help(&cli_parsed) {
+    if cli_parsed.version {
+        print_versions();
         return Ok(());
     }
 
@@ -306,26 +298,6 @@ async fn main() -> Result<()> {
     }
     rt.shutdown_background();
     Ok(())
-}
-
-fn do_cli_help(parsed: &CliStart) -> bool {
-    if parsed.help {
-        println!("{}", CliStart::usage());
-        println!();
-        if let Some(cmdlist) = CliStart::command_list() {
-            let commands: Vec<String> = cmdlist.lines().map(|s| s.to_owned()).collect();
-            for command in &commands {
-                println!("{}", command);
-            }
-        }
-    }
-
-    if parsed.version {
-        print_versions();
-        println!();
-    }
-
-    parsed.help
 }
 
 pub fn get_layout_path(path: &Path, layout_name: &str) -> PathBuf {

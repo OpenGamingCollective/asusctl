@@ -33,7 +33,7 @@ rog_platform = { path = "../rog-platform" }
 rog_slash = { path = "../rog-slash" }
 dmi_id = { path = "../dmi-id" }
 
-gumdrop.workspace = true
+argh.workspace = true
 log.workspace = true
 env_logger.workspace = true
 
