@@ -240,3 +240,72 @@ pub fn init_tray(
         }
     });
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn icon(tag: u8) -> Icon {
+        Icon {
+            width: 1,
+            height: 1,
+            data: vec![tag],
+        }
+    }
+
+    const BLUE: u8 = 1;
+    const RED: u8 = 2;
+    const WHITE: u8 = 3;
+    const FALLBACK: u8 = 4;
+
+    fn icons() -> Icons {
+        Icons {
+            rog_blue: icon(BLUE),
+            rog_red: icon(RED),
+            rog_white: icon(WHITE),
+            gpu_integrated: icon(FALLBACK),
+        }
+    }
+
+    fn icon_for(power: GfxPower, mode: &str) -> u8 {
+        map_power_to_icon(power, mode, &icons()).0.data[0]
+    }
+
+    #[test]
+    fn suspended_gets_the_blue_icon() {
+        assert_eq!(icon_for(GfxPower::Suspended, "Optimus"), BLUE);
+    }
+
+    #[test]
+    fn active_and_mux_discreet_get_the_red_icon() {
+        assert_eq!(icon_for(GfxPower::Active, "Optimus"), RED);
+        assert_eq!(icon_for(GfxPower::AsusMuxDiscreet, "Ultimate"), RED);
+    }
+
+    #[test]
+    fn dgpu_disabled_gets_the_white_icon() {
+        assert_eq!(icon_for(GfxPower::AsusDisabled, "Integrated"), WHITE);
+    }
+
+    #[test]
+    fn unknown_falls_back_to_the_rogcc_icon() {
+        assert_eq!(icon_for(GfxPower::Unknown, "Unknown"), FALLBACK);
+    }
+
+    #[test]
+    fn title_reports_mode_and_power() {
+        let (_, title) = map_power_to_icon(GfxPower::Suspended, "Optimus", &icons());
+        assert_eq!(title, "ROG: gpu mode = Optimus, gpu power = suspended");
+    }
+
+    #[test]
+    fn mode_derivation_precedence() {
+        // dgpu_disable wins over everything, mux over runtime status
+        assert_eq!(gpu_mode_for(true, false, GfxPower::Active), "Integrated");
+        assert_eq!(gpu_mode_for(true, true, GfxPower::Active), "Integrated");
+        assert_eq!(gpu_mode_for(false, true, GfxPower::Active), "Ultimate");
+        assert_eq!(gpu_mode_for(false, false, GfxPower::Active), "Optimus");
+        assert_eq!(gpu_mode_for(false, false, GfxPower::Suspended), "Optimus");
+        assert_eq!(gpu_mode_for(false, false, GfxPower::Unknown), "Unknown");
+    }
+}

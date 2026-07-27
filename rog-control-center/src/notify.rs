@@ -263,3 +263,60 @@ fn do_gpu_status_notif(message: &str, data: &GfxPower) -> Notification {
     notif.icon(icon);
     notif
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dgpu_disable_wins_over_an_enumerated_dgpu() {
+        assert_eq!(
+            dgpu_status_for_tick(true, Some(GfxPower::Active), false),
+            Some(GfxPower::AsusDisabled)
+        );
+        assert_eq!(
+            dgpu_status_for_tick(true, None, true),
+            Some(GfxPower::AsusDisabled)
+        );
+    }
+
+    #[test]
+    fn runtime_status_reported_when_a_dgpu_is_present() {
+        assert_eq!(
+            dgpu_status_for_tick(false, Some(GfxPower::Suspended), false),
+            Some(GfxPower::Suspended)
+        );
+        assert_eq!(
+            dgpu_status_for_tick(false, Some(GfxPower::Active), false),
+            Some(GfxPower::Active)
+        );
+    }
+
+    #[test]
+    fn mux_state_reported_when_no_dgpu_is_on_the_bus() {
+        assert_eq!(
+            dgpu_status_for_tick(false, None, true),
+            Some(GfxPower::AsusMuxDiscreet)
+        );
+    }
+
+    #[test]
+    fn transitional_unknown_from_a_present_dgpu_is_skipped() {
+        assert_eq!(
+            dgpu_status_for_tick(false, Some(GfxPower::Unknown), false),
+            None
+        );
+        assert_eq!(
+            dgpu_status_for_tick(false, Some(GfxPower::Unknown), true),
+            None
+        );
+    }
+
+    #[test]
+    fn persistent_unknown_with_no_dgpu_is_reported() {
+        assert_eq!(
+            dgpu_status_for_tick(false, None, false),
+            Some(GfxPower::Unknown)
+        );
+    }
+}
