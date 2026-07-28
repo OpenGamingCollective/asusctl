@@ -29,7 +29,6 @@ AGENTS.md
 
 # .agents is a universal standard for AI tools (Claude, Cursor, opencode, antigravity).
 .agents/*
-!.agents/AGENTS.md
 !.agents/CONTRIBUTING_AGENTS.md
 
 *.log

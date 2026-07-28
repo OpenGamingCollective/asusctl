@@ -7,17 +7,17 @@
 
 ## 📋 Table of Contents
 
-1. [Why This File Exists](#why-this-file-exists)
-2. [Research Findings](#research-findings)
+1. [Why This File Exists](#-why-this-file-exists)
+2. [Research Findings](#-research-findings)
    - [1. Instruction File Structure & Impact (Instructions-as-Code)](#1-instruction-file-structure--impact-instructions-as-code)
    - [2. Rule Polarity & Context Priming (Guardrails vs. Guidance)](#2-rule-polarity--context-priming-guardrails-vs-guidance)
    - [3. Repository Context Overhead & Minimalist Design (AGENTS.md Evaluation)](#3-repository-context-overhead--minimalist-design-agentsmd-evaluation)
    - [4. Closed-Loop Review Feedback & Behavioral Rule Accumulation (Self-Improving Agents)](#4-closed-loop-review-feedback--behavioral-rule-accumulation-self-improving-agents)
-3. [Contributor Conclusions](#contributor-conclusions)
-   - [Sub-Agent Usage](#sub-agent-usage)
+3. [Contributor Conclusions](#-contributor-conclusions)
+   - [Sub-Agent Usage and Setup Guidelines](#sub-agent-usage-and-setup-guidelines)
    - [Performance and Flow Configuration](#performance-and-flow-configuration)
    - [Documentation File Method](#documentation-file-method)
-4. [Note to Maintainers: AI Feedback Loop](#note-to-maintainers-ai-feedback-loop)
+4. [Note to Maintainers: AI Feedback Loop](#-note-to-maintainers-ai-feedback-loop)
 
 ---
 
@@ -35,7 +35,7 @@ Use `AGENTS.md` to document solutions for recurring issues encountered during LL
 ## 🔬 Research Findings
 
 > [!IMPORTANT]
-> Before making changes to the [AGENTS.md](/.agents/AGENTS.md) file, you must thoroughly read or analyze the papers listed below with the assistance of AI to fully understand them. To contribute, feel free to add any new research you find useful to this list.
+> Before making changes to the [AGENTS.md](/AGENTS.md) file, you must thoroughly read or analyze the papers listed below with the assistance of AI to fully understand them. To contribute, feel free to add any new research you find useful to this list.
 
 ### 1. Instruction File Structure & Impact (Instructions-as-Code)
 
@@ -167,7 +167,7 @@ We can solve this issue by creating a sub-agent named `codebase-explorer` and in
 > *"Is this a one-off issue specific to this task, or a general error class that the AI might repeat in the future?"*
 > 
 > * **If it is a one-off issue:** Simply request the code fix via a PR comment.
-> * **If it is a general error class (Closed Loop):** In addition to the code fix, ask the PR author (or update it yourself) to update the [AGENTS.md](/.agents/AGENTS.md) file within the same PR.
+> * **If it is a general error class (Closed Loop):** In addition to the code fix, ask the PR author (or update it yourself) to update the [AGENTS.md](/AGENTS.md) file within the same PR.
 > 
 > **Sections to Update in AGENTS.md:**
 > 1. **Code Standards / Behavioral Rules:** Add the constraint and rationale as a clear rule.
