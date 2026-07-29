@@ -25,6 +25,12 @@ pub const PROD_ID1_STR: &str = "193B";
 pub const PROD_ID2: u16 = 0x19b6;
 pub const PROD_ID2_STR: &str = "19B6";
 
+/// Official HID Report Descriptor for Slash Lightbar USB devices
+pub const SLASH_HID_REPORT_DESCRIPTOR: &[u8] = &[
+    0x06, 0x31, 0xff, 0x09, 0x76, 0xa1, 0x01, 0x85, 0x5a, 0x19, 0x00, 0x2a, 0xff, 0x00, 0x15, 0x00,
+    0x26, 0xff, 0x00, 0x75, 0x08, 0x95, 0x3f, 0xb1, 0x00, 0xc0,
+];
+
 pub type SlashUsbPacket = [u8; PACKET_SIZE];
 
 /// `get_anime_type` is very broad, matching on part of the laptop board name
