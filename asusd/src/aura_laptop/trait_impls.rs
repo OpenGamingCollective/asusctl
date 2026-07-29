@@ -239,7 +239,7 @@ impl CtrlTask for AuraZbus {
     async fn create_tasks(&self, _: SignalEmitter<'static>) -> Result<(), RogError> {
         let inner1 = self.0.clone();
         let inner3 = self.0.clone();
-        let mut tasks = self
+        let tasks = self
             .create_sys_event_tasks(
                 move |sleeping| {
                     let inner1 = inner1.clone();
@@ -292,13 +292,7 @@ impl CtrlTask for AuraZbus {
             )
             .await?;
 
-        tokio::spawn(async move {
-            while let Some(res) = tasks.join_next().await {
-                if let Err(err) = res {
-                    warn!("AuraZbus background task ended with error: {err:?}");
-                }
-            }
-        });
+        Self::spawn_task_supervisor("AuraZbus", tasks);
 
         // let ctrl2 = self.0.clone();
         // let ctrl = self.0.lock().await;

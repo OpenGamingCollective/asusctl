@@ -1120,13 +1120,7 @@ impl CtrlTask for CtrlPlatform {
             }
         });
 
-        tokio::spawn(async move {
-            while let Some(res) = tasks.join_next().await {
-                if let Err(err) = res {
-                    warn!("CtrlPlatform background task ended with error: {err:?}");
-                }
-            }
-        });
+        Self::spawn_task_supervisor("CtrlPlatform", tasks);
 
         Ok(())
     }
