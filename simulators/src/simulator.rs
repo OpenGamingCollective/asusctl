@@ -2,7 +2,7 @@ use std::env;
 use std::error::Error;
 use std::str::FromStr;
 
-use rog_anime::usb::{PROD_ID, VENDOR_ID};
+use rog_anime::usb::{ANIME_HID_REPORT_DESCRIPTOR, PROD_ID, VENDOR_ID};
 use rog_anime::{AnimeType, USB_PREFIX2};
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
@@ -26,7 +26,7 @@ impl VirtAnimeMatrix {
             buffer: [0; 640],
             animatrix: AniMatrix::new(model),
             device: UHIDDevice::create(CreateParams {
-                name: String::from("ROG_Virtual Anime Matrix"),
+                name: format!("ROG_Virtual Anime Matrix ({model:?})"),
                 phys: String::from(""),
                 uniq: String::from(""),
                 bus: Bus::USB,
@@ -34,57 +34,7 @@ impl VirtAnimeMatrix {
                 product: PROD_ID as u32,
                 version: 0,
                 country: 0,
-                // This is a device which emits the usage code as a whole, rather than as bits
-                rd_data: [
-                    0x06, 0x31, 0xff, // Usage Page (Vendor Defined 0xFF31)
-                    0x09, 0x76, // Usage (0x76)
-                    0xa1, 0x01, // Collection (Application)
-                    0x85, 0x5a, //   Report ID (90)
-                    0x19, 0x00, //   Usage Minimum (0x00)
-                    0x2a, 0xff, 0x00, //   Usage Maximum (0xFF)
-                    0x15, 0x00, //   Logical Minimum (0)
-                    0x26, 0xff, 0x00, //   Logical Maximum (255)
-                    0x75, 0x08, //   Report Size (8)
-                    0x95, 0x05, //   Report Count (5)
-                    0x81,
-                    0x00, /*   Input (Data,Array,Abs,No Wrap,Linear,Preferred State,No Null
-                           * Position) */
-                    0x19, 0x00, //   Usage Minimum (0x00)
-                    0x2a, 0xff, 0x00, //   Usage Maximum (0xFF)
-                    0x15, 0x00, //   Logical Minimum (0)
-                    0x26, 0xff, 0x00, //   Logical Maximum (255)
-                    0x75, 0x08, //   Report Size (8)
-                    0x95, 0x3f, //   Report Count (63)
-                    0xb1,
-                    0x00, /*   Feature (Data,Array,Abs,No Wrap,Linear,Preferred State,No Null
-                           * Position,Non-volatile) */
-                    0xc0, // End Collection
-                    0x06, 0x31, 0xff, // Usage Page (Vendor Defined 0xFF31)
-                    0x09, 0x80, // Usage (0x80)
-                    0xa1, 0x01, // Collection (Application)
-                    0x85, 0x5e, //   Report ID (94)
-                    0x19, 0x00, //   Usage Minimum (0x00)
-                    0x2a, 0xff, 0x00, //   Usage Maximum (0xFF)
-                    0x15, 0x00, //   Logical Minimum (0)
-                    0x26, 0xff, 0x00, //   Logical Maximum (255)
-                    0x75, 0x08, //   Report Size (8)
-                    0x95, 0x05, //   Report Count (5)
-                    0x81,
-                    0x00, /*   Input (Data,Array,Abs,No Wrap,Linear,Preferred State,No Null
-                           * Position) */
-                    0x19, 0x00, //   Usage Minimum (0x00)
-                    0x2a, 0xff, 0x00, //   Usage Maximum (0xFF)
-                    0x15, 0x00, //   Logical Minimum (0)
-                    0x26, 0xff, 0x00, //   Logical Maximum (255)
-                    0x96, 0x7f, 0x02, //   Report Count (639)
-                    0xb1,
-                    0x00, /*   Feature (Data,Array,Abs,No Wrap,Linear,Preferred State,No Null
-                           * Position,Non-volatile) */
-                    0xc0, /* End Collection */
-
-                          /* 85 bytes */
-                ]
-                .to_vec(),
+                rd_data: ANIME_HID_REPORT_DESCRIPTOR.to_vec(),
             })
             .unwrap_or_else(|err| {
                 panic!(
