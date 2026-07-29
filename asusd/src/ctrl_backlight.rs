@@ -150,14 +150,16 @@ impl CtrlBacklight {
         }
     }
 
-    pub async fn start_watch_primary(&self) -> Result<(), RogError> {
+    pub async fn start_watch_primary(
+        &self,
+    ) -> Result<Option<tokio::task::JoinHandle<()>>, RogError> {
         if self.get_backlight(&BacklightType::Screenpad).is_none() {
-            return Ok(());
+            return Ok(None);
         }
 
         if let Some(sync) = self.config.lock().await.screenpad_sync_primary {
             if !sync {
-                return Ok(());
+                return Ok(None);
             }
         }
 
@@ -165,7 +167,7 @@ impl CtrlBacklight {
             let watch = backlight.monitor_brightness()?;
 
             let backlights = self.clone();
-            tokio::spawn(async move {
+            let handle = tokio::spawn(async move {
                 let mut last_level = 0;
                 let mut buffer = [0; 32];
                 use futures_util::StreamExt;
@@ -203,16 +205,12 @@ impl CtrlBacklight {
                         // other processes cause "MODIFY" event and make this spin 100%, so sleep
                         tokio::time::sleep(Duration::from_millis(300)).await;
                     }
-                    // watch
-                    //     .into_event_stream(&mut buffer)
-                    //     .unwrap()
-                    //     .for_each(|_| async {})
-                    //     .await;
                 }
             });
+            return Ok(Some(handle));
         }
 
-        Ok(())
+        Ok(None)
     }
 }
 

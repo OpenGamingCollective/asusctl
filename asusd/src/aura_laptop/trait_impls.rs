@@ -241,46 +241,61 @@ impl CtrlTask for AuraZbus {
     async fn create_tasks(&self, _: SignalEmitter<'static>) -> Result<(), RogError> {
         let inner1 = self.0.clone();
         let inner3 = self.0.clone();
-        self.create_sys_event_tasks(
-            move |sleeping| {
-                let inner1 = inner1.clone();
-                async move {
-                    if !sleeping {
+        let mut tasks = self
+            .create_sys_event_tasks(
+                move |sleeping| {
+                    let inner1 = inner1.clone();
+                    async move {
+                        if !sleeping {
+                            info!("CtrlKbdLedTask reloading brightness and modes");
+                            let brightness = inner1.config.lock().await.brightness;
+                            if let Some(backlight) = &inner1.backlight {
+                                if let Err(e) =
+                                    backlight.lock().await.set_brightness(brightness.into())
+                                {
+                                    error!("CtrlKbdLedTask brightness error: {e}");
+                                }
+                            }
+                            let mut config = inner1.config.lock().await;
+                            if let Err(e) = inner1.write_current_config_mode(&mut config).await {
+                                error!("CtrlKbdLedTask config mode error: {e}");
+                            }
+                        } else if let Err(e) = inner1.update_config().await {
+                            error!("CtrlKbdLedTask update config error: {e}");
+                        }
+                    }
+                },
+                move |_shutting_down| {
+                    let inner3 = inner3.clone();
+                    async move {
                         info!("CtrlKbdLedTask reloading brightness and modes");
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-                        let brightness = inner1.config.lock().await.brightness;
-                        if let Some(backlight) = &inner1.backlight {
+                        let brightness = inner3.config.lock().await.brightness;
+                        if let Some(backlight) = &inner3.backlight {
                             if let Err(e) =
                                 backlight.lock().await.set_brightness(brightness.into())
-=======
-                        let brightness = inner3.config.lock().await.brightness;
-                        if let Some(backlight) = &inner3.backlight {
-                            if let Err(e) = backlight.lock().await.set_brightness(brightness.into())
->>>>>>> eaf1be57 (fixup! fix(asusd): remove unwrap panics in CtrlKbdLedTask event handlers)
-=======
-                        let brightness = inner3.config.lock().await.brightness;
-                        if let Some(backlight) = &inner3.backlight {
-                            if let Err(e) = backlight.lock().await.set_brightness(brightness.into())
->>>>>>> 79c2ce24 (fixup! fix(asusd): remove unwrap panics in CtrlKbdLedTask event handlers)
-=======
-                        let brightness = inner3.config.lock().await.brightness;
-                        if let Some(backlight) = &inner3.backlight {
-                            if let Err(e) = backlight.lock().await.set_brightness(brightness.into())
->>>>>>> db5143c8 (fixup! fix(asusd): remove unwrap panics in CtrlKbdLedTask event handlers)
                             {
                                 error!("CtrlKbdLedTask brightness error: {e}");
                             }
                         }
-                        let mut config = inner1.config.lock().await;
-                        if let Err(e) = inner1.write_current_config_mode(&mut config).await {
-                            error!("CtrlKbdLedTask config mode error: {e}");
-                        }
-                    } else if let Err(e) = inner1.update_config().await {
-                        error!("CtrlKbdLedTask update config error: {e}");
                     }
+                },
+                move |_lid_closed| {
+                    // on lid change
+                    async move {}
+                },
+                move |_power_plugged| {
+                    // power change
+                    async move {}
+                },
+            )
+            .await?;
+
+        tokio::spawn(async move {
+            while let Some(res) = tasks.join_next().await {
+                if let Err(err) = res {
+                    warn!("AuraZbus background task ended with error: {err:?}");
                 }
+<<<<<<< HEAD
             },
             move |_shutting_down| {
                 let inner3 = inner3.clone();
@@ -305,6 +320,10 @@ impl CtrlTask for AuraZbus {
             },
         )
         .await?;
+=======
+            }
+        });
+>>>>>>> 71c10a4b (refactor(asusd): update task watch macros and create_sys_event_tasks to return JoinSet and JoinHandle)
 
         Ok(())
     }

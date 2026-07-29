@@ -316,28 +316,18 @@ impl crate::CtrlTask for AniMeZbus {
         let inner2 = self.0.clone();
         let inner3 = self.0.clone();
         let inner4 = self.0.clone();
-        self.create_sys_event_tasks(
-            move |sleeping| {
-                // on_sleep
-                let inner = inner1.clone();
-                async move {
-                    let config = inner.config.lock().await.clone();
-                    if config.display_enabled {
-                        inner.thread_exit.store(true, Ordering::Release); // ensure clean slate
+        let mut tasks = self
+            .create_sys_event_tasks(
+                move |sleeping| {
+                    // on_sleep
+                    let inner = inner1.clone();
+                    async move {
+                        let config = inner.config.lock().await.clone();
+                        if config.display_enabled {
+                            inner.thread_exit.store(true, Ordering::Release); // ensure clean slate
 
-                        inner
-                            .write_bytes(&pkt_set_enable_display(
-                                !(sleeping && config.off_when_suspended),
-                            ))
-                            .await
-                            .map_err(|err| {
-                                warn!("create_sys_event_tasks::off_when_suspended {}", err);
-                            })
-                            .ok();
-
-                        if config.builtin_anims_enabled {
                             inner
-                                .write_bytes(&pkt_set_enable_powersave_anim(
+                                .write_bytes(&pkt_set_enable_display(
                                     !(sleeping && config.off_when_suspended),
                                 ))
                                 .await
@@ -345,105 +335,127 @@ impl crate::CtrlTask for AniMeZbus {
                                     warn!("create_sys_event_tasks::off_when_suspended {}", err);
                                 })
                                 .ok();
-                        } else if !sleeping && !config.builtin_anims_enabled {
-                            // Run custom wake animation
-                            inner
-                                .write_bytes(&pkt_set_enable_powersave_anim(false))
-                                .await
-                                .ok(); // ensure builtins are disabled
 
-                            inner.run_thread(inner.cache.wake.clone(), true).await;
+                            if config.builtin_anims_enabled {
+                                inner
+                                    .write_bytes(&pkt_set_enable_powersave_anim(
+                                        !(sleeping && config.off_when_suspended),
+                                    ))
+                                    .await
+                                    .map_err(|err| {
+                                        warn!("create_sys_event_tasks::off_when_suspended {}", err);
+                                    })
+                                    .ok();
+                            } else if !sleeping && !config.builtin_anims_enabled {
+                                // Run custom wake animation
+                                inner
+                                    .write_bytes(&pkt_set_enable_powersave_anim(false))
+                                    .await
+                                    .ok(); // ensure builtins are disabled
+
+                                inner.run_thread(inner.cache.wake.clone(), true).await;
+                            }
                         }
                     }
-                }
-            },
-            move |shutting_down| {
-                // on_shutdown
-                let inner = inner2.clone();
-                async move {
-                    let AniMeConfig {
-                        display_enabled,
-                        builtin_anims_enabled,
-                        ..
-                    } = *inner.config.lock().await;
-                    if display_enabled && !builtin_anims_enabled {
-                        if shutting_down {
-                            inner.run_thread(inner.cache.shutdown.clone(), true).await;
+                },
+                move |shutting_down| {
+                    // on_shutdown
+                    let inner = inner2.clone();
+                    async move {
+                        let AniMeConfig {
+                            display_enabled,
+                            builtin_anims_enabled,
+                            ..
+                        } = *inner.config.lock().await;
+                        if display_enabled && !builtin_anims_enabled {
+                            if shutting_down {
+                                inner.run_thread(inner.cache.shutdown.clone(), true).await;
+                            } else {
+                                inner.run_thread(inner.cache.boot.clone(), true).await;
+                            }
+                        }
+                    }
+                },
+                move |lid_closed| {
+                    let inner = inner3.clone();
+                    // on lid change
+                    async move {
+                        let AniMeConfig {
+                            off_when_lid_closed,
+                            builtin_anims_enabled,
+                            ..
+                        } = *inner.config.lock().await;
+                        if off_when_lid_closed {
+                            if builtin_anims_enabled {
+                                inner
+                                    .write_bytes(&pkt_set_enable_powersave_anim(!lid_closed))
+                                    .await
+                                    .map_err(|err| {
+                                        warn!(
+                                            "create_sys_event_tasks::off_when_lid_closed {}",
+                                            err
+                                        );
+                                    })
+                                    .ok();
+                            }
+                            inner
+                                .write_bytes(&pkt_set_enable_display(!lid_closed))
+                                .await
+                                .map_err(|err| {
+                                    warn!("create_sys_event_tasks::off_when_lid_closed {}", err);
+                                })
+                                .ok();
+                        }
+                    }
+                },
+                move |power_plugged| {
+                    let inner = inner4.clone();
+                    // on power change
+                    async move {
+                        let AniMeConfig {
+                            off_when_unplugged,
+                            builtin_anims_enabled,
+                            brightness_on_battery,
+                            ..
+                        } = *inner.config.lock().await;
+                        if off_when_unplugged {
+                            if builtin_anims_enabled {
+                                inner
+                                    .write_bytes(&pkt_set_enable_powersave_anim(power_plugged))
+                                    .await
+                                    .map_err(|err| {
+                                        warn!("create_sys_event_tasks::off_when_unplugged {}", err);
+                                    })
+                                    .ok();
+                            }
+                            inner
+                                .write_bytes(&pkt_set_enable_display(power_plugged))
+                                .await
+                                .map_err(|err| {
+                                    warn!("create_sys_event_tasks::off_when_unplugged {}", err);
+                                })
+                                .ok();
                         } else {
-                            inner.run_thread(inner.cache.boot.clone(), true).await;
-                        }
-                    }
-                }
-            },
-            move |lid_closed| {
-                let inner = inner3.clone();
-                // on lid change
-                async move {
-                    let AniMeConfig {
-                        off_when_lid_closed,
-                        builtin_anims_enabled,
-                        ..
-                    } = *inner.config.lock().await;
-                    if off_when_lid_closed {
-                        if builtin_anims_enabled {
                             inner
-                                .write_bytes(&pkt_set_enable_powersave_anim(!lid_closed))
+                                .write_bytes(&pkt_set_brightness(brightness_on_battery))
                                 .await
                                 .map_err(|err| {
-                                    warn!("create_sys_event_tasks::off_when_suspended {}", err);
+                                    warn!("create_sys_event_tasks::off_when_unplugged {}", err);
                                 })
                                 .ok();
                         }
-                        inner
-                            .write_bytes(&pkt_set_enable_display(!lid_closed))
-                            .await
-                            .map_err(|err| {
-                                warn!("create_sys_event_tasks::off_when_lid_closed {}", err);
-                            })
-                            .ok();
                     }
+                },
+            )
+            .await?;
+
+        tokio::spawn(async move {
+            while let Some(res) = tasks.join_next().await {
+                if let Err(err) = res {
+                    warn!("AniMeZbus background task ended with error: {err:?}");
                 }
-            },
-            move |power_plugged| {
-                let inner = inner4.clone();
-                // on power change
-                async move {
-                    let AniMeConfig {
-                        off_when_unplugged,
-                        builtin_anims_enabled,
-                        brightness_on_battery,
-                        ..
-                    } = *inner.config.lock().await;
-                    if off_when_unplugged {
-                        if builtin_anims_enabled {
-                            inner
-                                .write_bytes(&pkt_set_enable_powersave_anim(power_plugged))
-                                .await
-                                .map_err(|err| {
-                                    warn!("create_sys_event_tasks::off_when_suspended {}", err);
-                                })
-                                .ok();
-                        }
-                        inner
-                            .write_bytes(&pkt_set_enable_display(power_plugged))
-                            .await
-                            .map_err(|err| {
-                                warn!("create_sys_event_tasks::off_when_unplugged {}", err);
-                            })
-                            .ok();
-                    } else {
-                        inner
-                            .write_bytes(&pkt_set_brightness(brightness_on_battery))
-                            .await
-                            .map_err(|err| {
-                                warn!("create_sys_event_tasks::off_when_unplugged {}", err);
-                            })
-                            .ok();
-                    }
-                }
-            },
-        )
-        .await?;
+            }
+        });
 
         Ok(())
     }
