@@ -39,11 +39,11 @@ pub(crate) fn rgb_task(led: u32, rgb: &[u8; 3]) -> Task {
     task
 }
 
-/// 0-13
+/// 0-14
 pub(crate) fn mode_task(mode: u8) -> Task {
     let mut task = Task::new();
     task.set_cdb(data(ENE_REG_MODE, 1).as_slice());
-    task.set_data(&[mode.min(13)], Direction::ToDevice);
+    task.set_data(&[mode.min(14)], Direction::ToDevice);
     task
 }
 

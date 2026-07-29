@@ -301,8 +301,15 @@ impl Display for ModeData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Mode: {}, Zone: {}, Colour1: {:?}, Colour2: {:?}, Speed: {:?}, Direction: {:?}",
-            self.mode, self.zone, self.colour1, self.colour2, self.speed, self.direction
+            "Mode: {}, Zone: {}, Colour1: {:?}, Colour2: {:?}, Colour3: {:?}, Colour4: {:?}, Speed: {:?}, Direction: {:?}",
+            self.mode,
+            self.zone,
+            self.colour1,
+            self.colour2,
+            self.colour3,
+            self.colour4,
+            self.speed,
+            self.direction
         )
     }
 }
@@ -349,114 +356,34 @@ impl ModeData {
     }
 
     pub fn to_tasks(&self) -> Vec<Task> {
+        let (rgb, dir, speed) = match self.mode {
+            AuraMode::Off | AuraMode::Static => (true, false, false),
+            AuraMode::Breathe | AuraMode::Flashing | AuraMode::RandomFlicker => (true, false, true),
+            AuraMode::RainbowCycle | AuraMode::RainbowCycleBreathe => (false, false, true),
+            AuraMode::RainbowWave
+            | AuraMode::RainbowCycleChaseFade
+            | AuraMode::RainbowCycleChase
+            | AuraMode::RainbowCycleWave
+            | AuraMode::RainbowPulseChase => (false, true, true),
+            AuraMode::ChaseFade | AuraMode::Chase | AuraMode::DoubleFade => (true, true, true),
+        };
+
         let mut tasks = Vec::new();
-        match self.mode {
-            AuraMode::Off | AuraMode::Static => {
-                tasks.push(rgb_task(
-                    self.zone,
-                    &[
-                        self.colour1.r, self.colour1.g, self.colour1.b,
-                    ],
-                ));
-                tasks.push(mode_task(self.mode as u8));
-            }
-            AuraMode::Breathe => {
-                tasks.push(rgb_task(
-                    self.zone,
-                    &[
-                        self.colour1.r, self.colour1.g, self.colour1.b,
-                    ],
-                ));
-                tasks.push(speed_task(self.speed as u8));
-                tasks.push(mode_task(self.mode as u8));
-            }
-            AuraMode::Flashing => {
-                tasks.push(rgb_task(
-                    self.zone,
-                    &[
-                        self.colour1.r, self.colour1.g, self.colour1.b,
-                    ],
-                ));
-                tasks.push(speed_task(self.speed as u8));
-                tasks.push(mode_task(self.mode as u8));
-            }
-            AuraMode::RainbowCycle => {
-                tasks.push(speed_task(self.speed as u8));
-                tasks.push(mode_task(self.mode as u8));
-            }
-            AuraMode::RainbowWave => {
-                tasks.push(dir_task(self.direction as u8));
-                tasks.push(speed_task(self.speed as u8));
-                tasks.push(mode_task(self.mode as u8));
-            }
-            AuraMode::RainbowCycleBreathe => {
-                tasks.push(speed_task(self.speed as u8));
-                tasks.push(mode_task(self.mode as u8));
-            }
-            AuraMode::ChaseFade => {
-                tasks.push(rgb_task(
-                    self.zone,
-                    &[
-                        self.colour1.r, self.colour1.g, self.colour1.b,
-                    ],
-                ));
-                tasks.push(dir_task(self.direction as u8));
-                tasks.push(speed_task(self.speed as u8));
-                tasks.push(mode_task(self.mode as u8));
-            }
-            AuraMode::RainbowCycleChaseFade => {
-                tasks.push(dir_task(self.direction as u8));
-                tasks.push(speed_task(self.speed as u8));
-                tasks.push(mode_task(self.mode as u8));
-            }
-            AuraMode::Chase => {
-                tasks.push(rgb_task(
-                    self.zone,
-                    &[
-                        self.colour1.r, self.colour1.g, self.colour1.b,
-                    ],
-                ));
-                tasks.push(dir_task(self.direction as u8));
-                tasks.push(speed_task(self.speed as u8));
-                tasks.push(mode_task(self.mode as u8));
-            }
-            AuraMode::RainbowCycleChase => {
-                tasks.push(dir_task(self.direction as u8));
-                tasks.push(speed_task(self.speed as u8));
-                tasks.push(mode_task(self.mode as u8));
-            }
-            AuraMode::RainbowCycleWave => {
-                tasks.push(dir_task(self.direction as u8));
-                tasks.push(speed_task(self.speed as u8));
-                tasks.push(mode_task(self.mode as u8));
-            }
-            AuraMode::RainbowPulseChase => {
-                tasks.push(dir_task(self.direction as u8));
-                tasks.push(speed_task(self.speed as u8));
-                tasks.push(mode_task(self.mode as u8));
-            }
-            AuraMode::RandomFlicker => {
-                tasks.push(rgb_task(
-                    self.zone,
-                    &[
-                        self.colour1.r, self.colour1.g, self.colour1.b,
-                    ],
-                ));
-                tasks.push(speed_task(self.speed as u8));
-                tasks.push(mode_task(self.mode as u8));
-            }
-            AuraMode::DoubleFade => {
-                tasks.push(rgb_task(
-                    self.zone,
-                    &[
-                        self.colour1.r, self.colour1.g, self.colour1.b,
-                    ],
-                ));
-                tasks.push(dir_task(self.direction as u8));
-                tasks.push(speed_task(self.speed as u8));
-                tasks.push(mode_task(self.mode as u8));
-            }
+        if rgb {
+            tasks.push(rgb_task(
+                self.zone,
+                &[
+                    self.colour1.r, self.colour1.g, self.colour1.b,
+                ],
+            ));
         }
+        if dir {
+            tasks.push(dir_task(self.direction as u8));
+        }
+        if speed {
+            tasks.push(speed_task(self.speed as u8));
+        }
+        tasks.push(mode_task(self.mode as u8));
         tasks.push(apply_task());
         tasks.push(save_task());
         tasks
