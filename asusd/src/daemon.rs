@@ -117,12 +117,18 @@ async fn start_daemon() -> Result<(), Box<dyn Error>> {
     match CtrlBacklight::new(config.clone()) {
         Ok(backlight) => {
             info!("Backlight: found supported backlight");
-            if let Some(handle) = backlight.start_watch_primary().await? {
-                tokio::spawn(async move {
-                    if let Err(err) = handle.await {
-                        warn!("Backlight watcher task ended with error: {err:?}");
-                    }
-                });
+            match backlight.start_watch_primary().await {
+                Ok(Some(handle)) => {
+                    tokio::spawn(async move {
+                        if let Err(err) = handle.await {
+                            warn!("Backlight watcher task ended with error: {err:?}");
+                        }
+                    });
+                }
+                Ok(None) => {}
+                Err(err) => {
+                    warn!("Backlight: start_watch_primary: {err}");
+                }
             }
             backlight.add_to_server(&mut server).await;
             info!("Backlight: initialized");

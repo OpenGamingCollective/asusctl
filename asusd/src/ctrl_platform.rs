@@ -1073,15 +1073,21 @@ impl CtrlTask for CtrlPlatform {
             )
             .await?;
 
-        if let Some(h) = self
+        match self
             .watch_charge_control_end_threshold(signal_ctxt_copy.clone())
-            .await?
+            .await
         {
-            tasks.spawn(async move {
-                if let Err(err) = h.await {
-                    warn!("charge_control_end_threshold watcher ended with error: {err:?}");
-                }
-            });
+            Ok(Some(h)) => {
+                tasks.spawn(async move {
+                    if let Err(err) = h.await {
+                        warn!("charge_control_end_threshold watcher ended with error: {err:?}");
+                    }
+                });
+            }
+            Ok(None) => {}
+            Err(err) => {
+                warn!("Platform: watch_charge_control_end_threshold: {err}");
+            }
         }
 
         match self.platform.monitor_platform_profile() {

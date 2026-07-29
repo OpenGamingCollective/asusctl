@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use config_traits::StdConfig;
-use log::{info, warn};
+use log::{error, info, warn};
 use rog_platform::backlight::{Backlight, BacklightType};
 use tokio::sync::Mutex;
 use zbus::fdo::Error as FdoErr;
@@ -173,20 +173,14 @@ impl CtrlBacklight {
                 use futures_util::StreamExt;
                 if let Ok(mut stream) = watch.into_event_stream(&mut buffer) {
                     loop {
-                        let _ = stream.next().await;
+                        if stream.next().await.is_none() {
+                            info!("Primary backlight event stream closed");
+                            break;
+                        }
 
                         let sync = backlights.config.lock().await.screenpad_sync_primary;
-                        if let Some(sync) = sync {
-                            if !sync {
-                                continue;
-                            }
-                        } else if backlights
-                            .config
-                            .lock()
-                            .await
-                            .screenpad_sync_primary
-                            .is_none()
-                        {
+                        if !sync.unwrap_or(false) {
+                            tokio::time::sleep(Duration::from_millis(300)).await;
                             continue;
                         }
 
@@ -205,6 +199,8 @@ impl CtrlBacklight {
                         // other processes cause "MODIFY" event and make this spin 100%, so sleep
                         tokio::time::sleep(Duration::from_millis(300)).await;
                     }
+                } else {
+                    error!("Primary backlight watcher: into_event_stream initialization failed");
                 }
             });
             return Ok(Some(handle));
