@@ -230,6 +230,12 @@ pub trait CtrlTask {
     /// Free helper method to create tasks to run on: sleep, wake, shutdown,
     /// boot
     ///
+    /// # Ownership & Lifetime Contract
+    /// Callers receive an owned [`tokio::task::JoinSet`]. Callers **must** hand off
+    /// ownership to a task supervisor (e.g. via `spawn_task_supervisor`) before
+    /// performing any fallible operations with `?`. Dropping the returned `JoinSet`
+    /// immediately aborts all spawned system event listeners.
+    ///
     /// The closures can potentially block, so execution time should be the
     /// minimal possible such as save a variable.
     fn create_sys_event_tasks<Fut1, Fut2, Fut3, Fut4, F1, F2, F3, F4>(
