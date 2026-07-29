@@ -37,7 +37,9 @@ impl RogPlatform {
 
     pub fn new() -> Result<Self> {
         if let Ok(sysfs_root) = std::env::var("ASUS_SYSFS_ROOT") {
-            return Self::with_root(PathBuf::from(sysfs_root));
+            if !sysfs_root.is_empty() {
+                return Self::with_root(PathBuf::from(sysfs_root));
+            }
         }
 
         let mut enumerator = udev::Enumerator::new().map_err(|err| {
@@ -361,4 +363,26 @@ pub fn get_fan_rpms() -> (i32, i32, i32) {
         }
     }
     (cpu, gpu, mid)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_asus_sysfs_root_empty_env() {
+        std::env::set_var("ASUS_SYSFS_ROOT", "/tmp/custom_sysfs");
+        if let Ok(platform) = RogPlatform::new() {
+            assert_eq!(
+                platform.path,
+                PathBuf::from("/tmp/custom_sysfs/devices/platform/asus-wmi")
+            );
+        }
+
+        std::env::set_var("ASUS_SYSFS_ROOT", "");
+        if let Ok(platform) = RogPlatform::new() {
+            assert_ne!(platform.path, PathBuf::from("devices/platform/asus-wmi"));
+        }
+        std::env::remove_var("ASUS_SYSFS_ROOT");
+    }
 }
