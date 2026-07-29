@@ -68,14 +68,14 @@ macro_rules! task_watch_item {
         async fn fn_name(
             &self,
             signal_ctxt: SignalEmitter<'static>,
-        ) -> Result<(), RogError> {
+        ) -> Result<Option<tokio::task::JoinHandle<()>>, RogError> {
             use futures_util::StreamExt;
 
             let ctrl = self.clone();
             concat_idents::concat_idents!(watch_fn = monitor_, $name {
                 match self.$self_inner.watch_fn() {
                     Ok(watch) => {
-                        tokio::spawn(async move {
+                        let handle = tokio::spawn(async move {
                             let mut buffer = [0; 32];
                             if let Ok(stream) = watch.into_event_stream(&mut buffer) {
                                 stream.for_each(|_| async {
@@ -95,11 +95,14 @@ macro_rules! task_watch_item {
                                 log::error!("Failed to create event stream for {}", $name_str);
                             }
                         });
+                        Ok(Some(handle))
                     }
-                    Err(e) => info!("inotify watch failed: {}. You can ignore this if your device does not support the feature", e),
+                    Err(e) => {
+                        info!("inotify watch failed: {}. You can ignore this if your device does not support the feature", e);
+                        Ok(None)
+                    }
                 }
-            });
-            Ok(())
+            })
         }
         });
     };
@@ -112,14 +115,14 @@ macro_rules! task_watch_item_notify {
         async fn fn_name(
             &self,
             signal_ctxt: SignalEmitter<'static>,
-        ) -> Result<(), RogError> {
+        ) -> Result<Option<tokio::task::JoinHandle<()>>, RogError> {
             use futures_util::StreamExt;
 
             let ctrl = self.clone();
             concat_idents::concat_idents!(watch_fn = monitor_, $name {
                 match self.$self_inner.watch_fn() {
                     Ok(watch) => {
-                        tokio::spawn(async move {
+                        let handle = tokio::spawn(async move {
                             let mut buffer = [0; 32];
                             if let Ok(stream) = watch.into_event_stream(&mut buffer) {
                                 stream.for_each(|_| async {
@@ -129,11 +132,14 @@ macro_rules! task_watch_item_notify {
                                 }).await;
                             }
                         });
+                        Ok(Some(handle))
                     }
-                    Err(e) => info!("inotify watch failed: {}. You can ignore this if your device does not support the feature", e),
+                    Err(e) => {
+                        info!("inotify watch failed: {}. You can ignore this if your device does not support the feature", e);
+                        Ok(None)
+                    }
                 }
-            });
-            Ok(())
+            })
         }
         });
     };
@@ -221,7 +227,7 @@ pub trait CtrlTask {
         mut on_prepare_for_shutdown: F2,
         mut on_lid_change: F3,
         mut on_external_power_change: F4,
-    ) -> impl Future<Output = Result<(), RogError>> + Send
+    ) -> impl Future<Output = Result<tokio::task::JoinSet<()>, RogError>> + Send
     where
         F1: FnMut(bool) -> Fut1 + Send + 'static,
         F2: FnMut(bool) -> Fut2 + Send + 'static,
@@ -241,8 +247,10 @@ pub trait CtrlTask {
                 .await
                 .map_err(RogError::Zbus)?;
 
+            let mut set = tokio::task::JoinSet::new();
+
             let manager1 = manager.clone();
-            tokio::spawn(async move {
+            set.spawn(async move {
                 if let Ok(mut notif) = manager1.receive_prepare_for_shutdown().await {
                     while let Some(event) = notif.next().await {
                         if let Ok(args) = event.args() {
@@ -254,7 +262,7 @@ pub trait CtrlTask {
             });
 
             let manager2 = manager.clone();
-            tokio::spawn(async move {
+            set.spawn(async move {
                 if let Ok(mut notif) = manager2.receive_prepare_for_sleep().await {
                     while let Some(event) = notif.next().await {
                         if let Ok(args) = event.args() {
@@ -266,7 +274,7 @@ pub trait CtrlTask {
             });
 
             let manager3 = manager.clone();
-            tokio::spawn(async move {
+            set.spawn(async move {
                 let mut last_power = manager3.on_external_power().await.unwrap_or_default();
 
                 loop {
@@ -280,7 +288,7 @@ pub trait CtrlTask {
                 }
             });
 
-            tokio::spawn(async move {
+            set.spawn(async move {
                 let mut last_lid = manager.lid_closed().await.unwrap_or_default();
                 loop {
                     if let Ok(next) = manager.lid_closed().await {
@@ -293,7 +301,7 @@ pub trait CtrlTask {
                 }
             });
 
-            Ok(())
+            Ok(set)
         }
     }
 }

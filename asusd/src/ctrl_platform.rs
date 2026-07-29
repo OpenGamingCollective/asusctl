@@ -926,145 +926,151 @@ impl CtrlTask for CtrlPlatform {
         let platform2 = self.clone();
         let platform3 = self.clone();
         let signal_ctxt_copy = signal_ctxt.clone();
-        self.create_sys_event_tasks(
-            move |sleeping| {
-                let platform1 = platform1.clone();
-                async move {
-                    // This block is commented out due to some kind of issue reported. Maybe the
-                    // desktops used were storing a value whcih was then read here.
-                    // Don't store it on suspend, assume that the current config setting is desired
-                    // if sleeping && platform1.power.has_charge_control_end_threshold() {
-                    //     platform1.config.lock().await.charge_control_end_threshold = platform1
-                    //         .power
-                    //         .get_charge_control_end_threshold()
-                    //         .unwrap_or(100);
-                    // } else
-                    if !sleeping && platform1.power.has_charge_control_end_threshold() {
-                        platform1
-                            .power
-                            .set_charge_control_end_threshold(
-                                platform1.config.lock().await.charge_control_end_threshold,
-                            )
-                            .ok();
-                    }
-                    if let Ok(power_plugged) = platform1.power.get_online() {
-                        if platform1.config.lock().await.last_power_plugged != power_plugged {
-                            if !sleeping && platform1.platform.has_platform_profile() {
-                                let change_epp =
-                                    platform1.config.lock().await.platform_profile_linked_epp;
-                                platform1
-                                    .update_policy_ac_or_bat(power_plugged > 0, change_epp)
-                                    .await;
-                            }
-                            if !sleeping {
-                                platform1.run_ac_or_bat_cmd(power_plugged > 0).await;
-                                if let Ok(profile) =
-                                    platform1.platform.get_platform_profile().map(|p| p.into())
-                                {
-                                    let attrs = FirmwareAttributes::new();
+        let mut tasks = self
+            .create_sys_event_tasks(
+                move |sleeping| {
+                    let platform1 = platform1.clone();
+                    async move {
+                        // This block is commented out due to some kind of issue reported. Maybe the
+                        // desktops used were storing a value whcih was then read here.
+                        // Don't store it on suspend, assume that the current config setting is desired
+                        // if sleeping && platform1.power.has_charge_control_end_threshold() {
+                        //     platform1.config.lock().await.charge_control_end_threshold = platform1
+                        //         .power
+                        //         .get_charge_control_end_threshold()
+                        //         .unwrap_or(100);
+                        // } else
+                        if !sleeping && platform1.power.has_charge_control_end_threshold() {
+                            platform1
+                                .power
+                                .set_charge_control_end_threshold(
+                                    platform1.config.lock().await.charge_control_end_threshold,
+                                )
+                                .ok();
+                        }
+                        if let Ok(power_plugged) = platform1.power.get_online() {
+                            if platform1.config.lock().await.last_power_plugged != power_plugged {
+                                if !sleeping && platform1.platform.has_platform_profile() {
+                                    let change_epp =
+                                        platform1.config.lock().await.platform_profile_linked_epp;
                                     platform1
-                                        .apply_fan_curves_and_ppt(
-                                            &attrs,
-                                            power_plugged > 0,
-                                            profile,
-                                        )
+                                        .update_policy_ac_or_bat(power_plugged > 0, change_epp)
                                         .await;
-                                    if let Err(e) = platform1
-                                        .armoury_registry
-                                        .emit_limits(&platform1.connection)
-                                        .await
+                                }
+                                if !sleeping {
+                                    platform1.run_ac_or_bat_cmd(power_plugged > 0).await;
+                                    if let Ok(profile) =
+                                        platform1.platform.get_platform_profile().map(|p| p.into())
                                     {
-                                        error!(
+                                        let attrs = FirmwareAttributes::new();
+                                        platform1
+                                            .apply_fan_curves_and_ppt(
+                                                &attrs,
+                                                power_plugged > 0,
+                                                profile,
+                                            )
+                                            .await;
+                                        if let Err(e) = platform1
+                                            .armoury_registry
+                                            .emit_limits(&platform1.connection)
+                                            .await
+                                        {
+                                            error!(
                                             "Failed to emit armoury updates after power change: \
                                              {e:?}"
                                         );
+                                        }
                                     }
                                 }
+                                platform1.config.lock().await.last_power_plugged = power_plugged;
                             }
-                            platform1.config.lock().await.last_power_plugged = power_plugged;
                         }
                     }
-                }
-            },
-            move |shutting_down| {
-                let platform2 = platform2.clone();
-                async move {
-                    info!("RogPlatform reloading panel_od");
-                    let lock = platform2.config.lock().await;
-                    if shutting_down
-                        && platform2.power.has_charge_control_end_threshold()
-                        && lock.base_charge_control_end_threshold > 0
-                    {
-                        info!("RogPlatform restoring charge_control_end_threshold");
-                        platform2
-                            .power
-                            .set_charge_control_end_threshold(
-                                lock.base_charge_control_end_threshold,
-                            )
-                            .map_err(|err| {
-                                warn!("CtrlCharge: charge_control_end_threshold {}", err);
-                                err
-                            })
-                            .ok();
-                    }
-                }
-            },
-            move |_lid_closed| {
-                // on lid change
-                async move {}
-            },
-            move |power_plugged| {
-                let platform3 = platform3.clone();
-                let signal_ctxt_copy = signal_ctxt.clone();
-                // power change
-                async move {
-                    if platform3.platform.has_platform_profile() {
-                        let change_epp = platform3.config.lock().await.platform_profile_linked_epp;
-                        platform3
-                            .update_policy_ac_or_bat(power_plugged, change_epp)
-                            .await;
-                    }
-                    platform3.run_ac_or_bat_cmd(power_plugged).await;
-                    platform3.manage_nvidia_powerd(power_plugged).await;
-                    // In case one-shot charge was used, restore the old charge limit
-                    if platform3.power.has_charge_control_end_threshold() && !power_plugged {
-                        platform3.restore_charge_limit().await;
-                    }
-
-                    if let Ok(profile) = platform3
-                        .platform
-                        .get_platform_profile()
-                        .map(|p| p.into())
-                        .map_err(|e| {
-                            error!("Platform: get_platform_profile error: {e}");
-                        })
-                    {
-                        // TODO: manage this better, shouldn't need to create every time
-                        let attrs = FirmwareAttributes::new();
-                        platform3
-                            .apply_fan_curves_and_ppt(&attrs, power_plugged, profile)
-                            .await;
-                        if let Err(e) = platform3
-                            .armoury_registry
-                            .emit_limits(&platform3.connection)
-                            .await
+                },
+                move |shutting_down| {
+                    let platform2 = platform2.clone();
+                    async move {
+                        info!("RogPlatform reloading panel_od");
+                        let lock = platform2.config.lock().await;
+                        if shutting_down
+                            && platform2.power.has_charge_control_end_threshold()
+                            && lock.base_charge_control_end_threshold > 0
                         {
-                            error!("Failed to emit armoury updates after AC/DC toggle: {e:?}");
+                            info!("RogPlatform restoring charge_control_end_threshold");
+                            platform2
+                                .power
+                                .set_charge_control_end_threshold(
+                                    lock.base_charge_control_end_threshold,
+                                )
+                                .map_err(|err| {
+                                    warn!("CtrlCharge: charge_control_end_threshold {}", err);
+                                    err
+                                })
+                                .ok();
                         }
-                        platform3
-                            .enable_ppt_group_changed(&signal_ctxt_copy)
-                            .await
-                            .ok();
                     }
-                }
-            },
-        )
-        .await?;
+                },
+                move |_lid_closed| {
+                    // on lid change
+                    async move {}
+                },
+                move |power_plugged| {
+                    let platform3 = platform3.clone();
+                    let signal_ctxt_copy = signal_ctxt.clone();
+                    // power change
+                    async move {
+                        if platform3.platform.has_platform_profile() {
+                            let change_epp =
+                                platform3.config.lock().await.platform_profile_linked_epp;
+                            platform3
+                                .update_policy_ac_or_bat(power_plugged, change_epp)
+                                .await;
+                        }
+                        platform3.run_ac_or_bat_cmd(power_plugged).await;
+                        platform3.manage_nvidia_powerd(power_plugged).await;
+                        // In case one-shot charge was used, restore the old charge limit
+                        if platform3.power.has_charge_control_end_threshold() && !power_plugged {
+                            platform3.restore_charge_limit().await;
+                        }
 
-        // This spawns a new task for every item.
-        // TODO: find a better way to manage this
-        self.watch_charge_control_end_threshold(signal_ctxt_copy.clone())
+                        if let Ok(profile) = platform3
+                            .platform
+                            .get_platform_profile()
+                            .map(|p| p.into())
+                            .map_err(|e| {
+                                error!("Platform: get_platform_profile error: {e}");
+                            })
+                        {
+                            // TODO: manage this better, shouldn't need to create every time
+                            let attrs = FirmwareAttributes::new();
+                            platform3
+                                .apply_fan_curves_and_ppt(&attrs, power_plugged, profile)
+                                .await;
+                            if let Err(e) = platform3
+                                .armoury_registry
+                                .emit_limits(&platform3.connection)
+                                .await
+                            {
+                                error!("Failed to emit armoury updates after AC/DC toggle: {e:?}");
+                            }
+                            platform3
+                                .enable_ppt_group_changed(&signal_ctxt_copy)
+                                .await
+                                .ok();
+                        }
+                    }
+                },
+            )
             .await?;
+
+        if let Some(h) = self
+            .watch_charge_control_end_threshold(signal_ctxt_copy.clone())
+            .await?
+        {
+            tasks.spawn(async move {
+                let _ = h.await;
+            });
+        }
 
         let watch_platform_profile = self.platform.monitor_platform_profile()?;
         let ctrl = self.clone();
@@ -1072,12 +1078,11 @@ impl CtrlTask for CtrlPlatform {
         // Need a copy here, not ideal. But first use in asus_armoury.rs is
         // moved to zbus
         let attrs = FirmwareAttributes::new();
-        tokio::spawn(async move {
+        tasks.spawn(async move {
             use futures_util::StreamExt;
             let mut buffer = [0; 32];
             if let Ok(mut stream) = watch_platform_profile.into_event_stream(&mut buffer) {
                 while (stream.next().await).is_some() {
-                    // this blocks
                     debug!("Platform: watch_platform_profile changed");
                     if let Ok(profile) = ctrl
                         .platform
@@ -1106,6 +1111,14 @@ impl CtrlTask for CtrlPlatform {
                             error!("Failed to emit armoury updates after profile change: {e:?}");
                         }
                     }
+                }
+            }
+        });
+
+        tokio::spawn(async move {
+            while let Some(res) = tasks.join_next().await {
+                if let Err(err) = res {
+                    warn!("CtrlPlatform background task ended with error: {err:?}");
                 }
             }
         });
