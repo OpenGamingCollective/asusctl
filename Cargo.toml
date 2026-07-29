@@ -20,16 +20,13 @@ members = [
   "asus-shutdown",
   "asusd-user",
   "config-traits",
-  "dmi-id",
   "rog-platform",
   "rog-dbus",
   "rog-anime",
   "rog-aura",
   "rog-profiles",
   "rog-control-center",
-  "rog-slash",
   "simulators",
-  "rog-scsi",
 ]
 
 default-members = ["asusctl", "asusd", "asus-shutdown", "asusd-user", "rog-control-center"]
