@@ -147,7 +147,10 @@ pub const fn slash_pkt_set_mode(slash_type: SlashType, mode: SlashMode) -> [Slas
     pkt2[6] = 0x01;
     pkt2[7] = mode as u8;
     pkt2[8] = 0x02;
-    pkt2[9] = 0x19; // difference, GA605 = 0x10
+    pkt2[9] = match slash_type {
+        SlashType::GA605_2024 | SlashType::GA605_2025 => 0x10,
+        _ => 0x19,
+    };
     pkt2[10] = 0x03;
     pkt2[11] = 0x13;
     pkt2[12] = 0x04;
