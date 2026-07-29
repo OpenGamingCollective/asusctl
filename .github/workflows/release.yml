@@ -28,9 +28,6 @@ jobs:
                   useradd -m builder
                   echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
-            - name: Rust Cache
-              uses: Swatinem/rust-cache@v2
-
             - name: Determine pkgrel
               env:
                   BUCKET_PUBLIC_URL: ${{ vars.BUCKET_PUBLIC_URL }}
