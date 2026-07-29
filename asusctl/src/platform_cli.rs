@@ -1,6 +1,5 @@
 use std::process::Command;
 
-use dmi_id::DMIID;
 use log::{info, warn};
 use rog_aura::keyboard::{AuraPowerState, LaptopAuraPower};
 use rog_aura::{AuraEffect, PowerZones};
@@ -9,6 +8,7 @@ use rog_dbus::zbus_aura::AuraProxyBlocking;
 use rog_dbus::zbus_backlight::BacklightProxyBlocking;
 use rog_dbus::zbus_platform::PlatformProxyBlocking;
 use rog_platform::platform::{PlatformProfile, Properties};
+use rog_platform::DMIID;
 use rog_profiles::error::ProfileError;
 use zbus::blocking::Connection;
 

@@ -3,8 +3,8 @@ use std::str::FromStr;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
-use dmi_id::DMIID;
 use log::{info, warn};
+use rog_platform::DMIID;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "dbus")]
 use zbus::zvariant::{OwnedValue, Type, Value};

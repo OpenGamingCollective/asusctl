@@ -15,7 +15,7 @@ exclude = ["data"]
 [features]
 default = ["dbus", "detect"]
 dbus = ["zbus"]
-detect = ["dmi_id"]
+detect = ["rog_platform"]
 
 [lib]
 name = "rog_anime"
@@ -33,5 +33,5 @@ glam.workspace = true
 
 zbus = { workspace = true, optional = true }
 
-dmi_id = { path = "../dmi-id", optional = true }
+rog_platform = { path = "../rog-platform", optional = true }
 thiserror.workspace = true

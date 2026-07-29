@@ -1,8 +1,8 @@
 use config_traits::ron;
 use rog_anime::error::AnimeError;
 use rog_platform::error::PlatformError;
+use rog_platform::slash::SlashError;
 use rog_profiles::error::ProfileError;
-use rog_slash::error::SlashError;
 
 #[derive(thiserror::Error, Debug)]
 pub enum RogError {
@@ -106,12 +106,6 @@ impl From<ProfileError> for RogError {
 impl From<AnimeError> for RogError {
     fn from(err: AnimeError) -> Self {
         RogError::Anime(err)
-    }
-}
-
-impl From<SlashError> for RogError {
-    fn from(err: SlashError) -> Self {
-        RogError::Slash(err)
     }
 }
 

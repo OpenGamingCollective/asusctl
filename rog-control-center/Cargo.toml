@@ -29,8 +29,6 @@ rog_dbus = { path = "../rog-dbus" }
 rog_aura = { path = "../rog-aura" }
 rog_profiles = { path = "../rog-profiles" }
 rog_platform = { path = "../rog-platform" }
-rog_slash = { path = "../rog-slash" }
-dmi_id = { path = "../dmi-id" }
 
 argh.workspace = true
 log.workspace = true

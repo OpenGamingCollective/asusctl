@@ -8,10 +8,9 @@ use rog_anime::AnimeType;
 use rog_aura::AuraDeviceType;
 use rog_platform::hid_raw::HidRaw;
 use rog_platform::keyboard_led::KeyboardBacklight;
+use rog_platform::scsi::{open_device, ScsiType};
+use rog_platform::slash::{SlashError, SlashType};
 use rog_platform::usb_raw::USBRaw;
-use rog_scsi::{open_device, ScsiType};
-use rog_slash::error::SlashError;
-use rog_slash::SlashType;
 use tokio::sync::Mutex;
 
 use crate::aura_anime::config::AniMeConfig;
@@ -82,7 +81,7 @@ impl DeviceHandle {
         debug!("Testing for USB Slash");
         let slash_type = SlashType::from_dmi();
         if matches!(slash_type, SlashType::Unsupported) {
-            return Err(RogError::Slash(SlashError::NoDevice));
+            return Err(RogError::Slash(SlashError::NoSlashDevice));
         }
 
         if let Ok(usb) = USBRaw::new(slash_type.prod_id()) {

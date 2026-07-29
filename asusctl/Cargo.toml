@@ -10,13 +10,10 @@ edition.workspace = true
 
 [dependencies]
 rog_anime = { path = "../rog-anime" }
-rog_scsi = { path = "../rog-scsi" }
-rog_slash = { path = "../rog-slash" }
 rog_aura = { path = "../rog-aura" }
 rog_dbus = { path = "../rog-dbus" }
 rog_profiles = { path = "../rog-profiles" }
 rog_platform = { path = "../rog-platform" }
-dmi_id = { path = "../dmi-id" }
 
 log.workspace = true
 env_logger.workspace = true

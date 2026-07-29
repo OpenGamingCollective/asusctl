@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use config_traits::StdConfig;
 use log::error;
 use rog_aura::AuraDeviceType;
-use rog_scsi::{AuraEffect, AuraMode};
+use rog_platform::scsi::{AuraEffect, AuraMode};
 use zbus::fdo::Error as ZbErr;
 use zbus::zvariant::OwnedObjectPath;
 use zbus::{interface, Connection};

@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use config_traits::{StdConfig, StdConfigLoad};
 use rog_aura::AuraDeviceType;
-use rog_scsi::{AuraEffect, AuraMode};
+use rog_platform::scsi::{AuraEffect, AuraMode};
 use serde::{Deserialize, Serialize};
 
 const CONFIG_FILE: &str = "scsi.ron";

@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use log::{error, info};
 use rog_dbus::find_iface_async;
 use rog_dbus::zbus_slash::SlashProxy;
-use rog_slash::SlashMode;
+use rog_platform::slash::SlashMode;
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
 use crate::config::Config;

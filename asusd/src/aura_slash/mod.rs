@@ -2,8 +2,10 @@ use std::sync::Arc;
 
 use config::SlashConfig;
 use rog_platform::hid_raw::HidRaw;
+use rog_platform::slash::usb::{
+    slash_pkt_enable, slash_pkt_init, slash_pkt_options, slash_pkt_set_mode,
+};
 use rog_platform::usb_raw::USBRaw;
-use rog_slash::usb::{slash_pkt_enable, slash_pkt_init, slash_pkt_options, slash_pkt_set_mode};
 use tokio::sync::{Mutex, MutexGuard};
 
 use crate::error::RogError;

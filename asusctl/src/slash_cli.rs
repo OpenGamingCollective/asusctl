@@ -1,7 +1,7 @@
 use argh::FromArgs;
 use log::warn;
 use rog_dbus::zbus_slash::SlashProxyBlocking;
-use rog_slash::SlashMode;
+use rog_platform::slash::SlashMode;
 use zbus::blocking::Connection;
 
 #[derive(FromArgs, Debug)]

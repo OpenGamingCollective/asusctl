@@ -1,4 +1,4 @@
-use rog_slash::SlashMode;
+use rog_platform::slash::SlashMode;
 use zbus::proxy;
 
 #[proxy(

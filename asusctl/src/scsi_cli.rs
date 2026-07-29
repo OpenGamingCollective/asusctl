@@ -1,6 +1,6 @@
 use argh::FromArgs;
 use log::warn;
-use rog_scsi::{AuraMode, Colour, Direction, Speed};
+use rog_platform::scsi::{AuraMode, Colour, Direction, Speed};
 
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "scsi", description = "scsi LED commands")]
