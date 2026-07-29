@@ -2,6 +2,7 @@ use argh::FromArgs;
 use log::warn;
 use rog_anime::usb::{get_anime_type, AnimAwake, AnimBooting, AnimShutdown, AnimSleeping};
 use rog_anime::AnimeType;
+use rog_dbus::find_iface_blocking;
 
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "anime", description = "anime commands")]
@@ -31,8 +32,6 @@ pub struct AnimeCommand {
     pub off_when_suspended: Option<bool>,
     #[argh(option, description = "turn the anime off when the lid is closed")]
     pub off_when_lid_closed: Option<bool>,
-    #[argh(option, description = "off with his head!!!")]
-    pub off_with_his_head: Option<bool>,
     #[argh(subcommand)]
     pub command: Option<AnimeActions>,
 }
@@ -159,16 +158,23 @@ pub fn handle_anime(cmd: &AnimeCommand) -> Result<(), Box<dyn std::error::Error>
         && cmd.off_when_lid_closed.is_none()
         && cmd.off_when_suspended.is_none()
         && cmd.off_when_unplugged.is_none()
-        && cmd.off_with_his_head.is_none()
         && !cmd.clear
     {
         warn!("Missing arg or command; run 'asusctl anime --help' for usage");
         return Ok(());
     }
 
-    let animes = crate::platform_cli::find_iface_blocking::<
-        rog_dbus::zbus_anime::AnimeProxyBlocking,
-    >("xyz.ljones.Anime")?;
+    let animes =
+        find_iface_blocking::<rog_dbus::zbus_anime::AnimeProxyBlocking>("xyz.ljones.Anime")?;
+
+    let mut anime_type = get_anime_type();
+    if let AnimeType::Unsupported = anime_type {
+        if let Some(model) = cmd.override_type {
+            anime_type = model;
+        } else {
+            warn!("Anime display type is Unsupported; consider specifying --override-type");
+        }
+    }
 
     for proxy in animes {
         if let Some(enable) = cmd.enable_display {
@@ -188,13 +194,6 @@ pub fn handle_anime(cmd: &AnimeCommand) -> Result<(), Box<dyn std::error::Error>
         }
         if let Some(enable) = cmd.off_when_unplugged {
             proxy.set_off_when_unplugged(enable)?;
-        }
-
-        let mut anime_type = get_anime_type();
-        if let AnimeType::Unsupported = anime_type {
-            if let Some(model) = cmd.override_type {
-                anime_type = model;
-            }
         }
 
         if cmd.clear {

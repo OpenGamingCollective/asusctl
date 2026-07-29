@@ -24,15 +24,15 @@ pub fn check_service(name: &str) -> bool {
             "{} is not enabled, enable it with `systemctl enable {}`",
             name, name
         );
-        true
+        false
     } else if !check_systemd_unit_active(name) {
         warn!(
             "{} is not running, start it with `systemctl start {}`",
             name, name
         );
-        true
-    } else {
         false
+    } else {
+        true
     }
 }
 
@@ -69,7 +69,7 @@ pub fn print_info() {
     println!("      Board name: {}", board_name.trim());
 }
 
-pub use rog_dbus::find_iface_blocking;
+use rog_dbus::find_iface_blocking;
 
 pub fn handle_info(
     info_opt: &InfoCommand,
@@ -87,21 +87,24 @@ pub fn handle_info(
             "Supported Platform Properties:\n{:#?}",
             supported_properties
         );
-        if let Ok(aura) = find_iface_blocking::<AuraProxyBlocking>("xyz.ljones.Aura") {
-            if let Some(first_aura) = aura.first() {
-                let bright = first_aura.supported_brightness()?;
-                let modes = first_aura.supported_basic_modes()?;
-                let zones = first_aura.supported_basic_zones()?;
-                let power = first_aura.supported_power_zones()?;
-                println!("Supported Keyboard Brightness:\n{:#?}", bright);
-                println!("Supported Aura Modes:\n{:#?}", modes);
-                println!("Supported Aura Zones:\n{:#?}", zones);
-                println!("Supported Aura Power Zones:\n{:#?}", power);
-            } else {
-                warn!("No aura interface found");
+        match find_iface_blocking::<AuraProxyBlocking>("xyz.ljones.Aura") {
+            Ok(aura) => {
+                if let Some(first_aura) = aura.first() {
+                    let bright = first_aura.supported_brightness()?;
+                    let modes = first_aura.supported_basic_modes()?;
+                    let zones = first_aura.supported_basic_zones()?;
+                    let power = first_aura.supported_power_zones()?;
+                    println!("Supported Keyboard Brightness:\n{:#?}", bright);
+                    println!("Supported Aura Modes:\n{:#?}", modes);
+                    println!("Supported Aura Zones:\n{:#?}", zones);
+                    println!("Supported Aura Power Zones:\n{:#?}", power);
+                } else {
+                    warn!("No aura interface found");
+                }
             }
-        } else {
-            warn!("No aura interface found");
+            Err(err) => {
+                warn!("No aura interface found: {err}");
+            }
         }
     }
 
@@ -135,11 +138,12 @@ pub fn handle_battery(
 }
 
 pub fn handle_backlight(cmd: &BacklightCommand) -> Result<(), Box<dyn std::error::Error>> {
+    let backlights = find_iface_blocking::<BacklightProxyBlocking>("xyz.ljones.Backlight")?;
+
     if cmd.screenpad_brightness.is_none()
         && cmd.screenpad_gamma.is_none()
         && cmd.sync_screenpad_brightness.is_none()
     {
-        let backlights = find_iface_blocking::<BacklightProxyBlocking>("xyz.ljones.Backlight")?;
         for backlight in backlights {
             println!("Current screenpad settings:");
             println!("  Brightness: {}", backlight.screenpad_brightness()?);
@@ -153,7 +157,6 @@ pub fn handle_backlight(cmd: &BacklightCommand) -> Result<(), Box<dyn std::error
         return Ok(());
     }
 
-    let backlights = find_iface_blocking::<BacklightProxyBlocking>("xyz.ljones.Backlight")?;
     for backlight in backlights {
         if let Some(brightness) = cmd.screenpad_brightness {
             backlight.set_screenpad_brightness(brightness)?;
@@ -273,21 +276,21 @@ pub fn handle_led_mode(mode: &LedModeCommand) -> Result<(), Box<dyn std::error::
 }
 
 pub fn handle_led_power1(power: &LedPowerCommand1) -> Result<(), Box<dyn std::error::Error>> {
+    if power.awake.is_none()
+        && power.sleep.is_none()
+        && power.boot.is_none()
+        && !power.keyboard
+        && !power.lightbar
+    {
+        warn!("Missing arg or command; run 'asusctl aura power-tuf --help' for usage");
+        return Ok(());
+    }
+
     let aura = find_iface_blocking::<AuraProxyBlocking>("xyz.ljones.Aura")?;
     for aura in aura {
         let dev_type = aura.device_type()?;
         if !dev_type.is_old_laptop() && !dev_type.is_tuf_laptop() {
             warn!("This option applies only to keyboards 2021+");
-        }
-
-        if power.awake.is_none()
-            && power.sleep.is_none()
-            && power.boot.is_none()
-            && !power.keyboard
-            && !power.lightbar
-        {
-            warn!("Missing arg or command; run 'asusctl aura power-tuf --help' for usage");
-            return Ok(());
         }
 
         if dev_type.is_old_laptop() || dev_type.is_tuf_laptop() {
@@ -338,52 +341,47 @@ pub fn handle_led_power2(power: &LedPowerCommand2) -> Result<(), Box<dyn std::er
             continue;
         }
 
-        if power.command.is_none() {
+        let Some(cmd) = &power.command else {
             warn!("Missing arg or command; run 'asusctl aura power --help' for usage");
             println!("Commands available");
             return Ok(());
-        }
+        };
 
-        if let Some(_pow) = power.command.as_ref() {
-            let mut states = aura.led_power()?;
-            let mut set =
-                |zone: PowerZones, boot_v: bool, awake_v: bool, sleep_v: bool, shutdown_v: bool| {
-                    for state in states.states.iter_mut() {
-                        if state.zone == zone {
-                            state.boot = boot_v;
-                            state.awake = awake_v;
-                            state.sleep = sleep_v;
-                            state.shutdown = shutdown_v;
-                            break;
-                        }
-                    }
-                };
-
-            if let Some(cmd) = &power.command {
-                match cmd {
-                    crate::aura_cli::SetAuraZoneEnabled::Keyboard(k) => {
-                        set(PowerZones::Keyboard, k.boot, k.awake, k.sleep, k.shutdown)
-                    }
-                    crate::aura_cli::SetAuraZoneEnabled::Logo(l) => {
-                        set(PowerZones::Logo, l.boot, l.awake, l.sleep, l.shutdown)
-                    }
-                    crate::aura_cli::SetAuraZoneEnabled::Lightbar(l) => {
-                        set(PowerZones::Lightbar, l.boot, l.awake, l.sleep, l.shutdown)
-                    }
-                    crate::aura_cli::SetAuraZoneEnabled::Lid(l) => {
-                        set(PowerZones::Lid, l.boot, l.awake, l.sleep, l.shutdown)
-                    }
-                    crate::aura_cli::SetAuraZoneEnabled::RearGlow(r) => {
-                        set(PowerZones::RearGlow, r.boot, r.awake, r.sleep, r.shutdown)
-                    }
-                    crate::aura_cli::SetAuraZoneEnabled::Ally(r) => {
-                        set(PowerZones::Ally, r.boot, r.awake, r.sleep, r.shutdown)
-                    }
+        let mut states = aura.led_power()?;
+        let mut set =
+            |zone: PowerZones, boot_v: bool, awake_v: bool, sleep_v: bool, shutdown_v: bool| {
+                if let Some(state) = states.states.iter_mut().find(|s| s.zone == zone) {
+                    state.boot = boot_v;
+                    state.awake = awake_v;
+                    state.sleep = sleep_v;
+                    state.shutdown = shutdown_v;
+                } else {
+                    warn!("Zone {zone:?} is not supported by this device");
                 }
-            }
+            };
 
-            aura.set_led_power(states)?;
+        match cmd {
+            crate::aura_cli::SetAuraZoneEnabled::Keyboard(k) => {
+                set(PowerZones::Keyboard, k.boot, k.awake, k.sleep, k.shutdown)
+            }
+            crate::aura_cli::SetAuraZoneEnabled::Logo(l) => {
+                set(PowerZones::Logo, l.boot, l.awake, l.sleep, l.shutdown)
+            }
+            crate::aura_cli::SetAuraZoneEnabled::Lightbar(l) => {
+                set(PowerZones::Lightbar, l.boot, l.awake, l.sleep, l.shutdown)
+            }
+            crate::aura_cli::SetAuraZoneEnabled::Lid(l) => {
+                set(PowerZones::Lid, l.boot, l.awake, l.sleep, l.shutdown)
+            }
+            crate::aura_cli::SetAuraZoneEnabled::RearGlow(r) => {
+                set(PowerZones::RearGlow, r.boot, r.awake, r.sleep, r.shutdown)
+            }
+            crate::aura_cli::SetAuraZoneEnabled::Ally(r) => {
+                set(PowerZones::Ally, r.boot, r.awake, r.sleep, r.shutdown)
+            }
         }
+
+        aura.set_led_power(states)?;
     }
 
     Ok(())
@@ -511,16 +509,13 @@ pub fn print_firmware_attr(
     Ok(())
 }
 
-#[allow(clippy::manual_is_multiple_of, clippy::nonminimal_bool)]
 pub fn handle_armoury_command(cmd: &ArmouryCommand) -> Result<(), Box<dyn std::error::Error>> {
     match &cmd.command {
         ArmourySubCommand::List(_) => {
-            if let Ok(attrs) =
-                find_iface_blocking::<AsusArmouryProxyBlocking>("xyz.ljones.AsusArmoury")
-            {
-                for attr in attrs.iter() {
-                    print_firmware_attr(attr)?;
-                }
+            let attrs = find_iface_blocking::<AsusArmouryProxyBlocking>("xyz.ljones.AsusArmoury")
+                .map_err(|e| format!("Could not reach asusd armoury interface: {e}"))?;
+            for attr in attrs.iter() {
+                print_firmware_attr(attr)?;
             }
             Ok(())
         }

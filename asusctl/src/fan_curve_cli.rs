@@ -51,22 +51,25 @@ pub fn handle_fan_curve(
     conn: &zbus::blocking::Connection,
     cmd: &FanCurveCommand,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let fan_proxy = rog_dbus::zbus_fan_curves::FanCurvesProxyBlocking::new(conn).map_err(|e| {
-        warn!("Fan curves unavailable: {e}");
-        rog_profiles::error::ProfileError::NotSupported
-    })?;
-
     if !cmd.get_enabled && !cmd.default && cmd.mod_profile.is_none() {
         warn!("Missing arg or command; run 'asusctl fan-curve --help' for usage");
         return Ok(());
     }
 
-    if (cmd.enable_fan_curves.is_some() || cmd.fan.is_some() || cmd.data.is_some())
+    if (cmd.enable_fan_curves.is_some()
+        || cmd.enable_fan_curve.is_some()
+        || cmd.fan.is_some()
+        || cmd.data.is_some())
         && cmd.mod_profile.is_none()
     {
         warn!("{REQ_MOD_PROFILE_MSG}");
         return Ok(());
     }
+
+    let fan_proxy = rog_dbus::zbus_fan_curves::FanCurvesProxyBlocking::new(conn).map_err(|e| {
+        warn!("Fan curves unavailable: {e}");
+        rog_profiles::error::ProfileError::NotSupported
+    })?;
 
     let plat_proxy = rog_dbus::zbus_platform::PlatformProxyBlocking::new(conn)?;
     if cmd.get_enabled {
@@ -83,7 +86,7 @@ pub fn handle_fan_curve(
     }
 
     if let Some(profile) = cmd.mod_profile {
-        if cmd.enable_fan_curves.is_none() && cmd.data.is_none() {
+        if cmd.enable_fan_curves.is_none() && cmd.enable_fan_curve.is_none() && cmd.data.is_none() {
             let data = fan_proxy.fan_curve_data(profile)?;
             let ron =
                 ron::ser::to_string_pretty(&data, ron::ser::PrettyConfig::new().depth_limit(4))?;
@@ -98,14 +101,17 @@ pub fn handle_fan_curve(
             if let Some(fan) = cmd.fan {
                 fan_proxy.set_profile_fan_curve_enabled(profile, fan, enabled)?;
             } else {
-                warn!("{REQ_MOD_PROFILE_MSG}");
+                warn!("--enable-fan-curve requires --fan <cpu/gpu/mid>");
             }
         }
 
         if let Some(mut curve) = cmd.data.clone() {
-            let fan = cmd.fan.unwrap_or_default();
-            curve.set_fan(fan);
-            fan_proxy.set_fan_curve(profile, curve)?;
+            if let Some(fan) = cmd.fan {
+                curve.set_fan(fan);
+                fan_proxy.set_fan_curve(profile, curve)?;
+            } else {
+                warn!("--data requires --fan <cpu/gpu/mid>");
+            }
         }
     }
 

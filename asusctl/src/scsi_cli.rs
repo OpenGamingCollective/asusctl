@@ -1,5 +1,6 @@
 use argh::FromArgs;
 use log::warn;
+use rog_dbus::find_iface_blocking;
 use rog_platform::scsi::{AuraMode, Colour, Direction, Speed};
 
 #[derive(FromArgs, Debug)]
@@ -31,13 +32,19 @@ pub struct ScsiCommand {
 }
 
 pub fn handle_scsi(cmd: &ScsiCommand) -> Result<(), Box<dyn std::error::Error>> {
-    if !cmd.list && cmd.enable.is_none() && cmd.mode.is_none() && cmd.colours.is_empty() {
+    if !cmd.list
+        && cmd.enable.is_none()
+        && cmd.mode.is_none()
+        && cmd.speed.is_none()
+        && cmd.direction.is_none()
+        && cmd.colours.is_empty()
+    {
         warn!("Missing arg or command; run 'asusctl scsi --help' for usage");
+        return Ok(());
     }
 
-    let scsis = crate::platform_cli::find_iface_blocking::<
-        rog_dbus::scsi_aura::ScsiAuraProxyBlocking,
-    >("xyz.ljones.ScsiAura")?;
+    let scsis =
+        find_iface_blocking::<rog_dbus::scsi_aura::ScsiAuraProxyBlocking>("xyz.ljones.ScsiAura")?;
 
     for scsi in scsis {
         if let Some(enable) = cmd.enable {
@@ -51,18 +58,16 @@ pub fn handle_scsi(cmd: &ScsiCommand) -> Result<(), Box<dyn std::error::Error>> 
         let mut mode = scsi.led_mode_data()?;
         let mut do_update = false;
         if !cmd.colours.is_empty() {
+            if cmd.colours.len() > 4 {
+                warn!("Only the first 4 colours are used; ignoring the rest");
+            }
             for (count, c) in cmd.colours.iter().enumerate() {
-                if count == 0 {
-                    mode.colour1 = *c;
-                }
-                if count == 1 {
-                    mode.colour2 = *c;
-                }
-                if count == 2 {
-                    mode.colour3 = *c;
-                }
-                if count == 3 {
-                    mode.colour4 = *c;
+                match count {
+                    0 => mode.colour1 = *c,
+                    1 => mode.colour2 = *c,
+                    2 => mode.colour3 = *c,
+                    3 => mode.colour4 = *c,
+                    _ => break,
                 }
             }
             do_update = true;
