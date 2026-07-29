@@ -1084,48 +1084,59 @@ impl CtrlTask for CtrlPlatform {
             });
         }
 
-        let watch_platform_profile = self.platform.monitor_platform_profile()?;
-        let ctrl = self.clone();
+        match self.platform.monitor_platform_profile() {
+            Ok(watch_platform_profile) => {
+                let ctrl = self.clone();
 
-        // Need a copy here, not ideal. But first use in asus_armoury.rs is
-        // moved to zbus
-        let attrs = FirmwareAttributes::new();
-        tasks.spawn(async move {
-            use futures_util::StreamExt;
-            let mut buffer = [0; 32];
-            if let Ok(mut stream) = watch_platform_profile.into_event_stream(&mut buffer) {
-                while (stream.next().await).is_some() {
-                    debug!("Platform: watch_platform_profile changed");
-                    if let Ok(profile) = ctrl
-                        .platform
-                        .get_platform_profile()
-                        .map(|p| p.into())
-                        .map_err(|e| {
-                            error!("Platform: get_platform_profile error: {e}");
-                        })
-                    {
-                        let change_epp = ctrl.config.lock().await.platform_profile_linked_epp;
-                        let epp = ctrl.get_config_epp_for_throttle(profile).await;
-                        ctrl.check_and_set_epp(epp, change_epp);
-                        ctrl.platform_profile_changed(&signal_ctxt_copy).await.ok();
-                        ctrl.enable_ppt_group_changed(&signal_ctxt_copy).await.ok();
-                        let power_plugged = ctrl
-                            .power
-                            .get_online()
-                            .map_err(|e| {
-                                error!("Could not get power status: {e:?}");
-                                e
-                            })
-                            .unwrap_or_default();
-                        ctrl.apply_fan_curves_and_ppt(&attrs, power_plugged == 1, profile)
-                            .await;
-                        if let Err(e) = ctrl.armoury_registry.emit_limits(&ctrl.connection).await {
-                            error!("Failed to emit armoury updates after profile change: {e:?}");
+                // Need a copy here, not ideal. But first use in asus_armoury.rs is
+                // moved to zbus
+                let attrs = FirmwareAttributes::new();
+                tasks.spawn(async move {
+                    use futures_util::StreamExt;
+                    let mut buffer = [0; 32];
+                    if let Ok(mut stream) = watch_platform_profile.into_event_stream(&mut buffer) {
+                        while (stream.next().await).is_some() {
+                            debug!("Platform: watch_platform_profile changed");
+                            if let Ok(profile) = ctrl
+                                .platform
+                                .get_platform_profile()
+                                .map(|p| p.into())
+                                .map_err(|e| {
+                                    error!("Platform: get_platform_profile error: {e}");
+                                })
+                            {
+                                let change_epp =
+                                    ctrl.config.lock().await.platform_profile_linked_epp;
+                                let epp = ctrl.get_config_epp_for_throttle(profile).await;
+                                ctrl.check_and_set_epp(epp, change_epp);
+                                ctrl.platform_profile_changed(&signal_ctxt_copy).await.ok();
+                                ctrl.enable_ppt_group_changed(&signal_ctxt_copy).await.ok();
+                                let power_plugged = ctrl
+                                    .power
+                                    .get_online()
+                                    .map_err(|e| {
+                                        error!("Could not get power status: {e:?}");
+                                        e
+                                    })
+                                    .unwrap_or_default();
+                                ctrl.apply_fan_curves_and_ppt(&attrs, power_plugged == 1, profile)
+                                    .await;
+                                if let Err(e) =
+                                    ctrl.armoury_registry.emit_limits(&ctrl.connection).await
+                                {
+                                    error!("Failed to emit armoury updates after profile change: {e:?}");
+                                }
+                            }
                         }
+                    } else {
+                        error!("Platform: watch_platform_profile into_event_stream failed");
                     }
-                }
+                });
             }
-        });
+            Err(e) => {
+                error!("Platform: monitor_platform_profile failed: {e:?}, profile-change watcher disabled");
+            }
+        }
 
         Self::spawn_task_supervisor("CtrlPlatform", tasks);
 
