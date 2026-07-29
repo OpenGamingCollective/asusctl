@@ -289,7 +289,7 @@ impl CtrlTask for AuraZbus {
                 async move {}
             },
         )
-        .await;
+        .await?;
 
         // let ctrl2 = self.0.clone();
         // let ctrl = self.0.lock().await;
