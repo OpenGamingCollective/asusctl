@@ -132,7 +132,7 @@ impl CPUControl {
                 }
             }
         } else {
-            Err(PlatformError::CPU("No CPU's?".to_string()))
+            Err(PlatformError::CPU("No CPUs found".to_string()))
         }
     }
 

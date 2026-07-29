@@ -37,8 +37,7 @@ impl DeviceCapabilities {
             has_gpu_mux: asus_gpu_mux_exists(),
             has_dgpu_disable: asus_dgpu_disable_exists(),
             has_ppt_control: wmi.join("ppt_pl1_spl").exists() || wmi.join("ppt_pl2_sppt").exists(),
-            has_fan_curves: wmi.join("pwm1_auto_point1_pwm").exists()
-                || wmi.join("fan_boost_mode").exists(),
+            has_fan_curves: wmi.join("pwm1_auto_point1_pwm").exists(),
             has_panel_od: wmi.join("panel_od").exists(),
             has_mini_led: wmi.join("mini_led_mode").exists(),
             has_anime_matrix: detect_anime_matrix(),
