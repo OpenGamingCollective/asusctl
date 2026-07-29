@@ -205,6 +205,17 @@ pub trait CtrlTask {
         signal: SignalEmitter<'static>,
     ) -> impl Future<Output = Result<(), RogError>> + Send;
 
+    /// Helper to spawn a background task that drains JoinSet and logs any task errors.
+    fn spawn_task_supervisor(name: &'static str, mut tasks: tokio::task::JoinSet<()>) {
+        tokio::spawn(async move {
+            while let Some(res) = tasks.join_next().await {
+                if let Err(err) = res {
+                    warn!("{name} background task ended with error: {err:?}");
+                }
+            }
+        });
+    }
+
     // /// Create a timed repeating task
     // async fn repeating_task(&self, millis: u64, mut task: impl FnMut() + Send +
     // 'static) {     use std::time::Duration;

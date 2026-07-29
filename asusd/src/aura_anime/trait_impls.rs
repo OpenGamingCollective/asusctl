@@ -316,7 +316,7 @@ impl crate::CtrlTask for AniMeZbus {
         let inner2 = self.0.clone();
         let inner3 = self.0.clone();
         let inner4 = self.0.clone();
-        let mut tasks = self
+        let tasks = self
             .create_sys_event_tasks(
                 move |sleeping| {
                     // on_sleep
@@ -449,13 +449,7 @@ impl crate::CtrlTask for AniMeZbus {
             )
             .await?;
 
-        tokio::spawn(async move {
-            while let Some(res) = tasks.join_next().await {
-                if let Err(err) = res {
-                    warn!("AniMeZbus background task ended with error: {err:?}");
-                }
-            }
-        });
+        Self::spawn_task_supervisor("AniMeZbus", tasks);
 
         Ok(())
     }

@@ -241,7 +241,7 @@ impl CtrlTask for AuraZbus {
     async fn create_tasks(&self, _: SignalEmitter<'static>) -> Result<(), RogError> {
         let inner1 = self.0.clone();
         let inner3 = self.0.clone();
-        let mut tasks = self
+        let tasks = self
             .create_sys_event_tasks(
                 move |sleeping| {
                     let inner1 = inner1.clone();
@@ -290,40 +290,7 @@ impl CtrlTask for AuraZbus {
             )
             .await?;
 
-        tokio::spawn(async move {
-            while let Some(res) = tasks.join_next().await {
-                if let Err(err) = res {
-                    warn!("AuraZbus background task ended with error: {err:?}");
-                }
-<<<<<<< HEAD
-            },
-            move |_shutting_down| {
-                let inner3 = inner3.clone();
-                async move {
-                    info!("CtrlKbdLedTask reloading brightness and modes");
-                    let brightness = inner3.config.lock().await.brightness;
-                    if let Some(backlight) = &inner3.backlight {
-                        if let Err(e) = backlight.lock().await.set_brightness(brightness.into())
-                        {
-                            error!("CtrlKbdLedTask brightness error: {e}");
-                        }
-                    }
-                }
-            },
-            move |_lid_closed| {
-                // on lid change
-                async move {}
-            },
-            move |_power_plugged| {
-                // power change
-                async move {}
-            },
-        )
-        .await?;
-=======
-            }
-        });
->>>>>>> 71c10a4b (refactor(asusd): update task watch macros and create_sys_event_tasks to return JoinSet and JoinHandle)
+        Self::spawn_task_supervisor("AuraZbus", tasks);
 
         Ok(())
     }
