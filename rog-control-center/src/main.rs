@@ -6,7 +6,6 @@ use std::thread::{self, sleep};
 use std::time::Duration;
 
 use config_traits::{StdConfig, StdConfigLoad1};
-use dmi_id::DMIID;
 use log::{debug, error, info, warn, LevelFilter};
 use rog_control_center::cli_options::CliStart;
 use rog_control_center::config::Config;
@@ -21,6 +20,7 @@ use rog_control_center::window::{WindowCommand, WindowController};
 use rog_control_center::zbus_proxies::{
     AppState, ROGCCZbus, ROGCCZbusProxyBlocking, ZBUS_IFACE, ZBUS_PATH,
 };
+use rog_platform::DMIID;
 use tokio::runtime::Runtime;
 
 #[tokio::main]

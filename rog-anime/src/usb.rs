@@ -10,7 +10,7 @@
 
 use std::str::FromStr;
 
-use dmi_id::DMIID;
+use rog_platform::DMIID;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "dbus")]
 use zbus::zvariant::{OwnedValue, Type, Value};

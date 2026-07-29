@@ -1,11 +1,11 @@
 use config_traits::StdConfig;
 use log::{debug, error, warn};
-use rog_slash::usb::{
+use rog_platform::slash::usb::{
     slash_pkt_battery_saver, slash_pkt_boot, slash_pkt_enable, slash_pkt_lid_closed,
     slash_pkt_low_battery, slash_pkt_options, slash_pkt_save, slash_pkt_set_mode,
     slash_pkt_shutdown, slash_pkt_sleep,
 };
-use rog_slash::{DeviceState, SlashMode};
+use rog_platform::slash::{DeviceState, SlashMode};
 use zbus::zvariant::OwnedObjectPath;
 use zbus::{interface, Connection};
 

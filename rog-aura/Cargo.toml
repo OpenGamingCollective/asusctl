@@ -18,7 +18,7 @@ dbus = ["zbus"]
 [dependencies]
 serde.workspace = true
 zbus = { workspace = true, optional = true }
-dmi_id = { path = "../dmi-id" }
+rog_platform = { path = "../rog-platform" }
 
 # cli and logging
 log.workspace = true

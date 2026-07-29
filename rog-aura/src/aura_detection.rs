@@ -1,7 +1,7 @@
 use std::env;
 
-use dmi_id::DMIID;
 use log::{error, info, warn};
+use rog_platform::DMIID;
 use serde::{Deserialize, Serialize};
 
 use crate::keyboard::AdvancedAuraType;

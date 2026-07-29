@@ -46,7 +46,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("       daemon v{}", asusd::VERSION);
     info!("    rog-anime v{}", rog_anime::VERSION);
-    info!("    rog-slash v{}", rog_slash::VERSION);
     info!("     rog-aura v{}", rog_aura::VERSION);
     info!(" rog-profiles v{}", rog_profiles::VERSION);
     info!("rog-platform v{}", rog_platform::VERSION);

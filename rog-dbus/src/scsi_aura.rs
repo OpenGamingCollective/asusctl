@@ -20,7 +20,7 @@
 //!
 //! [Writing a client proxy]: https://dbus2.github.io/zbus/client.html
 //! [D-Bus standard interfaces]: https://dbus.freedesktop.org/doc/dbus-specification.html#standard-interfaces,
-use rog_scsi::{AuraEffect, AuraMode};
+use rog_platform::scsi::{AuraEffect, AuraMode};
 use zbus::proxy;
 #[proxy(
     interface = "xyz.ljones.ScsiAura",
