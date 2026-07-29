@@ -1,10 +1,9 @@
 mod builtin_modes;
-mod error;
-mod scsi;
+mod protocol;
 pub mod sg;
 
+pub use crate::error::PlatformError as Error;
 pub use builtin_modes::*;
-pub use error::*;
 use serde::{Deserialize, Serialize};
 pub use sg::{Device, Task};
 

@@ -91,7 +91,7 @@ mod tests {
     #[test]
     #[ignore = "Does not run in docker images"]
     fn dmi_sysfs_properties_not_unknown() {
-        let dmi = DMIID::new().unwrap();
+        let dmi = DMIID::new().expect("dmi creation failed");
 
         assert_ne!(dmi.id_model, "Unknown".to_string());
         dbg!(dmi.id_model);

@@ -3,10 +3,8 @@
 mod data;
 pub use data::*;
 
-/// Base errors that are possible
-pub mod error;
+pub use crate::error::PlatformError as SlashError;
+pub type Result<T> = std::result::Result<T, SlashError>;
 
 /// Provides const methods to create the USB HID control packets
 pub mod usb;
-
-pub const VERSION: &str = env!("CARGO_PKG_VERSION");

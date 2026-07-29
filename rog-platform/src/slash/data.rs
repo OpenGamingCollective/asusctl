@@ -1,14 +1,13 @@
 use std::fmt::Display;
 use std::str::FromStr;
 
-use dmi_id::DMIID;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "dbus")]
-use zbus::zvariant::Type;
-use zbus::zvariant::{OwnedValue, Value};
+use zbus::zvariant::{OwnedValue, Type, Value};
 
-use crate::error::SlashError;
-use crate::usb::{PROD_ID1, PROD_ID1_STR, PROD_ID2, PROD_ID2_STR};
+use crate::dmi::DMIID;
+use crate::slash::usb::{PROD_ID1, PROD_ID1_STR, PROD_ID2, PROD_ID2_STR};
+use crate::slash::SlashError;
 
 #[derive(Default, Debug, Copy, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum SlashType {

@@ -6,6 +6,7 @@ pub mod backlight;
 pub mod capabilities;
 pub mod cled;
 pub mod cpu;
+pub mod dmi;
 pub mod error;
 pub mod gpu_pci;
 pub mod hid_raw;
@@ -13,7 +14,11 @@ pub mod keyboard_led;
 pub(crate) mod macros;
 pub mod platform;
 pub mod power;
+pub mod scsi;
+pub mod slash;
 pub mod usb_raw;
+
+pub use dmi::DMIID;
 
 use std::path::Path;
 
