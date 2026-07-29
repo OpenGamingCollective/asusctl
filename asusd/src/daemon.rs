@@ -34,11 +34,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let is_service = match env::var_os("IS_SERVICE") {
         Some(val) => val == "1",
-        None => true,
+        None => false,
     };
 
     if !is_service {
-        println!("asusd schould be only run from the right systemd service");
+        println!("asusd should be only run from the right systemd service");
         println!(
             "do not run in your terminal, if you need an logs please use journalctl -b -u asusd"
         );
@@ -117,7 +117,13 @@ async fn start_daemon() -> Result<(), Box<dyn Error>> {
     match CtrlBacklight::new(config.clone()) {
         Ok(backlight) => {
             info!("Backlight: found supported backlight");
-            backlight.start_watch_primary().await?;
+            if let Some(handle) = backlight.start_watch_primary().await? {
+                tokio::spawn(async move {
+                    if let Err(err) = handle.await {
+                        warn!("Backlight watcher task ended with error: {err:?}");
+                    }
+                });
+            }
             backlight.add_to_server(&mut server).await;
             info!("Backlight: initialized");
         }

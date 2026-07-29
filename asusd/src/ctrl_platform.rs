@@ -953,6 +953,9 @@ impl CtrlTask for CtrlPlatform {
                                 .set_charge_control_end_threshold(
                                     platform1.config.lock().await.charge_control_end_threshold,
                                 )
+                                .map_err(|err| {
+                                    warn!("CtrlPlatform: failed to restore charge_control_end_threshold: {err}");
+                                })
                                 .ok();
                         }
                         if let Ok(power_plugged) = platform1.power.get_online() {
@@ -1075,7 +1078,9 @@ impl CtrlTask for CtrlPlatform {
             .await?
         {
             tasks.spawn(async move {
-                let _ = h.await;
+                if let Err(err) = h.await {
+                    warn!("charge_control_end_threshold watcher ended with error: {err:?}");
+                }
             });
         }
 
