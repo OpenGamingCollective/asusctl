@@ -1,9 +1,4 @@
-# Maintainer: thatayush <me@ayushm.com>
-# Previous maintainer: dragonn <dragonn@op.pl>
-# Contributor: Arglebargle <arglebargle@arglebargle.dev>
-# Contributor: Static_Rocket
-
-# shellcheck disable=SC2034,SC2154,SC2164
+# Maintainer: OpenGamingCollective <https://github.com/OpenGamingCollective/asusctl>
 
 pkgver=0.0.0
 _gitref="${_gitref:-HEAD}"
@@ -11,15 +6,13 @@ pkgrel=${pkgrel:-1}
 pkgdesc="Asus laptop control utilities"
 arch=('x86_64')
 url="https://github.com/OpenGamingCollective/asusctl"
-license=('MPL2')
+license=('MPL-2.0')
 depends=('libusb' 'udev')
-optdepends=(
-	'ASUS-WMI-FAN-CONTROL: custom fan curve support'
-	'linux-rog: deprecated name for custom fan curve capability'
-	)
+optdepends=()
 makedepends=('git' 'rust' 'llvm' 'clang' 'at-spi2-core' 'cairo' 'gtk3')
 provides=()
-conflicts=('asusctl-git' 'asus-nb-ctrl-git' 'asus-nb-ctrl' 'rog-core' 'tlp')
+conflicts=('asusctl-git' 'tlp')
+
 if [ -n "${CI_BUILD:-}" ]; then
 	source=()
 	md5sums=()
@@ -37,7 +30,9 @@ pkgver() {
 
 prepare() {
 	cd "$_workdir"
-	git checkout "$_gitref"
+	if [ "$_gitref" != "HEAD" ]; then
+		git checkout "$_gitref"
+	fi
 }
 
 build() {
@@ -46,17 +41,16 @@ build() {
 }
 
 _package-asusctl() {
-	# add runtime dependencies, these aren't needed during build
-	optdepends+=('rog-control-center' 'power-profiles-daemon')
+	optdepends+=('rog-control-center: GUI control panel for asusd')
 	install="asusctl.install"
 
 	cd "$_workdir"
 	make DESTDIR="$pkgdir" install
-	rm -rf $pkgdir/usr/bin/rog-control-center
-	rm -rf $pkgdir/usr/share/rog-gui
-	rm -rf $pkgdir/usr/share/icons
-	rm -rf $pkgdir/usr/share/applications
-	rm -rf $pkgdir/usr/share/metainfo
+	rm -rf "$pkgdir"/usr/bin/rog-control-center
+	rm -rf "$pkgdir"/usr/share/rog-gui
+	rm -rf "$pkgdir"/usr/share/icons
+	rm -rf "$pkgdir"/usr/share/applications
+	rm -rf "$pkgdir"/usr/share/metainfo
 }
 
 _package-rog-control-center() {
@@ -64,15 +58,15 @@ _package-rog-control-center() {
 
 	cd "$_workdir"
 	make DESTDIR="$pkgdir" install
-	rm -rf $pkgdir/usr/bin/asusctl
-	rm -rf $pkgdir/usr/bin/asusd
-	rm -rf $pkgdir/usr/bin/asusd-user
-	rm -rf $pkgdir/usr/bin/asus-shutdown
-	rm -rf $pkgdir/usr/lib
-	rm -rf $pkgdir/usr/share/dbus-1
-	rm -rf $pkgdir/usr/share/asusd
-	rm -rf $pkgdir/etc/asusd
-	rm -rf $pkgdir/usr/share/asusctl/LICENSE
+	rm -rf "$pkgdir"/usr/bin/asusctl
+	rm -rf "$pkgdir"/usr/bin/asusd
+	rm -rf "$pkgdir"/usr/bin/asusd-user
+	rm -rf "$pkgdir"/usr/bin/asus-shutdown
+	rm -rf "$pkgdir"/usr/lib
+	rm -rf "$pkgdir"/usr/share/dbus-1
+	rm -rf "$pkgdir"/usr/share/asusd
+	rm -rf "$pkgdir"/etc/asusd
+	rm -rf "$pkgdir"/usr/share/asusctl/LICENSE
 }
 
 pkgname=("asusctl" "rog-control-center")

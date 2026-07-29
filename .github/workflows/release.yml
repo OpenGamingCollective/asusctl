@@ -77,6 +77,14 @@ jobs:
                       *.pkg.tar.zst
                   fail_on_unmatched_files: true
 
+            - name: Rename non-release build assets
+              if: github.event_name != 'release'
+              run: |
+                  for f in *.pkg.tar.zst; do
+                      [ -f "$f" ] || continue
+                      mv "$f" "${f%.pkg.tar.zst}-run${{ github.run_number }}.${{ github.run_attempt }}.pkg.tar.zst"
+                  done
+
             - name: Upload build artifacts
               if: github.event_name != 'release'
               uses: actions/upload-artifact@v7
@@ -84,4 +92,3 @@ jobs:
                   name: arch-packages
                   path: |
                       *.pkg.tar.zst
-
