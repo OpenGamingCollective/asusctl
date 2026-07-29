@@ -4,7 +4,7 @@ On every published GitHub Release, [`.github/workflows/release.yml`](.github/wor
 
 ## Trigger
 
-The workflow runs on `release: types: [published]` and declares `permissions: contents: write`, which the asset-upload step needs.
+The workflow runs on `release: types: [published]` events as well as non-release triggers such as `workflow_dispatch`. For release events, packages are attached directly to the GitHub Release (requiring `permissions: contents: write`); for non-release triggers, packages are uploaded as build artifacts.
 
 ## What it does
 
