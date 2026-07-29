@@ -3,27 +3,12 @@ set -e
 
 ROOT_DIR=$(git rev-parse --show-toplevel)
 AURA_DATA="${ROOT_DIR}/rog-aura/data/aura_support.ron"
-SPEC_FILE="${ROOT_DIR}/distro-packaging/asusctl.spec"
 TRANSLATION="${ROOT_DIR}/rog-control-center/translations/en/rog-control-center.po"
 VERSION=$(grep -Pm1 'version = "(\d+.\d+.\d+.*)"' "${ROOT_DIR}/Cargo.toml" | cut -d'"' -f2)
 
 if [ -z "$VERSION" ]; then
     echo "Error: Could not extract version from Cargo.toml"
     exit 1
-fi
-if [ ! -f "$SPEC_FILE" ]; then
-    echo "Error: Spec file not found at ${SPEC_FILE}"
-    exit 1
-fi
-
-# Update spec file
-sed -i "s/^%define version.*/%define version ${VERSION}/" "$SPEC_FILE"
-if git diff --quiet "$SPEC_FILE"; then
-    echo "No changes to spec file"
-else
-    git add "$SPEC_FILE"
-    git commit --no-verify -m "chore: update spec file version to ${VERSION}"
-    echo "Updated spec file version to ${VERSION}"
 fi
 
 # Update translations only if UI files changed
