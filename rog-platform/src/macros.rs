@@ -153,7 +153,14 @@ macro_rules! get_attr_string {
         concat_idents::concat_idents!(fn_name = get_, $attr_name {
             $(#[$attr])*
             pub fn fn_name(&self) -> Result<String> {
-                $crate::read_attr_string(&to_device(&self.$item)?, $attr_name)
+                match to_device(&self.$item) {
+                    Ok(dev) => $crate::read_attr_string(&dev, $attr_name),
+                    Err(_) => {
+                        let path = self.$item.join($attr_name);
+                        std::fs::read_to_string(&path)
+                            .map_err(|e| PlatformError::IoPath(path.to_string_lossy().into(), e))
+                    }
+                }
             }
         });
     };
@@ -165,7 +172,19 @@ macro_rules! get_attr_string_array {
         concat_idents::concat_idents!(fn_name = get_, $attr_name {
             $(#[$attr])*
             pub fn fn_name(&self) -> Result<Vec<PlatformProfile>> {
-                $crate::read_attr_string_array(&to_device(&self.$item)?, $attr_name)
+                match to_device(&self.$item) {
+                    Ok(dev) => $crate::read_attr_string_array(&dev, $attr_name),
+                    Err(_) => {
+                        let path = self.$item.join($attr_name);
+                        let s = std::fs::read_to_string(&path)
+                            .map_err(|e| PlatformError::IoPath(path.to_string_lossy().into(), e))?;
+                        let tmp: Vec<PlatformProfile> = s
+                            .split(' ')
+                            .map(PlatformProfile::from)
+                            .collect();
+                        Ok(tmp)
+                    }
+                }
             }
         });
     };
@@ -177,7 +196,14 @@ macro_rules! set_attr_string {
         concat_idents::concat_idents!(fn_name = set_, $attr_name {
             $(#[$attr])*
             pub fn fn_name(&self, values: &str) -> Result<()> {
-                $crate::write_attr_string(&mut to_device(&self.$item)?, $attr_name, values)
+                match to_device(&self.$item) {
+                    Ok(mut dev) => $crate::write_attr_string(&mut dev, $attr_name, values),
+                    Err(_) => {
+                        let path = self.$item.join($attr_name);
+                        std::fs::write(&path, values.trim())
+                            .map_err(|e| PlatformError::IoPath(path.to_string_lossy().into(), e))
+                    }
+                }
             }
         });
     };

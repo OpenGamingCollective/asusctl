@@ -36,6 +36,10 @@ impl RogPlatform {
     );
 
     pub fn new() -> Result<Self> {
+        if let Ok(sysfs_root) = std::env::var("ASUS_SYSFS_ROOT") {
+            return Self::with_root(PathBuf::from(sysfs_root));
+        }
+
         let mut enumerator = udev::Enumerator::new().map_err(|err| {
             warn!("{}", err);
             PlatformError::Udev("enumerator failed".into(), err)
@@ -64,6 +68,15 @@ impl RogPlatform {
         Err(PlatformError::MissingFunction(
             "asus-nb-wmi not found".into(),
         ))
+    }
+
+    /// Create a `RogPlatform` instance pointing to a custom sysfs root (for testing/simulation)
+    pub fn with_root(root: impl Into<PathBuf>) -> Result<Self> {
+        let root = root.into();
+        let path = root.join("devices/platform/asus-wmi");
+        let pp_path = root.join("firmware/acpi");
+
+        Ok(Self { path, pp_path })
     }
 }
 
