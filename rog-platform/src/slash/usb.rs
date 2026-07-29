@@ -8,11 +8,10 @@
 //!
 //! Step 1 needs to be applied only on fresh system boot.
 
-use dmi_id::DMIID;
+use crate::dmi::DMIID;
 
-#[cfg(feature = "dbus")]
-use crate::error::SlashError;
-use crate::{SlashMode, SlashType};
+use crate::slash::SlashError;
+use crate::slash::{SlashMode, SlashType};
 
 const PACKET_SIZE: usize = 32;
 const REPORT_ID_193B: u8 = 0x5e;
@@ -35,7 +34,7 @@ pub type SlashUsbPacket = [u8; PACKET_SIZE];
 #[inline]
 pub fn get_slash_type() -> SlashType {
     let dmi = DMIID::new()
-        .map_err(|_| SlashError::NoDevice)
+        .map_err(|_| SlashError::NoSlashDevice)
         .unwrap_or_default();
     let board_name = dmi.board_name.to_uppercase();
     if board_name.contains("G614F") {
@@ -140,22 +139,22 @@ pub const fn slash_pkt_set_mode(slash_type: SlashType, mode: SlashMode) -> [Slas
 
     let mut pkt2 = [0; PACKET_SIZE];
     pkt2[0] = report_id;
-    pkt2[1] = 0xd3;
-    pkt2[2] = 0x04;
-    pkt2[3] = 0x00;
-    pkt2[4] = 0x0c;
-    pkt2[5] = 0x01;
-    pkt2[6] = mode as u8;
-    pkt2[7] = 0x02;
-    pkt2[8] = 0x19; // difference, GA605 = 0x10
-    pkt2[9] = 0x03;
-    pkt2[10] = 0x13;
-    pkt2[11] = 0x04;
-    pkt2[12] = 0x11;
-    pkt2[13] = 0x05;
-    pkt2[14] = 0x12;
-    pkt2[15] = 0x06;
-    pkt2[16] = 0x13;
+    pkt2[1] = 0xd2;
+    pkt2[2] = 0xd3;
+    pkt2[3] = 0x04;
+    pkt2[4] = 0x00;
+    pkt2[5] = 0x0c;
+    pkt2[6] = 0x01;
+    pkt2[7] = mode as u8;
+    pkt2[8] = 0x02;
+    pkt2[9] = 0x19; // difference, GA605 = 0x10
+    pkt2[10] = 0x03;
+    pkt2[11] = 0x13;
+    pkt2[12] = 0x04;
+    pkt2[13] = 0x11;
+    pkt2[14] = 0x05;
+    pkt2[15] = 0x12;
+    pkt2[16] = 0x06;
 
     [
         pkt1, pkt2,

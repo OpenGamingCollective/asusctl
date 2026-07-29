@@ -1,4 +1,4 @@
-use crate::sg::{Direction, Task};
+use crate::scsi::sg::{Direction, Task};
 
 static ENE_APPLY_VAL: u8 = 0x01; // Value for Apply Changes Register
 static ENE_SAVE_VAL: u8 = 0xaa;

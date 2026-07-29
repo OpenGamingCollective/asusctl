@@ -57,6 +57,36 @@ pub enum PlatformError {
 
     #[error("CPU control: {0}")]
     CPU(String),
+
+    #[error("Could not parse mode")]
+    ParseMode,
+
+    #[error("Could not parse colour")]
+    ParseColour,
+
+    #[error("Could not parse speed")]
+    ParseSpeed,
+
+    #[error("Could not parse direction")]
+    ParseDirection,
+
+    #[error("RON Parse Error: {0}")]
+    Ron(#[source] ron::Error),
+
+    #[error("RON Parse Error: {0}")]
+    RonParse(#[source] ron::error::SpannedError),
+
+    #[error("No Slash device found")]
+    NoSlashDevice,
+
+    #[error("Unsupported Slash device found")]
+    UnsupportedSlashDevice,
+
+    #[error("The data buffer was incorrect length for generating USB packets")]
+    DataBufferLength,
+
+    #[error("Could not parse {0}")]
+    ParseError(String),
 }
 
 impl From<rusb::Error> for PlatformError {
@@ -68,6 +98,18 @@ impl From<rusb::Error> for PlatformError {
 impl From<std::io::Error> for PlatformError {
     fn from(err: std::io::Error) -> Self {
         PlatformError::Io(err)
+    }
+}
+
+impl From<ron::Error> for PlatformError {
+    fn from(e: ron::Error) -> Self {
+        PlatformError::Ron(e)
+    }
+}
+
+impl From<ron::error::SpannedError> for PlatformError {
+    fn from(e: ron::error::SpannedError) -> Self {
+        PlatformError::RonParse(e)
     }
 }
 
