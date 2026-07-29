@@ -221,7 +221,7 @@ pub trait CtrlTask {
         mut on_prepare_for_shutdown: F2,
         mut on_lid_change: F3,
         mut on_external_power_change: F4,
-    ) -> impl Future<Output = ()> + Send
+    ) -> impl Future<Output = Result<(), RogError>> + Send
     where
         F1: FnMut(bool) -> Fut1 + Send + 'static,
         F2: FnMut(bool) -> Fut2 + Send + 'static,
@@ -232,22 +232,19 @@ pub trait CtrlTask {
         Fut3: Future<Output = ()> + Send,
         Fut4: Future<Output = ()> + Send,
     {
-        async {
-            let connection = Connection::system()
-                .await
-                .expect("Controller could not create dbus connection");
+        async move {
+            let connection = Connection::system().await.map_err(RogError::Zbus)?;
 
             let manager = ManagerProxy::builder(&connection)
                 .cache_properties(CacheProperties::No)
                 .build()
                 .await
-                .expect("Controller could not create ManagerProxy");
+                .map_err(RogError::Zbus)?;
 
             let manager1 = manager.clone();
             tokio::spawn(async move {
                 if let Ok(mut notif) = manager1.receive_prepare_for_shutdown().await {
                     while let Some(event) = notif.next().await {
-                        // blocks thread :|
                         if let Ok(args) = event.args() {
                             debug!("Doing on_prepare_for_shutdown({})", args.start);
                             on_prepare_for_shutdown(args.start).await;
@@ -260,7 +257,6 @@ pub trait CtrlTask {
             tokio::spawn(async move {
                 if let Ok(mut notif) = manager2.receive_prepare_for_sleep().await {
                     while let Some(event) = notif.next().await {
-                        // blocks thread :|
                         if let Ok(args) = event.args() {
                             debug!("Doing on_prepare_for_sleep({})", args.start);
                             on_prepare_for_sleep(args.start).await;
@@ -286,7 +282,6 @@ pub trait CtrlTask {
 
             tokio::spawn(async move {
                 let mut last_lid = manager.lid_closed().await.unwrap_or_default();
-                // need to loop on these as they don't emit signals
                 loop {
                     if let Ok(next) = manager.lid_closed().await {
                         if next != last_lid {
@@ -297,6 +292,8 @@ pub trait CtrlTask {
                     sleep(Duration::from_secs(2)).await;
                 }
             });
+
+            Ok(())
         }
     }
 }

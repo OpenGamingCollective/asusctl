@@ -443,7 +443,7 @@ impl crate::CtrlTask for AniMeZbus {
                 }
             },
         )
-        .await;
+        .await?;
 
         Ok(())
     }

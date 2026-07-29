@@ -1066,7 +1066,7 @@ impl CtrlTask for CtrlPlatform {
                 }
             },
         )
-        .await;
+        .await?;
 
         // This spawns a new task for every item.
         // TODO: find a better way to manage this
