@@ -233,10 +233,10 @@ pub trait CtrlTask {
         F2: FnMut(bool) -> Fut2 + Send + 'static,
         F3: FnMut(bool) -> Fut3 + Send + 'static,
         F4: FnMut(bool) -> Fut4 + Send + 'static,
-        Fut1: Future<Output = ()> + Send,
-        Fut2: Future<Output = ()> + Send,
-        Fut3: Future<Output = ()> + Send,
-        Fut4: Future<Output = ()> + Send,
+        Fut1: Future<Output = ()> + Send + 'static,
+        Fut2: Future<Output = ()> + Send + 'static,
+        Fut3: Future<Output = ()> + Send + 'static,
+        Fut4: Future<Output = ()> + Send + 'static,
     {
         async move {
             let connection = Connection::system().await.map_err(RogError::Zbus)?;
