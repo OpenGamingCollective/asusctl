@@ -1,14 +1,8 @@
 use std::collections::BTreeMap;
 
-use rog_aura::usb::{AuraDevRog2, AuraDevice, AuraPowerDev};
-use rog_aura::{AuraEffect, AuraModeNum, AuraZone};
+use rog_aura::{AuraEffect, AuraModeNum};
 use rog_platform::gpu_pci::GfxPower;
-use rog_platform::platform::GpuMode;
-use rog_platform::supported::{
-    AdvancedAura, AnimeSupportedFunctions, ChargeSupportedFunctions, LedSupportedFunctions,
-    PlatformProfileFunctions, RogBiosSupportedFunctions, SupportedFunctions,
-};
-use rog_profiles::fan_curve_set::{CurveData, FanCurveSet};
+use rog_platform::platform::{GpuMode, PlatformProfile};
 
 use crate::error::Result;
 
@@ -100,47 +94,26 @@ impl Bios {
 
 pub struct Profile;
 impl Profile {
-    pub fn profiles(&self) -> Result<Vec<rog_profiles::Profile>> {
+    pub fn profiles(&self) -> Result<Vec<PlatformProfile>> {
         Ok(vec![
-            rog_profiles::Profile::Balanced,
-            rog_profiles::Profile::Performance,
-            rog_profiles::Profile::Quiet,
+            PlatformProfile::Balanced,
+            PlatformProfile::Performance,
+            PlatformProfile::Quiet,
         ])
     }
 
-    pub fn active_profile(&self) -> Result<rog_profiles::Profile> {
-        Ok(rog_profiles::Profile::Performance)
+    pub fn active_profile(&self) -> Result<PlatformProfile> {
+        Ok(PlatformProfile::Performance)
     }
 
-    pub fn enabled_fan_profiles(&self) -> Result<Vec<rog_profiles::Profile>> {
+    pub fn enabled_fan_profiles(&self) -> Result<Vec<PlatformProfile>> {
         Ok(vec![
-            rog_profiles::Profile::Performance,
-            rog_profiles::Profile::Balanced,
+            PlatformProfile::Performance,
+            PlatformProfile::Balanced,
         ])
     }
 
-    pub fn fan_curve_data(&self, _p: rog_profiles::Profile) -> Result<FanCurveSet> {
-        let mut curve = FanCurveSet::default();
-        curve.cpu.pwm = [
-            30, 40, 60, 100, 140, 180, 200, 250,
-        ];
-        curve.cpu.temp = [
-            20, 30, 40, 50, 70, 80, 90, 100,
-        ];
-        curve.gpu.pwm = [
-            40, 80, 100, 140, 170, 200, 230, 250,
-        ];
-        curve.gpu.temp = [
-            20, 30, 40, 50, 70, 80, 90, 100,
-        ];
-        Ok(curve)
-    }
-
-    pub fn set_fan_curve(&self, _p: rog_profiles::Profile, _c: CurveData) -> Result<()> {
-        Ok(())
-    }
-
-    pub fn set_fan_curve_enabled(&self, _p: rog_profiles::Profile, _b: bool) -> Result<()> {
+    pub fn set_fan_curve_enabled(&self, _p: PlatformProfile, _b: bool) -> Result<()> {
         Ok(())
     }
 
@@ -152,7 +125,7 @@ impl Profile {
         Ok(())
     }
 
-    pub fn set_active_profile(&self, _p: rog_profiles::Profile) -> Result<()> {
+    pub fn set_active_profile(&self, _p: PlatformProfile) -> Result<()> {
         Ok(())
     }
 
@@ -167,9 +140,9 @@ impl Led {
         let mut data = BTreeMap::new();
         data.insert(AuraModeNum::Static, AuraEffect::default());
         data.insert(AuraModeNum::Star, AuraEffect::default());
-        data.insert(AuraModeNum::Strobe, AuraEffect::default());
+        data.insert(AuraModeNum::Highlight, AuraEffect::default());
         data.insert(AuraModeNum::Rain, AuraEffect::default());
-        data.insert(AuraModeNum::Rainbow, AuraEffect::default());
+        data.insert(AuraModeNum::RainbowCycle, AuraEffect::default());
         data.insert(AuraModeNum::Ripple, AuraEffect::default());
         data.insert(AuraModeNum::Breathe, AuraEffect::default());
         data.insert(AuraModeNum::Comet, AuraEffect::default());
@@ -180,28 +153,11 @@ impl Led {
     }
 
     pub fn led_mode(&self) -> Result<AuraModeNum> {
-        Ok(AuraModeNum::Rainbow)
+        Ok(AuraModeNum::RainbowCycle)
     }
 
     pub fn led_brightness(&self) -> Result<i16> {
         Ok(1)
-    }
-
-    pub fn led_powered(&self) -> Result<AuraPowerDev> {
-        Ok(AuraPowerDev {
-            tuf: vec![],
-            x1866: vec![],
-            x19b6: vec![
-                AuraDevRog2::BootKeyb,
-                AuraDevRog2::AwakeKeyb,
-                AuraDevRog2::SleepLogo,
-                AuraDevRog2::AwakeLogo,
-            ],
-        })
-    }
-
-    pub fn set_led_power(&self, _a: AuraPowerDev, _b: bool) -> Result<()> {
-        Ok(())
     }
 
     pub fn set_led_mode(&self, _a: &AuraEffect) -> Result<()> {
@@ -230,45 +186,7 @@ impl Anime {
 
 pub struct Supported;
 impl Supported {
-    pub fn supported_functions(&self) -> Result<SupportedFunctions> {
-        Ok(SupportedFunctions {
-            anime_ctrl: AnimeSupportedFunctions(true),
-            charge_ctrl: ChargeSupportedFunctions {
-                charge_level_set: true,
-            },
-            platform_profile: PlatformProfileFunctions {
-                platform_profile: true,
-                fan_curves: true,
-            },
-            keyboard_led: LedSupportedFunctions {
-                dev_id: AuraDevice::X19b6,
-                brightness: true,
-                basic_modes: vec![
-                    AuraModeNum::Rain,
-                    AuraModeNum::Rainbow,
-                    AuraModeNum::Star,
-                    AuraModeNum::Static,
-                    AuraModeNum::Strobe,
-                ],
-                basic_zones: vec![
-                    AuraZone::Key1,
-                    AuraZone::Key2,
-                    AuraZone::Key3,
-                    AuraZone::Key4,
-                    AuraZone::BarLeft,
-                    AuraZone::BarRight,
-                    AuraZone::Logo,
-                ],
-                advanced_type: AdvancedAura::PerKey,
-            },
-            rog_bios_ctrl: RogBiosSupportedFunctions {
-                post_sound: true,
-                gpu_mux: true,
-                panel_overdrive: true,
-                dgpu_disable: true,
-                mini_led_mode: true,
-                egpu_enable: true,
-            },
-        })
+    pub fn supported_functions(&self) -> Result<bool> {
+        Ok(true)
     }
 }
