@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "💬 Discord Community (Setup & General Help)"
+    url: https://discord.gg/B8GftRW2Hd
+    about: "Ask questions, get installation help, or chat with the community."
+  - name: "📖 Asus Linux Manual"
+    url: https://asus-linux.org/manual/asusctl-manual/
+    about: "Read the official guide."

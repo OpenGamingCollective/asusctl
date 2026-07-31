@@ -1,0 +1,128 @@
+name: Bug Report
+description: Create a bug report to help us improve asusctl, asusd, ROG Control Center, or the asus-armoury kernel driver
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report an issue!
+
+        **Important Notes Before Submitting:**
+        - **X11 is not supported.** Please ensure you are running a Wayland session.
+        - Many features depend on a recent kernel (Linux 6.19+ recommended for `asus-armoury` driver support).
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected Component
+      description: Select the main component where the issue occurs.
+      options:
+        - "asusd (System Daemon / D-Bus)"
+        - "asusd-user (User Session Daemon)"
+        - "asusctl (CLI Tool)"
+        - "rog-control-center (GUI / Slint / System Tray)"
+        - "rog-aura (Keyboard / Aura RGB)"
+        - "rog-anime (AniMe Matrix Display)"
+        - "rog-slash (Slash LED Bar)"
+        - "rog-scsi (Drive / SCSI LED)"
+        - "rog-profiles (Power Profiles / Fan Curves)"
+        - "rog-platform (GPU Switching / Armoury / WMI)"
+        - "backlight (ScreenPad / Brightness)"
+        - "battery (Charge Limit)"
+        - "xgmled (XG Mobile LED)"
+        - "kernel (asus-armoury kernel driver)"
+        - "Other / Not Sure"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Issue Description
+      description: A clear and concise description of what the bug is.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Describe the exact steps to reproduce the behavior.
+      placeholder: |
+        1. Run command '...' or open page '...'
+        2. Click on '....'
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-actual
+    attributes:
+      label: Expected vs Actual Behavior
+      description: What did you expect to happen, and what actually happened?
+    validations:
+      required: true
+
+  - type: input
+    id: laptop-model
+    attributes:
+      label: Laptop Model / Board Name
+      description: Output of `cat /sys/class/dmi/id/board_name` or laptop model.
+      placeholder: e.g., GA401IV, G614PR, FA507ZE
+    validations:
+      required: true
+
+  - type: input
+    id: distro
+    attributes:
+      label: Linux Distribution
+      description: Which distribution are you using?
+      placeholder: e.g., Arch Linux, Fedora 44, CachyOS
+    validations:
+      required: true
+
+  - type: input
+    id: kernel
+    attributes:
+      label: Kernel Version
+      description: Output of `uname -r`. Kernels prior to 6.19 are unsupported.
+      placeholder: e.g., 7.1.4-1-cachyos
+    validations:
+      required: true
+
+  - type: input
+    id: asusctl-version
+    attributes:
+      label: asusctl / asusd / ROG Control Center Version
+      description: Output of `asusctl info --show-supported`.
+      placeholder: e.g., asusctl 6.3.11
+    validations:
+      required: true
+
+  - type: dropdown
+    id: desktop-session
+    attributes:
+      label: Desktop Environment & Display Server
+      description: Which desktop environment and session type are you running?
+      options:
+        - "GNOME (Wayland)"
+        - "KDE Plasma (Wayland)"
+        - "Sway / Hyprland (Wayland)"
+        - "COSMIC (Wayland)"
+        - "Other Wayland Compositor"
+        - "X11 Session (Unsupported)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs
+      description: |
+        Please run `journalctl -b -u asusd > ~/asusd.log` and paste only the relevant log lines here.
+        **Redact** any usernames, file paths, hardware identifiers, tokens, or other sensitive values before submitting.
+      render: shell
+    validations:
+      required: false

@@ -1,0 +1,96 @@
+name: New Device Support Request
+description: Request support for a new ASUS laptop model (Aura RGB, Fan Curves, AniMe Matrix, Slash Lighting)
+title: "[Device Support]: "
+labels:
+  - enhancement
+  - device-support
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### Welcome! Let's get your ASUS device fully supported.
+        To add your laptop to `asusctl` and `rog-control-center`, we need exact hardware identification. Please run the commands below in your terminal and paste the outputs.
+
+  - type: textarea
+    id: asusctl-info
+    attributes:
+      label: 1. System & Device Information
+      description: |
+        Please run `asusctl info --show-supported` in your terminal and paste the **entire** output here.
+        *(This gives us the DMI Board Name, Product Family, and currently supported features).*
+      placeholder: |
+        asusctl v6.3.9
+        Product family: ROG Strix ...
+        Board name: G614PR
+        ...
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: lsusb-output
+    attributes:
+      label: 2. USB Device ID (Keyboard / MCU)
+      description: |
+        Please run `lsusb | grep 0b05` in your terminal and paste the output.
+        *(This tells us the Product ID (PID) of your keyboard/lighting controller, e.g., 0b05:19b6).*
+      placeholder: |
+        Bus 001 Device 002: ID 0b05:19b6 ASUSTek Computer, Inc. N-KEY Device
+      render: shell
+    validations:
+      required: false
+
+  - type: dropdown
+    id: keyboard-type
+    attributes:
+      label: 3. Keyboard Lighting Type
+      description: What kind of RGB lighting does your laptop keyboard have?
+      options:
+        - "Per-Key RGB (Each key can be a different color)"
+        - "4-Zone RGB (Keyboard is split into 4 color zones)"
+        - "1-Zone RGB (Whole keyboard is a single color)"
+        - "White Backlight Only (No RGB)"
+        - "Not Sure"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: extra-lighting
+    attributes:
+      label: 4. Additional Lighting Zones
+      description: Check all the extra lighting features your laptop has physically.
+      options:
+        - label: "Front Lightbar (Underglow at the front edge)"
+        - label: "Lid Logo (Illuminated ROG Logo on the back of the screen)"
+        - label: "Rear Glow (LEDs at the rear exhaust vents)"
+        - label: "AniMe Matrix (Pixel LED display on the lid)"
+        - label: "Slash Lighting (Diagonal LED strip on the lid - 2024/2025 Zephyrus)"
+
+  - type: textarea
+    id: armoury-crate-backlight
+    attributes:
+      label: 5. Keyboard Backlight Settings (Armoury Crate)
+      description: |
+        If you have access to Windows, open **Armoury Crate** and navigate to the keyboard lighting/RGB settings page, then attach a screenshot showing all available lighting modes and zones.
+        *(This helps us see exactly which Aura modes your device supports.)*
+    validations:
+      required: false
+
+  - type: textarea
+    id: keyboard-layout
+    attributes:
+      label: 6. Keyboard Layout / Photo
+      description: |
+        To create the GUI representation in ROG Control Center, we need to know your keyboard layout.
+        Please drag and drop a **clear photo of your laptop's keyboard** here, or provide a link to the official ASUS product page showing the keyboard.
+        *(We need to see if it has a Numpad, the shape of the Enter key, macro keys, etc.)*
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Is there anything currently working or completely broken? (e.g., "Fan curves work, but the keyboard is stuck on red").
+    validations:
+      required: false

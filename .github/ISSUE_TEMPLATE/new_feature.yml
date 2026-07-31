@@ -1,0 +1,114 @@
+name: Feature Request
+description: Suggest a new feature or enhancement for the asusctl ecosystem.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### 💡 Welcome to the Feature Request Form!
+        **Wait!** If you are requesting support for a **new laptop model** (e.g., keyboard lights or AniMe Matrix not working), please go back and use the **New Device Support Request** template instead. This form is for proposing new software features, UI improvements, or CLI additions.
+
+        This project is community-driven. Before filing, please:
+        - Search existing issues to avoid duplicates.
+        - Skim the [`MANUAL.md`](https://github.com/OpenGamingCollective/asusctl/blob/main/MANUAL.md) and [`CONTRIBUTING.md`](https://github.com/OpenGamingCollective/asusctl/blob/main/CONTRIBUTING.md) to see what is already possible.
+
+  - type: input
+    id: short-summary
+    attributes:
+      label: Short Summary
+      description: Provide a one-sentence summary of the feature you are requesting.
+      placeholder: "e.g., Add a toggle in ROG Control Center to switch between dark and light themes."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected Component
+      description: Select the main component or crate where this feature belongs.
+      options:
+        - "asusd (System Daemon / D-Bus)"
+        - "asusd-user (User Session Daemon)"
+        - "asusctl (CLI Tool)"
+        - "rog-control-center (GUI / Slint / System Tray)"
+        - "rog-aura (Keyboard / Aura RGB)"
+        - "rog-anime (AniMe Matrix Display)"
+        - "rog-slash (Slash LED Bar)"
+        - "rog-scsi (Drive / SCSI LED)"
+        - "rog-profiles (Power Profiles / Fan Curves)"
+        - "rog-platform (GPU Switching / Armoury / WMI)"
+        - "backlight (ScreenPad / Brightness)"
+        - "battery (Charge Limit)"
+        - "xgmled (XG Mobile LED)"
+        - "kernel (asus-armoury kernel driver)"
+        - "Other / Not Sure"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: hardware-check
+    attributes:
+      label: Hardware & Kernel Dependency Check
+      description: |
+        Many features (like new TDP limits, fan-curve types, GPU MUX, or firmware attributes) require Linux Kernel support before `asusctl` can expose them.
+      options:
+        - label: "I understand that hardware-specific features generally require upstream Linux Kernel support via the `asus-armoury` (mainline 6.19+) or `asus-wmi` drivers before asusctl can use them."
+          required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Problem / Motivation
+      description: |
+        Is your feature request related to a problem? What is the use case?
+        Please describe the problem you are trying to solve or the workflow you are trying to improve.
+      placeholder: "e.g., I often switch between AC and battery, and it's annoying to manually change my AniMe Matrix animation every time..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed Solution / Expected Behavior
+      description: |
+        Describe how you want this feature to work. Be as specific as possible.
+        - For a **CLI** feature: what should the command look like? (e.g. `asusctl profile -n`, `asusctl fan-curve ...`)
+        - For a **GUI** feature: where should the control live in ROG Control Center?
+        - For a **config/automation** feature: which file should change? System configs live under `/etc/asusd/*.ron`; user configs under `~/.config/rog/*.ron`; GUI prefs in `~/.config/rog/rog-control-center.cfg`.
+        - For a **D-Bus** feature: which interface (`xyz.ljones.*`) is affected?
+      placeholder: |
+        e.g.,
+        - Add a new `--theme` flag to `asusctl`.
+        - Add a toggle on the main page of ROG Control Center, persisted to `~/.config/rog/rog-control-center.cfg`.
+    validations:
+      required: true
+
+  - type: textarea
+    id: mockups
+    attributes:
+      label: Mockups / Screenshots
+      description: |
+        Optional. Attach any mockups, screenshots, or links that illustrate the desired result — especially useful for GUI features.
+      placeholder: "Drag-and-drop images here, or paste a link to a mockup."
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Have you considered any alternative solutions or workarounds? How are you dealing with this currently?
+      placeholder: "e.g., Currently I am using a custom bash script hooked to systemd/udev rules to achieve this."
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Willingness to Contribute
+      description: This project is community-driven. Would you be willing to submit a Pull Request if guided? (Knowing Rust, Slint UI, or zbus is highly appreciated!)
+      options:
+        - label: "Yes, I can write Rust/Slint/zbus code and would like to submit a PR."
+        - label: "No, I just wanted to suggest the idea."
