@@ -30,6 +30,7 @@ pub enum CliCommand {
     Battery(BatteryCommand),
     Info(InfoCommand),
     XgmLed(XgmLedCommand),
+    Dialpad(DialpadCommand),
 }
 
 impl Default for CliCommand {
@@ -364,5 +365,50 @@ pub struct XgmLedGetCommand {}
 )]
 pub struct XgmLedSetCommand {
     #[argh(positional, description = "zero for off, one for on")]
+    pub value: u8,
+}
+
+#[derive(FromArgs, Debug)]
+#[argh(subcommand, name = "dialpad", description = "ASUS DialPad control")]
+pub struct DialpadCommand {
+    #[argh(subcommand)]
+    pub command: DialpadSubCommand,
+}
+
+#[derive(FromArgs, Debug)]
+#[argh(subcommand)]
+pub enum DialpadSubCommand {
+    Get(DialpadGetCommand),
+    On(DialpadOnCommand),
+    Off(DialpadOffCommand),
+    Brightness(DialpadSetBrightnessCommand),
+}
+
+impl Default for DialpadSubCommand {
+    fn default() -> Self {
+        DialpadSubCommand::Get(DialpadGetCommand::default())
+    }
+}
+
+#[derive(FromArgs, Debug, Default)]
+#[argh(subcommand, name = "get", description = "get current DialPad status")]
+pub struct DialpadGetCommand {}
+
+#[derive(FromArgs, Debug, Default)]
+#[argh(subcommand, name = "on", description = "turn DialPad on")]
+pub struct DialpadOnCommand {}
+
+#[derive(FromArgs, Debug, Default)]
+#[argh(subcommand, name = "off", description = "turn DialPad off")]
+pub struct DialpadOffCommand {}
+
+#[derive(FromArgs, Debug)]
+#[argh(
+    subcommand,
+    name = "brightness",
+    description = "set DialPad brightness (0-255)"
+)]
+pub struct DialpadSetBrightnessCommand {
+    #[argh(positional, description = "brightness level (0-255)")]
     pub value: u8,
 }

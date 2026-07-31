@@ -63,6 +63,12 @@ pub struct Config {
     /// Some(true) = ON. Re-applied when the device appears.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub xgm_led_enabled: Option<bool>,
+    /// Persisted DialPad enabled state
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub dialpad_enabled: Option<bool>,
+    /// Persisted DialPad brightness state
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub dialpad_brightness: Option<u8>,
     /// Temporary state for AC/Batt
     #[serde(skip)]
     pub last_power_plugged: u8,
@@ -119,6 +125,8 @@ impl Default for Config {
             screenpad_gamma: Default::default(),
             screenpad_sync_primary: Default::default(),
             xgm_led_enabled: Default::default(),
+            dialpad_enabled: Default::default(),
+            dialpad_brightness: Default::default(),
         }
     }
 }
@@ -196,6 +204,8 @@ impl From<Config611> for Config {
             screenpad_gamma: None,
             screenpad_sync_primary: Default::default(),
             xgm_led_enabled: Default::default(),
+            dialpad_enabled: Default::default(),
+            dialpad_brightness: Default::default(),
         };
 
         config.ac_profile_tunings = c.ac_profile_tunings;
@@ -269,6 +279,8 @@ impl From<Config601> for Config {
             screenpad_gamma: None,
             screenpad_sync_primary: Default::default(),
             xgm_led_enabled: Default::default(),
+            dialpad_enabled: Default::default(),
+            dialpad_brightness: Default::default(),
         }
     }
 }

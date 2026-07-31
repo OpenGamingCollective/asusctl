@@ -5,6 +5,7 @@ pub mod asus_armoury;
 pub mod backlight;
 pub mod cled;
 pub mod cpu;
+pub mod dialpad;
 pub mod error;
 pub mod gpu_pci;
 pub mod hid_raw;
