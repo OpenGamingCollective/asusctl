@@ -10,7 +10,6 @@ edition.workspace = true
 
 [features]
 default = []
-mocking = []
 x11 = ["slint/backend-winit-x11"]
 # Optional tokio debug feature does not require nightly; remove RUSTFLAGS note.
 tokio-debug = ["console-subscriber"]

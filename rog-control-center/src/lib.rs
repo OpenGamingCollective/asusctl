@@ -9,8 +9,6 @@ pub use slint;
 pub mod cli_options;
 pub mod config;
 pub mod error;
-#[cfg(feature = "mocking")]
-pub mod mocking;
 pub mod notify;
 pub mod shortcuts;
 pub mod tray;
