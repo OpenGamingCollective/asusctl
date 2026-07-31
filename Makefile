@@ -101,6 +101,7 @@ install-data-rog_gui:
 	$(INSTALL_DATA) "./rog-control-center/data/$(BIN_ROG).png" "$(DESTDIR)$(datarootdir)/icons/hicolor/512x512/apps/$(BIN_ROG).png"
 	$(INSTALL_DATA) "./rog-control-center/data/$(APP_ID).metainfo.xml" "$(DESTDIR)$(datarootdir)/metainfo/$(APP_ID).metainfo.xml"
 	cd rog-aura/data/layouts && find . -type f -name "*.ron" -exec $(INSTALL_DATA) "{}" "$(DESTDIR_REALPATH)$(datarootdir)/rog-gui/layouts/{}" \;
+	cd rog-control-center/translations && find . -type f -name "*.mo" -exec $(INSTALL_DATA) "{}" "$(DESTDIR_REALPATH)$(datarootdir)/locale/{}" \;
 
 	$(INSTALL_DATA) "./data/icons/asus_notif_yellow.png" "$(DESTDIR)$(datarootdir)/icons/hicolor/512x512/apps/asus_notif_yellow.png"
 	$(INSTALL_DATA) "./data/icons/asus_notif_green.png" "$(DESTDIR)$(datarootdir)/icons/hicolor/512x512/apps/asus_notif_green.png"
@@ -164,6 +165,7 @@ uninstall:
 	rm -rf "$(DESTDIR)$(datarootdir)/asusd"
 	rm -rf "$(DESTDIR)$(datarootdir)/asusctl"
 	rm -rf "$(DESTDIR)$(datarootdir)/rog-gui"
+	cd rog-control-center/translations && find . -type f -name "*.mo" -exec rm -f "$(DESTDIR_REALPATH)$(datarootdir)/locale/{}" \;
 
 update:
 	cargo update
