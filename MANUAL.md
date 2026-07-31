@@ -71,7 +71,27 @@ These options are not written to the config file as they are stored in efivars. 
 
 ### Profiles
 
-asusctl can support setting a power profile via platform_profile drivers. This requires [power-profiles-daemon](https://gitlab.freedesktop.org/hadess/power-profiles-daemon) v0.10.0 minimum. It also requires the kernel patch for platform_profile support to be applied form [here](https://lkml.org/lkml/2021/8/18/1022) - this patch is merged to 5.15 kernel upstream.
+asusctl supports setting power profiles via ACPI `platform_profile` drivers.
+
+> [!IMPORTANT]
+> **Compatibility with Power Profiles Daemons**:
+> Running an external power profiles daemon (such as `power-profiles-daemon` or `tuned`) concurrently with `asusd`'s profile management can cause race conditions and contention over `/sys/firmware/acpi/platform_profile` and CPU EPP preferences.
+> 
+> You have two options for managing power profiles:
+> 
+> 1. **Allow `asusd` to manage profiles**: Disable the conflicting service (e.g. `power-profiles-daemon`):
+> 
+>    ```bash
+>    sudo systemctl disable --now power-profiles-daemon.service
+>    ```
+> 
+> 2. **Allow an external daemon (PPD/Tuned) to manage profiles**: Keep `power-profiles-daemon` active, and disable `asusd`'s profile management settings in `/etc/asusd/asusd.ron`:
+> 
+>    ```ron
+>    change_platform_profile_on_ac: false,
+>    change_platform_profile_on_battery: false,
+>    platform_profile_linked_epp: false,
+>    ```
 
 A common use of asusctl is to bind the `fn+f5` (fan) key to `asusctl profile -n` to cycle through the 3 profiles:
 

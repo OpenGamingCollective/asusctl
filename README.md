@@ -23,6 +23,10 @@ Due to ongoing driver work, the minimum suggested kernel version is always **the
 
 Support for TDP is tied to the new asus-armoury driver: available mainline since Linux 6.19: everything older is not supported.
 
+## Power Profiles
+
+asusctl supports and manage power profile daemons. Be sure to follow [Manual](MANUAL.md) on how to manage it and warnings about other ppds.
+
 ## X11 support
 
 X11 is not, and will not, supported by asusctl in any way. We will not help you with X11 issues if there are any due to limited time and it being unmaintained itself. You can however build `rog-control-center` with it enabled `cargo build --features "rog-control-center/x11"`.
