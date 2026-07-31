@@ -19,6 +19,7 @@ pub enum SlashType {
     GU605_2024,
     GU605_2025,
     GU606_2026,
+    GU405_2026,
     G614_2025,
     #[default]
     Unsupported,
@@ -34,6 +35,7 @@ impl SlashType {
             SlashType::GU605_2025 => PROD_ID2,
             SlashType::GU605_2024 => PROD_ID1,
             SlashType::GU606_2026 => PROD_ID2,
+            SlashType::GU405_2026 => PROD_ID2,
             SlashType::G614_2025 => PROD_ID2,
             SlashType::Unsupported => 0,
         }
@@ -48,6 +50,7 @@ impl SlashType {
             SlashType::GU605_2025 => PROD_ID2_STR,
             SlashType::GU605_2024 => PROD_ID1_STR,
             SlashType::GU606_2026 => PROD_ID2_STR,
+            SlashType::GU405_2026 => PROD_ID2_STR,
             SlashType::G614_2025 => PROD_ID2_STR,
             SlashType::Unsupported => "",
         }
@@ -76,6 +79,8 @@ impl SlashType {
             SlashType::GU605_2025
         } else if board_name.contains("GU605") {
             SlashType::GU605_2024
+        } else if board_name.contains("GU405") {
+            SlashType::GU405_2026
         } else {
             SlashType::Unsupported
         }
@@ -94,6 +99,7 @@ impl FromStr for SlashType {
             "GU605_2025" => Self::GU605_2025,
             "GU605_2024" => Self::GU605_2024,
             "GU606_2026" => Self::GU606_2026,
+            "GU405_2026" => Self::GU405_2026,
             "G614_2025" => Self::G614_2025,
             _ => Self::Unsupported,
         })
