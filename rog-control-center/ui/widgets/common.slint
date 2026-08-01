@@ -1,9 +1,11 @@
 import { Palette, VerticalBox , StandardButton, Button, HorizontalBox, ComboBox, Switch, Slider} from "std-widgets.slint";
+import { Theme } from "../globals.slint";
 
 export component RogItem inherits Rectangle {
-    border-color: Palette.border;
+    border-color: Theme.border;
     border-width: 1px;
-    border-radius: 2px;
+    border-radius: Theme.radius-item;
+    background: Theme.bg-card;
     min-height: 44px;
     max-height: 44px;
 }
@@ -31,7 +33,7 @@ export component SystemSlider inherits RogItem {
                 Text {
                     font-size: 14px;
                     vertical-alignment: TextVerticalAlignment.center;
-                    color: Palette.control-foreground;
+                    color: Theme.text-primary;
                     text: root.text;
                 }
 
@@ -39,7 +41,7 @@ export component SystemSlider inherits RogItem {
                     font-size: 14px;
                     horizontal-alignment: TextHorizontalAlignment.right;
                     vertical-alignment: TextVerticalAlignment.center;
-                    color: Palette.control-foreground;
+                    color: Theme.text-primary;
                     text: "\{Math.round(root.value)}";
                 }
             }
@@ -65,8 +67,8 @@ export component SystemSlider inherits RogItem {
                 drop-shadow-blur: 10px;
                 drop-shadow-color: black;
                 border-radius: 10px;
-                border-color: Palette.accent-background;
-                background: Palette.background;
+                border-color: Theme.rog-red;
+                background: Theme.bg-card;
                 Dialog {
                     title: root.title;
                     VerticalBox {
@@ -115,8 +117,8 @@ export component SystemSlider inherits RogItem {
                 drop-shadow-blur: 10px;
                 drop-shadow-color: black;
                 border-radius: 10px;
-                border-color: Palette.accent-background;
-                background: Palette.background;
+                border-color: Theme.rog-red;
+                background: Theme.bg-card;
                 Dialog {
                     Text {
                         max-width: 420px;
@@ -164,7 +166,7 @@ export component SystemToggle inherits RogItem {
             Text {
                 font-size: 14px;
                 vertical-alignment: TextVerticalAlignment.center;
-                color: Palette.control-foreground;
+                color: Theme.text-primary;
                 text: root.text;
             }
         }
@@ -196,7 +198,7 @@ export component SystemToggleInt inherits RogItem {
             Text {
                 font-size: 14px;
                 vertical-alignment: TextVerticalAlignment.center;
-                color: Palette.control-foreground;
+                color: Theme.text-primary;
                 text: root.text;
             }
         }
@@ -227,7 +229,7 @@ export component SystemToggleVert inherits RogItem {
             font-size: 14px;
             vertical-alignment: TextVerticalAlignment.bottom;
             horizontal-alignment: TextHorizontalAlignment.center;
-            color: Palette.control-foreground;
+            color: Theme.text-primary;
             text: root.text;
         }
 
@@ -260,7 +262,7 @@ export component SystemDropdown inherits RogItem {
             Text {
                 font-size: 14px;
                 vertical-alignment: TextVerticalAlignment.center;
-                color: Palette.control-foreground;
+                color: Theme.text-primary;
                 text: root.text;
             }
         }
@@ -295,8 +297,8 @@ export component PopupNotification {
         // TODO: add properties to display
         Rectangle {
             border-width: 2px;
-            border-color: Palette.accent-background;
-            background: Palette.background;
+            border-color: Theme.rog-red;
+            background: Theme.bg-card;
 
             VerticalLayout {
                 Dialog {
@@ -304,14 +306,14 @@ export component PopupNotification {
                         alignment: start;
                         Text {
                             text: heading;
-                            color: Palette.control-foreground;
+                            color: Theme.text-primary;
                             font-size: 32px;
                             font-weight: 900;
                         }
 
                         Text {
                             text: content;
-                            color: Palette.control-foreground;
+                            color: Theme.text-primary;
                             font-size: 18px;
                         }
                     }
@@ -325,7 +327,7 @@ export component PopupNotification {
                     }
 
                     Button {
-                        text: "More Info";
+                        text: @tr("More Info");
                         dialog-button-role: action;
                     }
                 }
