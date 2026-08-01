@@ -11,6 +11,39 @@ export component RogPage inherits Rectangle {
     animate opacity { duration: 180ms; easing: ease-out; }
 }
 
+// — "Reboot required" notice banner —
+//   Shown inline next to controls whose changes only apply after a restart
+//   (GPU mode, MUX, reserved memory, miniLED...). Parent toggles `visible`.
+export component RogRebootBanner inherits Rectangle {
+    height: 40px;
+    border-radius: 8px;
+    background: #66550033;
+    border-width: 1px;
+    border-color: #E0B04033;
+    animate opacity { duration: 200ms; easing: ease-out; }
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 14px;
+        spacing: 10px;
+        Image {
+            source: @image-url("../images/nav-about.svg");
+            colorize: #E0B040;
+            width: 18px;
+            height: 18px;
+            // Layouts stretch children to full height; anchor the icon to
+            // the row's vertical centre explicitly.
+            y: (parent.height - self.height) / 2;
+        }
+        Text {
+            text: @tr("Changes are staged. They will take effect after restarting.");
+            color: Theme.text-secondary;
+            font-size: Theme.font-sm;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+    }
+}
+
 // — Card: dark fill + radius 8 + deep shadow, no bright border (matches AC cards) —
 export component RogCard inherits Rectangle {
     in property <length> radius: Theme.radius-card;
@@ -22,87 +55,7 @@ export component RogCard inherits Rectangle {
     clip: true;
 }
 
-// — Section heading: text + short red underline —
-export component RogSectionHeader inherits VerticalLayout {
-    in property <string> title;
-    spacing: 5px;
-    Text {
-        text: root.title;
-        color: Theme.text-primary;
-        font-size: Theme.font-md;
-        font-weight: 800;
-        letter-spacing: 0.5px;
-    }
-    Rectangle {
-        height: 2px;
-        width: 30px;
-        background: Theme.rog-red;
-        border-radius: 1px;
-    }
-}
 
-// — Metric card: top-left icon + label + big number + unit + red progress bar (matches AC quad) —
-export component RogMetricCard inherits RogCard {
-    in property <string> label;
-    in property <string> value;
-    in property <string> unit;
-    in property <float> progress: 0.0;        // 0..1
-    in property <color> value-color: Theme.text-primary;
-    in property <image> icon;
-    VerticalLayout {
-        padding: Theme.pad-card;
-        spacing: 10px;
-        // icon + label
-        HorizontalLayout {
-            spacing: 8px;
-            if root.icon.width > 0: Image {
-                source: root.icon;
-                colorize: Theme.text-secondary;
-                height: 20px;
-                vertical-alignment: center;
-            }
-            Text {
-                text: root.label;
-                color: Theme.text-secondary;
-                font-size: Theme.font-sm;
-                letter-spacing: 0.4px;
-                vertical-alignment: center;
-            }
-            Rectangle { horizontal-stretch: 1; }
-        }
-        // big number + unit
-        HorizontalLayout {
-            spacing: 3px;
-            alignment: start;
-            Text {
-                text: root.value;
-                color: root.value-color;
-                font-size: 32px;
-                font-weight: 800;
-            }
-            Text {
-                text: root.unit;
-                color: root.value-color;
-                font-size: Theme.font-md;
-                vertical-alignment: bottom;
-                y: 7px;
-            }
-        }
-        // bottom red progress bar
-        Rectangle {
-            height: 4px;
-            background: Theme.bg-elevated;
-            border-radius: 2px;
-            Rectangle {
-                x: 0;
-                width: parent.width * clamp(root.progress, 0.0, 1.0);
-                height: 100%;
-                background: Theme.rog-red;
-                border-radius: 2px;
-            }
-        }
-    }
-}
 
 // — Performance mode segmented selector (matches AC ModePivot) —
 export component RogModeSelector inherits Rectangle {
@@ -657,64 +610,6 @@ export component RogTabBar inherits Rectangle {
     }
 }
 
-// —— Icon card for system config grid (icon + title + description) ——
-export component RogIconCard inherits Rectangle {
-    in property <image> icon;
-    in property <string> title;
-    in property <string> description: "";
-    in property <bool> selected: false;
-    callback clicked();
-    background: Theme.bg-card;
-    border-radius: 4px;
-    clip: true;
-
-    // Red bottom accent line (AC style)
-    if root.selected: Rectangle {
-        y: parent.height - 3px;
-        width: 100%;
-        height: 3px;
-        background: Theme.rog-red;
-    }
-
-    VerticalLayout {
-        padding-top: 24px;
-        padding-bottom: 20px;
-        padding-left: 16px;
-        padding-right: 16px;
-        spacing: 8px;
-        alignment: center;
-
-        Image {
-            source: root.icon;
-            colorize: Theme.text-secondary;
-            width: 48px;
-            height: 48px;
-            image-fit: contain;
-            horizontal-alignment: center;
-        }
-
-        Text {
-            text: root.title;
-            color: Theme.text-primary;
-            font-size: 14px;
-            font-weight: 500;
-            horizontal-alignment: center;
-        }
-
-        if root.description != "": Text {
-            text: root.description;
-            color: Theme.text-dim;
-            font-size: 11px;
-            horizontal-alignment: center;
-            wrap: word-wrap;
-            max-width: parent.width - 8px;
-        }
-    }
-
-    ta := TouchArea {
-        clicked => { root.clicked(); }
-    }
-}
 
 // —— Effect icon button for lighting page (large circular icon, radio-style single-select) ——
 // IMPORTANT: parent manages 'selected' state — this component only signals clicked()
