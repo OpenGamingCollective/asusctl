@@ -138,9 +138,11 @@ pub fn setup_window(
         .map_err(|e| warn!("Couldn't set application ID: {e:?}"))
         .ok();
     let ui = MainWindow::new().expect("Couldn't create main window");
+    ui.set_app_version(env!("CARGO_PKG_VERSION").into());
     if let Err(e) = ui.window().show() {
         warn!("Couldn't show main window: {e:?}");
     }
+
 
     let available = list_iface_blocking().unwrap_or_default();
     ui.set_sidebar_items_avilable(
@@ -194,6 +196,66 @@ fn ui_shortcut_status(status: ShortcutStatus) -> GlobalShortcutStatus {
     }
 }
 
+/// Locale codes that have a translation on disk: the source `translations/`
+/// tree (every subdir is ours) plus any installed under `/usr/share/locale`
+/// that actually ships our catalog. Sorted + deduped, with an "en" fallback so
+/// the picker is never empty. The locale *list* is automatic; the native
+/// display names live in `language_display_name` (add a line there when a new
+/// translation lands — until then it shows the raw code).
+fn available_languages() -> Vec<SharedString> {
+    let mut set: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    // English is the source language (no .mo needed) — always present, so a
+    // fresh config never lands on a translation by default.
+    set.insert("en".to_owned());
+    // Dev builds: scan the source tree translations dir (harmless on installed
+    // builds — the dir won't exist, so read_dir returns Err and is skipped).
+    let dev = concat!(env!("CARGO_MANIFEST_DIR"), "/translations");
+    for dir in [
+        dev, "/usr/share/locale",
+    ] {
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if !path.is_dir() {
+                    continue;
+                }
+                // /usr/share/locale holds every app's locales, so only count
+                // dirs carrying our catalog; the source tree is all ours.
+                let ours = dir == dev || path.join("LC_MESSAGES/rog-control-center.mo").exists();
+                if ours {
+                    if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                        set.insert(name.to_string());
+                    }
+                }
+            }
+        }
+    }
+    let mut v: Vec<SharedString> = set.into_iter().map(SharedString::from).collect();
+    if v.is_empty() {
+        v.push(SharedString::from("en"));
+    }
+    v
+}
+
+/// Native display name for a locale code — language pickers conventionally
+/// show each language in its own tongue. Unknown codes fall back to themselves
+/// so a newly added translation still shows up (as its code) until named here.
+fn language_display_name(code: &str) -> SharedString {
+    let name = match code {
+        "en" => "English",
+        "zh_CN" => "简体中文",
+        "fr" => "Français",
+        "it" => "Italiano",
+        "ru" => "Русский",
+        "tr" => "Türkçe",
+        "uk_UA" => "Українська",
+        "pt_BR" => "Português (Brasil)",
+        "az" => "Azərbaycanca",
+        other => other,
+    };
+    SharedString::from(name)
+}
+
 pub fn setup_app_settings_page(
     ui: &MainWindow,
     config: Arc<Mutex<Config>>,
@@ -201,57 +263,66 @@ pub fn setup_app_settings_page(
 ) {
     let config_copy = config.clone();
     let global = ui.global::<AppSettingsPageData>();
-    global.on_set_run_in_background(move |enable| {
-        if let Ok(mut lock) = config_copy.try_lock() {
+    global.on_set_run_in_background(move |enable| match config_copy.lock() {
+        Ok(mut lock) => {
             lock.run_in_background = enable;
             lock.write();
         }
+        Err(err) => error!("Could not save setting: {err}"),
     });
     let config_copy = config.clone();
-    global.on_set_startup_in_background(move |enable| {
-        if let Ok(mut lock) = config_copy.try_lock() {
+    global.on_set_startup_in_background(move |enable| match config_copy.lock() {
+        Ok(mut lock) => {
             lock.startup_in_background = enable;
             lock.write();
         }
+        Err(err) => error!("Could not save setting: {err}"),
     });
     let config_copy = config.clone();
-    global.on_set_enable_tray_icon(move |enable| {
-        if let Ok(mut lock) = config_copy.try_lock() {
+    global.on_set_enable_tray_icon(move |enable| match config_copy.lock() {
+        Ok(mut lock) => {
             lock.enable_tray_icon = enable;
             lock.write();
         }
+        Err(err) => error!("Could not save setting: {err}"),
     });
     let config_copy = config.clone();
-    global.on_set_enable_dgpu_notifications(move |enable| {
-        if let Ok(mut lock) = config_copy.try_lock() {
+    global.on_set_enable_dgpu_notifications(move |enable| match config_copy.lock() {
+        Ok(mut lock) => {
             lock.notifications.enabled = enable;
             lock.write();
         }
+        Err(err) => error!("Could not save setting: {err}"),
     });
     let config_copy = config.clone();
-    global.on_set_enable_autostart(move |enable| {
-        if let Ok(mut lock) = config_copy.try_lock() {
+    global.on_set_enable_autostart(move |enable| match config_copy.lock() {
+        Ok(mut lock) => {
             lock.enable_autostart = enable;
             let in_bg = super::config::is_autostart_in_background();
             lock.write();
             super::config::update_autostart(enable, in_bg);
         }
+        Err(err) => error!("Could not save setting: {err}"),
     });
     let config_copy = config.clone();
-    global.on_set_autostart_in_background(move |enable| {
-        if let Ok(lock) = config_copy.try_lock() {
+    global.on_set_autostart_in_background(move |enable| match config_copy.lock() {
+        Ok(lock) => {
             let autostart = lock.enable_autostart;
             super::config::update_autostart(autostart, enable);
         }
+        Err(err) => error!("Could not read setting: {err}"),
     });
 
-    if let Ok(lock) = config.try_lock() {
-        global.set_run_in_background(lock.run_in_background);
-        global.set_startup_in_background(lock.startup_in_background);
-        global.set_enable_tray_icon(lock.enable_tray_icon);
-        global.set_enable_dgpu_notifications(lock.notifications.enabled);
-        global.set_enable_autostart(lock.enable_autostart);
-        global.set_autostart_in_background(super::config::is_autostart_in_background());
+    match config.lock() {
+        Ok(lock) => {
+            global.set_run_in_background(lock.run_in_background);
+            global.set_startup_in_background(lock.startup_in_background);
+            global.set_enable_tray_icon(lock.enable_tray_icon);
+            global.set_enable_dgpu_notifications(lock.notifications.enabled);
+            global.set_enable_autostart(lock.enable_autostart);
+            global.set_autostart_in_background(super::config::is_autostart_in_background());
+        }
+        Err(err) => error!("Could not read config: {err}"),
     }
 
     global.set_show_global_shortcut_controls(shortcuts.is_some());
@@ -357,4 +428,130 @@ pub fn setup_app_settings_page(
             });
         });
     }
+
+    // Discover shipped translations at startup so the picker lists every
+    // language without a hardcoded array. The scan walks /usr/share/locale
+    // (hundreds of stats), so do it off the UI thread and fill the picker
+    // when it lands; the callback needs the codes list, so wire it after.
+    let configured_language = match config.lock() {
+        Ok(lock) => lock.language.clone(),
+        Err(err) => {
+            error!("Could not read config: {err}");
+            String::default()
+        }
+    };
+    // When no language is explicitly configured, main.rs leaves the system
+    // locale in place and gettext renders whatever LANG/LC_ALL says. Mirror
+    // that locale here so the picker doesn't show "English" while the UI is
+    // actually (e.g.) Chinese on a fresh install.
+    let effective_language = if configured_language.is_empty() {
+        std::env::var("LANGUAGE")
+            .ok()
+            .and_then(|s| s.split(':').next().map(str::to_string))
+            .filter(|s| !s.is_empty())
+            .or_else(|| std::env::var("LC_ALL").ok().filter(|s| !s.is_empty()))
+            .or_else(|| {
+                std::env::var("LANG")
+                    .ok()
+                    .filter(|s| !s.is_empty() && s != "C" && s != "POSIX")
+            })
+            .map(|raw| {
+                let base = raw.split('.').next().unwrap_or(&raw);
+                base.replace("_Hans", "").replace("_Hant", "")
+            })
+            .unwrap_or_else(|| "en".to_string())
+    } else {
+        configured_language
+    };
+    // Match the effective language; fall back to "en" (source language), then
+    // index 0 — so a stale config like the old "en_US" still lands on English.
+    let codes_handle = std::sync::Arc::new(std::sync::OnceLock::<Vec<SharedString>>::new());
+    {
+        let codes_handle = codes_handle.clone();
+        let eff = effective_language.clone();
+        let weak = ui.as_weak();
+        tokio::spawn(async move {
+            let codes = tokio::task::spawn_blocking(available_languages)
+                .await
+                .unwrap_or_default();
+            let current_idx = codes
+                .iter()
+                .position(|l| l.as_str() == eff.as_str())
+                .or_else(|| codes.iter().position(|l| l.as_str() == "en"))
+                .unwrap_or_else(|| {
+                    log::warn!("No matching language found in available list; defaulting to index 0");
+                    0
+                }) as i32;
+            // The picker shows each language in its own name (standard for
+            // language selectors); the raw code is what gets persisted, so
+            // keep both in lockstep.
+            let display: Vec<SharedString> = codes
+                .iter()
+                .map(|c| language_display_name(c.as_str()))
+                .collect();
+            let _ = codes_handle.set(codes);
+            if let Err(e) = weak.upgrade_in_event_loop(move |h| {
+                let global = h.global::<AppSettingsPageData>();
+                global.set_available_languages(slint::ModelRc::new(slint::VecModel::from(display)));
+                global.set_current_language(current_idx);
+            }) {
+                error!("language scan UI update: {e:?}");
+            }
+        });
+    }
+
+    let config_copy = config.clone();
+    let codes_cb = codes_handle;
+    global.on_cb_change_language(move |index: i32| {
+        // The scan may still be in flight on first click; codes arrive via
+        // the OnceLock once spawn_blocking finishes.
+        if let Some(codes) = codes_cb.get() {
+            if let Some(code) = codes.get(index as usize) {
+                match config_copy.lock() {
+                    Ok(mut lock) => {
+                        lock.language = code.to_string();
+                        lock.write();
+                        log::info!("Language changed to {code}; reload to apply");
+                    }
+                    Err(err) => error!("Could not save language setting: {err}"),
+                }
+            }
+        }
+    });
+
+    // Reload Window: spawn a fresh instance flagged to skip the single-instance
+    // guard (--no-single-instance), then quit this one. spawn+quit is
+    // reliable where exec() was not: the old DBus name is released on quit and
+    // the new image never races the check. The child re-reads config.language
+    // and re-resolves @tr() in the chosen locale.
+    global.on_cb_reload_window(move || {
+        let exe = match std::env::current_exe() {
+            Ok(e) => e,
+            Err(e) => {
+                log::error!("reload: cannot resolve current exe: {e}");
+                return;
+            }
+        };
+        log::info!("reload: spawning {:?}", exe);
+        // Forward the original CLI args (fullscreen/windowed/sizes) so the
+        // reloaded window keeps them, and force the window to open even when
+        // the config says "start in background" — the user clicked a button,
+        // they expect to see a window.
+        let mut cmd = std::process::Command::new(exe);
+        cmd.arg("--no-single-instance");
+        for arg in std::env::args_os().skip(1) {
+            if arg == "--background" || arg == "--no-single-instance" {
+                continue;
+            }
+            cmd.arg(arg);
+        }
+        cmd.env("ROGCC_RELOAD_SHOW_WINDOW", "1");
+        match cmd.spawn() {
+            Ok(_) => {
+                slint::quit_event_loop()
+                    .unwrap_or_else(|e| log::error!("reload: quit_event_loop: {e}"));
+            }
+            Err(e) => log::error!("reload: spawn failed: {e}"),
+        }
+    });
 }

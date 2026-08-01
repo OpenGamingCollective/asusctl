@@ -241,6 +241,10 @@ async fn async_main(rt: &Runtime, cli_parsed: CliStart) -> Result<()> {
     let enable_tray_icon = config.enable_tray_icon;
     let startup_in_background = if cli_parsed.autostart {
         cli_parsed.background
+    } else if std::env::var_os("ROGCC_RELOAD_SHOW_WINDOW").is_some() {
+        // Spawned by "Reload Window": the user expects the window to appear
+        // even if the config normally starts hidden in the background.
+        false
     } else {
         cli_parsed.background || config.startup_in_background
     };
