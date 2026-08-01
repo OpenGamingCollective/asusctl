@@ -150,16 +150,22 @@ fn set_gpu_mode(caps: Arc<GpuCaps>, handle: Weak<MainWindow>, mode: GpuMode) {
             SharedString::from("GPU mode change scheduled — reboot required for changes to apply."),
             SharedString::from("Failed to set GPU mode"),
             handle.clone(),
-            result,
+            result.clone(),
         );
 
-        // Reflect the (possibly unchanged) hardware state back into the dropdown.
-        let new_index = index_of(&caps.modes(), caps.current_mode().await);
-        handle
-            .upgrade_in_event_loop(move |h| {
-                h.global::<GPUPageData>().set_gpu_mode_index(new_index);
-            })
-            .unwrap_or_else(|e| error!("setup_gpu: failed to refresh mode: {e:?}"));
+        // asus-armoury firmware attributes only report the *applied* value in
+        // current_value; a freshly written mode stays pending until reboot, so
+        // reading current_mode() back would bounce the selection to the old
+        // mode. On success keep the user's selection (it IS the pending
+        // mode); only on failure re-read the hardware to restore the truth.
+        if result.is_err() {
+            let new_index = index_of(&caps.modes(), caps.current_mode().await);
+            handle
+                .upgrade_in_event_loop(move |h| {
+                    h.global::<GPUPageData>().set_gpu_mode_index(new_index);
+                })
+                .unwrap_or_else(|e| error!("setup_gpu: failed to refresh mode: {e:?}"));
+        }
 
         set_dropdown_enabled(&handle, true);
     });
