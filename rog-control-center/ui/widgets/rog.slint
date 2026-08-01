@@ -718,32 +718,27 @@ export component RogIconCard inherits Rectangle {
 
 // —— Effect icon button for lighting page (large circular icon, radio-style single-select) ——
 // IMPORTANT: parent manages 'selected' state — this component only signals clicked()
-export component RogEffectButton inherits VerticalLayout {
+export component RogEffectButton inherits Rectangle {
     in property <image> icon;
     in property <string> label;
     in property <bool> selected: false;  // read-only from parent, do NOT self-assign
+    in property <bool> enabled: true;
     callback clicked();
-    spacing: 10px;
-    alignment: center;
+    width: 92px;
+    height: 104px;
+    opacity: root.enabled ? 1.0 : 0.35;
 
-    // Circle background
+    // Circle background, horizontally centred in the cell (absolute x, not a
+    // layout child, so a fixed-width circle never drifts to the left).
     outer := Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: 4px;
         width: 72px;
         height: 72px;
         border-radius: 36px;
         background: root.selected ? Theme.mode-selected : Theme.bg-app;
         border-width: root.selected ? 2px : 1px;
         border-color: root.selected ? Theme.rog-red : Theme.line-soft;
-
-        if root.selected: Rectangle {
-            x: -4px; y: -4px;
-            width: parent.width + 8px;
-            height: parent.height + 8px;
-            border-radius: 40px;
-            border-width: 1px;
-            border-color: #FF192933;
-            clip: true;
-        }
 
         Image {
             source: root.icon;
@@ -754,18 +749,26 @@ export component RogEffectButton inherits VerticalLayout {
             horizontal-alignment: center;
             vertical-alignment: center;
         }
-
-        ta := TouchArea {
-            clicked => { root.clicked(); }
-        }
     }
 
+    // Label spans the full cell width so its centre lines up with the circle.
     Text {
         text: root.label;
         color: root.selected ? Theme.text-primary : Theme.text-secondary;
-        font-size: 13px;
+        font-size: 12px;
         font-weight: root.selected ? 600 : 400;
+        x: 0;
+        y: 82px;
+        width: 100%;
         horizontal-alignment: center;
+        overflow: elide;
+    }
+
+    ta := TouchArea {
+        width: 100%;
+        height: 100%;
+        enabled: root.enabled;
+        clicked => { root.clicked(); }
     }
 }
 
