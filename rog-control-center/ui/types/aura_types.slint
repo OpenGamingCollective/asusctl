@@ -74,6 +74,8 @@ export global AuraPageData {
     ];
     in-out property <int> brightness;
     callback cb_brightness(int);
+    // Set the animation speed (0..2, Low/Medium/High) for the current mode.
+    callback cb_speed(int);
     in-out property <[string]> mode_names: [
         @tr("Basic aura mode" => "Static"),
         @tr("Basic aura mode" => "Breathe"),
@@ -92,26 +94,29 @@ export global AuraPageData {
     in-out property <[string]> available_mode_names: [ @tr("Basic aura mode" => "Static"), @tr("Basic aura mode" => "Breathe"), @tr("Basic aura mode" => "Strobe") ];
     in-out property <int> current_available_mode: 0;
     in-out property <[int]> supported_basic_modes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12];
-    in-out property <[string]> zone_names: [
-        @tr("Aura zone" => "None"),
-        @tr("Aura zone" => "Key1"),
-        @tr("Aura zone" => "Key2"),
-        @tr("Aura zone" => "Key3"),
-        @tr("Aura zone" => "Key4"),
-        @tr("Aura zone" => "Logo"),
-        @tr("Aura zone" => "Lightbar Left"),
-        @tr("Aura zone" => "Lightbar Right"),
+    // Per-mode icon (index = raw AuraMode number, matches mode_names above).
+    // All from Remix Icon (open license), colorized at draw time.
+    in property <[image]> mode_icons: [
+        @image-url("../images/effect-static.svg"),     // 0 Static
+        @image-url("../images/effect-breathing.svg"),  // 1 Breathe
+        @image-url("../images/effect-strobe.svg"),     // 2 Strobe
+        @image-url("../images/effect-cycle.svg"),      // 3 Rainbow (colour cycle)
+        @image-url("../images/effect-star.svg"),       // 4 Star
+        @image-url("../images/effect-rain.svg"),       // 5 Rain
+        @image-url("../images/effect-highlight.svg"),  // 6 Highlight
+        @image-url("../images/effect-laser.svg"),      // 7 Laser
+        @image-url("../images/effect-ripple.svg"),     // 8 Ripple
+        @image-url("../images/effect-static.svg"),     // 9 Nothing (unused, filtered out)
+        @image-url("../images/effect-pulse.svg"),      // 10 Pulse
+        @image-url("../images/effect-comet.svg"),      // 11 Comet
+        @image-url("../images/effect-flash.svg"),      // 12 Flash
     ];
-    in-out property <[string]> direction_names: [
-        @tr("Aura direction" => "Right"),
-        @tr("Aura direction" => "Left"),
-        @tr("Aura direction" => "Up"),
-        @tr("Aura direction" => "Down"),
-    ];
-    in-out property <[string]> speed_names: [
-        @tr("Aura speed" => "Low"),
-        @tr("Aura speed" => "Medium"),
-        @tr("Aura speed" => "High"),
+    // Direction arrows (Right/Left/Up/Down), shown only for modes with direction.
+    in property <[image]> direction_icons: [
+        @image-url("../images/dir-right.svg"),
+        @image-url("../images/dir-left.svg"),
+        @image-url("../images/dir-up.svg"),
+        @image-url("../images/dir-down.svg"),
     ];
 
     in-out property <AuraEffect> led_mode_data: {
@@ -134,15 +139,16 @@ export global AuraPageData {
 
     callback apply_led_mode_data();
     callback apply_effect(AuraEffect);
-    apply_effect(e) => { led_mode_data = e; apply_led_mode_data(); }
-    in-out property <int> zone;
+    apply_effect(e) => {
+        led_mode_data = e;
+        apply_led_mode_data();
+    }
     in-out property <int> speed;
     in-out property <int> direction;
 
     callback update_led_mode_data(AuraEffect);
     update_led_mode_data(d) => {
         led_mode_data = d;
-        zone = d.zone;
         speed = d.speed;
         direction = d.direction;
         color1 = d.colour1;

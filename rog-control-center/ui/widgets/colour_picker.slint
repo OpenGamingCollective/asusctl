@@ -89,17 +89,33 @@ export component ColourSlider inherits VerticalLayout {
 
     callback external_colour_change();
 
-    external_colour_change => {
+    // Re-sync thumbs + hex from final_colour. Self-contained so the component
+    // tracks external data changes (restore, effect switch) through the
+    // two-way final_colour binding without the parent reaching in.
+    property <bool> syncing: false;
+    function sync_from_final() {
         if (root.final_colour.to-hsv().hue < 0) {
             c1.value = root.base_colours.length * (root.final_colour.to-hsv().hue + 360) / 360;
         } else {
             c1.value = root.base_colours.length * root.final_colour.to-hsv().hue / 360;
         }
-        // c1.value = root.base_colours.length * 360 / root.final_colour.to-hsv().hue;
         c2.value = root.base_saturation.length - root.base_saturation.length * root.final_colour.to-hsv().saturation;
         c3.value = root.base_value.length - root.base_value.length * root.final_colour.to-hsv().value;
         root.set_base_colour();
         hex = set_hex_from_colour(final_colour);
+    }
+
+    changed final_colour => {
+        // Guard against re-entry: set_base_colour() writes final_colour back.
+        if (!root.syncing) {
+            root.syncing = true;
+            root.sync_from_final();
+            root.syncing = false;
+        }
+    }
+
+    external_colour_change => {
+        root.sync_from_final();
     }
     Rectangle {
         height: 28px;

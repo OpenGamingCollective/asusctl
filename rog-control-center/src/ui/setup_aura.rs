@@ -183,6 +183,19 @@ pub fn setup_aura_page(
                         show_toast("LED mode applied".into(), "LED mode failed".into(), t, r);
                     });
                 });
+
+                // Speed slider: stamp the new speed onto the active effect,
+                // mirror it in the UI, then run the existing apply path (which
+                // also pushes to hardware and toasts) so the write logic stays
+                // in one place.
+                let w_speed = weak.clone();
+                h.global::<AuraPageData>().on_cb_speed(move |speed| {
+                    let Some(ui) = w_speed.upgrade() else { return };
+                    let mut data = ui.global::<AuraPageData>().get_led_mode_data();
+                    data.speed = speed;
+                    ui.global::<AuraPageData>().set_led_mode_data(data);
+                    ui.global::<AuraPageData>().invoke_apply_led_mode_data();
+                });
                 h.invoke_external_colour_change();
             })
             .ok();
