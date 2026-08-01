@@ -250,37 +250,73 @@ export component RogToggle inherits Rectangle {
     // compact: take only the content width; otherwise fill the row so the
     // switch sits at the far right (settings-row style).
     horizontal-stretch: root.compact ? 0 : 1;
-    HorizontalLayout {
-        padding-left: root.compact ? 0px : Theme.pad-card;
-        padding-right: root.compact ? 0px : Theme.pad-card;
-        spacing: root.compact ? 8px : 0px;
-        Text {
-            text: root.label;
-            color: root.enabled ? Theme.text-primary : Theme.text-dim;
-            font-size: Theme.font-sm;
-            vertical-alignment: center;
+    // Screen readers see a labelled checkbox; Space/Return toggles it.
+    accessible-role: checkbox;
+    accessible-label: root.label;
+    accessible-checkable: true;
+    accessible-checked: root.checked;
+    accessible-action-default => {
+        if (root.enabled) {
+            root.checked = !root.checked;
+            root.toggled(root.checked);
         }
-        if !root.compact: Rectangle { horizontal-stretch: 1; }
-        tg := Rectangle {
-            width: 44px;
-            height: 24px;
-            border-radius: 12px;
-            background: root.checked ? (root.enabled ? Theme.rog-red : Theme.fg-disabled) : Theme.toggle-off;
-            ta := TouchArea {
-                enabled: root.enabled;
-                clicked => {
-                    root.checked = !root.checked;
-                    root.toggled(root.checked);
-                }
+    }
+    // Center the switch row vertically so a caller can place this in a taller
+    // row (e.g. height: 46px) without the switch sticking to the top.
+    VerticalLayout {
+        alignment: center;
+        HorizontalLayout {
+            padding-left: root.compact ? 0px : Theme.pad-card;
+            padding-right: root.compact ? 0px : Theme.pad-card;
+            spacing: root.compact ? 8px : 0px;
+            Text {
+                text: root.label;
+                color: root.enabled ? Theme.text-primary : Theme.text-dim;
+                font-size: Theme.font-sm;
+                vertical-alignment: center;
             }
-            Rectangle {
-                x: root.checked ? parent.width - self.width - 3px : 3px;
-                animate x { duration: 120ms; easing: ease-in-out; }
-                y: 3px;
-                width: 18px;
-                height: 18px;
-                border-radius: 9px;
-                background: Theme.fg-normal;
+            if !root.compact: Rectangle { horizontal-stretch: 1; }
+            tg := Rectangle {
+                width: 44px;
+                height: 24px;
+                border-radius: 12px;
+                background: root.checked ? (root.enabled ? Theme.rog-red : Theme.fg-disabled) : Theme.toggle-off;
+                ta := TouchArea {
+                    enabled: root.enabled;
+                    clicked => {
+                        root.checked = !root.checked;
+                        root.toggled(root.checked);
+                    }
+                }
+                FocusScope {
+                    enabled: root.enabled;
+                    key-pressed(event) => {
+                        if (event.text == Key.Return || event.text == Key.Space) {
+                            root.checked = !root.checked;
+                            root.toggled(root.checked);
+                            return accept;
+                        }
+                        reject
+                    }
+                    if self.has-focus: Rectangle {
+                        x: -3px; y: -3px;
+                        width: parent.width + 6px;
+                        height: parent.height + 6px;
+                        border-radius: 15px;
+                        border-width: 2px;
+                        border-color: Theme.rog-red;
+                        background: transparent;
+                    }
+                }
+                Rectangle {
+                    x: root.checked ? parent.width - self.width - 3px : 3px;
+                    animate x { duration: 120ms; easing: ease-in-out; }
+                    y: 3px;
+                    width: 18px;
+                    height: 18px;
+                    border-radius: 9px;
+                    background: Theme.fg-normal;
+                }
             }
         }
     }
@@ -334,24 +370,32 @@ export component RogDropdownRow inherits Rectangle {
     in-out property <string> current-value;
     in-out property <[string]> model;
     in property <length> combo-min-width: 180px;
+    in property <bool> enabled: true;
     callback selected(int);
     background: transparent;
+    opacity: root.enabled ? 1.0 : 0.4;
     HorizontalLayout {
         padding-left: Theme.pad-card;
         padding-right: Theme.pad-card;
         Text {
             text: root.label;
-            color: Theme.text-secondary;
+            color: root.enabled ? Theme.text-secondary : Theme.text-dim;
             font-size: Theme.font-sm;
             vertical-alignment: center;
         }
         Rectangle { horizontal-stretch: 1; }
-        ComboBox {
+        if root.enabled: ComboBox {
             min-width: root.combo-min-width;
             current-index <=> root.current-index;
             current-value <=> root.current-value;
             model <=> root.model;
             selected => { root.selected(root.current-index); }
+        }
+        if !root.enabled: Text {
+            text: @tr("Not available");
+            color: Theme.text-dim;
+            font-size: Theme.font-sm;
+            vertical-alignment: center;
         }
     }
 }

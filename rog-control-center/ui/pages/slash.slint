@@ -1,5 +1,361 @@
-import { Palette, VerticalBox, ScrollView } from "std-widgets.slint";
-import { SystemDropdown, SystemSlider, SystemToggle, RogItem } from "../widgets/common.slint";
+import { ComboBox } from "std-widgets.slint";
+import { RogToggle, RogPage } from "../widgets/rog.slint";
+import { Theme } from "../globals.slint";
+
+component SlashPanelHeader inherits Rectangle {
+    in property <string> title;
+    in property <bool> expanded;
+    in property <bool> show-sync: false;
+    callback clicked();
+    callback sync-clicked();
+
+    height: 44px;
+    border-radius: 4px;
+    border-width: 1px;
+    border-color: Theme.line;
+    background: Theme.bg-preview;
+
+    HorizontalLayout {
+        padding-left: 14px;
+        // Reserve the icon's footprint so a long translated title can't slide
+        // underneath it.
+        padding-right: 44px;
+        spacing: 12px;
+
+        Text {
+            text: root.expanded ? "▼" : "▶";
+            color: root.expanded ? Theme.rog-red : Theme.text-primary;
+            font-size: 10px;
+            vertical-alignment: center;
+        }
+        Text {
+            text: root.title;
+            color: Theme.text-primary;
+            font-size: 14px;
+            font-weight: 600;
+            vertical-alignment: center;
+        }
+        Rectangle { horizontal-stretch: 1; }
+    }
+
+    // Reset icon: pulled out of the HorizontalLayout and absolutely positioned,
+    // because a layout child can't reliably center vertically —
+    // `vertical-alignment` only reflows glyphs inside a Text box, not an Image.
+    if root.show-sync: Image {
+        source: @image-url("../images/ic-sync.svg");
+        colorize: Theme.text-secondary;
+        width: 20px;
+        height: 20px;
+        image-fit: contain;
+        x: parent.width - 14px - self.width;
+        y: (parent.height - self.height) / 2;
+    }
+
+    // Click anywhere on the header toggles expand.
+    TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+
+    // The sync icon is a reset action: its own hit area, layered ON TOP of the
+    // expand TouchArea so only the icon (right side) triggers it.
+    if root.show-sync: TouchArea {
+        x: parent.width - 44px;
+        width: 44px;
+        height: 100%;
+        mouse-cursor: pointer;
+        clicked => { root.sync-clicked(); }
+    }
+}
+
+component SlashSwitch inherits Rectangle {
+    in-out property <bool> checked;
+    in property <bool> enabled: true;
+    callback toggled(bool);
+
+    width: 46px;
+    height: 24px;
+    border-radius: 4px;
+    // Track flips with the theme (fg-normal inverts and would render an
+    // unreadable dark pill in light mode). Red when active, neutral otherwise.
+    background: root.enabled ? (root.checked ? Theme.rog-red : Theme.toggle-off) : Theme.text-dim;
+    opacity: root.enabled ? 1.0 : 0.55;
+
+    Text {
+        x: root.checked ? 5px : 24px;
+        width: 18px;
+        height: 100%;
+        text: root.checked ? "ON" : "OFF";
+        color: root.checked ? #FFFFFF : Theme.text-primary;
+        font-size: 10px;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    Rectangle {
+        x: root.checked ? 27px : 3px;
+        y: 3px;
+        width: 18px;
+        height: 18px;
+        border-radius: 4px;
+        background: #FFFFFF;
+        border-width: 1px;
+        border-color: Theme.line;
+        animate x { duration: 120ms; easing: ease; }
+    }
+    TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => {
+            root.checked = !root.checked;
+            root.toggled(root.checked);
+        }
+    }
+}
+
+component SlashSlider inherits Rectangle {
+    in property <string> label;
+    in property <string> value-text;
+    in-out property <int> value;
+    in property <int> maximum: 100;
+    in property <bool> enabled: true;
+    callback released(int);
+
+    private property <float> fraction: clamp(root.value / max(root.maximum, 1), 0.0, 1.0);
+    height: 70px;
+    opacity: root.enabled ? 1.0 : 0.45;
+
+    VerticalLayout {
+        spacing: 8px;
+        HorizontalLayout {
+            Text {
+                text: root.label;
+                color: Theme.text-secondary;
+                font-size: 12px;
+                vertical-alignment: center;
+            }
+            Rectangle { horizontal-stretch: 1; }
+            Text {
+                text: root.value-text;
+                color: Theme.text-secondary;
+                font-size: 12px;
+                vertical-alignment: center;
+            }
+        }
+        track-area := Rectangle {
+            width: 100%;
+            height: 30px;
+
+            for dot[i] in 6: Rectangle {
+                x: i * (parent.width - 6px) / 5;
+                y: 0px;
+                width: 6px;
+                height: 6px;
+                border-radius: 3px;
+                background: Theme.text-secondary;
+            }
+            Rectangle {
+                y: 18px;
+                width: 100%;
+                height: 4px;
+                border-radius: 2px;
+                background: Theme.line;
+                Rectangle {
+                    x: 0;
+                    width: parent.width * root.fraction;
+                    height: 100%;
+                    border-radius: 2px;
+                    background: Theme.rog-red;
+                }
+            }
+            Rectangle {
+                x: root.fraction * (parent.width - self.width);
+                y: 14px;
+                width: 10px;
+                height: 14px;
+                border-radius: 2px;
+                background: Theme.fg-normal;
+            }
+            TouchArea {
+                enabled: root.enabled;
+                mouse-cursor: pointer;
+                pointer-event(e) => {
+                    if e.kind == PointerEventKind.down || (e.kind == PointerEventKind.move && self.pressed) {
+                        root.value = Math.round(clamp((self.mouse-x - 5px) / (self.width - 10px), 0.0, 1.0) * root.maximum);
+                    }
+                    if e.kind == PointerEventKind.up {
+                        root.released(root.value);
+                    }
+                }
+            }
+        }
+    }
+}
+
+component SlashDevicePreview inherits Rectangle {
+    background: transparent;
+    in property <bool> active: false;
+
+    // asusd's Slash D-Bus interface exposes no LED/zone count — it only sends a
+    // whole-bar animation mode. This is a PREVIEW fidelity constant, not hardware
+    // data: how many segments to draw when approximating the bar. The animation
+    // math (segment-level below) is modular and adapts to any value here.
+    private property <int> zone-count: 7;
+    private property <int> last-zone: root.zone-count - 1;
+    private property <int> bounce-cycle: root.last-zone * 2;
+    private property <int> animation-step: 0;
+
+    // Segment geometry, derived so the preview fills the same bar regardless of
+    // zone-count (was hardcoded to a 7-zone step). Plain numbers: these are
+    // viewbox coordinates (1440x1000), not physical lengths.
+    private property <float> seg-dx: 1120 / root.zone-count;
+    private property <float> seg-dy: 710 / root.zone-count;
+    private property <float> seg-x0: 161;
+    private property <float> seg-y0: 157;
+
+    private property <float> light-opacity: SlashPageData.enabled
+        ? 0.38 + 0.62 * SlashPageData.brightness / 255
+        : 0.20;
+
+    function segment-level(index: int) -> float {
+        // The firmware renders the effects and exposes no per-zone frame data.
+        // Approximate the motion while keeping mode, speed and brightness exact.
+        if SlashPageData.mode == 0 {
+            return 1.0;
+        }
+
+        if SlashPageData.mode == 1 {
+            // Bounce: a short packet travels in both directions.
+            return Math.abs(index - (Math.mod(root.animation-step, root.bounce-cycle) < root.zone-count
+                ? Math.mod(root.animation-step, root.bounce-cycle)
+                : root.bounce-cycle - Math.mod(root.animation-step, root.bounce-cycle))) < 1 ? 1.0 : 0.08;
+        }
+        if SlashPageData.mode == 2 {
+            // Slash: a sharp one-way sweep.
+            return index == Math.mod(root.animation-step, root.zone-count) ? 1.0 : 0.04;
+        }
+        if SlashPageData.mode == 3 || SlashPageData.mode == 14 {
+            // Loading and Start progressively fill the strip.
+            return index <= Math.mod(root.animation-step, root.zone-count + 2) ? 1.0 : 0.06;
+        }
+        if SlashPageData.mode == 4 {
+            // BitStream: staggered digital pulses.
+            return Math.mod(index * 3 + root.animation-step, 5) < 2 ? 1.0 : 0.08;
+        }
+        if SlashPageData.mode == 5 {
+            // Transmission: two packets move in opposite directions.
+            return index == Math.mod(root.animation-step, root.zone-count)
+                || index == root.last-zone - Math.mod(root.animation-step, root.zone-count) ? 1.0 : 0.06;
+        }
+        if SlashPageData.mode == 6 {
+            // Flow: a continuous head with a fading tail.
+            return 0.12 + 0.88 * Math.mod(index - root.animation-step + root.zone-count * 2, root.zone-count) / root.last-zone;
+        }
+        if SlashPageData.mode == 7 {
+            // Flux: the whole strip breathes together.
+            return 0.16 + 0.84 * Math.abs(Math.mod(root.animation-step, 32) - 16) / 16;
+        }
+        if SlashPageData.mode == 8 {
+            // Phantom: a broad, soft moving trail.
+            return max(0.08, 1.0 - Math.abs(index - Math.mod(root.animation-step, root.zone-count + 2)) / 2.5);
+        }
+        if SlashPageData.mode == 9 {
+            // Spectrum: several intensity waves travel along the diffuser.
+            return 0.20 + 0.80 * Math.abs(Math.mod(index * 2 + root.animation-step, 8) - 4) / 4;
+        }
+        if SlashPageData.mode == 10 {
+            // Hazard: alternating warning bands flash out of phase.
+            return Math.mod(index + Math.floor(root.animation-step / 3), 2) == 0 ? 1.0 : 0.08;
+        }
+        if SlashPageData.mode == 11 {
+            // Interfacing: dim idle segments behind a precise scan point.
+            return index == Math.mod(root.animation-step, root.zone-count) ? 1.0 : 0.22;
+        }
+        if SlashPageData.mode == 12 {
+            // Ramp: a moving brightness gradient.
+            return 0.12 + 0.88 * Math.mod(index + root.animation-step, root.zone-count) / root.last-zone;
+        }
+        if SlashPageData.mode == 13 {
+            // GameOver drains the strip from the far end.
+            return index < root.zone-count - Math.mod(root.animation-step, root.zone-count + 2) ? 0.72 : 0.03;
+        }
+
+        // Buzzer: a fast full-strip pulse.
+        return Math.mod(root.animation-step, 6) < 2 ? 1.0 : 0.05;
+    }
+
+    // Animate the preview for any non-static mode, even when the hardware is
+    // off — users should see what an effect looks like before enabling it.
+    // `enabled` only dims brightness (light-opacity), not whether it animates.
+    Timer {
+        running: root.active && SlashPageData.mode != 0;
+        interval: (70 + SlashPageData.interval * 32) * 1ms;
+        triggered => { root.animation-step = Math.mod(root.animation-step + 1, 1240); }
+    }
+
+    device := Rectangle {
+        width: min(root.width - 8px, (root.height - 8px) * 1.44);
+        height: self.width / 1.44;
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        clip: true;
+
+        Image {
+            // The lid is a filled render, not line-art, so it needs a separate
+            // light variant instead of a tint. Swap with the theme.
+            source: Theme.dark ? @image-url("../images/slash-device-shell.svg")
+                               : @image-url("../images/slash-device-shell-light.svg");
+            width: 100%;
+            height: 100%;
+            image-fit: fill;
+        }
+
+        // A soft underlay gives the physical diffuser depth without extra effects.
+        Path {
+            width: 100%;
+            height: 100%;
+            viewbox-width: 1440;
+            viewbox-height: 1000;
+            fill: transparent;
+            stroke: Theme.fg-normal;
+            stroke-width: 12px;
+            opacity: SlashPageData.enabled ? root.light-opacity * 0.06 : 0.03;
+            MoveTo { x: 174; y: 148; }
+            LineTo { x: 1274; y: 856; }
+        }
+
+        // The two rails reproduce the outlined Slash light bar on the lid.
+        Path {
+            width: 100%;
+            height: 100%;
+            viewbox-width: 1440;
+            viewbox-height: 1000;
+            fill: transparent;
+            stroke: Theme.fg-normal;
+            stroke-width: 3px;
+            opacity: SlashPageData.enabled ? 0.24 + root.light-opacity * 0.18 : 0.20;
+            MoveTo { x: 168; y: 148; }
+            LineTo { x: 1284; y: 856; }
+            LineTo { x: 1271; y: 874; }
+            LineTo { x: 155; y: 166; }
+            LineTo { x: 168; y: 148; }
+        }
+
+        // Animated segments along the bar. Spacing derives from zone-count above,
+        // so the preview is never silently coupled to a specific segment count.
+        for segment[index] in root.zone-count: Path {
+            width: 100%;
+            height: 100%;
+            viewbox-width: 1440;
+            viewbox-height: 1000;
+            fill: transparent;
+            stroke: Theme.fg-normal;
+            stroke-width: 8px;
+            opacity: root.light-opacity * root.segment-level(index);
+            MoveTo { x: root.seg-x0 + index * root.seg-dx; y: root.seg-y0 + index * root.seg-dy; }
+            LineTo { x: root.seg-x0 + index * root.seg-dx + 145; y: root.seg-y0 + index * root.seg-dy + 92; }
+        }
+    }
+}
 
 export global SlashPageData {
     in-out property <bool> enabled: false;
@@ -29,145 +385,179 @@ export global SlashPageData {
     callback cb_show_on_lid_closed(bool);
 }
 
-export component PageSlash inherits Rectangle {
+export component PageSlash inherits RogPage {
+    background: Theme.bg-base;
     clip: true;
+    in property <bool> page-active: false;
 
-    ScrollView {
+    // Basic-effects panel expanded state (the only collapsible panel left).
+    property <bool> basic-effects-expanded: true;
+    property <bool> show-settings: false;
+
+    titlebar := Rectangle {
+        y: 0px;
+        width: 100%;
+        height: 52px;
+        background: Theme.bg-base;
+        Text {
+            x: 24px;
+            y: 13px;
+            text: @tr("Slash Lighting");
+            color: Theme.text-primary;
+            font-size: 20px;
+            font-weight: 700;
+        }
+    }
+
+    content := Rectangle {
+        y: titlebar.height;
+        width: 100%;
+        height: root.height - titlebar.height;
+
         VerticalLayout {
-            padding: 12px;
-            spacing: 8px;
-            alignment: LayoutAlignment.start;
+            padding-left: 24px;
+            padding-right: 24px;
+            padding-top: 12px;
+            padding-bottom: 24px;
+            spacing: 14px;
 
-            Rectangle {
-                background: Palette.alternate-background;
-                border-color: Palette.border;
-                border-width: 1px;
-                border-radius: 2px;
-                height: 36px;
+            HorizontalLayout {
+                height: 32px;
+                spacing: 12px;
+                SlashSwitch {
+                    checked <=> SlashPageData.enabled;
+                    toggled(value) => { SlashPageData.cb_enabled(value); }
+                }
                 Text {
-                    font-size: 16px;
-                    color: Palette.control-foreground;
-                    horizontal-alignment: TextHorizontalAlignment.center;
-                    text: @tr("Slash lighting");
+                    text: @tr("Active Slash Lighting");
+                    color: Theme.text-secondary;
+                    font-size: 14px;
+                    vertical-alignment: center;
+                }
+                Rectangle { horizontal-stretch: 1; }
+                Rectangle {
+                    width: 96px;
+                    height: 30px;
+                    border-radius: 3px;
+                    border-width: 1px;
+                    border-color: root.show-settings ? Theme.rog-red : Theme.text-secondary;
+                    Text {
+                        text: root.show-settings ? @tr("Effects") : @tr("Settings");
+                        color: root.show-settings ? Theme.rog-red : Theme.text-primary;
+                        font-size: 12px;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                    TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => { root.show-settings = !root.show-settings; }
+                    }
                 }
             }
 
-            SystemToggle {
-                text: @tr("Enable A-cover lighting");
-                checked <=> SlashPageData.enabled;
-                toggled => {
-                    SlashPageData.cb_enabled(SlashPageData.enabled);
-                }
-            }
+            HorizontalLayout {
+                spacing: 20px;
+                vertical-stretch: 1;
 
-            SystemSlider {
-                text: @tr("Brightness");
-                minimum: 0;
-                maximum: 255;
-                has_reset: false;
-                enabled <=> SlashPageData.enabled;
-                value: SlashPageData.brightness;
-                released => {
-                    SlashPageData.brightness = Math.round(self.value);
-                    SlashPageData.cb_brightness(SlashPageData.brightness);
+                preview := SlashDevicePreview {
+                    active: root.page-active;
+                    horizontal-stretch: 2;
+                    min-width: 0px;
                 }
-            }
 
-            SystemSlider {
-                text: @tr("Animation speed");
-                minimum: 0;
-                maximum: 5;
-                has_reset: false;
-                enabled <=> SlashPageData.enabled;
-                value: SlashPageData.interval;
-                released => {
-                    SlashPageData.interval = Math.round(self.value);
-                    SlashPageData.cb_interval(SlashPageData.interval);
-                }
-            }
+                right-panel := Rectangle {
+                    horizontal-stretch: 1;
+                    min-width: 280px;
+                    max-width: 520px;
+                    clip: true;
 
-            if SlashPageData.mode_choices.length > 0: SystemDropdown {
-                text: @tr("Animation");
-                current_index <=> SlashPageData.mode;
-                current_value: SlashPageData.mode_choices[SlashPageData.mode];
-                model <=> SlashPageData.mode_choices;
-                enabled <=> SlashPageData.enabled;
-                selected => {
-                    SlashPageData.cb_mode(SlashPageData.mode);
-                }
-            }
+                    if !root.show-settings: VerticalLayout {
+                        spacing: 10px;
+                        alignment: start;
 
-            Rectangle {
-                background: Palette.alternate-background;
-                border-color: Palette.border;
-                border-width: 1px;
-                border-radius: 2px;
-                height: 36px;
-                Text {
-                    font-size: 16px;
-                    color: Palette.control-foreground;
-                    horizontal-alignment: TextHorizontalAlignment.center;
-                    text: @tr("Visibility triggers");
-                }
-            }
+                        SlashPanelHeader {
+                            title: @tr("Basic Effects");
+                            expanded: root.basic-effects-expanded;
+                            show-sync: true;
+                            clicked => { root.basic-effects-expanded = !root.basic-effects-expanded; }
+                            // Reset icon: restore animation speed (interval) and
+                            // brightness to their defaults.
+                            sync-clicked => {
+                                SlashPageData.interval = 0;
+                                SlashPageData.brightness = 255;
+                                SlashPageData.cb_interval(0);
+                                SlashPageData.cb_brightness(255);
+                            }
+                        }
+                        if root.basic-effects-expanded: Rectangle {
+                            height: 220px;
+                            border-radius: 4px;
+                            border-width: 1px;
+                            border-color: Theme.line;
+                            background: Theme.bg-preview;
+                            VerticalLayout {
+                                padding-left: 16px;
+                                padding-right: 16px;
+                                padding-top: 14px;
+                                padding-bottom: 10px;
+                                spacing: 8px;
+                                if SlashPageData.mode_choices.length > 0: mode-combo := ComboBox {
+                                    height: 34px;
+                                    model: SlashPageData.mode_choices;
+                                    // One-way display binding: a two-way `<=>` would let the
+                                    // freshly-created ComboBox (current-index defaults to 0)
+                                    // clobber the persisted mode back to Static on every
+                                    // page re-entry. Read the combo's own current-index in
+                                    // the callback and write it back explicitly.
+                                    current-index: SlashPageData.mode;
+                                    enabled: SlashPageData.enabled;
+                                    selected => {
+                                        SlashPageData.mode = mode-combo.current-index;
+                                        SlashPageData.cb_mode(mode-combo.current-index);
+                                    }
+                                }
+                                SlashSlider {
+                                    label: @tr("Interval");
+                                    value-text: "\{SlashPageData.interval} s";
+                                    value <=> SlashPageData.interval;
+                                    maximum: 5;
+                                    enabled: SlashPageData.enabled;
+                                    released(value) => { SlashPageData.cb_interval(value); }
+                                }
+                                SlashSlider {
+                                    label: @tr("Brightness");
+                                    value-text: "\{Math.round(SlashPageData.brightness * 100 / 255)} %";
+                                    value <=> SlashPageData.brightness;
+                                    maximum: 255;
+                                    enabled: SlashPageData.enabled;
+                                    released(value) => { SlashPageData.cb_brightness(value); }
+                                }
+                            }
+                        }
+                    }
 
-            SystemToggle {
-                text: @tr("Show on boot");
-                checked <=> SlashPageData.show_on_boot;
-                toggled => {
-                    SlashPageData.cb_show_on_boot(SlashPageData.show_on_boot);
-                }
-            }
-
-            SystemToggle {
-                text: @tr("Show on shutdown");
-                checked <=> SlashPageData.show_on_shutdown;
-                toggled => {
-                    SlashPageData.cb_show_on_shutdown(SlashPageData.show_on_shutdown);
-                }
-            }
-
-            SystemToggle {
-                text: @tr("Show on sleep");
-                checked <=> SlashPageData.show_on_sleep;
-                toggled => {
-                    SlashPageData.cb_show_on_sleep(SlashPageData.show_on_sleep);
-                }
-            }
-
-            SystemToggle {
-                text: @tr("Show on battery");
-                checked <=> SlashPageData.show_on_battery;
-                toggled => {
-                    SlashPageData.cb_show_on_battery(SlashPageData.show_on_battery);
-                }
-            }
-
-            SystemToggle {
-                text: @tr("Show low-battery warning");
-                checked <=> SlashPageData.show_battery_warning;
-                toggled => {
-                    SlashPageData.cb_show_battery_warning(SlashPageData.show_battery_warning);
-                }
-            }
-
-            SystemToggle {
-                text: @tr("Show when lid is closed");
-                checked <=> SlashPageData.show_on_lid_closed;
-                toggled => {
-                    SlashPageData.cb_show_on_lid_closed(SlashPageData.show_on_lid_closed);
-                }
-            }
-
-            RogItem {
-                min-height: 64px;
-                max-height: 64px;
-                Text {
-                    width: parent.width - 20px;
-                    x: 10px;
-                    wrap: TextWrap.word-wrap;
-                    color: Palette.control-foreground;
-                    text: @tr("Slash_tip" => "Slash Lighting controls the A-cover LED strip found on supported Zephyrus models.");
+                    if root.show-settings: Rectangle {
+                        border-radius: 4px;
+                        border-width: 1px;
+                        border-color: Theme.line;
+                        background: Theme.bg-preview;
+                        VerticalLayout {
+                            padding: 16px;
+                            spacing: 8px;
+                            Text {
+                                text: @tr("Visibility Triggers");
+                                color: Theme.text-primary;
+                                font-size: 15px;
+                                font-weight: 600;
+                            }
+                            RogToggle { height: 34px; label: @tr("Show on boot"); checked <=> SlashPageData.show_on_boot; toggled(value) => { SlashPageData.cb_show_on_boot(value); } }
+                            RogToggle { height: 34px; label: @tr("Show on shutdown"); checked <=> SlashPageData.show_on_shutdown; toggled(value) => { SlashPageData.cb_show_on_shutdown(value); } }
+                            RogToggle { height: 34px; label: @tr("Show on sleep"); checked <=> SlashPageData.show_on_sleep; toggled(value) => { SlashPageData.cb_show_on_sleep(value); } }
+                            RogToggle { height: 34px; label: @tr("Show on battery"); checked <=> SlashPageData.show_on_battery; toggled(value) => { SlashPageData.cb_show_on_battery(value); } }
+                            RogToggle { height: 34px; label: @tr("Show low-battery warning"); checked <=> SlashPageData.show_battery_warning; toggled(value) => { SlashPageData.cb_show_battery_warning(value); } }
+                            RogToggle { height: 34px; label: @tr("Show when lid is closed"); checked <=> SlashPageData.show_on_lid_closed; toggled(value) => { SlashPageData.cb_show_on_lid_closed(value); } }
+                        }
+                    }
                 }
             }
         }

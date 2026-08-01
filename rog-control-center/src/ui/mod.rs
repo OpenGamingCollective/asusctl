@@ -146,7 +146,8 @@ pub fn setup_window(
     ui.set_sidebar_items_avilable(
         [
             // Needs to match the order of slint sidebar items
-            available.contains(&"xyz.ljones.Platform".to_string()),
+            true,                                                   // Home (landing page, degrades gracefully)
+            available.contains(&"xyz.ljones.Platform".to_string()), // System Tuning (power limits)
             available.contains(&"xyz.ljones.Aura".to_string()),
             available.contains(&"xyz.ljones.Anime".to_string()),
             available.contains(&"xyz.ljones.Slash".to_string()),
@@ -158,12 +159,6 @@ pub fn setup_window(
         ]
         .into(),
     );
-
-    ui.on_exit_app(move || {
-        if let Err(e) = slint::quit_event_loop() {
-            log::warn!("Failed to quit event loop: {e:?}");
-        }
-    });
 
     setup_app_settings_page(&ui, config.clone(), shortcuts);
     if available.contains(&"xyz.ljones.Platform".to_string()) {

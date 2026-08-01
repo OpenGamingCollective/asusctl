@@ -87,6 +87,33 @@ pub fn setup_system_page(
         .set_dgpu_name(dgpu_model.into());
     ui.global::<SystemPageData>().set_has_igpu(has_igpu);
 
+    // Real product name from DMI (e.g. "ROG Zephyrus G16 GU605MV")
+    // Read off the UI thread to avoid blocking on sysfs I/O.
+    let weak = ui.as_weak();
+    tokio::spawn(async move {
+        let product_name = tokio::task::spawn_blocking(|| {
+            match std::fs::read_to_string("/sys/class/dmi/id/product_name") {
+                Ok(s) => s.trim().to_string(),
+                Err(e) => {
+                    log::debug!("DMI product_name unreadable: {e}");
+                    String::new()
+                }
+            }
+        })
+        .await
+        .unwrap_or_else(|e| {
+            log::warn!("setup_system: DMI spawn_blocking task failed: {e}");
+            String::new()
+        });
+        if !product_name.is_empty() {
+            weak.upgrade_in_event_loop(move |ui| {
+                ui.global::<SystemPageData>()
+                    .set_product_name(product_name.into());
+            })
+            .ok();
+        }
+    });
+
     if let Ok(sys_props) = platform
         .supported_properties()
         .map_err(|e| log::error!("Failed to get supported properties: {}", e))
@@ -149,6 +176,10 @@ pub fn setup_system_page(
             let dgpu_suspended = gpu_telemetry.dgpu_suspended;
             let (cpu_fan, gpu_fan, mid_fan) = rog_platform::platform::get_fan_rpms();
             let cpu_freq = rog_platform::cpu::get_cpu_frequency_mhz();
+            // dGPU graphics clock comes from the same telemetry snapshot
+            // (#275): -1.0 when suspended or unreadable, so the UI shows it
+            // as unavailable rather than a bogus "0 MHz".
+            let gpu_freq = gpu_telemetry.dgpu_freq_mhz;
             let ram_usage = rog_platform::cpu::get_ram_usage_pct();
             let gpu_usage = gpu_telemetry.dgpu_usage;
             let igpu_usage = gpu_telemetry.igpu_usage;
@@ -186,6 +217,7 @@ pub fn setup_system_page(
                 data.set_igpu_usage_val(igpu_usage);
                 data.set_ram_usage_val(ram_usage);
                 data.set_cpu_freq_mhz(cpu_freq);
+                data.set_gpu_freq_mhz(gpu_freq);
                 data.set_cpu_fan_rpm(cpu_fan);
                 data.set_gpu_fan_rpm(gpu_fan);
                 data.set_mid_fan_rpm(mid_fan);
