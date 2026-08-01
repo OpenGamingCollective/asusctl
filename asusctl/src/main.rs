@@ -36,6 +36,7 @@ use crate::slash_cli::{
 mod anime_cli;
 mod aura_cli;
 mod cli_opts;
+mod dialpad_cli;
 mod fan_curve_cli;
 mod scsi_cli;
 mod slash_cli;
@@ -208,6 +209,7 @@ fn do_parsed(
         CliCommand::Backlight(cmd) => handle_backlight(cmd)?,
         CliCommand::Battery(cmd) => handle_battery(cmd, &conn)?,
         CliCommand::XgmLed(cmd) => xgm_led_cli::handle_xgm_led(&cmd.command)?,
+        CliCommand::Dialpad(cmd) => dialpad_cli::handle_dialpad(cmd)?,
         CliCommand::Info(info_opt) => {
             handle_info(info_opt, supported_interfaces, supported_properties)?
         }

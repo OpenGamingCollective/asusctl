@@ -7,6 +7,7 @@ use asusd::asus_armoury::{start_attributes_zbus, ArmouryAttributeRegistry};
 use asusd::aura_manager::DeviceManager;
 use asusd::config::Config;
 use asusd::ctrl_backlight::CtrlBacklight;
+use asusd::ctrl_dialpad::CtrlDialpad;
 use asusd::ctrl_fancurves::CtrlFanCurveZbus;
 use asusd::ctrl_platform::CtrlPlatform;
 use asusd::ctrl_xgm_led::CtrlXgmLed;
@@ -160,6 +161,16 @@ async fn start_daemon() -> Result<(), Box<dyn Error>> {
         }
         Ok(None) => info!("XG Mobile LED: not present"),
         Err(e) => error!("XG Mobile LED: {e}"),
+    }
+
+    // DialPad controller (non-fatal if not present)
+    match CtrlDialpad::try_new(config.clone()).await {
+        Ok(Some(ctrl)) => {
+            info!("DialPad: found and initialized");
+            ctrl.add_to_server(&mut server).await;
+        }
+        Ok(None) => info!("DialPad: not present"),
+        Err(e) => error!("DialPad: {e}"),
     }
 
     // Request dbus name after finishing initalizing all functions

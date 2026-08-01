@@ -25,16 +25,6 @@ pub fn setup_system_page(
     _config: Arc<Mutex<Config>>,
     app_state: Arc<Mutex<AppState>>,
 ) {
-    let conn = zbus::blocking::Connection::system()
-        .map_err(|e| error!("DBus system connection failed: {e:?}"))
-        .unwrap();
-    let platform = PlatformProxyBlocking::builder(&conn)
-        .build()
-        .map_err(|e| error!("PlatformProxy failed: {e:?}"))
-        .unwrap();
-    // let armoury_attrs =
-    // find_iface::<AsusArmouryProxyBlocking>("xyz.ljones.AsusArmoury").unwrap();
-
     // Null everything before the setup step
     debug!("Defaulting system page values");
     ui.global::<SystemPageData>()
@@ -68,6 +58,20 @@ pub fn setup_system_page(
     ui.global::<SystemPageData>()
         .set_ppt_enabled_available(false);
 
+    let platform = match zbus::blocking::Connection::system() {
+        Ok(conn) => match PlatformProxyBlocking::builder(&conn).build() {
+            Ok(p) => Some(p),
+            Err(e) => {
+                error!("PlatformProxy failed: {e:?}");
+                None
+            }
+        },
+        Err(e) => {
+            error!("DBus system connection failed: {e:?}");
+            None
+        }
+    };
+
     let has_dgpu = {
         let devices = rog_platform::gpu_pci::Device::find().unwrap_or_default();
         devices.iter().any(|d| d.is_dgpu())
@@ -87,16 +91,18 @@ pub fn setup_system_page(
         .set_dgpu_name(dgpu_model.into());
     ui.global::<SystemPageData>().set_has_igpu(has_igpu);
 
-    if let Ok(sys_props) = platform
-        .supported_properties()
-        .map_err(|e| log::error!("Failed to get supported properties: {}", e))
-    {
-        log::debug!("Available system properties: {:?}", sys_props);
-        if sys_props.contains(&Properties::ChargeControlEndThreshold) {
-            ui.global::<SystemPageData>()
-                .set_charge_control_end_threshold(60.0);
-            ui.global::<SystemPageData>()
-                .set_charge_control_enabled(true);
+    if let Some(ref platform) = platform {
+        if let Ok(sys_props) = platform
+            .supported_properties()
+            .map_err(|e| log::error!("Failed to get supported properties: {}", e))
+        {
+            log::debug!("Available system properties: {:?}", sys_props);
+            if sys_props.contains(&Properties::ChargeControlEndThreshold) {
+                ui.global::<SystemPageData>()
+                    .set_charge_control_end_threshold(60.0);
+                ui.global::<SystemPageData>()
+                    .set_charge_control_enabled(true);
+            }
         }
     }
 
