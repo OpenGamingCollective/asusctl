@@ -1,76 +1,172 @@
-import {
-    AboutSlint,
-    VerticalBox,
-    HorizontalBox,
-    ScrollView,
-} from "std-widgets.slint";
+// PageAbout — About page in AC style
+// Layout: titlebar + centered info card
+// Pattern: alignment:start, no ScrollView, natural height
+import { RogCard, RogPage } from "../widgets/rog.slint";
+import { Theme } from "../globals.slint";
 
-export component PageAbout inherits VerticalLayout {
-    padding: 10px;
-    spacing: 10px;
-    ScrollView {
+export component PageAbout inherits RogPage {
+    in property <string> app-version: "";
+    background: Theme.bg-base;
+    clip: true;
 
-        HorizontalBox {
-            alignment: LayoutAlignment.center;
-            VerticalBox {
-                alignment: LayoutAlignment.center;
+    // ====== Titlebar ======
+    titlebar := Rectangle {
+        y: 0px;
+        height: 52px;
+        width: 100%;
+        background: Theme.bg-base;
+        HorizontalLayout {
+            spacing: 12px;
+            x: 24px;
+            y: (parent.height - 24px) / 2;
+            height: 24px;
+            Text {
+                text: @tr("About");
+                color: Theme.text-primary;
+                font-size: 20px;
+                font-weight: 700;
+                vertical-alignment: center;
+            }
+        }
+    }
 
-                Text {
-                    vertical-alignment: TextVerticalAlignment.center;
-                    horizontal-alignment: TextHorizontalAlignment.center;
-                    text: "ROG Control Center";
-                    font-size: 22px;
-                }
+    // ====== Content area ======
+    content := Rectangle {
+        y: titlebar.height;
+        width: 100%;
+        height: root.height - titlebar.height;
 
-                Text {
-                    wrap: TextWrap.word-wrap;
-                    text: @tr("\nA powerful graphical interface for managing ASUS ROG, TUF, and ProArt laptops on Linux. It acts as the official GUI for the asusctl toolset, allowing for seamless hardware tuning without the command line.");
-                }
+        VerticalLayout {
+            padding-left: 24px;
+            padding-right: 24px;
+            padding-top: 12px;
+            padding-bottom: 24px;
+            spacing: 20px;
+            alignment: start;
 
-                Text {
-                    font-weight: 900;
-                    text: @tr("Key Features:");
-                }
+            // Centered about card
+            Rectangle {
+                width: 100%;
+                HorizontalLayout {
+                    Rectangle { horizontal-stretch: 1; }
+                    RogCard {
+                        width: min(560px, root.width - 100px);
+                        VerticalLayout {
+                            padding: 28px;
+                            spacing: 16px;
+                            alignment: center;
 
-                Text {
-                    text: @tr("      • Performance: Switch power profiles and customize fan curves.\n      • Aura Sync: Control keyboard backlighting and LED effects.\n      • Battery Health: Set charge limits to extend battery longevity.\n      • Display: Toggle Panel Overdrive and refresh rates.\n      • AniMe Matrix: Control AniMe Matrix displays.");
-                }
+                            // App name + version
+                            Text {
+                                text: "ROG Control Center";
+                                color: Theme.text-primary;
+                                font-size: 24px;
+                                font-weight: 800;
+                                font-family: "Inter Display";
+                                horizontal-alignment: center;
+                            }
 
-                Text {
-                    font-weight: 900;
-                    text: @tr("Requirements:");
-                }
+                            Text {
+                                text: root.app-version;
+                                color: Theme.text-dim;
+                                font-size: 12px;
+                                horizontal-alignment: center;
+                            }
 
-                Text {
-                    wrap: TextWrap.word-wrap;
-                    text: @tr("      This software requires kernel version 6.19 or later. However due to active development, the latest kernel is always the recommended one.");
-                }
+                            Rectangle { width: 120px; height: 2px; background: Theme.rog-red; border-radius: 1px; }
 
-                Text {
-                    font-weight: 900;
-                    text: @tr("Work in progress:");
-                }
+                            // Description
+                            Text {
+                                text: @tr("A powerful graphical interface for managing ASUS ROG, TUF, and ProArt laptops on Linux.");
+                                color: Theme.text-secondary;
+                                font-size: 13px;
+                                horizontal-alignment: center;
+                                wrap: word-wrap;
+                            }
 
-                Text {
-                    text: @tr("      • Theme the widgets\n      • Add a cpu/gpu temp/fan speed info bar\n      • Include fan speeds, temps in a bottom bar\n      • Screenpad controls\n      • ROG Ally specific settings");
-                }
+                            Text {
+                                text: @tr("Official GUI for the asusctl toolset — seamless hardware tuning without the command line.");
+                                color: Theme.text-dim;
+                                font-size: 11px;
+                                horizontal-alignment: center;
+                                wrap: word-wrap;
+                            }
 
-                Text {
-                    font-weight: 900;
-                    text: @tr("License:");
-                }
+                            Rectangle { width: 100%; height: 1px; background: Theme.line-soft; }
 
-                Text {
-                    text: @tr("      This project is open-source software licensed under the Mozilla Public License 2.0 (MPL-2.0).");
-                }
+                            // Key Features
+                            Text {
+                                text: @tr("Key Features");
+                                color: Theme.text-primary;
+                                font-size: 14px;
+                                font-weight: 700;
+                                horizontal-alignment: left;
+                                width: 100%;
+                            }
+                            VerticalLayout {
+                                spacing: 4px;
+                                Text { text: @tr("Performance: Switch power profiles and customize fan curves."); color: Theme.text-secondary; font-size: 12px; width: 100%; wrap: word-wrap; }
+                                Text { text: @tr("Aura Sync: Control keyboard backlighting and LED effects."); color: Theme.text-secondary; font-size: 12px; width: 100%; wrap: word-wrap; }
+                                Text { text: @tr("Battery Health: Set charge limits to extend battery longevity."); color: Theme.text-secondary; font-size: 12px; width: 100%; wrap: word-wrap; }
+                                Text { text: @tr("Display: Toggle Panel Overdrive and refresh rates."); color: Theme.text-secondary; font-size: 12px; width: 100%; wrap: word-wrap; }
+                                Text { text: @tr("AniMe Matrix: Control AniMe Matrix displays."); color: Theme.text-secondary; font-size: 12px; width: 100%; wrap: word-wrap; }
+                            }
 
-                Text {
-                    font-weight: 900;
-                    text: @tr("Links:");
-                }
+                            // Requirements
+                            Text {
+                                text: @tr("Requirements");
+                                color: Theme.text-primary;
+                                font-size: 14px;
+                                font-weight: 700;
+                                horizontal-alignment: left;
+                                width: 100%;
+                            }
+                            Text {
+                                text: @tr("Kernel 6.19+ recommended (latest kernel always preferred). asusctl/asusd daemon required for hardware control.");
+                                color: Theme.text-secondary;
+                                font-size: 12px;
+                                horizontal-alignment: left;
+                                width: 100%;
+                                wrap: word-wrap;
+                            }
 
-                Text {
-                    text: @tr("      Source Code: https://github.com/OpenGamingCollective/asusctl\n      Website: https://asus-linux.org/");
+                            // License
+                            Text {
+                                text: @tr("License");
+                                color: Theme.text-primary;
+                                font-size: 14px;
+                                font-weight: 700;
+                                horizontal-alignment: left;
+                                width: 100%;
+                            }
+                            Text {
+                                text: @tr("Mozilla Public License 2.0 (MPL-2.0). Open source software by OpenGamingCollective.");
+                                color: Theme.text-secondary;
+                                font-size: 12px;
+                                horizontal-alignment: left;
+                                width: 100%;
+                                wrap: word-wrap;
+                            }
+
+                            // Links
+                            Text {
+                                text: @tr("Links");
+                                color: Theme.text-primary;
+                                font-size: 14px;
+                                font-weight: 700;
+                                horizontal-alignment: left;
+                                width: 100%;
+                            }
+                            Text {
+                                text: "github.com/OpenGamingCollective/asusctl\nasus-linux.org";
+                                color: Theme.text-secondary;
+                                font-size: 12px;
+                                horizontal-alignment: left;
+                                width: 100%;
+                            }
+                        }
+                    }
+                    Rectangle { horizontal-stretch: 1; }
                 }
             }
         }
