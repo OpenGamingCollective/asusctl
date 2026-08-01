@@ -1,102 +1,178 @@
-import { SystemSlider, RogItem } from "../widgets/common.slint";
-import { Palette, VerticalBox, ScrollView } from "std-widgets.slint";
+// PageBattery — Battery page matching AC style
+// Layout: titlebar + content (charge control + battery info card)
+// Pattern: alignment:start, no ScrollView, natural height
+import { RogCard, RogSlider, RogToggle, RogSlashMark, RogMeter, RogStatRow, RogPage } from "../widgets/rog.slint";
+import { Theme } from "../globals.slint";
 import { SystemPageData } from "system.slint";
 
-export component PageBattery inherits Rectangle {
+export component PageBattery inherits RogPage {
+    background: Theme.bg-base;
     clip: true;
+    // Remembers the user's charge threshold while the limit toggle is off
+    // (asusd has no on/off — "off" is emulated as threshold 100).
+    property <float> saved-charge-threshold: 80.0;
 
-    ScrollView {
+    // ====== Titlebar ======
+    titlebar := Rectangle {
+        y: 0px;
+        height: 52px;
+        width: 100%;
+        background: Theme.bg-base;
+        HorizontalLayout {
+            spacing: 12px;
+            x: 24px;
+            y: (parent.height - 24px) / 2;
+            height: 24px;
+            Text {
+                text: @tr("Battery");
+                color: Theme.text-primary;
+                font-size: 20px;
+                font-weight: 700;
+                vertical-alignment: center;
+            }
+        }
+    }
+
+    // ====== Content area ======
+    content := Rectangle {
+        y: titlebar.height;
+        width: 100%;
+        height: root.height - titlebar.height;
+
         VerticalLayout {
-            padding: 12px;
-            spacing: 8px;
-            alignment: LayoutAlignment.start;
+            padding-left: 24px;
+            padding-right: 24px;
+            padding-top: 12px;
+            padding-bottom: 24px;
+            spacing: 20px;
+            alignment: start;
 
-            Rectangle {
-                background: Palette.alternate-background;
-                border-color: Palette.border;
-                border-width: 1px;
-                border-radius: 2px;
-                height: 36px;
-                Text {
-                    font-size: 16px;
-                    color: Palette.control-foreground;
-                    horizontal-alignment: TextHorizontalAlignment.center;
-                    text: @tr("Battery Information");
+            // ---- Charge Control section ----
+            if SystemPageData.charge_control_end_threshold != -1: VerticalLayout {
+                width: 100%;
+                spacing: 16px;
+                alignment: start;
+
+                Rectangle {
+                    height: 24px;
+                    HorizontalLayout {
+                        spacing: 8px;
+                        RogSlashMark { count: 3; bar-w: 4px; bar-color: Theme.rog-red; }
+                        Text {
+                            text: @tr("Charge Control");
+                            color: Theme.text-primary;
+                            font-size: 14px;
+                            font-weight: 600;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                RogCard {
+                    width: 100%;
+                    VerticalLayout {
+                        padding: Theme.pad-card;
+                        spacing: 14px;
+
+                        RogToggle {
+                            label: @tr("Enable Charge Limit");
+                            checked <=> SystemPageData.charge_control_enabled;
+                            toggled(v) => {
+                                // asusd exposes no on/off switch — disabling the
+                                // limit means "charge to 100%".
+                                if (v) {
+                                    SystemPageData.cb_charge_control_end_threshold(Math.round(root.saved-charge-threshold));
+                                } else {
+                                    root.saved-charge-threshold = SystemPageData.charge_control_end_threshold;
+                                    SystemPageData.cb_charge_control_end_threshold(100);
+                                }
+                            }
+                        }
+
+                        if SystemPageData.charge_control_enabled: RogSlider {
+                            label: @tr("Charge Limit");
+                            minimum: 20; maximum: 100;
+                            value <=> SystemPageData.charge_control_end_threshold;
+                            unit: "%";
+                            released(v) => { SystemPageData.cb_charge_control_end_threshold(Math.round(v)); }
+                        }
+
+                        Text {
+                            text: @tr("Limiting maximum charge to 80% can significantly extend battery lifespan.");
+                            color: Theme.text-dim;
+                            font-size: 11px;
+                            wrap: word-wrap;
+                        }
+                    }
                 }
             }
 
-            if SystemPageData.charge_control_end_threshold != -1: SystemSlider {
-                text: @tr("Charge limit");
-                minimum: 20;
-                maximum: 100;
-                has_reset: false;
-                enabled <=> SystemPageData.charge_control_enabled;
-                value: SystemPageData.charge_control_end_threshold;
-                released => {
-                    SystemPageData.charge_control_end_threshold = self.value;
-                    SystemPageData.cb_charge_control_end_threshold(Math.round(SystemPageData.charge_control_end_threshold))
+            // ---- Battery Information Card ----
+            if SystemPageData.battery_health != -1: VerticalLayout {
+                width: 100%;
+                spacing: 16px;
+                alignment: start;
+
+                Rectangle {
+                    height: 24px;
+                    HorizontalLayout {
+                        spacing: 8px;
+                        RogSlashMark { count: 3; bar-w: 4px; bar-color: Theme.rog-red; }
+                        Text {
+                            text: @tr("Battery Information");
+                            color: Theme.text-primary;
+                            font-size: 14px;
+                            font-weight: 600;
+                            vertical-alignment: center;
+                        }
+                    }
                 }
-            }
 
-            if SystemPageData.battery_health != -1: Rectangle {
-                background: Palette.alternate-background;
-                border-color: Palette.border;
-                border-width: 1px;
-                border-radius: 4px;
-                
-                VerticalLayout {
-                    padding: 12px;
-                    spacing: 8px;
-                    
-                    HorizontalLayout {
-                        alignment: LayoutAlignment.space-between;
-                        Text {
-                            text: @tr("Battery Health (Capacity):");
-                            color: Palette.control-foreground;
-                        }
-                        Text {
-                            text: SystemPageData.battery_health + "%";
-                            font-weight: 700;
-                            color: SystemPageData.battery_health > 80 ? #22c55e : (SystemPageData.battery_health > 50 ? #eab308 : #ef4444);
-                        }
-                    }
+                RogCard {
+                    width: 100%;
+                    VerticalLayout {
+                        padding: Theme.pad-card;
+                        spacing: 14px;
 
-                    HorizontalLayout {
-                        alignment: LayoutAlignment.space-between;
-                        Text {
-                            text: @tr("Status:");
-                            color: Palette.control-foreground;
+                        // Health row (big number)
+                        HorizontalLayout {
+                            spacing: 8px;
+                            Text {
+                                text: @tr("Battery Health");
+                                color: Theme.text-secondary;
+                                font-size: 13px;
+                                vertical-alignment: center;
+                            }
+                            Rectangle { horizontal-stretch: 1; }
+                            Text {
+                                text: "\{SystemPageData.battery_health}%";
+                                color: SystemPageData.battery_health > 80 ? Theme.state-good : (SystemPageData.battery_health > 50 ? Theme.state-warn : Theme.state-danger);
+                                font-size: 28px;
+                                font-weight: 800;
+                                font-family: "Inter Display";
+                                vertical-alignment: center;
+                            }
                         }
-                        Text {
-                            text: SystemPageData.battery_status;
-                            font-weight: 700;
-                            color: Palette.control-foreground;
-                        }
-                    }
 
-                    if SystemPageData.battery_power_consumption != -1.0: HorizontalLayout {
-                        alignment: LayoutAlignment.space-between;
-                        Text {
-                            text: @tr("Power Draw:");
-                            color: Palette.control-foreground;
-                        }
-                        Text {
-                            text: Math.round(SystemPageData.battery_power_consumption * 10) / 10 + " W";
-                            font-weight: 700;
-                            color: SystemPageData.battery_status == "Discharging" ? #ef4444 : #22c55e;
-                        }
-                    }
+                        // Health meter
+                        RogMeter { value: SystemPageData.battery_health / 100.0; }
 
-                    if SystemPageData.battery_time_estimate != "": HorizontalLayout {
-                        alignment: LayoutAlignment.space-between;
-                        Text {
-                            text: SystemPageData.battery_status == "Charging" ? @tr("Time to Full:") : @tr("Time Remaining:");
-                            color: Palette.control-foreground;
+                        Rectangle { height: 1px; background: Theme.line-soft; }
+
+                        // Status rows
+                        RogStatRow {
+                            label: @tr("Status");
+                            value: SystemPageData.battery_status;
                         }
-                        Text {
-                            text: SystemPageData.battery_time_estimate;
-                            font-weight: 700;
-                            color: Palette.control-foreground;
+
+                        if SystemPageData.battery_power_consumption != -1.0: RogStatRow {
+                            label: @tr("Power Draw");
+                            value: Math.round(SystemPageData.battery_power_consumption * 10) / 10 + " W";
+                        }
+
+                        if SystemPageData.battery_time_estimate != "": RogStatRow {
+                            label: SystemPageData.battery_status == "Charging" ? @tr("Time to Full") : @tr("Time Remaining");
+                            value: SystemPageData.battery_time_estimate;
                         }
                     }
                 }
