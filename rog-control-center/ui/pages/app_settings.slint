@@ -1,5 +1,8 @@
-import { Palette, Button } from "std-widgets.slint";
-import { SystemToggle } from "../widgets/common.slint";
+// PageAppSettings — Application Settings (AC style)
+// All upstream features preserved (background/tray/autostart toggles, global
+// shortcut status machine, language selector), restyled with RogCard/RogToggle.
+import { RogCard, RogToggle, RogSlashMark, RogDropdownRow, RogPage } from "../widgets/rog.slint";
+import { Theme } from "../globals.slint";
 
 export enum GlobalShortcutStatus {
     disabled,
@@ -32,114 +35,199 @@ export global AppSettingsPageData {
     in-out property <bool> global_shortcut_configurable;
     // Routes by status: Bind on first use, Configure when active.
     callback manage_global_shortcut();
+
+    // Language selector (index into the language list shown in the UI).
+    in-out property <int> current_language: 0;
+    // Locale codes discovered at startup (translations/ + /usr/share/locale),
+    // so new translations show up in the picker without code changes.
+    in-out property <[string]> available_languages: ["en"];
+    callback cb_change_language(int);
+    // Re-launch the app so the new language takes effect (@tr is resolved at
+    // window build time, so the process must restart to re-resolve).
+    callback cb_reload_window();
 }
 
-export component PageAppSettings inherits VerticalLayout {
-    Rectangle {
-        clip: true;
+export component PageAppSettings inherits RogPage {
+    background: Theme.bg-base;
+    clip: true;
 
-        mainview := VerticalLayout {
-            padding: 10px;
-            spacing: 10px;
-            SystemToggle {
-                text: @tr("Run in background after closing");
-                checked <=> AppSettingsPageData.run_in_background;
-                toggled => {
-                    AppSettingsPageData.set_run_in_background(AppSettingsPageData.run_in_background)
-                }
+    // ====== Titlebar ======
+    titlebar := Rectangle {
+        y: 0px;
+        height: 52px;
+        width: 100%;
+        background: Theme.bg-base;
+        HorizontalLayout {
+            x: 24px;
+            y: (parent.height - 24px) / 2;
+            height: 24px;
+            spacing: 12px;
+            Text {
+                text: @tr("App Settings");
+                color: Theme.text-primary;
+                font-size: 20px;
+                font-weight: 700;
+                vertical-alignment: center;
             }
+        }
+    }
 
-            SystemToggle {
-                text: @tr("Start app in background (UI closed)");
-                checked <=> AppSettingsPageData.startup_in_background;
-                toggled => {
-                    AppSettingsPageData.set_startup_in_background(AppSettingsPageData.startup_in_background)
-                }
-            }
+    // ====== Content ======
+    content := Rectangle {
+        y: titlebar.height;
+        width: 100%;
+        height: parent.height - titlebar.height;
 
-            SystemToggle {
-                text: @tr("Enable system tray icon");
-                checked <=> AppSettingsPageData.enable_tray_icon;
-                toggled => {
-                    AppSettingsPageData.set_enable_tray_icon(AppSettingsPageData.enable_tray_icon)
-                }
-            }
+        VerticalLayout {
+            padding-left: 24px;
+            padding-right: 24px;
+            padding-top: 12px;
+            padding-bottom: 24px;
+            spacing: 16px;
+            alignment: start;
 
-            SystemToggle {
-                text: @tr("Enable dGPU notifications");
-                checked <=> AppSettingsPageData.enable_dgpu_notifications;
-                toggled => {
-                    AppSettingsPageData.set_enable_dgpu_notifications(AppSettingsPageData.enable_dgpu_notifications)
-                }
-            }
-
-            SystemToggle {
-                text: @tr("Start app on system startup");
-                checked <=> AppSettingsPageData.enable_autostart;
-                toggled => {
-                    AppSettingsPageData.set_enable_autostart(AppSettingsPageData.enable_autostart)
-                }
-            }
-
-            if AppSettingsPageData.enable_autostart: HorizontalLayout {
-                padding-left: 20px;
-                SystemToggle {
-                    text: @tr("Start in background on startup");
-                    checked <=> AppSettingsPageData.autostart_in_background;
-                    toggled => {
-                        AppSettingsPageData.set_autostart_in_background(AppSettingsPageData.autostart_in_background)
+            // ---- General toggles ----
+            RogCard {
+                width: 100%;
+                VerticalLayout {
+                    padding: Theme.pad-card;
+                    spacing: 14px;
+                    RogToggle {
+                        label: @tr("Run in background after closing");
+                        checked <=> AppSettingsPageData.run_in_background;
+                        toggled(v) => { AppSettingsPageData.set_run_in_background(v); }
+                    }
+                    RogToggle {
+                        label: @tr("Start app in background (UI closed)");
+                        checked <=> AppSettingsPageData.startup_in_background;
+                        toggled(v) => { AppSettingsPageData.set_startup_in_background(v); }
+                    }
+                    RogToggle {
+                        label: @tr("Enable system tray icon");
+                        checked <=> AppSettingsPageData.enable_tray_icon;
+                        toggled(v) => { AppSettingsPageData.set_enable_tray_icon(v); }
+                    }
+                    RogToggle {
+                        label: @tr("Enable dGPU notifications");
+                        checked <=> AppSettingsPageData.enable_dgpu_notifications;
+                        toggled(v) => { AppSettingsPageData.set_enable_dgpu_notifications(v); }
+                    }
+                    RogToggle {
+                        label: @tr("Start app on system startup");
+                        checked <=> AppSettingsPageData.enable_autostart;
+                        toggled(v) => { AppSettingsPageData.set_enable_autostart(v); }
+                    }
+                    if AppSettingsPageData.enable_autostart: RogToggle {
+                        label: @tr("Start in background on startup");
+                        checked <=> AppSettingsPageData.autostart_in_background;
+                        toggled(v) => { AppSettingsPageData.set_autostart_in_background(v); }
                     }
                 }
             }
 
-            if AppSettingsPageData.show_global_shortcut_controls: SystemToggle {
-                enabled: AppSettingsPageData.global_shortcut_status != GlobalShortcutStatus.starting;
-                text: @tr("Armory/ROG key to show/hide window (keep app running in background)");
-                checked <=> AppSettingsPageData.enable_global_shortcut;
-                toggled => {
-                    AppSettingsPageData.set_enable_global_shortcut(AppSettingsPageData.enable_global_shortcut)
-                }
-            }
-
-            if AppSettingsPageData.show_global_shortcut_controls && AppSettingsPageData.enable_global_shortcut: HorizontalLayout {
-                padding-left: 20px;
-                spacing: 10px;
-
-                Text {
-                    vertical-alignment: TextVerticalAlignment.center;
-                    color: Palette.control-foreground;
-                    text: {
-                        if AppSettingsPageData.global_shortcut_status == GlobalShortcutStatus.starting {
-                            @tr("Setting up…")
-                        } else if AppSettingsPageData.global_shortcut_status == GlobalShortcutStatus.listening {
-                            @tr("Shortcut active")
-                        } else if AppSettingsPageData.global_shortcut_status == GlobalShortcutStatus.unassigned {
-                            @tr("No shortcut assigned")
-                        } else if AppSettingsPageData.global_shortcut_status == GlobalShortcutStatus.unavailable {
-                            @tr("Global shortcuts unavailable")
-                        } else {
-                            ""
+            // ---- Global shortcut ----
+            if AppSettingsPageData.show_global_shortcut_controls: RogCard {
+                width: 100%;
+                VerticalLayout {
+                    padding: Theme.pad-card;
+                    spacing: 12px;
+                    HorizontalLayout {
+                        spacing: 8px;
+                        RogSlashMark {}
+                        Text {
+                            text: @tr("Global Shortcut");
+                            color: Theme.text-primary;
+                            font-size: 14px;
+                            font-weight: 600;
+                            vertical-alignment: center;
+                        }
+                    }
+                    RogToggle {
+                        enabled: AppSettingsPageData.global_shortcut_status != GlobalShortcutStatus.starting;
+                        label: @tr("Armory/ROG key to show/hide window (keep app running in background)");
+                        checked <=> AppSettingsPageData.enable_global_shortcut;
+                        toggled(v) => { AppSettingsPageData.set_enable_global_shortcut(v); }
+                    }
+                    if AppSettingsPageData.enable_global_shortcut: HorizontalLayout {
+                        spacing: 12px;
+                        Text {
+                            text: {
+                                if AppSettingsPageData.global_shortcut_status == GlobalShortcutStatus.starting {
+                                    @tr("Setting up…")
+                                } else if AppSettingsPageData.global_shortcut_status == GlobalShortcutStatus.listening {
+                                    @tr("Shortcut active")
+                                } else if AppSettingsPageData.global_shortcut_status == GlobalShortcutStatus.unassigned {
+                                    @tr("No shortcut assigned")
+                                } else if AppSettingsPageData.global_shortcut_status == GlobalShortcutStatus.unavailable {
+                                    @tr("Global shortcuts unavailable")
+                                } else {
+                                    ""
+                                }
+                            }
+                            color: Theme.text-dim;
+                            font-size: 12px;
+                            vertical-alignment: center;
+                        }
+                        Rectangle { horizontal-stretch: 1; }
+                        if AppSettingsPageData.global_shortcut_status == GlobalShortcutStatus.unassigned
+                            || (AppSettingsPageData.global_shortcut_status == GlobalShortcutStatus.listening
+                            && AppSettingsPageData.global_shortcut_configurable): Rectangle {
+                            width: 150px;
+                            height: 30px;
+                            border-radius: 3px;
+                            border-width: 1px;
+                            border-color: Theme.rog-red;
+                            Text {
+                                text: AppSettingsPageData.global_shortcut_status == GlobalShortcutStatus.unassigned
+                                    ? @tr("Set up shortcut")
+                                    : @tr("Configure shortcut");
+                                color: Theme.rog-red;
+                                font-size: 11px;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                            TouchArea {
+                                clicked => { AppSettingsPageData.manage_global_shortcut(); }
+                            }
                         }
                     }
                 }
-
-                Button {
-                    visible: AppSettingsPageData.global_shortcut_status == GlobalShortcutStatus.unassigned
-                        || (AppSettingsPageData.global_shortcut_status == GlobalShortcutStatus.listening
-                        && AppSettingsPageData.global_shortcut_configurable);
-                    height: 30px;
-                    text: AppSettingsPageData.global_shortcut_status == GlobalShortcutStatus.unassigned
-                        ? @tr("Set up shortcut")
-                        : @tr("Configure shortcut");
-                    clicked => {
-                        AppSettingsPageData.manage_global_shortcut()
-                    }
-                }
             }
 
-            Text {
-                color: Palette.accent-background;
-                text: " WIP: some features like notifications are not complete";
+            // ---- Language ----
+            RogCard {
+                width: 100%;
+                VerticalLayout {
+                    padding: Theme.pad-card;
+                    spacing: 12px;
+                    RogDropdownRow {
+                        label: @tr("Language");
+                        model: AppSettingsPageData.available_languages;
+                        current-index <=> AppSettingsPageData.current_language;
+                        selected(index) => { AppSettingsPageData.cb_change_language(index); }
+                    }
+                    // Reload button: re-launches the app to apply the language.
+                    Rectangle {
+                        width: 150px;
+                        height: 32px;
+                        border-radius: 3px;
+                        border-width: 1px;
+                        border-color: Theme.rog-red;
+                        HorizontalLayout {
+                            alignment: center;
+                            Text {
+                                text: @tr("Reload Window");
+                                color: Theme.rog-red;
+                                font-size: 12px;
+                                font-weight: 600;
+                                vertical-alignment: center;
+                            }
+                        }
+                        TouchArea {
+                            clicked => { AppSettingsPageData.cb_reload_window(); }
+                        }
+                    }
+                }
             }
         }
     }
