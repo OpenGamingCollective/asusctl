@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 1000">
+  <defs>
+    <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="0.55" stop-color="#EDEDED"/>
+      <stop offset="1" stop-color="#F4F4F4"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#BFBFBF"/>
+      <stop offset="0.18" stop-color="#D6D6D6"/>
+      <stop offset="0.82" stop-color="#B0B0B0"/>
+      <stop offset="1" stop-color="#C4C4C4"/>
+    </linearGradient>
+    <radialGradient id="sheen" cx="50%" cy="38%" r="72%">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.35"/>
+      <stop offset="0.62" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0.06"/>
+    </radialGradient>
+    <pattern id="carbon" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(-35)">
+      <rect width="10" height="10" fill="#F1F1F1"/>
+      <rect width="1.2" height="10" fill="#E0E0E0" fill-opacity="0.5"/>
+      <rect x="5" width="0.7" height="10" fill="#E8E8E8" fill-opacity="0.45"/>
+    </pattern>
+    <clipPath id="lid">
+      <rect x="8" y="8" width="1424" height="984" rx="35"/>
+    </clipPath>
+  </defs>
+
+  <rect x="5" y="5" width="1430" height="990" rx="38" fill="#F2F2F2" stroke="url(#edge)" stroke-width="10"/>
+  <g clip-path="url(#lid)">
+    <rect x="8" y="8" width="1424" height="984" fill="url(#surface)"/>
+    <rect x="8" y="8" width="1424" height="984" fill="url(#carbon)" opacity="0.58"/>
+    <rect x="8" y="8" width="1424" height="984" fill="url(#sheen)"/>
+    <path d="M8 690 C320 640 935 655 1432 570 V1000 H8 Z" fill="#E2E2E2" opacity="0.32"/>
+  </g>
+  <rect x="15" y="15" width="1410" height="970" rx="29" fill="none" stroke="#E0E0E0" stroke-width="2"/>
+</svg>
