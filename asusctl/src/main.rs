@@ -20,6 +20,7 @@ use rog_dbus::zbus_aura::AuraProxyBlocking;
 use rog_dbus::zbus_backlight::BacklightProxyBlocking;
 use rog_dbus::zbus_fan_curves::FanCurvesProxyBlocking;
 use rog_dbus::zbus_platform::PlatformProxyBlocking;
+use rog_platform::asus_armoury::FirmwareAttributeType;
 use rog_platform::platform::{PlatformProfile, Properties};
 use rog_profiles::error::ProfileError;
 use rog_scsi::AuraMode;
@@ -204,7 +205,7 @@ fn do_parsed(
         CliCommand::Anime(cmd) => handle_anime(cmd)?,
         CliCommand::Slash(cmd) => handle_slash(cmd)?,
         CliCommand::Scsi(cmd) => handle_scsi(cmd)?,
-        CliCommand::Armoury(cmd) => handle_armoury_command(cmd)?,
+        CliCommand::Armoury(cmd) => handle_armoury_command(cmd, &conn)?,
         CliCommand::Backlight(cmd) => handle_backlight(cmd)?,
         CliCommand::Battery(cmd) => handle_battery(cmd, &conn)?,
         CliCommand::XgmLed(cmd) => xgm_led_cli::handle_xgm_led(&cmd.command)?,
@@ -1023,7 +1024,10 @@ fn print_firmware_attr(attr: &AsusArmouryProxyBlocking) -> Result<(), Box<dyn st
 }
 
 #[allow(clippy::manual_is_multiple_of, clippy::nonminimal_bool)]
-fn handle_armoury_command(cmd: &ArmouryCommand) -> Result<(), Box<dyn std::error::Error>> {
+fn handle_armoury_command(
+    cmd: &ArmouryCommand,
+    conn: &Connection,
+) -> Result<(), Box<dyn std::error::Error>> {
     // If nested subcommand provided, handle set/get/list.
     match &cmd.command {
         ArmourySubCommand::List(_) => {
@@ -1063,6 +1067,24 @@ fn handle_armoury_command(cmd: &ArmouryCommand) -> Result<(), Box<dyn std::error
                         value = attr.default_value()?;
                     }
                     attr.set_current_value(value)?;
+
+                    if attr.name()?.property_type() == FirmwareAttributeType::Ppt {
+                        // Only Ok(true) means the value was applied to hardware now
+                        match PlatformProxyBlocking::new(conn).and_then(|p| p.enable_ppt_group()) {
+                            Ok(true) => {}
+                            Ok(false) => println!(
+                                "PPT config updated and will be applied when tuning is enabled\n\
+                                 See: asusctl profile tuning --help"
+                            ),
+                            Err(e) => {
+                                println!(
+                                    "PPT config updated, but tuning state is unknown: {e}\n\
+                                    See: asusctl profile tuning --help"
+                                )
+                            }
+                        }
+                    }
+
                     print_firmware_attr(attr)?;
                     found = true;
                 }
