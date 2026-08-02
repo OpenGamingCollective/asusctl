@@ -756,6 +756,26 @@ impl CtrlPlatform {
             .unwrap_or_default();
         let profile: PlatformProfile = self.platform.get_platform_profile()?.into();
 
+        if enable {
+            // On devices that support it, fan curve is required for any writes to PPT.
+            // Future plans involve unifying that mechanism across all devices.
+            // So we just don't allow writing PPT without fan curve enabled (if device supports it).
+            if let Some(ref fc_config) = self.fan_curve_config {
+                let fc = fc_config.lock().await;
+                let curve_active = fc
+                    .profiles
+                    .get_fan_curves_for(profile)
+                    .iter()
+                    .any(|c| c.enabled);
+
+                if !curve_active {
+                    return Err(FdoErr::Failed(
+                        "Custom fan curve is required to enable profile tuning".to_string(),
+                    ));
+                }
+            }
+        }
+
         // Update config and persist BEFORE any kernel calls that trigger the
         // platform profile watcher, otherwise the watcher races us and reads
         // stale `enabled` state.
