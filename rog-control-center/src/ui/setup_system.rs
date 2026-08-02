@@ -747,36 +747,6 @@ pub fn setup_system_page_callbacks(ui: &MainWindow, _states: Arc<Mutex<Config>>)
                             FirmwareAttribute::ApuMem => {}
                             FirmwareAttribute::CoresPerformance => {}
                             FirmwareAttribute::CoresEfficiency => {}
-                            FirmwareAttribute::PptEnabled => {
-                                init_property!(ppt_enabled, handle, value, bool);
-                                setup_callback!(ppt_enabled, handle, attr, bool);
-                                let handle_copy = handle.as_weak();
-                                let proxy_copy = attr.clone();
-                                tokio::spawn(async move {
-                                    let mut x = proxy_copy.receive_current_value_changed().await;
-                                    use futures_util::StreamExt;
-                                    while let Some(e) = x.next().await {
-                                        if let Ok(out) = e.get().await {
-                                            handle_copy
-                                                .upgrade_in_event_loop(move |handle| {
-                                                    handle
-                                                        .global::<SystemPageData>()
-                                                        .set_enable_ppt_group(out == 1);
-                                                    handle
-                                                        .global::<SystemPageData>()
-                                                        .set_ppt_enabled(out == 1);
-                                                })
-                                                .ok();
-                                        }
-                                    }
-                                });
-                                handle
-                                    .global::<SystemPageData>()
-                                    .set_ppt_enabled_available(true);
-                                handle
-                                    .global::<SystemPageData>()
-                                    .set_enable_ppt_group(value == 1);
-                            }
                             FirmwareAttribute::PptPl1Spl => {
                                 init_minmax_property!(ppt_pl1_spl, handle, attr);
                                 setup_callback!(ppt_pl1_spl, handle, attr, i32);

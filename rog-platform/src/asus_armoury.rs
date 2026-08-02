@@ -402,7 +402,6 @@ pub enum FirmwareAttribute {
     GpuMuxMode = 21,
     MiniLedMode = 22,
     PendingReboot = 23,
-    PptEnabled = 24,
     None = 25,
     ScreenAutoBrightness = 26,
 }
@@ -413,7 +412,6 @@ impl From<&str> for FirmwareAttribute {
             "apu_mem" => Self::ApuMem,
             "cores_performance" => Self::CoresPerformance,
             "cores_efficiency" => Self::CoresEfficiency,
-            "ppt_enabled" => Self::PptEnabled,
             "ppt_pl1_spl" => Self::PptPl1Spl,
             "ppt_pl2_sppt" => Self::PptPl2Sppt,
             "ppt_pl3_fppt" => Self::PptPl3Fppt,
@@ -450,7 +448,6 @@ impl From<FirmwareAttribute> for &str {
             FirmwareAttribute::ApuMem => "apu_mem",
             FirmwareAttribute::CoresPerformance => "cores_performance",
             FirmwareAttribute::CoresEfficiency => "cores_efficiency",
-            FirmwareAttribute::PptEnabled => "ppt_enabled",
             FirmwareAttribute::PptPl1Spl => "ppt_pl1_spl",
             FirmwareAttribute::PptPl2Sppt => "ppt_pl2_sppt",
             FirmwareAttribute::PptPl3Fppt => "ppt_pl3_fppt",
