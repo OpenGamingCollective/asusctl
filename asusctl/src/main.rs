@@ -834,6 +834,19 @@ fn handle_throttle_profile(
             println!("AC profile {:?}", proxy.platform_profile_on_ac()?);
             println!("Battery profile {:?}", proxy.platform_profile_on_battery()?);
         }
+        crate::cli_opts::ProfileSubCommand::Tuning(t) => match t.enable {
+            Some(true) => {
+                proxy.set_enable_ppt_group(true)?;
+                println!("Profile tuning enabled")
+            }
+            Some(false) => {
+                proxy.set_enable_ppt_group(false)?;
+                println!("Profile tuning disabled")
+            }
+            None => {
+                println!("Profile tuning: {}", proxy.enable_ppt_group()?)
+            }
+        },
     }
 
     Ok(())

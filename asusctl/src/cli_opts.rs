@@ -52,6 +52,7 @@ pub enum ProfileSubCommand {
     List(ProfileListCommand),
     Get(ProfileGetCommand),
     Set(ProfileSetCommand),
+    Tuning(ProfileTuningCommand),
 }
 
 impl Default for ProfileSubCommand {
@@ -95,6 +96,20 @@ pub struct ProfileSetCommand {
         description = "set the profile to use on battery power"
     )]
     pub battery: bool,
+}
+
+#[derive(FromArgs, Debug, Default)]
+#[argh(
+    subcommand,
+    name = "tuning",
+    description = "enable/disable profile tuning"
+)]
+pub struct ProfileTuningCommand {
+    #[argh(
+        positional,
+        description = "true/false to enable/disable profile tuning respectively. omit to show current state"
+    )]
+    pub enable: Option<bool>,
 }
 
 #[derive(FromArgs, Debug, Default)]
