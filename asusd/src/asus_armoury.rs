@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use config_traits::StdConfig;
@@ -38,6 +39,7 @@ pub struct AsusArmouryAttribute {
     /// platform control required here for access to PPD or Throttle profile
     platform: RogPlatform,
     power: AsusPower,
+    logged_read_error: Arc<AtomicBool>,
 }
 
 impl AsusArmouryAttribute {
@@ -54,6 +56,7 @@ impl AsusArmouryAttribute {
             queued_gpu,
             platform,
             power,
+            logged_read_error: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -285,13 +288,20 @@ impl AsusArmouryAttribute {
         if !matches!(self.attr.possible_values(), AttrValue::None) {
             attrs.push("possible_values".to_string());
         }
-        // TODO: Don't unwrap, use error
-        if let Ok(value) = self.attr.current_value().map_err(|e| {
-            error!("Failed to read: {e:?}");
-            e
-        }) {
-            if !matches!(value, AttrValue::None) {
-                attrs.push("current_value".to_string());
+        match self.attr.current_value() {
+            Ok(value) => {
+                self.logged_read_error.store(false, Ordering::Relaxed);
+                if matches!(value, AttrValue::Integer(_)) {
+                    attrs.push("current_value".to_string());
+                }
+            }
+            Err(e) => {
+                if !self.logged_read_error.swap(true, Ordering::Relaxed) {
+                    error!(
+                        "Firmware attribute '{}' is not supported or failed to read: {e:?}",
+                        self.attr.name()
+                    );
+                }
             }
         }
         attrs
@@ -403,8 +413,11 @@ impl AsusArmouryAttribute {
         }
         */
 
-        if let Ok(AttrValue::Integer(i)) = self.attr.current_value() {
-            return Ok(i);
+        if let Ok(value) = self.attr.current_value() {
+            self.logged_read_error.store(false, Ordering::Relaxed);
+            if let AttrValue::Integer(i) = value {
+                return Ok(i);
+            }
         }
         Err(fdo::Error::Failed(
             "Could not read current value".to_string(),
