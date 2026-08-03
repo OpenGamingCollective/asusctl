@@ -176,10 +176,13 @@ pub fn setup_system_page(
             let dgpu_suspended = gpu_telemetry.dgpu_suspended;
             let (cpu_fan, gpu_fan, mid_fan) = rog_platform::platform::get_fan_rpms();
             let cpu_freq = rog_platform::cpu::get_cpu_frequency_mhz();
-            // dGPU graphics clock comes from the same telemetry snapshot
-            // (#275): -1.0 when suspended or unreadable, so the UI shows it
-            // as unavailable rather than a bogus "0 MHz".
-            let gpu_freq = gpu_telemetry.dgpu_freq_mhz;
+            // -1.0 means "no reading" (suspended, unreadable, or absent);
+            // the UI maps anything below 0.0 to N/A / Suspended.
+            let gpu_freq = if has_dgpu {
+                gpu_telemetry.dgpu_freq_mhz
+            } else {
+                -1.0
+            };
             let ram_usage = rog_platform::cpu::get_ram_usage_pct();
             let gpu_usage = gpu_telemetry.dgpu_usage;
             let igpu_usage = gpu_telemetry.igpu_usage;
@@ -478,6 +481,19 @@ pub fn setup_system_page_callbacks(ui: &MainWindow, _states: Arc<Mutex<Config>>)
             SystemPageData,
             charge_control_end_threshold
         );
+
+        // The backend has no charge-limit on/off switch: "off" is a threshold
+        // of 100. Derive the toggle state from the real threshold so a user
+        // who disabled the limit (100%) doesn't see the toggle lie "on" after
+        // a restart.
+        if let Ok(threshold) = platform.charge_control_end_threshold().await {
+            let enabled = threshold < 100;
+            if let Err(e) = handle.upgrade_in_event_loop(move |h| {
+                h.global::<SystemPageData>().set_charge_control_enabled(enabled);
+            }) {
+                error!("charge limit toggle sync: {e:?}");
+            }
+        }
 
         let platform_copy = platform.clone();
         if let Ok(mut value) = platform.platform_profile_choices().await {

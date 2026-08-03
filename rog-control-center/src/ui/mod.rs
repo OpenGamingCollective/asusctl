@@ -24,7 +24,7 @@ use crate::ui::setup_fans::setup_fan_curve_page;
 use crate::ui::setup_slash::setup_slash_page;
 use crate::ui::setup_system::{setup_system_page, setup_system_page_callbacks};
 use crate::zbus_proxies::AppState;
-use crate::{AppSettingsPageData, GlobalShortcutStatus, MainWindow};
+use crate::{AppSettingsPageData, GlobalShortcutStatus, GPUPageData, MainWindow, SystemPageData};
 
 // this macro sets up:
 // - a link from UI callback -> dbus proxy property
@@ -143,6 +143,47 @@ pub fn setup_window(
         warn!("Couldn't show main window: {e:?}");
     }
 
+
+    // Firmware-wide "reboot pending" watch. Many settings stage a reboot
+    // (GPU mode, MUX, reserved memory, miniLED...), and asusd neither exports
+    // pending_reboot on D-Bus nor signals its changes, so poll sysfs directly.
+    // The flag is global, but the notice is shown in-page next to the
+    // controls that caused it (GPU page, System page). Cheap read, every 2s.
+    {
+        let handle = ui.as_weak();
+        tokio::spawn(async move {
+            let path = std::path::Path::new(
+                "/sys/class/firmware-attributes/asus-armoury/attributes/pending_reboot",
+            );
+            loop {
+                // Re-check existence every round: the asus-armoury attribute
+                // dir can appear after app start (driver bind race), and a
+                // read of a missing file is treated as "no reboot pending".
+                let p = path.to_path_buf();
+                let pending = tokio::task::spawn_blocking(move || {
+                    p.exists()
+                        && std::fs::read_to_string(p)
+                            .ok()
+                            .and_then(|s| s.trim().parse::<i32>().ok())
+                            .unwrap_or(0)
+                            != 0
+                })
+                .await
+                .unwrap_or(false);
+                // A failed upgrade means the window is gone (this task is
+                // spawned per setup_window call); exit instead of polling
+                // forever on a dead handle.
+                if let Err(e) = handle.upgrade_in_event_loop(move |h| {
+                    h.global::<GPUPageData>().set_reboot_pending(pending);
+                    h.global::<SystemPageData>().set_reboot_pending(pending);
+                }) {
+                    warn!("reboot-pending watch stopping: {e:?}");
+                    break;
+                }
+                tokio::time::sleep(Duration::from_secs(2)).await;
+            }
+        });
+    }
 
     let available = list_iface_blocking().unwrap_or_default();
     ui.set_sidebar_items_avilable(

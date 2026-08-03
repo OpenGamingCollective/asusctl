@@ -3,7 +3,7 @@
 // RogSlider=hand-drawn AC slider (grey track + red fill + white/red handle), RogToggle=hand-drawn ON-red/OFF-grey,
 // RogModeSelector=performance segment, RogDropdownRow=dropdown, RogSectionHeader=heading
 import { Theme } from "../globals.slint";
-import { ComboBox } from "std-widgets.slint";
+import { ComboBox, Button } from "std-widgets.slint";
 
 // — Page root: declares the opacity transition. The actual opacity value is
 // driven by main_window per active page (crossfade); this only provides the curve. —
@@ -25,14 +25,18 @@ export component RogRebootBanner inherits Rectangle {
         padding-left: 14px;
         padding-right: 14px;
         spacing: 10px;
-        Image {
-            source: @image-url("../images/nav-about.svg");
-            colorize: #E0B040;
-            width: 18px;
-            height: 18px;
-            // Layouts stretch children to full height; anchor the icon to
-            // the row's vertical centre explicitly.
-            y: (parent.height - self.height) / 2;
+        // Full-height cell so the icon can be centred inside it: Slint
+        // layouts own direct-child geometry, so an Image child can't set y.
+        Rectangle {
+            height: 100%;
+            Image {
+                source: @image-url("../images/nav-about.svg");
+                colorize: #E0B040;
+                width: 18px;
+                height: 18px;
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+            }
         }
         Text {
             text: @tr("Changes are staged. They will take effect after restarting.");
@@ -106,6 +110,13 @@ export component RogSlider inherits Rectangle {
     in property <float> maximum: 100;
     in property <string> unit: "";
     in property <bool> enabled: true;
+    // When false the device exposes no value for this control: render the row
+    // greyed-out with an "N/A" marker instead of hiding it, so users can see
+    // the option exists but is unsupported on their hardware.
+    in property <bool> available: true;
+    // Row width minus the reserve for right-side action chips (help/reset),
+    // so the value text and track stay clear of them.
+    in property <length> controls-width: 0px;
     callback released(float);
     background: transparent;
 
@@ -119,18 +130,26 @@ export component RogSlider inherits Rectangle {
             spacing: 6px;
             Text {
                 text: root.label;
-                color: Theme.text-secondary;
+                color: root.available ? Theme.text-secondary : Theme.fg-disabled;
                 font-size: Theme.font-sm;
                 vertical-alignment: center;
             }
             Rectangle { horizontal-stretch: 1; }
-            Text {
+            if root.available: Text {
                 text: "\{Math.round(root.value)}" + (root.unit == "" ? "" : " " + root.unit);
                 color: Theme.rog-red;
                 font-size: Theme.font-md;
                 font-weight: 700;
                 vertical-alignment: center;
             }
+            if !root.available: Text {
+                text: @tr("not_supported_short" => "N/A");
+                color: Theme.fg-disabled;
+                font-size: Theme.font-md;
+                font-weight: 700;
+                vertical-alignment: center;
+            }
+            if root.controls-width > 0px: Rectangle { width: root.controls-width; }
         }
         track := Rectangle {
             width: 100%;
@@ -148,7 +167,7 @@ export component RogSlider inherits Rectangle {
                     x: 0;
                     width: parent.width * root.pct;
                     height: 100%;
-                    background: root.enabled ? Theme.rog-red : Theme.fg-disabled;
+                    background: root.enabled && root.available ? Theme.rog-red : Theme.fg-disabled;
                     border-radius: 2px;
                 }
             }
@@ -161,14 +180,14 @@ export component RogSlider inherits Rectangle {
                 border-radius: 8px;
                 background: #FFFFFF;
                 border-width: 2px;
-                border-color: root.enabled ? Theme.rog-red : Theme.fg-disabled;
+                border-color: root.enabled && root.available ? Theme.rog-red : Theme.fg-disabled;
                 drop-shadow-blur: 4px;
                 drop-shadow-color: #00000040;
             }
             ta := TouchArea {
                 width: 100%;
                 height: 100%;
-                enabled: root.enabled;
+                enabled: root.enabled && root.available;
                 mouse-cursor: pointer;
                 pointer-event(e) => {
                     if e.kind == PointerEventKind.down || (e.kind == PointerEventKind.move && self.pressed) {
@@ -187,6 +206,127 @@ export component RogSlider inherits Rectangle {
         // 16px handle), centered on the handle — so clicking the handle
         // doesn't jump it and both ends are reachable.
         root.value = root.minimum + clamp((x - 8px) / (track.width - 16px), 0.0, 1.0) * root.range;
+    }
+}
+
+// — Power-limit slider: AC slider with optional help popup and reset-to-default.
+//   `available` / "N/A" handling lives in RogSlider itself. —
+export component RogPowerSlider inherits RogSlider {
+    in property <string> help-text: "";
+    in property <bool> has-reset: false;
+    callback do-reset();
+    controls-width: (root.has-reset && root.available ? 34px : 0px) + (root.help-text != "" ? 34px : 0px);
+
+    help-popup := PopupWindow {
+        x: root.x + root.width - self.width - 24px;
+        y: root.y - self.height - 8px;
+        Rectangle {
+            drop-shadow-blur: 10px;
+            drop-shadow-color: black;
+            border-radius: Theme.radius-item;
+            border-color: Theme.border;
+            background: Theme.bg-card;
+            width: content.preferred-width;
+            height: content.preferred-height;
+            content := VerticalLayout {
+                padding: Theme.pad-card;
+                spacing: 10px;
+                Text {
+                    max-width: 420px;
+                    font-size: Theme.font-sm;
+                    wrap: TextWrap.word-wrap;
+                    color: Theme.text-primary;
+                    text: root.help-text;
+                }
+                Button {
+                    text: @tr("OK");
+                    clicked => { help-popup.close(); }
+                }
+            }
+        }
+    }
+
+    reset-popup := PopupWindow {
+        x: root.x + root.width - self.width - 24px;
+        y: root.y - self.height - 8px;
+        Rectangle {
+            drop-shadow-blur: 10px;
+            drop-shadow-color: black;
+            border-radius: Theme.radius-item;
+            border-color: Theme.border;
+            background: Theme.bg-card;
+            width: reset-content.preferred-width;
+            height: reset-content.preferred-height;
+            reset-content := VerticalLayout {
+                padding: Theme.pad-card;
+                spacing: 10px;
+                Text {
+                    max-width: 420px;
+                    font-size: Theme.font-sm;
+                    wrap: TextWrap.word-wrap;
+                    color: Theme.text-primary;
+                    text: @tr("confirm_reset" => "Are you sure you want to reset this?");
+                }
+                HorizontalLayout {
+                    spacing: 10px;
+                    alignment: end;
+                    Button {
+                        text: @tr("Cancel");
+                        clicked => { reset-popup.close(); }
+                    }
+                    Button {
+                        text: @tr("Reset");
+                        clicked => {
+                            reset-popup.close();
+                            root.do-reset();
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Action chips (help / reset) anchored at the far right of the label row;
+    // the slider row keeps `controls-width` clear so nothing overlaps them.
+    chips := HorizontalLayout {
+        x: root.width - self.preferred-width - Theme.pad-card;
+        y: Theme.pad-card - 2px;
+        spacing: 8px;
+        if root.has-reset && root.available: Rectangle {
+            width: 26px;
+            height: 22px;
+            border-radius: Theme.radius-item;
+            background: reset-ta.has-hover ? Theme.bg-elevated : transparent;
+            reset-ta := TouchArea {
+                enabled: root.enabled;
+                mouse-cursor: root.enabled ? pointer : default;
+                clicked => { reset-popup.show(); }
+            }
+            Text {
+                text: "↺";
+                color: root.enabled ? Theme.text-secondary : Theme.fg-disabled;
+                font-size: Theme.font-md;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+        if root.help-text != "": Rectangle {
+            width: 26px;
+            height: 22px;
+            border-radius: Theme.radius-item;
+            background: help-ta.has-hover ? Theme.bg-elevated : transparent;
+            help-ta := TouchArea {
+                clicked => { help-popup.show(); }
+            }
+            Text {
+                text: "?";
+                color: Theme.text-secondary;
+                font-size: Theme.font-sm;
+                font-weight: 700;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
     }
 }
 
@@ -280,37 +420,48 @@ export component RogToggleInt inherits Rectangle {
     in property <string> label;
     in-out property <int> checked-int;
     in property <bool> enabled: true;
+    // Unsupported on this device: grey the row out and lock the switch off.
+    in property <bool> available: true;
+    // compact: label + switch sit together (no stretch spacer), for grids
+    // where the toggle is centered in a cell rather than filling a full row.
+    in property <bool> compact: false;
     callback toggled(int);
     background: transparent;
-    HorizontalLayout {
-        padding-left: Theme.pad-card;
-        padding-right: Theme.pad-card;
-        Text {
-            text: root.label;
-            color: root.enabled ? Theme.text-primary : Theme.text-dim;
-            font-size: Theme.font-sm;
-            vertical-alignment: center;
-        }
-        Rectangle { horizontal-stretch: 1; }
-        tg := Rectangle {
-            width: 44px;
-            height: 24px;
-            border-radius: 12px;
-            background: root.checked-int != 0 ? (root.enabled ? Theme.rog-red : Theme.fg-disabled) : Theme.toggle-off;
-            ta := TouchArea {
-                enabled: root.enabled;
-                clicked => {
-                    root.checked-int = root.checked-int != 0 ? 0 : 1;
-                    root.toggled(root.checked-int);
-                }
+    horizontal-stretch: root.compact ? 0 : 1;
+    // Center the switch row vertically (see RogToggle).
+    VerticalLayout {
+        alignment: center;
+        HorizontalLayout {
+            padding-left: root.compact ? 0px : Theme.pad-card;
+            padding-right: root.compact ? 0px : Theme.pad-card;
+            spacing: root.compact ? 10px : 0px;
+            Text {
+                text: root.label;
+                color: root.enabled && root.available ? Theme.text-primary : Theme.text-dim;
+                font-size: Theme.font-sm;
+                vertical-alignment: center;
             }
-            Rectangle {
-                x: root.checked-int != 0 ? parent.width - self.width - 3px : 3px;
-                y: 3px;
-                width: 18px;
-                height: 18px;
-                border-radius: 9px;
-                background: #FFFFFF;
+            if !root.compact: Rectangle { horizontal-stretch: 1; }
+            tg := Rectangle {
+                width: 44px;
+                height: 24px;
+                border-radius: 12px;
+                background: root.checked-int != 0 && root.available ? (root.enabled ? Theme.rog-red : Theme.fg-disabled) : Theme.toggle-off;
+                ta := TouchArea {
+                    enabled: root.enabled && root.available;
+                    clicked => {
+                        root.checked-int = root.checked-int != 0 ? 0 : 1;
+                        root.toggled(root.checked-int);
+                    }
+                }
+                Rectangle {
+                    x: root.checked-int != 0 ? parent.width - self.width - 3px : 3px;
+                    y: 3px;
+                    width: 18px;
+                    height: 18px;
+                    border-radius: 9px;
+                    background: #FFFFFF;
+                }
             }
         }
     }
