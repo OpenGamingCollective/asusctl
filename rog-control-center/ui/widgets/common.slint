@@ -20,6 +20,10 @@ export component SystemSlider inherits RogItem {
 
     in property <string> help_text;
     in property <bool> enabled: true;
+    // When false the device exposes no value for this control: render the row
+    // greyed-out with an "N/A" marker instead of hiding it, so users can see
+    // the option exists but is unsupported on their hardware.
+    in property <bool> available: true;
     in property <bool> has_reset: false;
     callback cb_do_reset();
 
@@ -33,7 +37,7 @@ export component SystemSlider inherits RogItem {
                 Text {
                     font-size: 14px;
                     vertical-alignment: TextVerticalAlignment.center;
-                    color: Theme.text-primary;
+                    color: root.available ? Theme.text-primary : Theme.fg-disabled;
                     text: root.text;
                 }
 
@@ -41,15 +45,15 @@ export component SystemSlider inherits RogItem {
                     font-size: 14px;
                     horizontal-alignment: TextHorizontalAlignment.right;
                     vertical-alignment: TextVerticalAlignment.center;
-                    color: Theme.text-primary;
-                    text: "\{Math.round(root.value)}";
+                    color: root.available ? Theme.text-primary : Theme.fg-disabled;
+                    text: root.available ? "\{Math.round(root.value)}" : @tr("not_supported_short" => "N/A");
                 }
             }
         }
 
         HorizontalBox {
             padding-right: 10px;
-            slider := Slider {
+            if root.available: Slider {
                 enabled: root.enabled;
                 maximum: root.maximum;
                 minimum: root.minimum;
@@ -142,7 +146,7 @@ export component SystemSlider inherits RogItem {
         }
 
         reset := HorizontalBox {
-            if (has_reset): StandardButton {
+            if (has_reset && root.available): StandardButton {
                 kind: StandardButtonKind.reset;
                 enabled: root.enabled;
                 clicked => {

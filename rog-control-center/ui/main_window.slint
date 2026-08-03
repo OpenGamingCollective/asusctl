@@ -1,6 +1,6 @@
 import { Palette, Button, VerticalBox } from "std-widgets.slint";
 import { AppSize, Theme } from "globals.slint";
-import { SystemPageData, AttrMinMax } from "pages/system.slint";
+import { PageSystem, SystemPageData, AttrMinMax } from "pages/system.slint";
 import { PageHome } from "pages/home.slint";
 import { SideBar } from "widgets/sidebar.slint";
 import { PageAbout } from "pages/about.slint";
@@ -31,6 +31,7 @@ export component MainWindow inherits Window {
     icon: @image-url("../data/rog-control-center.png");
     in property <[bool]> sidebar_items_avilable: [
         true,
+        true, // System (power limits / tuning)
         true,
         true,
         true,
@@ -78,6 +79,7 @@ export component MainWindow inherits Window {
             // to keep in sync when entries are added or reordered.
             model: [
                 { title: @tr("Menu1" => "System Control"), icon: @image-url("images/nav-home.svg") },
+                { title: @tr("Menu_system" => "System Tuning"), icon: @image-url("images/ic-cpu.svg") },
                 { title: @tr("Menu2" => "Keyboard Aura"), icon: @image-url("images/nav-keyboard.svg") },
                 { title: @tr("Menu3" => "AniMe Matrix"), icon: @image-url("images/nav-matrix.svg") },
                 { title: @tr("Menu4" => "Slash Lighting"), icon: @image-url("images/nav-slash.svg") },
@@ -105,62 +107,71 @@ export component MainWindow inherits Window {
                 visible: side-bar.current-item == 0 || self.opacity > 0;
             }
 
-            aura := PageAura {
+            // System Tuning — power limits / device toggles / Screenpad. Standard
+            // RogPage layout (52px titlebar + ScrollView), same as the other pages.
+            PageSystem {
                 width: root.width - side-bar.width;
-                height: root.height + 12px;
+                height: root.height;
                 opacity: side-bar.current-item == 1 ? 1 : 0;
                 visible: side-bar.current-item == 1 || self.opacity > 0;
             }
 
-            PageAnime {
+            aura := PageAura {
                 width: root.width - side-bar.width;
                 height: root.height + 12px;
                 opacity: side-bar.current-item == 2 ? 1 : 0;
                 visible: side-bar.current-item == 2 || self.opacity > 0;
             }
 
-            PageSlash {
+            PageAnime {
                 width: root.width - side-bar.width;
                 height: root.height + 12px;
-                page-active: side-bar.current-item == 3;
                 opacity: side-bar.current-item == 3 ? 1 : 0;
                 visible: side-bar.current-item == 3 || self.opacity > 0;
             }
 
-            fans := PageFans {
+            PageSlash {
                 width: root.width - side-bar.width;
                 height: root.height + 12px;
+                page-active: side-bar.current-item == 4;
                 opacity: side-bar.current-item == 4 ? 1 : 0;
                 visible: side-bar.current-item == 4 || self.opacity > 0;
             }
 
-            PageGPU {
+            fans := PageFans {
                 width: root.width - side-bar.width;
                 height: root.height + 12px;
                 opacity: side-bar.current-item == 5 ? 1 : 0;
                 visible: side-bar.current-item == 5 || self.opacity > 0;
             }
 
-            PageBattery {
+            PageGPU {
                 width: root.width - side-bar.width;
                 height: root.height + 12px;
                 opacity: side-bar.current-item == 6 ? 1 : 0;
                 visible: side-bar.current-item == 6 || self.opacity > 0;
             }
 
-            PageAppSettings {
+            PageBattery {
                 width: root.width - side-bar.width;
                 height: root.height + 12px;
                 opacity: side-bar.current-item == 7 ? 1 : 0;
                 visible: side-bar.current-item == 7 || self.opacity > 0;
             }
 
+            PageAppSettings {
+                width: root.width - side-bar.width;
+                height: root.height + 12px;
+                opacity: side-bar.current-item == 8 ? 1 : 0;
+                visible: side-bar.current-item == 8 || self.opacity > 0;
+            }
+
             PageAbout {
                 width: root.width - side-bar.width;
                 height: root.height + 12px;
                 app-version: root.app-version;
-                opacity: side-bar.current-item == 8 ? 1 : 0;
-                visible: side-bar.current-item == 8 || self.opacity > 0;
+                opacity: side-bar.current-item == 9 ? 1 : 0;
+                visible: side-bar.current-item == 9 || self.opacity > 0;
             }
         }
     }
