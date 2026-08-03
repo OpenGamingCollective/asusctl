@@ -622,31 +622,46 @@ pub fn setup_system_page_callbacks(ui: &MainWindow, _states: Arc<Mutex<Config>>)
 
                 let handle_copy = handle.as_weak();
                 let proxy_copy = platform_copy.clone();
-                // spawn required since the while let never exits
                 tokio::spawn(async move {
-                    let mut x = proxy_copy.receive_platform_profile_changed().await;
                     use futures_util::StreamExt;
-                    while let Some(e) = x.next().await {
-                        if let Ok(out) = e.get().await {
-                            handle_copy
-                                .upgrade_in_event_loop(move |handle| {
-                                    let indexes = handle
-                                        .global::<SystemPageData>()
-                                        .get_platform_profile_indexes();
+                    let apply_profile = |profile_value: i32| {
+                        handle_copy
+                            .clone()
+                            .upgrade_in_event_loop(move |handle| {
+                                let indexes = handle
+                                    .global::<SystemPageData>()
+                                    .get_platform_profile_indexes();
+                                handle
+                                    .global::<SystemPageData>()
+                                    .set_platform_profile(profile_value);
+                                if let Some(position) =
+                                    indexes.iter().position(|index| index == profile_value)
+                                {
                                     handle
                                         .global::<SystemPageData>()
-                                        .set_platform_profile(out as i32);
-                                    let profile_value = <i32>::from(out);
-                                    if let Some(position) =
-                                        indexes.iter().position(|index| index == profile_value)
-                                    {
-                                        handle
-                                            .global::<SystemPageData>()
-                                            .set_platform_profile(position as i32);
-                                    }
-                                })
-                                .ok();
+                                        .set_platform_profile(position as i32);
+                                }
+                            })
+                            .ok();
+                    };
+                    // Outer loop re-subscribes if the signal stream ends. Without
+                    // it, an asusd restart silently kills the subscription and the
+                    // UI keeps showing the last manual selection instead of the
+                    // real profile (asusd may auto-change it on restart).
+                    loop {
+                        // On (re)subscribe, re-read the current value so the UI
+                        // resyncs after asusd comes back.
+                        if let Ok(out) = proxy_copy.platform_profile().await {
+                            apply_profile(<i32>::from(out));
                         }
+                        let mut x = proxy_copy.receive_platform_profile_changed().await;
+                        while let Some(e) = x.next().await {
+                            if let Ok(out) = e.get().await {
+                                apply_profile(<i32>::from(out));
+                            }
+                        }
+                        // Stream ended (asusd went away). Back off, then retry.
+                        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
                     }
                 });
 
