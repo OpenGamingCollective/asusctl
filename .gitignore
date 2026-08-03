@@ -28,5 +28,8 @@ AGENTS.md
 
 *.log
 
+# Compiled gettext catalogs — build artifacts, generated into OUT_DIR by rog-control-center/build.rs
+/rog-control-center/translations/*/LC_MESSAGES/*.mo
+
 # Git should not follow this IN ANY CASE
 Cargo.lock

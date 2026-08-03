@@ -21,7 +21,7 @@ LEDCFG := aura_support.ron
 
 DESTDIR_REALPATH := $(if $(DESTDIR),$(shell realpath $(DESTDIR)),)
 
-SRC := Cargo.toml Makefile $(shell find -type f -wholename '**/src/*.rs')
+SRC := Cargo.toml Makefile $(wildcard */build.rs) $(shell find -type f -wholename '**/src/*.rs') $(shell find rog-control-center/translations)
 
 STRIP_BINARIES ?= 0
 
@@ -96,11 +96,17 @@ install-rog_gui: target/$(TARGET)/$(BIN_ROG)
 
 install-program: install-asusd install-asus-shutdown install-asusctl install-asusd_user install-rog_gui
 
-install-data-rog_gui:
+install-data-rog_gui: target/$(TARGET)/$(BIN_ROG)
 	$(INSTALL_DATA) "./rog-control-center/data/$(APP_ID).desktop" "$(DESTDIR)$(datarootdir)/applications/$(APP_ID).desktop"
 	$(INSTALL_DATA) "./rog-control-center/data/$(BIN_ROG).png" "$(DESTDIR)$(datarootdir)/icons/hicolor/512x512/apps/$(BIN_ROG).png"
 	$(INSTALL_DATA) "./rog-control-center/data/$(APP_ID).metainfo.xml" "$(DESTDIR)$(datarootdir)/metainfo/$(APP_ID).metainfo.xml"
 	cd rog-aura/data/layouts && find . -type f -name "*.ron" -exec $(INSTALL_DATA) "{}" "$(DESTDIR_REALPATH)$(datarootdir)/rog-gui/layouts/{}" \;
+	set -- $$(ls -t target/$(TARGET)/build/$(BIN_ROG)-*/out/translations/*/LC_MESSAGES/$(BIN_ROG).mo 2>/dev/null); \
+	if [ $$# -eq 0 ]; then \
+		echo "no compiled translations found, skipping locale install" >&2; \
+	else \
+		cd "$${1%/*/*/*}" && find . -type f -name "$(BIN_ROG).mo" -exec $(INSTALL_DATA) "{}" "$(DESTDIR_REALPATH)$(datarootdir)/locale/{}" \; ; \
+	fi
 
 	$(INSTALL_DATA) "./data/icons/asus_notif_yellow.png" "$(DESTDIR)$(datarootdir)/icons/hicolor/512x512/apps/asus_notif_yellow.png"
 	$(INSTALL_DATA) "./data/icons/asus_notif_green.png" "$(DESTDIR)$(datarootdir)/icons/hicolor/512x512/apps/asus_notif_green.png"
@@ -139,6 +145,7 @@ uninstall:
 	rm -f "$(DESTDIR)$(datarootdir)/applications/$(BIN_ROG).desktop"
 	rm -f "$(DESTDIR)$(datarootdir)/icons/hicolor/512x512/apps/$(BIN_ROG).png"
 	rm -f "$(DESTDIR)$(datarootdir)/metainfo/$(APP_ID).metainfo.xml"
+	rm -f "$(DESTDIR)$(datarootdir)"/locale/*/LC_MESSAGES/$(BIN_ROG).mo
 
 	rm -f "$(DESTDIR)$(bindir)/$(BIN_C)"
 	rm -f "$(DESTDIR)$(bindir)/$(BIN_D)"

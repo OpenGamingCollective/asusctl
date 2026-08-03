@@ -9,7 +9,7 @@ url="https://github.com/OpenGamingCollective/asusctl"
 license=('MPL-2.0')
 depends=('libusb' 'udev')
 optdepends=()
-makedepends=('git' 'rust' 'llvm' 'clang' 'at-spi2-core' 'cairo' 'gtk3')
+makedepends=('git' 'rust' 'llvm' 'clang' 'at-spi2-core' 'cairo' 'gtk3' 'gettext')
 provides=()
 conflicts=('asusctl-git' 'tlp')
 
@@ -51,6 +51,7 @@ _package-asusctl() {
 	rm -rf "$pkgdir"/usr/share/icons
 	rm -rf "$pkgdir"/usr/share/applications
 	rm -rf "$pkgdir"/usr/share/metainfo
+	rm -rf "$pkgdir"/usr/share/locale
 }
 
 _package-rog-control-center() {

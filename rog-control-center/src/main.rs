@@ -187,10 +187,10 @@ async fn main() -> Result<()> {
     if std::env::var("RUST_TRANSLATIONS").is_ok() {
         // don't care about content
         log::debug!("---- Using local-dir translations");
-        slint::init_translations!("/usr/share/locale/");
+        slint::init_translations!(env!("ROGCC_TRANSLATIONS_DIR"));
     } else {
         log::debug!("Using system installed translations");
-        slint::init_translations!(concat!(env!("CARGO_MANIFEST_DIR"), "/translations/"));
+        slint::init_translations!("/usr/share/locale/");
     }
 
     // Prefetch supported Aura modes once at startup and move into the
