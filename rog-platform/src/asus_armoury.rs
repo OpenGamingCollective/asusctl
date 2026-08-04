@@ -13,15 +13,9 @@ use crate::error::PlatformError;
 const BASE_DIR: &str = "/sys/class/firmware-attributes/asus-armoury/attributes/";
 
 fn read_i32(path: &Path) -> Result<i32, PlatformError> {
-    if let Ok(mut f) = File::open(path) {
-        let mut buf = String::new();
-        f.read_to_string(&mut buf)?;
-        buf.trim()
-            .parse::<i32>()
-            .map_err(|_| PlatformError::ParseNum)
-    } else {
-        Err(PlatformError::ParseNum)
-    }
+    read_string(path)?
+        .parse::<i32>()
+        .map_err(|_| PlatformError::ParseNum)
 }
 
 fn read_string(path: &Path) -> Result<String, PlatformError> {
@@ -39,6 +33,22 @@ pub enum AttrValue {
     EnumStr(Vec<String>),
     #[default]
     None,
+}
+
+impl AttrValue {
+    pub fn as_i32(&self) -> Option<i32> {
+        match self {
+            Self::Integer(val) => Some(*val),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(&self) -> Option<&str> {
+        match self {
+            Self::String(val) => Some(val.as_str()),
+            _ => None,
+        }
+    }
 }
 
 impl From<String> for AttrValue {
@@ -162,15 +172,21 @@ impl Attribute {
             .unwrap_or_default();
 
         let possible_values = match read_string(&base_path.join("possible_values")) {
-            Ok(val) => {
-                if let Ok(int) = val.parse::<i32>() {
-                    AttrValue::Integer(int)
-                } else if val.contains(';') {
-                    AttrValue::EnumInt(val.split(';').filter_map(|s| s.parse().ok()).collect())
-                } else {
-                    AttrValue::EnumStr(val.split(';').map(|s| s.to_string()).collect())
+            Ok(val) => match val.parse::<i32>() {
+                Ok(int) => AttrValue::Integer(int),
+                Err(_) => {
+                    let tokens: Vec<&str> = val.split(';').collect();
+                    if let Ok(ints) = tokens
+                        .iter()
+                        .map(|s| s.parse::<i32>())
+                        .collect::<Result<Vec<i32>, _>>()
+                    {
+                        AttrValue::EnumInt(ints)
+                    } else {
+                        AttrValue::EnumStr(tokens.into_iter().map(String::from).collect())
+                    }
                 }
-            }
+            },
             Err(_) => AttrValue::None,
         };
 
@@ -569,5 +585,67 @@ mod tests {
             *val = 0;
         }
         attr.set_current_value(&val).unwrap();
+    }
+
+    #[test]
+    fn test_possible_values_parsing() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "test_possible_values_parsing_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&temp_dir)
+            .expect("Failed to create temp_dir for test_possible_values_parsing");
+
+        let possible_path = temp_dir.join("possible_values");
+
+        // 1. All integer tokens
+        std::fs::write(&possible_path, "0;1;2\n").expect("Failed to write possible_values");
+        let (_, possible, _, _, _) = Attribute::read_base_values(&temp_dir);
+        assert_eq!(possible, AttrValue::EnumInt(vec![0, 1, 2]));
+
+        // 2. All string tokens
+        std::fs::write(&possible_path, "Disabled;Enabled\n")
+            .expect("Failed to write possible_values");
+        let (_, possible, _, _, _) = Attribute::read_base_values(&temp_dir);
+        assert_eq!(
+            possible,
+            AttrValue::EnumStr(vec![
+                "Disabled".to_string(),
+                "Enabled".to_string()
+            ])
+        );
+
+        // 3. Mixed string and int tokens (preserves all tokens without dropping non-integers)
+        std::fs::write(&possible_path, "0;Disabled;2\n").expect("Failed to write possible_values");
+        let (_, possible, _, _, _) = Attribute::read_base_values(&temp_dir);
+        assert_eq!(
+            possible,
+            AttrValue::EnumStr(vec![
+                "0".to_string(),
+                "Disabled".to_string(),
+                "2".to_string()
+            ])
+        );
+
+        // 4. Single integer token
+        std::fs::write(&possible_path, "42\n").expect("Failed to write possible_values");
+        let (_, possible, _, _, _) = Attribute::read_base_values(&temp_dir);
+        assert_eq!(possible, AttrValue::Integer(42));
+
+        // 5. Single string token
+        std::fs::write(&possible_path, "Performance\n").expect("Failed to write possible_values");
+        let (_, possible, _, _, _) = Attribute::read_base_values(&temp_dir);
+        assert_eq!(
+            possible,
+            AttrValue::EnumStr(vec!["Performance".to_string()])
+        );
+
+        // Cleanup
+        std::fs::remove_dir_all(&temp_dir)
+            .expect("Failed to remove temp_dir for test_possible_values_parsing");
     }
 }

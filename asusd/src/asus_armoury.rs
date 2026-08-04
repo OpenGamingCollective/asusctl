@@ -65,12 +65,7 @@ impl AsusArmouryAttribute {
     }
 
     fn resolve_i32_value(refreshed: Option<i32>, cached: &AttrValue) -> i32 {
-        refreshed
-            .or(match cached {
-                AttrValue::Integer(i) => Some(*i),
-                _ => None,
-            })
-            .unwrap_or(-1)
+        refreshed.or_else(|| cached.as_i32()).unwrap_or(-1)
     }
 
     pub async fn emit_limits(&self, connection: &Connection) -> Result<(), RogError> {
