@@ -23,6 +23,8 @@ pub fn list_iface_blocking() -> Result<Vec<String>, Box<dyn std::error::Error>> 
             ifaces.push(k.to_string());
         }
     }
+    ifaces.sort();
+    ifaces.dedup();
     Ok(ifaces)
 }
 
@@ -73,7 +75,7 @@ where
         }
     }
     if paths.len() > 1 {
-        println!("Multiple asusd interfaces devices found");
+        log::warn!("Multiple asusd interfaces devices found");
     }
     if !paths.is_empty() {
         let mut ctrl = Vec::new();
@@ -85,6 +87,41 @@ where
                     .destination("xyz.ljones.Asusd")?
                     .build()
                     .await?,
+            );
+        }
+        return Ok(ctrl);
+    }
+
+    Err(format!("Did not find {iface_name}").into())
+}
+
+pub fn find_iface_blocking<T>(iface_name: &str) -> Result<Vec<T>, Box<dyn std::error::Error>>
+where
+    T: zbus::blocking::proxy::ProxyImpl<'static> + From<zbus::Proxy<'static>>,
+{
+    let conn = zbus::blocking::Connection::system()?;
+    let f = zbus::blocking::fdo::ObjectManagerProxy::new(&conn, "xyz.ljones.Asusd", "/")?;
+    let interfaces = f.get_managed_objects()?;
+    let mut paths = Vec::new();
+    for v in interfaces.iter() {
+        for k in v.1.keys() {
+            if k.as_str() == iface_name {
+                paths.push(v.0.clone());
+            }
+        }
+    }
+    if paths.len() > 1 {
+        log::warn!("Multiple asusd interfaces devices found");
+    }
+    if !paths.is_empty() {
+        let mut ctrl = Vec::new();
+        paths.sort_by(|a, b| a.cmp(b));
+        for path in paths {
+            ctrl.push(
+                T::builder(&conn)
+                    .path(path.clone())?
+                    .destination("xyz.ljones.Asusd")?
+                    .build()?,
             );
         }
         return Ok(ctrl);

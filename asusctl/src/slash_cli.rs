@@ -1,7 +1,7 @@
 use argh::FromArgs;
+use rog_dbus::find_iface_blocking;
 use rog_dbus::zbus_slash::SlashProxyBlocking;
 use rog_slash::SlashMode;
-use zbus::blocking::Connection;
 
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "slash", description = "slash ledbar commands")]
@@ -79,73 +79,72 @@ pub fn handle_slash_set(cmd: &SlashSetCommand) -> Result<(), Box<dyn std::error:
         && !cmd.disable
     {
         println!("Missing arg; run 'asusctl slash set --help' for usage");
+        return Ok(());
     }
 
-    let conn = Connection::system()?;
-    let proxy = SlashProxyBlocking::new(&conn)
-        .map_err(|e| format!("Failed to connect to Slash interface: {e}"))?;
-
-    if cmd.enable {
-        proxy.set_enabled(true)?;
-    }
-    if cmd.disable {
-        proxy.set_enabled(false)?;
-    }
-    if let Some(brightness) = cmd.brightness {
-        proxy.set_brightness(brightness)?;
-    }
-    if let Some(interval) = cmd.interval {
-        proxy.set_interval(interval)?;
-    }
-    if let Some(slash_mode) = cmd.mode {
-        proxy.set_mode(slash_mode)?;
-    }
-    if let Some(show) = cmd.show_on_boot {
-        proxy.set_show_on_boot(show)?;
-    }
-    if let Some(show) = cmd.show_on_shutdown {
-        proxy.set_show_on_shutdown(show)?;
-    }
-    if let Some(show) = cmd.show_on_sleep {
-        proxy.set_show_on_sleep(show)?;
-    }
-    if let Some(show) = cmd.show_on_battery {
-        proxy.set_show_on_battery(show)?;
-    }
-    if let Some(show) = cmd.show_battery_warning {
-        proxy.set_show_battery_warning(show)?;
+    let slashes = find_iface_blocking::<SlashProxyBlocking>("xyz.ljones.Slash")?;
+    for proxy in &slashes {
+        if cmd.enable {
+            proxy.set_enabled(true)?;
+        }
+        if cmd.disable {
+            proxy.set_enabled(false)?;
+        }
+        if let Some(brightness) = cmd.brightness {
+            proxy.set_brightness(brightness)?;
+        }
+        if let Some(interval) = cmd.interval {
+            proxy.set_interval(interval)?;
+        }
+        if let Some(slash_mode) = cmd.mode {
+            proxy.set_mode(slash_mode)?;
+        }
+        if let Some(show) = cmd.show_on_boot {
+            proxy.set_show_on_boot(show)?;
+        }
+        if let Some(show) = cmd.show_on_shutdown {
+            proxy.set_show_on_shutdown(show)?;
+        }
+        if let Some(show) = cmd.show_on_sleep {
+            proxy.set_show_on_sleep(show)?;
+        }
+        if let Some(show) = cmd.show_on_battery {
+            proxy.set_show_on_battery(show)?;
+        }
+        if let Some(show) = cmd.show_battery_warning {
+            proxy.set_show_battery_warning(show)?;
+        }
     }
 
     Ok(())
 }
 
 pub fn handle_slash_get() -> Result<(), Box<dyn std::error::Error>> {
-    let conn = Connection::system()?;
-    let proxy = SlashProxyBlocking::new(&conn)
-        .map_err(|e| format!("Failed to connect to Slash interface: {e}"))?;
+    let slashes = find_iface_blocking::<SlashProxyBlocking>("xyz.ljones.Slash")?;
+    for proxy in &slashes {
+        let enabled = proxy.enabled()?;
+        let brightness = proxy.brightness()?;
+        let interval = proxy.interval()?;
+        let mode = proxy.mode()?;
+        let show_on_boot = proxy.show_on_boot()?;
+        let show_on_shutdown = proxy.show_on_shutdown()?;
+        let show_on_sleep = proxy.show_on_sleep()?;
+        let show_on_battery = proxy.show_on_battery()?;
+        let show_battery_warning = proxy.show_battery_warning()?;
 
-    let enabled = proxy.enabled()?;
-    let brightness = proxy.brightness()?;
-    let interval = proxy.interval()?;
-    let mode = proxy.mode()?;
-    let show_on_boot = proxy.show_on_boot()?;
-    let show_on_shutdown = proxy.show_on_shutdown()?;
-    let show_on_sleep = proxy.show_on_sleep()?;
-    let show_on_battery = proxy.show_on_battery()?;
-    let show_battery_warning = proxy.show_battery_warning()?;
-
-    println!(
-        "Slash LED: {}",
-        if enabled { "enabled" } else { "disabled" }
-    );
-    println!("Brightness: {}", brightness);
-    println!("Interval: {}", interval);
-    println!("Mode: {}", mode);
-    println!("Show on boot: {}", show_on_boot);
-    println!("Show on shutdown: {}", show_on_shutdown);
-    println!("Show on sleep: {}", show_on_sleep);
-    println!("Show on battery: {}", show_on_battery);
-    println!("Show battery warning: {}", show_battery_warning);
+        println!(
+            "Slash LED: {}",
+            if enabled { "enabled" } else { "disabled" }
+        );
+        println!("Brightness: {}", brightness);
+        println!("Interval: {}", interval);
+        println!("Mode: {}", mode);
+        println!("Show on boot: {}", show_on_boot);
+        println!("Show on shutdown: {}", show_on_shutdown);
+        println!("Show on sleep: {}", show_on_sleep);
+        println!("Show on battery: {}", show_on_battery);
+        println!("Show battery warning: {}", show_battery_warning);
+    }
 
     Ok(())
 }

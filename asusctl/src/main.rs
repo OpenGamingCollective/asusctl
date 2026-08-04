@@ -13,6 +13,7 @@ use rog_anime::{AnimTime, AnimeDataBuffer, AnimeDiagonal, AnimeGif, AnimeImage, 
 use rog_aura::keyboard::{AuraPowerState, LaptopAuraPower};
 use rog_aura::{self, AuraEffect, PowerZones};
 use rog_dbus::asus_armoury::AsusArmouryProxyBlocking;
+use rog_dbus::find_iface_blocking;
 use rog_dbus::list_iface_blocking;
 use rog_dbus::scsi_aura::ScsiAuraProxyBlocking;
 use rog_dbus::zbus_anime::AnimeProxyBlocking;
@@ -26,7 +27,6 @@ use rog_profiles::error::ProfileError;
 use rog_scsi::AuraMode;
 use ron::ser::PrettyConfig;
 use scsi_cli::ScsiCommand;
-use zbus::blocking::proxy::ProxyImpl;
 use zbus::blocking::Connection;
 
 use crate::cli_opts::*;
@@ -149,44 +149,6 @@ fn check_service(name: &str) -> bool {
     false
 }
 
-fn find_iface<T>(iface_name: &str) -> Result<Vec<T>, Box<dyn std::error::Error>>
-where
-    T: ProxyImpl<'static> + From<zbus::Proxy<'static>>,
-{
-    let conn = zbus::blocking::Connection::system()?;
-    let f = zbus::blocking::fdo::ObjectManagerProxy::new(&conn, "xyz.ljones.Asusd", "/")?;
-    let interfaces = f.get_managed_objects()?;
-    let mut paths = Vec::new();
-    for v in interfaces.iter() {
-        // let o: Vec<zbus::names::OwnedInterfaceName> = v.1.keys().map(|e|
-        // e.to_owned()).collect(); println!("{}, {:?}", v.0, o);
-        for k in v.1.keys() {
-            if k.as_str() == iface_name {
-                // println!("Found {iface_name} device at {}, {}", v.0, k);
-                paths.push(v.0.clone());
-            }
-        }
-    }
-    if paths.len() > 1 {
-        println!("Multiple asusd interfaces devices found");
-    }
-    if !paths.is_empty() {
-        let mut ctrl = Vec::new();
-        paths.sort_by(|a, b| a.cmp(b));
-        for path in paths {
-            ctrl.push(
-                T::builder(&conn)
-                    .path(path.clone())?
-                    .destination("xyz.ljones.Asusd")?
-                    .build()?,
-            );
-        }
-        return Ok(ctrl);
-    }
-
-    Err(format!("Did not find {iface_name}").into())
-}
-
 fn do_parsed(
     parsed: &CliStart,
     supported_interfaces: &[String],
@@ -259,7 +221,7 @@ fn handle_info(
             "Supported Platform Properties:\n{:#?}",
             supported_properties
         );
-        if let Ok(aura) = find_iface::<AuraProxyBlocking>("xyz.ljones.Aura") {
+        if let Ok(aura) = find_iface_blocking::<AuraProxyBlocking>("xyz.ljones.Aura") {
             // TODO: multiple RGB check
             if let Some(first_aura) = aura.first() {
                 let bright = first_aura.supported_brightness()?;
@@ -286,7 +248,7 @@ fn handle_backlight(cmd: &BacklightCommand) -> Result<(), Box<dyn std::error::Er
         && cmd.screenpad_gamma.is_none()
         && cmd.sync_screenpad_brightness.is_none()
     {
-        let backlights = find_iface::<BacklightProxyBlocking>("xyz.ljones.Backlight")?;
+        let backlights = find_iface_blocking::<BacklightProxyBlocking>("xyz.ljones.Backlight")?;
         for backlight in backlights {
             println!("Current screenpad settings:");
             println!("  Brightness: {}", backlight.screenpad_brightness()?);
@@ -300,7 +262,7 @@ fn handle_backlight(cmd: &BacklightCommand) -> Result<(), Box<dyn std::error::Er
         return Ok(());
     }
 
-    let backlights = find_iface::<BacklightProxyBlocking>("xyz.ljones.Backlight")?;
+    let backlights = find_iface_blocking::<BacklightProxyBlocking>("xyz.ljones.Backlight")?;
     for backlight in backlights {
         if let Some(brightness) = cmd.screenpad_brightness {
             backlight.set_screenpad_brightness(brightness)?;
@@ -319,7 +281,7 @@ fn handle_backlight(cmd: &BacklightCommand) -> Result<(), Box<dyn std::error::Er
 }
 
 fn handle_brightness(cmd: &BrightnessCommand) -> Result<(), Box<dyn std::error::Error>> {
-    let Ok(aura_proxies) = find_iface::<AuraProxyBlocking>("xyz.ljones.Aura") else {
+    let Ok(aura_proxies) = find_iface_blocking::<AuraProxyBlocking>("xyz.ljones.Aura") else {
         println!("No aura interface found");
         return Ok(());
     };
@@ -374,7 +336,7 @@ fn handle_anime(cmd: &AnimeCommand) -> Result<(), Box<dyn std::error::Error>> {
         println!("Missing arg or command; run 'asusctl anime --help' for usage");
     }
 
-    let animes = find_iface::<AnimeProxyBlocking>("xyz.ljones.Anime").map_err(|e| {
+    let animes = find_iface_blocking::<AnimeProxyBlocking>("xyz.ljones.Anime").map_err(|e| {
         error!("Did not find any interface for xyz.ljones.Anime: {e:?}");
         e
     })?;
@@ -557,7 +519,7 @@ fn handle_scsi(cmd: &ScsiCommand) -> Result<(), Box<dyn std::error::Error>> {
         println!("Missing arg or command; run 'asusctl scsi --help' for usage");
     }
 
-    let scsis = find_iface::<ScsiAuraProxyBlocking>("xyz.ljones.ScsiAura")?;
+    let scsis = find_iface_blocking::<ScsiAuraProxyBlocking>("xyz.ljones.ScsiAura")?;
 
     for scsi in scsis {
         if let Some(enable) = cmd.enable {
@@ -621,7 +583,7 @@ fn handle_led_mode(mode: &LedModeCommand) -> Result<(), Box<dyn std::error::Erro
     if mode.command.is_none() && !mode.prev_mode && !mode.next_mode {
         println!("Missing arg or command; run 'asusctl aura --help' for usage");
         // print available modes when possible
-        if let Ok(aura) = find_iface::<AuraProxyBlocking>("xyz.ljones.Aura") {
+        if let Ok(aura) = find_iface_blocking::<AuraProxyBlocking>("xyz.ljones.Aura") {
             if let Some(first_aura) = aura.first() {
                 let modes = first_aura.supported_basic_modes()?;
                 println!("Available modes:");
@@ -637,7 +599,7 @@ fn handle_led_mode(mode: &LedModeCommand) -> Result<(), Box<dyn std::error::Erro
         println!("Please specify either next or previous");
         return Ok(());
     }
-    let aura = find_iface::<AuraProxyBlocking>("xyz.ljones.Aura")?;
+    let aura = find_iface_blocking::<AuraProxyBlocking>("xyz.ljones.Aura")?;
     if mode.next_mode {
         for aura in aura {
             let mode = aura.led_mode()?;
@@ -678,7 +640,7 @@ fn handle_led_mode(mode: &LedModeCommand) -> Result<(), Box<dyn std::error::Erro
 }
 
 fn handle_led_power1(power: &LedPowerCommand1) -> Result<(), Box<dyn std::error::Error>> {
-    let aura = find_iface::<AuraProxyBlocking>("xyz.ljones.Aura")?;
+    let aura = find_iface_blocking::<AuraProxyBlocking>("xyz.ljones.Aura")?;
     for aura in aura {
         let dev_type = aura.device_type()?;
         if !dev_type.is_old_laptop() && !dev_type.is_tuf_laptop() {
@@ -735,7 +697,7 @@ fn handle_led_power_1_do_1866(
 }
 
 fn handle_led_power2(power: &LedPowerCommand2) -> Result<(), Box<dyn std::error::Error>> {
-    let aura = find_iface::<AuraProxyBlocking>("xyz.ljones.Aura")?;
+    let aura = find_iface_blocking::<AuraProxyBlocking>("xyz.ljones.Aura")?;
     for aura in aura {
         let dev_type = aura.device_type()?;
         if !dev_type.is_new_laptop() {
@@ -1031,7 +993,9 @@ fn handle_armoury_command(
     // If nested subcommand provided, handle set/get/list.
     match &cmd.command {
         ArmourySubCommand::List(_) => {
-            if let Ok(attrs) = find_iface::<AsusArmouryProxyBlocking>("xyz.ljones.AsusArmoury") {
+            if let Ok(attrs) =
+                find_iface_blocking::<AsusArmouryProxyBlocking>("xyz.ljones.AsusArmoury")
+            {
                 for attr in attrs.iter() {
                     print_firmware_attr(attr)?;
                 }
@@ -1040,7 +1004,7 @@ fn handle_armoury_command(
         }
         ArmourySubCommand::Get(g) => {
             let mut found = false;
-            let attrs = find_iface::<AsusArmouryProxyBlocking>("xyz.ljones.AsusArmoury")
+            let attrs = find_iface_blocking::<AsusArmouryProxyBlocking>("xyz.ljones.AsusArmoury")
                 .map_err(|e| format!("Could not reach asusd armoury interface: {e}"))?;
             for attr in attrs.iter() {
                 let name = attr.name()?;
@@ -1056,7 +1020,7 @@ fn handle_armoury_command(
         }
         ArmourySubCommand::Set(s) => {
             let mut found = false;
-            let attrs = find_iface::<AsusArmouryProxyBlocking>("xyz.ljones.AsusArmoury")
+            let attrs = find_iface_blocking::<AsusArmouryProxyBlocking>("xyz.ljones.AsusArmoury")
                 .map_err(|e| format!("Could not reach asusd armoury interface: {e}"))?;
             for attr in attrs.iter() {
                 let name = attr.name()?;

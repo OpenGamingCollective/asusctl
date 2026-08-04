@@ -18,4 +18,5 @@ rog_aura = { path = "../rog-aura" }
 rog_profiles = { path = "../rog-profiles" }
 rog_platform = { path = "../rog-platform" }
 zbus.workspace = true
+log.workspace = true
 
