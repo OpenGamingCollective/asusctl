@@ -10,6 +10,6 @@ You can help with translations by following https://slint.dev/releases/1.1.0/doc
 
 Begin by copying `rog-control-center/translations/en/rog-control-center.po` to `rog-control-center/translations/<YOUR LOCALE>/rog-control-center.po`, then edit that file.
 
-Run `msgfmt rog-control-center/translations/<YOUR LOCALE>/rog-control-center.po -o rog-control-center/translations/<YOUR LOCALE>/LC_MESSAGES/rog-control-center.mo` to make the binary formatted translation where `<YOUR LOCALE>` is changed to your translation locale.
+The binary catalogs are compiled from the `.po` sources at build time, so rebuild to pick up your edits. This needs `msgfmt` from gettext installed.
 
 To test you local translations run `RUST_TRANSLATIONS=1 rog-control-center`.
