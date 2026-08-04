@@ -41,6 +41,22 @@ pub enum AttrValue {
     None,
 }
 
+impl From<String> for AttrValue {
+    fn from(val: String) -> Self {
+        val.parse::<i32>()
+            .map(AttrValue::Integer)
+            .unwrap_or_else(|_| AttrValue::String(val))
+    }
+}
+
+impl From<&str> for AttrValue {
+    fn from(val: &str) -> Self {
+        val.parse::<i32>()
+            .map(AttrValue::Integer)
+            .unwrap_or_else(|_| AttrValue::String(val.to_string()))
+    }
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct Attribute {
     name: String,
@@ -64,15 +80,10 @@ impl Attribute {
 
     /// Read the `current_value` directly from the attribute path
     pub fn current_value(&self) -> Result<AttrValue, PlatformError> {
-        match read_string(&self.base_path.join("current_value")) {
-            Ok(val) => {
-                if let Ok(int) = val.parse::<i32>() {
-                    Ok(AttrValue::Integer(int))
-                } else {
-                    Ok(AttrValue::String(val))
-                }
-            }
-            Err(e) => Err(e),
+        let val = read_string(&self.base_path.join("current_value"))?;
+        match val.parse::<i32>() {
+            Ok(int) => Ok(AttrValue::Integer(int)),
+            Err(_) => Ok(AttrValue::String(val)),
         }
     }
 
@@ -146,16 +157,9 @@ impl Attribute {
     fn read_base_values(
         base_path: &Path,
     ) -> (AttrValue, AttrValue, AttrValue, AttrValue, AttrValue) {
-        let default_value = match read_string(&base_path.join("default_value")) {
-            Ok(val) => {
-                if let Ok(int) = val.parse::<i32>() {
-                    AttrValue::Integer(int)
-                } else {
-                    AttrValue::String(val)
-                }
-            }
-            Err(_) => AttrValue::None,
-        };
+        let default_value = read_string(&base_path.join("default_value"))
+            .map(AttrValue::from)
+            .unwrap_or_default();
 
         let possible_values = match read_string(&base_path.join("possible_values")) {
             Ok(val) => {
