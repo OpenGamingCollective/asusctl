@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use zbus::zvariant::{OwnedValue, Type, Value};
 
 use crate::error::{PlatformError, Result};
-use crate::{attr_string, attr_string_array, to_device};
+use crate::{attr_string, attr_string_array, read_sysfs_parsed, to_device};
 
 /// The "platform" device provides access to things like:
 /// - `dgpu_disable`
@@ -286,15 +286,9 @@ pub fn get_fan_rpms() -> (i32, i32, i32) {
             let path = entry.path();
             if let Ok(name) = std::fs::read_to_string(path.join("name")) {
                 if name.trim() == "asus" {
-                    if let Ok(v) = std::fs::read_to_string(path.join("fan1_input")) {
-                        cpu = v.trim().parse().unwrap_or(0);
-                    }
-                    if let Ok(v) = std::fs::read_to_string(path.join("fan2_input")) {
-                        gpu = v.trim().parse().unwrap_or(0);
-                    }
-                    if let Ok(v) = std::fs::read_to_string(path.join("fan3_input")) {
-                        mid = v.trim().parse().unwrap_or(0);
-                    }
+                    cpu = read_sysfs_parsed(path.join("fan1_input")).unwrap_or(0);
+                    gpu = read_sysfs_parsed(path.join("fan2_input")).unwrap_or(0);
+                    mid = read_sysfs_parsed(path.join("fan3_input")).unwrap_or(0);
                     break;
                 }
             }

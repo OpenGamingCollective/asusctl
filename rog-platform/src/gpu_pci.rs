@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use zbus::zvariant::{OwnedValue, Type, Value};
 
 use crate::error::{PlatformError, Result};
+use crate::read_sysfs_parsed;
 
 // --- ASUS-specific sysfs paths (reused from rog-platform) ---
 
@@ -527,12 +528,9 @@ pub fn get_igpu_temp() -> f32 {
         for entry in entries.flatten() {
             let path = entry.path();
             if let Ok(name) = std::fs::read_to_string(path.join("name")) {
-                let name = name.trim();
-                if name == "amdgpu" {
-                    if let Ok(temp_str) = std::fs::read_to_string(path.join("temp1_input")) {
-                        if let Ok(temp_val) = temp_str.trim().parse::<f32>() {
-                            return temp_val / 1000.0;
-                        }
+                if name.trim() == "amdgpu" {
+                    if let Some(temp_val) = read_sysfs_parsed::<f32>(path.join("temp1_input")) {
+                        return temp_val / 1000.0;
                     }
                 }
             }
@@ -547,18 +545,15 @@ pub fn get_igpu_usage_pct() -> f32 {
             let path = entry.path();
             let name = path
                 .file_name()
-                .map(|n| n.to_string_lossy().into_owned())
+                .map(|n| n.to_string_lossy())
                 .unwrap_or_default();
             if name.starts_with("card") {
                 let busy_path = path.join("device/gpu_busy_percent");
                 if busy_path.exists() {
                     if let Ok(vendor_str) = std::fs::read_to_string(path.join("device/vendor")) {
-                        let vendor = vendor_str.trim();
-                        if vendor == "0x1002" {
-                            if let Ok(val_str) = std::fs::read_to_string(busy_path) {
-                                if let Ok(val) = val_str.trim().parse::<f32>() {
-                                    return val;
-                                }
+                        if vendor_str.trim() == "0x1002" {
+                            if let Some(val) = read_sysfs_parsed::<f32>(busy_path) {
+                                return val;
                             }
                         }
                     }
@@ -585,10 +580,8 @@ pub fn get_gpu_temp() -> f32 {
             if let Ok(name) = std::fs::read_to_string(path.join("name")) {
                 let name = name.trim();
                 if name == "amdgpu" || name == "nouveau" {
-                    if let Ok(temp_str) = std::fs::read_to_string(path.join("temp1_input")) {
-                        if let Ok(temp_val) = temp_str.trim().parse::<f32>() {
-                            return temp_val / 1000.0;
-                        }
+                    if let Some(temp_val) = read_sysfs_parsed::<f32>(path.join("temp1_input")) {
+                        return temp_val / 1000.0;
                     }
                 }
             }
@@ -608,16 +601,12 @@ pub fn get_gpu_usage_pct() -> f32 {
     if let Ok(entries) = std::fs::read_dir("/sys/class/drm") {
         for entry in entries.flatten() {
             let path = entry.path().join("device/gpu_busy_percent");
-            if path.exists() {
-                if let Ok(val_str) = std::fs::read_to_string(path) {
-                    if let Ok(val) = val_str.trim().parse::<f32>() {
-                        return val;
-                    }
-                }
+            if let Some(val) = read_sysfs_parsed::<f32>(path) {
+                return val;
             }
         }
     }
-    0.0
+    -1.0
 }
 
 #[cfg(test)]
