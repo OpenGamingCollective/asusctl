@@ -157,12 +157,6 @@ impl CtrlBacklight {
             return Ok(None);
         }
 
-        if let Some(sync) = self.config.lock().await.screenpad_sync_primary {
-            if !sync {
-                return Ok(None);
-            }
-        }
-
         if let Some(backlight) = self.get_backlight(&BacklightType::Primary) {
             let watch = backlight.monitor_brightness()?;
 

@@ -22,7 +22,7 @@ use std::time::Duration;
 
 use dmi_id::DMIID;
 use futures_util::stream::StreamExt;
-use log::{debug, info, warn};
+use log::{debug, error, info, warn};
 use logind_zbus::manager::ManagerProxy;
 use tokio::time::sleep;
 use zbus::object_server::{Interface, SignalEmitter};
@@ -268,37 +268,75 @@ pub trait CtrlTask {
 
             let manager1 = manager.clone();
             set.spawn(async move {
-                if let Ok(mut notif) = manager1.receive_prepare_for_shutdown().await {
-                    while let Some(event) = notif.next().await {
-                        if let Ok(args) = event.args() {
-                            debug!("Doing on_prepare_for_shutdown({})", args.start);
-                            on_prepare_for_shutdown(args.start).await;
+                match manager1.receive_prepare_for_shutdown().await {
+                    Ok(mut notif) => {
+                        while let Some(event) = notif.next().await {
+                            match event.args() {
+                                Ok(args) => {
+                                    debug!("Doing on_prepare_for_shutdown({})", args.start);
+                                    on_prepare_for_shutdown(args.start).await;
+                                }
+                                Err(err) => {
+                                    error!("Prepare for shutdown event args error: {err}");
+                                }
+                            }
                         }
+                        warn!("Prepare for shutdown notification stream closed");
+                    }
+                    Err(err) => {
+                        error!("Failed to subscribe to prepare_for_shutdown signal: {err}");
                     }
                 }
             });
 
             let manager2 = manager.clone();
             set.spawn(async move {
-                if let Ok(mut notif) = manager2.receive_prepare_for_sleep().await {
-                    while let Some(event) = notif.next().await {
-                        if let Ok(args) = event.args() {
-                            debug!("Doing on_prepare_for_sleep({})", args.start);
-                            on_prepare_for_sleep(args.start).await;
+                match manager2.receive_prepare_for_sleep().await {
+                    Ok(mut notif) => {
+                        while let Some(event) = notif.next().await {
+                            match event.args() {
+                                Ok(args) => {
+                                    debug!("Doing on_prepare_for_sleep({})", args.start);
+                                    on_prepare_for_sleep(args.start).await;
+                                }
+                                Err(err) => {
+                                    error!("Prepare for sleep event args error: {err}");
+                                }
+                            }
                         }
+                        warn!("Prepare for sleep notification stream closed");
+                    }
+                    Err(err) => {
+                        error!("Failed to subscribe to prepare_for_sleep signal: {err}");
                     }
                 }
             });
 
             let manager3 = manager.clone();
             set.spawn(async move {
-                let mut last_power = manager3.on_external_power().await.unwrap_or_default();
+                let mut last_power = match manager3.on_external_power().await {
+                    Ok(p) => p,
+                    Err(err) => {
+                        error!("Failed to read initial on_external_power property: {err}");
+                        false
+                    }
+                };
 
+                let mut in_error_state = false;
                 loop {
-                    if let Ok(next) = manager3.on_external_power().await {
-                        if next != last_power {
-                            last_power = next;
-                            on_external_power_change(next).await;
+                    match manager3.on_external_power().await {
+                        Ok(next) => {
+                            in_error_state = false;
+                            if next != last_power {
+                                last_power = next;
+                                on_external_power_change(next).await;
+                            }
+                        }
+                        Err(err) => {
+                            if !in_error_state {
+                                warn!("Failed to read on_external_power property: {err}");
+                                in_error_state = true;
+                            }
                         }
                     }
                     sleep(Duration::from_secs(2)).await;
@@ -306,12 +344,29 @@ pub trait CtrlTask {
             });
 
             set.spawn(async move {
-                let mut last_lid = manager.lid_closed().await.unwrap_or_default();
+                let mut last_lid = match manager.lid_closed().await {
+                    Ok(l) => l,
+                    Err(err) => {
+                        error!("Failed to read initial lid_closed property: {err}");
+                        false
+                    }
+                };
+
+                let mut in_error_state = false;
                 loop {
-                    if let Ok(next) = manager.lid_closed().await {
-                        if next != last_lid {
-                            last_lid = next;
-                            on_lid_change(next).await;
+                    match manager.lid_closed().await {
+                        Ok(next) => {
+                            in_error_state = false;
+                            if next != last_lid {
+                                last_lid = next;
+                                on_lid_change(next).await;
+                            }
+                        }
+                        Err(err) => {
+                            if !in_error_state {
+                                warn!("Failed to read lid_closed property: {err}");
+                                in_error_state = true;
+                            }
                         }
                     }
                     sleep(Duration::from_secs(2)).await;

@@ -271,8 +271,7 @@ impl CtrlTask for AuraZbus {
                         info!("CtrlKbdLedTask reloading brightness and modes");
                         let brightness = inner3.config.lock().await.brightness;
                         if let Some(backlight) = &inner3.backlight {
-                            if let Err(e) =
-                                backlight.lock().await.set_brightness(brightness.into())
+                            if let Err(e) = backlight.lock().await.set_brightness(brightness.into())
                             {
                                 error!("CtrlKbdLedTask brightness error: {e}");
                             }
