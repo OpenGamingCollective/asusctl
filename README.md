@@ -1,4 +1,4 @@
-# asusctl for ASUS laptops
+# asusctl for ASUS ROG
 
 <p align="center">
   <a href="https://www.patreon.com/bePatron?u=7602281"><img src="extra/icons/patreon-button.svg" width="190" height="32" alt="Become a Patron" /></a>
@@ -30,12 +30,15 @@ The primary goal of `asusctl` is to provide a safe, efficient abstraction layer 
 ## Hardware and kernel compatibility
 
 ### Supported laptops
+
 `asusctl` supports most ASUS gaming laptops equipped with a USB keyboard. To verify device compatibility, run `lsusb` in your terminal and check for entries matching:
 
 ```plain
 Bus 001 Device 002: ID 0b05:1866 ASUSTek Computer, Inc. N-KEY Device
 ```
+
 or
+
 ```plain
 Bus 003 Device 002: ID 0b05:19b6 ASUSTek Computer, Inc. [unknown]
 ```
@@ -43,11 +46,13 @@ Bus 003 Device 002: ID 0b05:19b6 ASUSTek Computer, Inc. [unknown]
 Devices displaying these hardware IDs typically function without extra configuration. Features such as battery charge thresholds use generic kernel interfaces and can work on other hardware, but platform and fan controls require the ASUS-specific `asus-nb-wmi` or `asus-armoury` drivers.
 
 ### Kernel requirements
+
 Maintainers recommend running the latest stable Linux kernel, as driver improvements are merged upstream continuously.
 
 Thermal Design Power (TDP) controls require the `asus-armoury` driver, which was included in mainline Linux starting with version 6.19. Kernels older than 6.19 do not support TDP management.
 
 ### Display server support (X11)
+
 > [!NOTE]
 > X11 is officially unsupported. Technical assistance is not provided for X11 environments due to developer resource constraints and the unmaintained status of X11 itself.
 >
@@ -58,23 +63,27 @@ Thermal Design Power (TDP) controls require the `asus-armoury` driver, which was
 Feature availability depends on upstream Linux kernel support and specific hardware capabilities.
 
 ### Power and performance
+
 - [x] **Battery charge thresholds:** Configure maximum charging limits (requires kernel support)
 - [x] **Custom fan curves:** Adjust fan profiles on supported hardware
 - [x] **GPU MUX toggling:** Switch GPU operational modes (G-Sync / MUX) on 2022 and newer laptops
 - [x] **Power profile management:** Control system performance profiles as detailed in [MANUAL.md](MANUAL.md)
 
 ### Lighting and displays
+
 - [x] **Built-in LED controls:** Adjust integrated keyboard lighting modes
 - [x] **Per-key RGB configuration:** Customize individual key backlight settings
 - [x] **Advanced lighting effects:** Apply custom animation modes (currently undergoing revision)
 - [x] **AniMe Matrix displays:** Control panel rendering on equipped G14, M16, and Strix Scar 16/18 models
 
 ### System integration
+
 - [x] **System daemon (`asusd`):** Background service handling hardware communications
 - [x] **Graphical interface (`rog-control-center`):** Desktop application with system tray integration and notifications
 - [x] **POST audio controls:** Toggle the BIOS boot sound setting
 
 ### Additional hardware configuration notes
+
 Keyboard backlight support relies on hardware mappings defined in [`./rog-aura/data/aura_support.ron`](./rog-aura/data/aura_support.ron), installed to `/usr/share/asusd/aura_support.ron`. Because keyboard controller configurations vary across model generations and firmware revisions, explicit layout definitions prevent misconfigurations. Refer to the [rog-aura README](./rog-aura/README.md) for configuration details.
 
 ## Installation and setup
@@ -93,9 +102,11 @@ Pre-built binary packages are available in several Linux distribution repositori
 | **Solus** | Official Repositories | `sudo eopkg install asusctl` | Direct package installation |
 
 #### Service management
+
 `asusctl` uses `udev` rules to initialize background services when hardware is detected.
 
 On systems such as Fedora or Ultramarine, enable and start the services manually after installation:
+
 ```sh
 systemctl enable --now asusd.service
 systemctl enable --now asus-shutdown.service
@@ -108,6 +119,7 @@ On Debian, service activation may require manual intervention. On Pop!_OS system
 Compiling `asusctl` requires the Rust compiler and Cargo toolchain from [rustup.rs](https://rustup.rs/). Use the stable toolchain for build tasks.
 
 #### Arch Linux
+
 ```sh
 sudo pacman -S git cmake clang pkg-config libzip rust openssl
 make
@@ -115,6 +127,7 @@ sudo make install
 ```
 
 #### Fedora
+
 ```sh
 sudo dnf install cmake clang-devel libxkbcommon-devel systemd-devel expat-devel pcre2-devel libzstd-devel gtk3-devel
 make
@@ -122,16 +135,20 @@ sudo make install
 ```
 
 #### openSUSE
+
 For KDE Plasma desktop environments without GTK dependencies:
+
 ```sh
 sudo zypper in -t pattern devel_basis
-sudo zypper in rustup make cmake clang-devel libxkbcommon-devel systemd-devel expat-devel pcre2-devel libzstd-devel gtk3-devel
+sudo zypper in rustup make cmake clang-devel libxkbcommon-devel systemd-devel expat-devel pcre2-devel libzstd-devel
 make
 sudo make install
 ```
 
 #### Debian (Unsupported)
+
 Debian is officially unsupported, but you can attempt to build with:
+
 ```sh
 sudo apt install libclang-dev libudev-dev libfontconfig-dev build-essential cmake libxkbcommon-dev
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
@@ -140,6 +157,7 @@ sudo make install
 ```
 
 #### Ubuntu and Pop!_OS (Unsupported)
+
 ```sh
 sudo apt install make cargo gcc pkg-config openssl libasound2-dev cmake build-essential python3 libfreetype6-dev libexpat1-dev libxcb-composite0-dev libssl-dev libx11-dev libfontconfig1-dev curl libclang-dev libudev-dev checkinstall libseat-dev libinput-dev libxkbcommon-dev libgbm-dev
 make
@@ -147,17 +165,25 @@ sudo make install
 ```
 
 ### Upgrading
+
 When upgrading an existing installation, reload systemd service definitions and restart `asusd`:
+
 ```sh
 systemctl daemon-reload && systemctl restart asusd
 ```
+
 Alternatively, reboot the system to apply updates.
 
 ### Uninstalling
-To remove installations built from source, navigate to the source directory and run:
+
+To remove installations built from source, stop and disable the `asusd` service, then run `sudo make uninstall` from the source directory and reload systemd:
+
 ```sh
+sudo systemctl disable --now asusd.service
 sudo make uninstall
+sudo systemctl daemon-reload
 ```
+
 Remove any remaining configuration files in `/etc/asusd/`.
 
 For binary installations, remove `asusctl` using your distribution package manager.
@@ -165,6 +191,7 @@ For binary installations, remove `asusctl` using your distribution package manag
 ## Development and testing
 
 ### Contributing
+
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow. Install `cargo-cranky`, then run `cargo test` once to set up the `cargo-husky` commit hooks:
 
 ```sh
@@ -175,21 +202,26 @@ cargo test
 Do not bypass the hooks with `--no-verify`.
 
 ### AniMe Matrix simulator
+
 An SDL2-based simulator is included for testing matrix display rendering without physical hardware.
 
 To compile and launch the simulator:
+
 ```sh
 cargo build --package rog_simulators
 ./target/debug/anime_sim
 ```
+
 Restart `asusd` after starting the simulator to attach the service to the simulated display interface. Running the simulator on a laptop with a physical display redirects display output to the simulator window.
 
 ### Laptop support requests
-To request support for unlisted hardware models, open a request on the project issue tracker.
+
+To request support for unlisted hardware models, open a request on the [project issue tracker](https://github.com/OpenGamingCollective/asusctl/issues).
 
 ## Legal and governance
 
 ### License and trademarks
+
 This project is licensed under the [Mozilla Public License 2.0 (MPL-2.0)](LICENSE).
 
 ---
@@ -201,4 +233,5 @@ References to ASUS products, services, or trademarks within this repository do n
 ---
 
 ### AI contribution policy
+
 Contributions created with AI assistance are reviewed under standard code contribution guidelines. All AI-assisted submissions must be reviewed, verified, and tested by the author before submitting a pull request.
