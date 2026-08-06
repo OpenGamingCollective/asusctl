@@ -91,14 +91,6 @@ impl AuraDeviceType {
     pub fn is_new_laptop(&self) -> bool {
         *self == Self::LaptopKeyboard2021
     }
-
-    pub fn is_ally(&self) -> bool {
-        *self == Self::Ally
-    }
-
-    pub fn is_scsi(&self) -> bool {
-        *self == Self::ScsiExtDisk
-    }
 }
 
 impl From<&str> for AuraDeviceType {

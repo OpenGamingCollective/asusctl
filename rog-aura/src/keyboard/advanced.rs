@@ -168,17 +168,6 @@ pub enum LedCode {
 }
 
 impl LedCode {
-    pub fn is_placeholder(&self) -> bool {
-        matches!(self, Self::Spacing | Self::Blocking)
-    }
-
-    pub fn is_keyboard_zone(&self) -> bool {
-        matches!(
-            self,
-            Self::ZonedKbLeft | Self::ZonedKbLeftMid | Self::ZonedKbRightMid | Self::ZonedKbRight
-        )
-    }
-
     pub fn is_lightbar_zone(&self) -> bool {
         matches!(
             self,
@@ -470,11 +459,6 @@ impl LedUsbPackets {
     #[inline]
     pub fn get(&self) -> AuraLaptopUsbPackets {
         self.usb_packets.clone()
-    }
-
-    #[inline]
-    pub fn get_ref(&self) -> &AuraLaptopUsbPackets {
-        &self.usb_packets
     }
 
     #[inline]

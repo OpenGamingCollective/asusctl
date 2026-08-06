@@ -53,10 +53,6 @@ impl KeyShape {
         }
     }
 
-    pub fn new_blank(width: f32, height: f32) -> Self {
-        Self::Blank { width, height }
-    }
-
     /// Scale the shape up/down. Intended for use in UI on a clone
     pub fn scale(&mut self, scale: f32) {
         match self {
@@ -112,10 +108,6 @@ impl KeyRow {
 
     pub fn row(&self) -> Iter<'_, (LedCode, KeyShape)> {
         self.built_row.iter()
-    }
-
-    pub fn row_ref(&self) -> &[(LedCode, KeyShape)] {
-        &self.built_row
     }
 
     /// Find and return the heightest height of this row
@@ -229,10 +221,6 @@ impl KeyLayout {
         self.key_rows.iter()
     }
 
-    pub fn rows_ref(&self) -> &[KeyRow] {
-        &self.key_rows
-    }
-
     pub fn basic_modes(&self) -> &[AuraModeNum] {
         &self.basic_modes
     }
@@ -243,38 +231,6 @@ impl KeyLayout {
 
     pub fn advanced_type(&self) -> &AdvancedAuraType {
         &self.advanced_type
-    }
-
-    /// Find the total heighht of the keyboard, not including lightbar rows
-    pub fn keyboard_height(&self) -> f32 {
-        let mut height = 0.0;
-        for r in &self.key_rows {
-            if let Some(key) = r.row.first() {
-                if !key.0.is_lightbar_zone() {
-                    height += r.height();
-                }
-            }
-        }
-        height
-    }
-
-    pub fn max_height(&self) -> f32 {
-        let mut height = 0.0;
-        for r in &self.key_rows {
-            height += r.height();
-        }
-        height
-    }
-
-    pub fn max_width(&self) -> f32 {
-        let mut width = 0.0;
-        for r in &self.key_rows {
-            let tmp = r.width();
-            if width < tmp {
-                width = tmp;
-            }
-        }
-        width
     }
 
     /// Find a layout matching the name in `LaptopLedData` in the provided dir
@@ -297,25 +253,6 @@ impl KeyLayout {
         tmp.advanced_type = led_data.advanced_type;
 
         Ok(tmp)
-    }
-
-    pub fn layout_files(mut data_path: PathBuf) -> Result<Vec<PathBuf>, Error> {
-        data_path.push("layouts");
-        let path = data_path.as_path();
-        let mut files = Vec::new();
-        std::fs::read_dir(path)
-            .map_err(|e| {
-                println!("{:?}, {e}", path);
-                e
-            })
-            .unwrap()
-            .for_each(|p| {
-                if let Ok(p) = p {
-                    files.push(p.path());
-                }
-            });
-
-        Ok(files)
     }
 }
 
