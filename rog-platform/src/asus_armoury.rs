@@ -42,13 +42,6 @@ impl AttrValue {
             _ => None,
         }
     }
-
-    pub fn as_str(&self) -> Option<&str> {
-        match self {
-            Self::String(val) => Some(val.as_str()),
-            _ => None,
-        }
-    }
 }
 
 impl From<String> for AttrValue {
@@ -58,15 +51,6 @@ impl From<String> for AttrValue {
             .unwrap_or_else(|_| AttrValue::String(val))
     }
 }
-
-impl From<&str> for AttrValue {
-    fn from(val: &str) -> Self {
-        val.parse::<i32>()
-            .map(AttrValue::Integer)
-            .unwrap_or_else(|_| AttrValue::String(val.to_string()))
-    }
-}
-
 #[derive(Debug, Default, Clone)]
 pub struct Attribute {
     name: String,
@@ -90,11 +74,7 @@ impl Attribute {
 
     /// Read the `current_value` directly from the attribute path
     pub fn current_value(&self) -> Result<AttrValue, PlatformError> {
-        let val = read_string(&self.base_path.join("current_value"))?;
-        match val.parse::<i32>() {
-            Ok(int) => Ok(AttrValue::Integer(int)),
-            Err(_) => Ok(AttrValue::String(val)),
-        }
+        read_string(&self.base_path.join("current_value")).map(AttrValue::from)
     }
 
     pub fn base_path_exists(&self) -> bool {
@@ -587,30 +567,45 @@ mod tests {
         attr.set_current_value(&val).unwrap();
     }
 
+    struct TestDir(PathBuf);
+
+    impl TestDir {
+        fn new(name: &str) -> Self {
+            let dir = std::env::temp_dir().join(format!("{name}_{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&dir);
+            std::fs::create_dir_all(&dir).expect("failed to create test dir");
+            Self(dir)
+        }
+
+        fn path(&self) -> &Path {
+            &self.0
+        }
+
+        fn join(&self, path: &str) -> PathBuf {
+            self.0.join(path)
+        }
+    }
+
+    impl Drop for TestDir {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
     #[test]
     fn test_possible_values_parsing() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "test_possible_values_parsing_{}_{}",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_nanos()
-        ));
-        std::fs::create_dir_all(&temp_dir)
-            .expect("Failed to create temp_dir for test_possible_values_parsing");
-
-        let possible_path = temp_dir.join("possible_values");
+        let test_dir = TestDir::new("test_possible_values_parsing");
+        let possible_path = test_dir.join("possible_values");
 
         // 1. All integer tokens
         std::fs::write(&possible_path, "0;1;2\n").expect("Failed to write possible_values");
-        let (_, possible, _, _, _) = Attribute::read_base_values(&temp_dir);
+        let (_, possible, _, _, _) = Attribute::read_base_values(test_dir.path());
         assert_eq!(possible, AttrValue::EnumInt(vec![0, 1, 2]));
 
         // 2. All string tokens
         std::fs::write(&possible_path, "Disabled;Enabled\n")
             .expect("Failed to write possible_values");
-        let (_, possible, _, _, _) = Attribute::read_base_values(&temp_dir);
+        let (_, possible, _, _, _) = Attribute::read_base_values(test_dir.path());
         assert_eq!(
             possible,
             AttrValue::EnumStr(vec![
@@ -621,7 +616,7 @@ mod tests {
 
         // 3. Mixed string and int tokens (preserves all tokens without dropping non-integers)
         std::fs::write(&possible_path, "0;Disabled;2\n").expect("Failed to write possible_values");
-        let (_, possible, _, _, _) = Attribute::read_base_values(&temp_dir);
+        let (_, possible, _, _, _) = Attribute::read_base_values(test_dir.path());
         assert_eq!(
             possible,
             AttrValue::EnumStr(vec![
@@ -633,19 +628,15 @@ mod tests {
 
         // 4. Single integer token
         std::fs::write(&possible_path, "42\n").expect("Failed to write possible_values");
-        let (_, possible, _, _, _) = Attribute::read_base_values(&temp_dir);
+        let (_, possible, _, _, _) = Attribute::read_base_values(test_dir.path());
         assert_eq!(possible, AttrValue::Integer(42));
 
         // 5. Single string token
         std::fs::write(&possible_path, "Performance\n").expect("Failed to write possible_values");
-        let (_, possible, _, _, _) = Attribute::read_base_values(&temp_dir);
+        let (_, possible, _, _, _) = Attribute::read_base_values(test_dir.path());
         assert_eq!(
             possible,
             AttrValue::EnumStr(vec!["Performance".to_string()])
         );
-
-        // Cleanup
-        std::fs::remove_dir_all(&temp_dir)
-            .expect("Failed to remove temp_dir for test_possible_values_parsing");
     }
 }

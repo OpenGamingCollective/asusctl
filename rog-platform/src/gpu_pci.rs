@@ -548,13 +548,11 @@ pub fn get_igpu_usage_pct() -> f32 {
                 .map(|n| n.to_string_lossy())
                 .unwrap_or_default();
             if name.starts_with("card") {
-                let busy_path = path.join("device/gpu_busy_percent");
-                if busy_path.exists() {
-                    if let Ok(vendor_str) = std::fs::read_to_string(path.join("device/vendor")) {
-                        if vendor_str.trim() == "0x1002" {
-                            if let Some(val) = read_sysfs_parsed::<f32>(busy_path) {
-                                return val;
-                            }
+                if let Ok(vendor_str) = std::fs::read_to_string(path.join("device/vendor")) {
+                    if vendor_str.trim() == "0x1002" {
+                        let busy_path = path.join("device/gpu_busy_percent");
+                        if let Some(val) = read_sysfs_parsed::<f32>(busy_path) {
+                            return val;
                         }
                     }
                 }
@@ -587,7 +585,7 @@ pub fn get_gpu_temp() -> f32 {
             }
         }
     }
-    0.0
+    -1.0
 }
 
 pub fn get_gpu_usage_pct() -> f32 {

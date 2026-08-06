@@ -326,7 +326,7 @@ pub fn get_cpu_temp() -> f32 {
     }
     read_sysfs_parsed::<f32>("/sys/class/thermal/thermal_zone0/temp")
         .map(|t| t / 1000.0)
-        .unwrap_or(0.0)
+        .unwrap_or(-1.0)
 }
 
 pub fn get_cpu_frequency_mhz() -> f32 {
@@ -361,7 +361,7 @@ pub fn get_cpu_frequency_mhz() -> f32 {
     if count > 0 {
         total_freq / count as f32
     } else {
-        0.0
+        -1.0
     }
 }
 

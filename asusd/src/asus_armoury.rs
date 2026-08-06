@@ -290,13 +290,11 @@ impl AsusArmouryAttribute {
                     attrs.push("current_value".to_string());
                 }
             }
-            Err(e) => {
-                if !self.logged_read_error.swap(true, Ordering::Relaxed) {
-                    error!(
-                        "Firmware attribute '{}' is not supported or failed to read: {e:?}",
-                        self.attr.name()
-                    );
-                }
+            Err(e) if !self.logged_read_error.swap(true, Ordering::Relaxed) => {
+                error!(
+                    "Firmware attribute '{}' is not supported or failed to read: {e:?}",
+                    self.attr.name()
+                );
             }
             _ => {}
         }
