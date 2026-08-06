@@ -4,7 +4,6 @@ use std::io;
 use std::os::unix::fs::OpenOptionsExt;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::path::Path;
-use std::time::Duration;
 
 pub const SG_DXFER_NONE: i32 = -1;
 pub const SG_DXFER_TO_DEV: i32 = -2;
@@ -153,35 +152,11 @@ impl Task {
         self
     }
 
-    pub fn cdb(&self) -> &[u8] {
-        &self.cmd
-    }
-
-    pub fn timeout(&self) -> Duration {
-        Duration::from_millis(u64::from(self.inner.timeout))
-    }
-
     pub fn set_data(&mut self, buf: &[u8], direction: Direction) -> &mut Self {
         self.data = buf.to_vec();
         self.inner.dxfer_direction = direction.to_underlying();
         self.sync_pointers();
         self
-    }
-
-    pub fn data(&self) -> &[u8] {
-        &self.data
-    }
-
-    pub fn data_mut(&mut self) -> &mut [u8] {
-        &mut self.data
-    }
-
-    pub fn flags(&self) -> u32 {
-        self.inner.flags
-    }
-
-    pub fn duration(&self) -> u32 {
-        self.inner.duration
     }
 
     pub fn status(&self) -> u8 {
