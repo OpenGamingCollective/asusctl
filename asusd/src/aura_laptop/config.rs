@@ -224,7 +224,7 @@ impl AuraConfig {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{Mutex, MutexGuard, OnceLock};
+    use std::sync::{Mutex, MutexGuard};
 
     use rog_aura::keyboard::AuraPowerState;
     use rog_aura::{
@@ -235,13 +235,10 @@ mod tests {
 
     // Global mutex to serialize tests that rely on process-wide environment
     // variables
-    static TEST_MUTEX: OnceLock<Mutex<()>> = OnceLock::new();
+    static TEST_MUTEX: Mutex<()> = Mutex::new(());
 
     fn test_lock() -> MutexGuard<'static, ()> {
-        TEST_MUTEX
-            .get_or_init(|| Mutex::new(()))
-            .lock()
-            .expect("TEST_MUTEX poisoned")
+        TEST_MUTEX.lock().expect("TEST_MUTEX poisoned")
     }
 
     #[test]
