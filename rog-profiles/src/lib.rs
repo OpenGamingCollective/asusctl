@@ -270,40 +270,6 @@ impl FanCurveProfiles {
         }
     }
 
-    pub fn get_fan_curve_for(&self, name: &PlatformProfile, pu: FanCurvePU) -> Option<&CurveData> {
-        match name {
-            PlatformProfile::Balanced => {
-                for this_curve in self.balanced.iter() {
-                    if this_curve.fan == pu {
-                        return Some(this_curve);
-                    }
-                }
-            }
-            PlatformProfile::Performance => {
-                for this_curve in self.performance.iter() {
-                    if this_curve.fan == pu {
-                        return Some(this_curve);
-                    }
-                }
-            }
-            PlatformProfile::Quiet | PlatformProfile::LowPower => {
-                for this_curve in self.quiet.iter() {
-                    if this_curve.fan == pu {
-                        return Some(this_curve);
-                    }
-                }
-            }
-            PlatformProfile::Custom => {
-                for this_curve in self.custom.iter() {
-                    if this_curve.fan == pu {
-                        return Some(this_curve);
-                    }
-                }
-            }
-        }
-        None
-    }
-
     pub fn save_fan_curve(
         &mut self,
         curve: CurveData,
