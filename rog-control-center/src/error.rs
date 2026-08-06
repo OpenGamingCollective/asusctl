@@ -13,6 +13,9 @@ pub enum Error {
     #[error("Failed to lock user config")]
     ConfigLockFail,
 
+    #[error("D-Bus connection failed after retries")]
+    DbusConnectionFailed,
+
     #[error("XDG environment vars appear unset")]
     XdgVars,
 

@@ -9,7 +9,7 @@ use dmi_id::DMIID;
 use log::{debug, error, info, warn, LevelFilter};
 use rog_control_center::cli_options::CliStart;
 use rog_control_center::config::Config;
-use rog_control_center::error::Result;
+use rog_control_center::error::{Error, Result};
 use rog_control_center::notify::start_notifications;
 use rog_control_center::print_versions;
 use rog_control_center::shortcuts::EnableMode;
@@ -22,11 +22,21 @@ use rog_control_center::zbus_proxies::{
 };
 use tokio::runtime::Runtime;
 
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
+    // NOTE on the `unsafe` env writes below: this is a plain synchronous main,
+    // not `#[tokio::main]`. No Tokio runtime (and therefore no worker threads)
+    // exists yet — the multi-thread runtime is only built later via
+    // `Runtime::new` + `block_on`. With a single thread there is no concurrent
+    // getenv that could race these setenv calls, which is what makes them sound.
+    // That guarantee does NOT hold under `#[tokio::main]`, where the runtime and
+    // its threads are created before the function body runs.
+
     // Ensure tracing spans are quiet by default unless user overrides
     if std::env::var_os("RUST_LOG").is_none() {
-        std::env::set_var("RUST_LOG", "warn,tracing=error,zbus=error");
+        // SAFETY: single-threaded, no runtime yet (see note above).
+        unsafe {
+            std::env::set_var("RUST_LOG", "warn,tracing=error,zbus=error");
+        }
     }
     let mut logger = env_logger::Builder::new();
     logger
@@ -50,20 +60,33 @@ async fn main() -> Result<()> {
         debug!("Gamescope detected");
         if !gamescope.is_empty() {
             debug!("Setting WAYLAND_DISPLAY to {}", gamescope);
-            env::set_var("WAYLAND_DISPLAY", gamescope);
+            // SAFETY: This runs before any threads are spawned (before Runtime::new),
+            // so no concurrent getenv can race with this setenv.
+            unsafe {
+                env::set_var("WAYLAND_DISPLAY", gamescope);
+            }
         }
         // gamescope-0
         else if let Ok(wayland) = env::var("WAYLAND_DISPLAY") {
             debug!("Wayland display detected");
             if wayland.is_empty() {
                 debug!("Setting WAYLAND_DISPLAY to gamescope-0");
-                env::set_var("WAYLAND_DISPLAY", "gamescope-0");
+                // SAFETY: This runs before any threads are spawned (before Runtime::new),
+                // so no concurrent getenv can race with this setenv.
+                unsafe {
+                    env::set_var("WAYLAND_DISPLAY", "gamescope-0");
+                }
             }
         }
     }
 
-    // Try to open a proxy and check for app state first
-    {
+    // Single-instance guard. Skipped when this binary re-spawned itself for a
+    // "Reload Window" — the child carries --no-single-instance so it doesn't
+    // see the still-registered parent and exit; the parent quits right after
+    // spawning, freeing the name for future reloads.
+    let skip_single_instance = cli_parsed.no_single_instance;
+    if !skip_single_instance {
+        // Try to open a proxy and check for app state first
         let user_con = zbus::blocking::Connection::session()?;
         if let Ok(proxy) = ROGCCZbusProxyBlocking::new(&user_con) {
             if let Ok(state) = proxy.state() {
@@ -75,6 +98,34 @@ async fn main() -> Result<()> {
         }
     }
 
+    // Apply the configured UI language through env vars before Runtime::new
+    // (they're process-global). "Reload Window" restarts the process, which
+    // re-reads config.language here so gettext resolves @tr() in the chosen
+    // locale at init_translations — no setlocale / unsafe / libc needed.
+    let startup_language = Config::new().load().language;
+    if !startup_language.is_empty() {
+        let locale = format!("{startup_language}.UTF-8");
+        // SAFETY: single-threaded, no runtime yet (see note at the top of main).
+        unsafe {
+            env::set_var("LANG", &locale);
+            env::set_var("LC_ALL", &locale);
+            env::set_var("LANGUAGE", &startup_language);
+        }
+    }
+
+    // start tokio
+    let rt = Runtime::new().expect("Unable to create Runtime");
+
+    #[cfg(feature = "tokio-debug")]
+    console_subscriber::init();
+
+    // Run the async body on the runtime. Everything below this point executes
+    // inside `block_on`, so `tokio::spawn` and `.await` are available. main
+    // keeps ownership of `rt` and shuts it down after block_on returns.
+    rt.block_on(async_main(&rt, cli_parsed))
+}
+
+async fn async_main(rt: &Runtime, cli_parsed: CliStart) -> Result<()> {
     // version checks
     let self_version = env!("CARGO_PKG_VERSION");
     let zbus_con = zbus::blocking::Connection::system()?;
@@ -91,25 +142,56 @@ async fn main() -> Result<()> {
         // return Ok(());
     }
 
-    // start tokio
-    let rt = Runtime::new().expect("Unable to create Runtime");
-    // Enter the runtime so that `tokio::spawn` is available immediately.
-    let _enter = rt.enter();
 
-    #[cfg(feature = "tokio-debug")]
-    console_subscriber::init();
+    let (conn, app_state) = {
+        let mut last_err: Option<zbus::Error> = None;
+        let mut connection = None;
+        let mut shared_state = None;
+        for attempt in 0..5u32 {
+            let state_zbus = ROGCCZbus::new();
+            let cloned = state_zbus.clone_state();
 
-    let state_zbus = ROGCCZbus::new();
-    let app_state = state_zbus.clone_state();
-    let conn = zbus::connection::Builder::session()?
-        .name(ZBUS_IFACE)?
-        .serve_at(ZBUS_PATH, state_zbus)?
-        .build()
-        .await
-        .map_err(|err| {
-            warn!("{}: add_to_server {}", ZBUS_PATH, err);
-            err
-        })?;
+            // Build the connection, catching any registration errors (e.g.
+            // NameTaken when the child races the parent during reload).
+            let build_result: zbus::Result<_> = async {
+                zbus::connection::Builder::session()?
+                    .name(ZBUS_IFACE)?
+                    .serve_at(ZBUS_PATH, state_zbus)?
+                    .build()
+                    .await
+            }
+            .await;
+
+            match build_result {
+                Ok(c) => {
+                    connection = Some(c);
+                    shared_state = Some(cloned);
+                    break;
+                }
+                Err(e) => {
+                    warn!(
+                        "D-Bus name registration attempt {} failed: {e}",
+                        attempt + 1
+                    );
+                    last_err = Some(e);
+                    if attempt < 4 {
+                        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                    }
+                }
+            }
+        }
+        match (connection, shared_state) {
+            (Some(c), Some(s)) => (c, s),
+            _ => {
+                // Unreachable in practice — the loop always sets last_err on
+                // failure — but avoid a panicking expect: fall back to a plain
+                // error variant if the invariant ever breaks.
+                return Err(
+                    last_err.map(Error::from).unwrap_or(Error::DbusConnectionFailed),
+                )
+            }
+        }
+    };
 
     let dmi = DMIID::new().unwrap_or_default();
     let board_name = dmi.board_name;
@@ -143,12 +225,6 @@ async fn main() -> Result<()> {
         }
     };
 
-    let is_tuf = {
-        let b = board_name.to_lowercase();
-        let p = prod_family.to_lowercase();
-        b.contains("tuf") || p.contains("tuf")
-    };
-
     #[cfg(feature = "rog_ally")]
     if is_rog_ally {
         config.notifications.enabled = false;
@@ -170,12 +246,15 @@ async fn main() -> Result<()> {
     };
     let config = Arc::new(Mutex::new(config));
 
+    // The LANG/LC_ALL env was applied before Runtime::new (see above);
+    // gettext picks them up at init_translations below.
+
     // GPU power status channel: written by the dGPU status monitor in
     // notify.rs, read by the tray to color its icon
     let (gpu_status_tx, gpu_status_rx) =
         tokio::sync::watch::channel(rog_platform::gpu_pci::get_gpu_power_status());
 
-    start_notifications(config.clone(), &rt, gpu_status_tx)?;
+    start_notifications(config.clone(), rt, gpu_status_tx)?;
 
     if !startup_in_background {
         if let Ok(mut app_state) = app_state.lock() {
@@ -184,11 +263,10 @@ async fn main() -> Result<()> {
     }
 
     if std::env::var("RUST_TRANSLATIONS").is_ok() {
-        // don't care about content
-        log::debug!("---- Using local-dir translations");
+        log::debug!("Using build-time translations from OUT_DIR");
         slint::init_translations!(env!("ROGCC_TRANSLATIONS_DIR"));
     } else {
-        log::debug!("Using system installed translations");
+        log::debug!("Using system-installed translations");
         slint::init_translations!("/usr/share/locale/");
     }
 
@@ -202,14 +280,14 @@ async fn main() -> Result<()> {
         config.clone(),
         prefetched_supported.clone(),
         app_state.clone(),
-        is_tuf,
     );
 
     let shortcut_service = if is_rog_ally {
         None
     } else {
+        let rt_handle = rt.handle();
         let service =
-            rog_control_center::shortcuts::start(rt.handle(), conn.clone(), window.clone());
+            rog_control_center::shortcuts::start(rt_handle, conn.clone(), window.clone());
         let handle = service.handle();
         window.set_shortcuts(handle.clone());
         if config.lock().is_ok_and(|c| c.enable_global_shortcut) {
@@ -240,7 +318,6 @@ async fn main() -> Result<()> {
                     config.clone(),
                     prefetched_supported.clone(),
                     app_state.clone(),
-                    is_tuf,
                     None,
                 );
                 newui.window().on_close_requested(move || {
@@ -298,13 +375,11 @@ async fn main() -> Result<()> {
     if let Err(e) = slint::run_event_loop_until_quit() {
         error!("Slint event loop error: {e:?}");
     }
-    // Restore the outer Tokio context before awaiting a task owned by the
-    // application runtime, then stop that runtime only after the portal
-    // session has been closed.
-    drop(_enter);
+    // Shut the shortcut service down only after the Slint loop (and its portal
+    // session) has fully stopped. The runtime itself is dropped in main once
+    // block_on returns.
     if let Some(service) = shortcut_service {
         service.shutdown().await;
     }
-    rt.shutdown_background();
     Ok(())
 }
