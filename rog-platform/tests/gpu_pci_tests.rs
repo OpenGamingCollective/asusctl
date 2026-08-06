@@ -5,7 +5,7 @@
 //! functions (`Device::find`, `get_gpu_power_status`) are tested via integration
 //! tests on machines with actual GPUs.
 
-use rog_platform::gpu_pci::{lscpi_dgpu_check, GfxPower, GfxVendor};
+use rog_platform::gpu_pci::{lscpi_dgpu_check, GfxPower};
 use std::str::FromStr;
 
 // ---------------------------------------------------------------------------
@@ -120,56 +120,6 @@ fn gfx_power_copy_clone() {
 }
 
 // ---------------------------------------------------------------------------
-// GfxVendor – From<u16>
-// ---------------------------------------------------------------------------
-
-#[test]
-fn gfx_vendor_from_nvidia() {
-    assert_eq!(GfxVendor::from(0x10DEu16), GfxVendor::Nvidia);
-}
-
-#[test]
-fn gfx_vendor_from_amd() {
-    assert_eq!(GfxVendor::from(0x1002u16), GfxVendor::Amd);
-}
-
-#[test]
-fn gfx_vendor_from_intel() {
-    assert_eq!(GfxVendor::from(0x8086u16), GfxVendor::Intel);
-}
-
-#[test]
-fn gfx_vendor_from_unknown() {
-    assert_eq!(GfxVendor::from(0x1234u16), GfxVendor::Unknown);
-    assert_eq!(GfxVendor::from(0u16), GfxVendor::Unknown);
-}
-
-// ---------------------------------------------------------------------------
-// GfxVendor – Display
-// ---------------------------------------------------------------------------
-
-#[test]
-fn gfx_vendor_display() {
-    assert_eq!(format!("{}", GfxVendor::Nvidia), "Nvidia");
-    assert_eq!(format!("{}", GfxVendor::Amd), "AMD");
-    assert_eq!(format!("{}", GfxVendor::Intel), "Intel");
-    assert_eq!(format!("{}", GfxVendor::Unknown), "Unknown");
-    assert_eq!(
-        format!("{}", GfxVendor::AsusDgpuDisabled),
-        "ASUS dGPU disabled"
-    );
-}
-
-// ---------------------------------------------------------------------------
-// GfxVendor – Default
-// ---------------------------------------------------------------------------
-
-#[test]
-fn gfx_vendor_default_is_unknown() {
-    assert_eq!(GfxVendor::default(), GfxVendor::Unknown);
-}
-
-// ---------------------------------------------------------------------------
 // lscpi_dgpu_check – positive matches
 // ---------------------------------------------------------------------------
 
@@ -244,29 +194,6 @@ fn gfx_power_serde_roundtrip() {
     for variant in variants {
         let json = serde_json::to_string(&variant).expect("serialize");
         let deserialized: GfxPower = serde_json::from_str(&json).expect("deserialize");
-        assert_eq!(
-            deserialized, variant,
-            "serde roundtrip failed for {variant:?}"
-        );
-    }
-}
-
-// ---------------------------------------------------------------------------
-// GfxVendor – serialization (serde)
-// ---------------------------------------------------------------------------
-
-#[test]
-fn gfx_vendor_serde_roundtrip() {
-    let variants = [
-        GfxVendor::Nvidia,
-        GfxVendor::Amd,
-        GfxVendor::Intel,
-        GfxVendor::Unknown,
-        GfxVendor::AsusDgpuDisabled,
-    ];
-    for variant in variants {
-        let json = serde_json::to_string(&variant).expect("serialize");
-        let deserialized: GfxVendor = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(
             deserialized, variant,
             "serde roundtrip failed for {variant:?}"

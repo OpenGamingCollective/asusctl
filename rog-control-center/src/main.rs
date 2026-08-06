@@ -174,7 +174,7 @@ async fn main() -> Result<()> {
     // GPU power status channel: written by the dGPU status monitor in
     // notify.rs, read by the tray to color its icon
     let (gpu_status_tx, gpu_status_rx) =
-        tokio::sync::watch::channel(rog_platform::gpu_pci::get_gpu_power_status().0);
+        tokio::sync::watch::channel(rog_platform::gpu_pci::get_gpu_power_status());
 
     start_notifications(config.clone(), &rt, gpu_status_tx)?;
 

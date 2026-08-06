@@ -17,9 +17,6 @@ use zbus::zvariant::{OwnedValue, Type, Value};
 
 use crate::error::{PlatformError, Result};
 
-const PCI_BUS_PATH: &str = "/sys/bus/pci";
-const SLOTS: &str = "/sys/bus/pci/slots";
-
 // --- ASUS-specific sysfs paths (reused from rog-platform) ---
 
 // Both locations read the same WMI devstate and report the same values. The
@@ -136,44 +133,6 @@ impl Display for GfxPower {
     }
 }
 
-// --- GfxVendor ---
-
-/// GPU vendor identification.
-#[derive(
-    Debug, Default, Type, Value, OwnedValue, PartialEq, Eq, Copy, Clone, Serialize, Deserialize,
-)]
-pub enum GfxVendor {
-    Nvidia,
-    Amd,
-    Intel,
-    #[default]
-    Unknown,
-    AsusDgpuDisabled,
-}
-
-impl From<u16> for GfxVendor {
-    fn from(vendor: u16) -> Self {
-        match vendor {
-            0x1002 => GfxVendor::Amd,
-            0x10DE => GfxVendor::Nvidia,
-            0x8086 => GfxVendor::Intel,
-            _ => GfxVendor::Unknown,
-        }
-    }
-}
-
-impl Display for GfxVendor {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            GfxVendor::Nvidia => write!(f, "Nvidia"),
-            GfxVendor::Amd => write!(f, "AMD"),
-            GfxVendor::Intel => write!(f, "Intel"),
-            GfxVendor::Unknown => write!(f, "Unknown"),
-            GfxVendor::AsusDgpuDisabled => write!(f, "ASUS dGPU disabled"),
-        }
-    }
-}
-
 // --- PCI GPU identification ---
 
 /// Nvidia PCI vendor ID, as it appears in the udev `PCI_ID` property.
@@ -203,8 +162,6 @@ pub fn is_display_class(pci_class: &str) -> bool {
 pub struct Device {
     /// Path to the device sysfs entry.
     dev_path: PathBuf,
-    /// Vendor of this device.
-    vendor: GfxVendor,
     /// Whether this device is the discrete GPU.
     is_dgpu: bool,
     /// Kernel name, e.g. `0000:01:00.0`.
@@ -217,10 +174,6 @@ pub struct Device {
 impl Device {
     pub fn dev_path(&self) -> &PathBuf {
         &self.dev_path
-    }
-
-    pub fn vendor(&self) -> GfxVendor {
-        self.vendor
     }
 
     pub fn is_dgpu(&self) -> bool {
@@ -296,80 +249,75 @@ impl Device {
                     let class = class.to_string_lossy();
                     // Match only Nvidia or AMD
                     if is_gpu_vendor(&id) {
-                        if let Some(vendor) = id.split(':').next() {
-                            let mut dgpu = false;
-                            // Check connected displays to distinguish dGPU from iGPU.
-                            // eDP-1 is the internal panel, always on iGPU.
-                            let displays =
-                                find_connected_displays(device.syspath()).unwrap_or_default();
-                            if !displays.contains(&"eDP-1".to_string()) {
+                        let mut dgpu = false;
+                        // Check connected displays to distinguish dGPU from iGPU.
+                        // eDP-1 is the internal panel, always on iGPU.
+                        let displays =
+                            find_connected_displays(device.syspath()).unwrap_or_default();
+                        if !displays.contains(&"eDP-1".to_string()) {
+                            trace!(
+                                "Matched dGPU {id} at {:?} by checking display connections",
+                                device.sysname()
+                            );
+                            dgpu = is_display_class(&class);
+                        } else {
+                            trace!(
+                                "Device {id} at {:?} appears to be the iGPU",
+                                device.sysname()
+                            );
+                        }
+                        if !dgpu && id.starts_with(AMD_PCI_VENDOR) {
+                            trace!(
+                                "Found dGPU Device {id} without boot_vga attribute at {:?}",
+                                device.sysname()
+                            );
+                            // Fallback: check hwmon for AMD iGPU detection
+                            let mut dev_path = PathBuf::from(device.syspath());
+                            dev_path.push("hwmon");
+
+                            let hwmon_n_opt = match dev_path.read_dir() {
+                                Ok(mut entries) => entries.next(),
+                                Err(e) => {
+                                    trace!("Error reading hwmon directory: {}", e);
+                                    None
+                                }
+                            };
+
+                            if let Some(Ok(hwmon_n)) = hwmon_n_opt {
+                                let mut hwmon_path = hwmon_n.path();
+                                hwmon_path.push("in1_input");
+                                dgpu = !hwmon_path.exists();
+                            }
+                        }
+                        if !dgpu {
+                            if let Some(label) = device.property_value("ID_MODEL_FROM_DATABASE") {
                                 trace!(
-                                    "Matched dGPU {id} at {:?} by checking display connections",
+                                    "Found ID_MODEL_FROM_DATABASE property {id} at {:?} : {label:?}",
                                     device.sysname()
                                 );
-                                dgpu = is_display_class(&class);
+                                dgpu = lscpi_dgpu_check(&label.to_string_lossy());
                             } else {
                                 trace!(
-                                    "Device {id} at {:?} appears to be the iGPU",
+                                    "Didn't find dGPU with standard methods, using last resort for id:{id} at {:?}",
                                     device.sysname()
                                 );
+                                dgpu = lscpi_dgpu_check(&lscpi(&id).unwrap_or_default());
                             }
-                            if !dgpu && id.starts_with(AMD_PCI_VENDOR) {
-                                trace!(
-                                    "Found dGPU Device {id} without boot_vga attribute at {:?}",
-                                    device.sysname()
-                                );
-                                // Fallback: check hwmon for AMD iGPU detection
-                                let mut dev_path = PathBuf::from(device.syspath());
-                                dev_path.push("hwmon");
+                        }
 
-                                let hwmon_n_opt = match dev_path.read_dir() {
-                                    Ok(mut entries) => entries.next(),
-                                    Err(e) => {
-                                        trace!("Error reading hwmon directory: {}", e);
-                                        None
-                                    }
-                                };
-
-                                if let Some(Ok(hwmon_n)) = hwmon_n_opt {
-                                    let mut hwmon_path = hwmon_n.path();
-                                    hwmon_path.push("in1_input");
-                                    dgpu = !hwmon_path.exists();
-                                }
+                        if dgpu || (!parent.is_empty() && sysname.contains(&parent)) {
+                            if dgpu {
+                                info!("Found dgpu {id} at {:?}", device.sysname());
+                            } else {
+                                info!("Found additional device {id} at {:?}", device.sysname());
                             }
-                            if !dgpu {
-                                if let Some(label) = device.property_value("ID_MODEL_FROM_DATABASE")
-                                {
-                                    trace!(
-                                        "Found ID_MODEL_FROM_DATABASE property {id} at {:?} : {label:?}",
-                                        device.sysname()
-                                    );
-                                    dgpu = lscpi_dgpu_check(&label.to_string_lossy());
-                                } else {
-                                    trace!(
-                                        "Didn't find dGPU with standard methods, using last resort for id:{id} at {:?}",
-                                        device.sysname()
-                                    );
-                                    dgpu = lscpi_dgpu_check(&lscpi(&id).unwrap_or_default());
-                                }
-                            }
-
-                            if dgpu || (!parent.is_empty() && sysname.contains(&parent)) {
-                                if dgpu {
-                                    info!("Found dgpu {id} at {:?}", device.sysname());
-                                } else {
-                                    info!("Found additional device {id} at {:?}", device.sysname());
-                                }
-                                parent = get_parent(&device);
-                                let vendor_id: u16 = u16::from_str_radix(vendor, 16).unwrap_or(0);
-                                devices.push(Self {
-                                    dev_path: PathBuf::from(device.syspath()),
-                                    vendor: vendor_id.into(),
-                                    is_dgpu: dgpu,
-                                    name: sysname.to_string(),
-                                    pci_id: id.to_string(),
-                                });
-                            }
+                            parent = get_parent(&device);
+                            devices.push(Self {
+                                dev_path: PathBuf::from(device.syspath()),
+                                is_dgpu: dgpu,
+                                name: sysname.to_string(),
+                                pci_id: id.to_string(),
+                            });
                         }
                     }
                 }
@@ -452,43 +400,6 @@ pub fn find_connected_displays(gpu_path: &Path) -> Result<Vec<String>> {
     Ok(displays)
 }
 
-/// Find the PCI hotplug slot power control file for a device.
-pub fn find_slot_power(address: &str) -> Result<PathBuf> {
-    let mut buf = Vec::new();
-    let path = PathBuf::from(SLOTS);
-    if !path.exists() {
-        return Err(PlatformError::NotSupported);
-    }
-    for path in path.read_dir().map_err(PlatformError::Io)? {
-        let path = path.map_err(PlatformError::Io)?.path();
-
-        let mut address_path = path.to_path_buf();
-        address_path.push("address");
-
-        let mut file = OpenOptions::new()
-            .read(true)
-            .open(&address_path)
-            .map_err(PlatformError::Io)?;
-        file.read_to_end(&mut buf).map_err(PlatformError::Io)?;
-
-        if address.contains(String::from_utf8_lossy(&buf).trim_end()) {
-            address_path.pop();
-            address_path.push("power");
-            info!("Found hotplug power slot at {:?}", address_path);
-            return Ok(address_path);
-        }
-        buf.clear();
-    }
-    Err(PlatformError::NotSupported)
-}
-
-/// Rescan the PCI bus to add all removed devices back.
-pub fn rescan_pci_bus() -> Result<()> {
-    let path = PathBuf::from(PCI_BUS_PATH).join("rescan");
-    std::fs::write(&path, "1")
-        .map_err(|e| PlatformError::Write(path.to_string_lossy().to_string(), e))
-}
-
 /// Get the current GPU power status, using all available detection methods.
 ///
 /// This is the main entry point for determining dGPU power state. It tries:
@@ -497,11 +408,11 @@ pub fn rescan_pci_bus() -> Result<()> {
 ///    dGPU
 /// 2. Direct PCI device detection (if dGPU devices are found)
 /// 3. ASUS gpu_mux_mode attribute
-pub fn get_gpu_power_status() -> (GfxPower, GfxVendor) {
+pub fn get_gpu_power_status() -> GfxPower {
     if asus_dgpu_disable_exists() {
         if let Ok(disabled) = asus_dgpu_disabled() {
             if disabled {
-                return (GfxPower::AsusDisabled, GfxVendor::AsusDgpuDisabled);
+                return GfxPower::AsusDisabled;
             }
         }
     }
@@ -509,23 +420,19 @@ pub fn get_gpu_power_status() -> (GfxPower, GfxVendor) {
     let devices = Device::find().unwrap_or_default();
 
     if let Some(dgpu) = devices.iter().find(|d| d.is_dgpu()) {
-        let vendor = dgpu.vendor();
-        if let Ok(power) = dgpu.get_runtime_status() {
-            return (power, vendor);
-        }
-        return (GfxPower::Unknown, vendor);
+        return dgpu.get_runtime_status().unwrap_or(GfxPower::Unknown);
     }
 
     // No dGPU devices found — check the MUX attribute
     if asus_gpu_mux_exists() {
         if let Ok(discreet) = asus_gpu_mux_discreet() {
             if discreet {
-                return (GfxPower::AsusMuxDiscreet, GfxVendor::Nvidia);
+                return GfxPower::AsusMuxDiscreet;
             }
         }
     }
 
-    (GfxPower::Unknown, GfxVendor::Unknown)
+    GfxPower::Unknown
 }
 
 fn lookup_amdgpu_name(device_id: &str, revision: &str) -> Option<String> {
@@ -747,7 +654,6 @@ mod tests {
     fn fake_device(dev_path: PathBuf) -> Device {
         Device {
             dev_path,
-            vendor: GfxVendor::Nvidia,
             is_dgpu: true,
             name: "0000:01:00.0".to_string(),
             pci_id: "10DE:2820".to_string(),
@@ -846,7 +752,7 @@ mod tests {
     fn live_dgpu_detection() -> std::result::Result<(), Box<dyn std::error::Error>> {
         let devices = Device::find()?;
         let dgpu = devices.iter().find(|d| d.is_dgpu()).expect("no dGPU found");
-        assert_ne!(dgpu.vendor(), GfxVendor::Unknown);
+        assert!(is_gpu_vendor(dgpu.pci_id()));
         println!(
             "dGPU {} runtime status: {:?}",
             dgpu.pci_id(),
