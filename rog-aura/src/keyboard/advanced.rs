@@ -167,20 +167,6 @@ pub enum LedCode {
     Blocking,
 }
 
-impl LedCode {
-    pub fn is_lightbar_zone(&self) -> bool {
-        matches!(
-            self,
-            Self::LightbarLeft
-                | Self::LightbarLeftCorner
-                | Self::LightbarLeftBottom
-                | Self::LightbarRightBottom
-                | Self::LightbarRightCorner
-                | Self::LightbarRight
-        )
-    }
-}
-
 /// Represents the per-key raw USB packets
 pub type AuraLaptopUsbPackets = Vec<Vec<u8>>;
 
