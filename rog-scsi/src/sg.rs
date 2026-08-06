@@ -157,11 +157,6 @@ impl Task {
         &self.cmd
     }
 
-    pub fn set_timeout(&mut self, timeout: Duration) -> &mut Self {
-        self.inner.timeout = timeout.as_millis() as u32;
-        self
-    }
-
     pub fn timeout(&self) -> Duration {
         Duration::from_millis(u64::from(self.inner.timeout))
     }
@@ -181,31 +176,12 @@ impl Task {
         &mut self.data
     }
 
-    pub fn set_sense_buffer(&mut self, buf: &[u8]) -> &mut Self {
-        self.sense = buf.to_vec();
-        self.sync_pointers();
-        self
-    }
-
-    pub fn sense_buffer(&self) -> &[u8] {
-        &self.sense
-    }
-
-    pub fn set_flags(&mut self, flags: u32) -> &mut Self {
-        self.inner.flags = flags;
-        self
-    }
-
     pub fn flags(&self) -> u32 {
         self.inner.flags
     }
 
     pub fn duration(&self) -> u32 {
         self.inner.duration
-    }
-
-    pub fn residual_data(&self) -> i32 {
-        self.inner.resid
     }
 
     pub fn status(&self) -> u8 {

@@ -323,14 +323,6 @@ impl AuraEffect {
         &self.mode
     }
 
-    pub fn mode_name(&self) -> &str {
-        <&str>::from(&self.mode)
-    }
-
-    pub fn mode_num(&self) -> u8 {
-        self.mode as u8
-    }
-
     pub fn default_with_mode(mode: AuraMode) -> Self {
         Self {
             mode,
