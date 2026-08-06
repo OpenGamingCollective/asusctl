@@ -132,15 +132,12 @@ pub fn setup_window(
     config: Arc<Mutex<Config>>,
     prefetched_supported: std::sync::Arc<Option<Vec<i32>>>,
     app_state: Arc<Mutex<AppState>>,
-    is_tuf: bool,
     shortcuts: Option<ShortcutHandle>,
 ) -> MainWindow {
     slint::set_xdg_app_id(crate::APP_ID)
         .map_err(|e| warn!("Couldn't set application ID: {e:?}"))
         .ok();
     let ui = MainWindow::new().expect("Couldn't create main window");
-    // propagate TUF flag to the UI so the sidebar can swap logo branding
-    ui.set_is_tuf(is_tuf);
     if let Err(e) = ui.window().show() {
         warn!("Couldn't show main window: {e:?}");
     }
