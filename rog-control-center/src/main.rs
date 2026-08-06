@@ -1,5 +1,4 @@
 use std::env;
-use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::sync::{Arc, Mutex};
 use std::thread::{self, sleep};
@@ -308,12 +307,4 @@ async fn main() -> Result<()> {
     }
     rt.shutdown_background();
     Ok(())
-}
-
-pub fn get_layout_path(path: &Path, layout_name: &str) -> PathBuf {
-    let mut data_path = PathBuf::from(path);
-    let layout_file = format!("{}_US.ron", layout_name);
-    data_path.push("layouts");
-    data_path.push(layout_file);
-    data_path
 }

@@ -117,10 +117,6 @@ impl ShortcutHandle {
         *self.status.borrow()
     }
 
-    pub fn is_listening(&self) -> bool {
-        self.status() == ShortcutStatus::Listening
-    }
-
     pub fn status_receiver(&self) -> watch::Receiver<ShortcutStatus> {
         self.status.clone()
     }
