@@ -30,9 +30,9 @@ impl FromStr for Colour {
         if s.len() < 6 || !s.chars().take(6).all(|c| c.is_ascii_hexdigit()) {
             return Err(Error::ParseColour);
         }
-        let r = u8::from_str_radix(&s[0..2], 16).or(Err(Error::ParseColour))?;
-        let g = u8::from_str_radix(&s[2..4], 16).or(Err(Error::ParseColour))?;
-        let b = u8::from_str_radix(&s[4..6], 16).or(Err(Error::ParseColour))?;
+        let r = u8::from_str_radix(&s[0..2], 16).map_err(|_| Error::ParseColour)?;
+        let g = u8::from_str_radix(&s[2..4], 16).map_err(|_| Error::ParseColour)?;
+        let b = u8::from_str_radix(&s[4..6], 16).map_err(|_| Error::ParseColour)?;
         Ok(Colour { r, g, b })
     }
 }
