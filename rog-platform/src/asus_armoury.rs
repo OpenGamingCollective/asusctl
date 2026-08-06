@@ -249,10 +249,6 @@ impl FirmwareAttributes {
     pub fn attributes(&self) -> &Vec<Attribute> {
         &self.attrs
     }
-
-    pub fn attributes_mut(&mut self) -> &mut Vec<Attribute> {
-        &mut self.attrs
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]

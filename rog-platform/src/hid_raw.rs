@@ -13,8 +13,6 @@ use crate::error::{PlatformError, Result};
 pub struct HidRaw {
     /// The path to the `/dev/<name>` of the device
     devfs_path: PathBuf,
-    /// The sysfs path
-    syspath: PathBuf,
     /// The product ID. The vendor ID is not kept
     prod_id: String,
     _device_bcd: u32,
@@ -60,7 +58,6 @@ impl HidRaw {
                             file: RefCell::new(OpenOptions::new().write(true).open(dev_node)?),
                             devfs_path: dev_node.to_owned(),
                             prod_id: this_id_product.to_string_lossy().into(),
-                            syspath: endpoint.syspath().into(),
                             _device_bcd: usb_device
                                 .attribute_value("bcdDevice")
                                 .unwrap_or_default()
@@ -92,7 +89,6 @@ impl HidRaw {
                         file: RefCell::new(OpenOptions::new().write(true).open(dev_node)?),
                         devfs_path: dev_node.to_owned(),
                         prod_id: id_product.to_string_lossy().into(),
-                        syspath: endpoint.syspath().into(),
                         _device_bcd: endpoint
                             .attribute_value("bcdDevice")
                             .unwrap_or_default()
@@ -121,12 +117,5 @@ impl HidRaw {
             })?;
         }
         Ok(())
-    }
-
-    /// This method was added for certain devices like AniMe to prevent them
-    /// waking the laptop
-    pub fn set_wakeup_disabled(&self) -> Result<()> {
-        let mut dev = Device::from_syspath(&self.syspath)?;
-        Ok(dev.set_attribute_value("power/wakeup", "disabled")?)
     }
 }

@@ -111,53 +111,6 @@ impl From<GpuMode> for u8 {
     }
 }
 
-impl GpuMode {
-    /// For writing to `gpu_mux_mode` attribute
-    pub fn to_mux_attr(&self) -> u8 {
-        if *self == Self::Ultimate {
-            return 0;
-        }
-        1
-    }
-
-    pub fn to_dgpu_attr(&self) -> u8 {
-        if *self == Self::Integrated {
-            return 1;
-        }
-        0
-    }
-
-    pub fn to_egpu_attr(&self) -> u8 {
-        if *self == Self::Egpu {
-            return 1;
-        }
-        0
-    }
-
-    pub fn from_mux(num: u8) -> Self {
-        if num == 0 {
-            return Self::Ultimate;
-        }
-        Self::Optimus
-    }
-
-    pub fn from_dgpu(num: u8) -> Self {
-        if num == 1 {
-            return Self::Integrated;
-        }
-        Self::Optimus
-    }
-
-    // `from_dgpu()` should be called also, and should take precedence if result
-    // are not equal.
-    pub fn from_egpu(num: u8) -> Self {
-        if num == 1 {
-            return Self::Egpu;
-        }
-        Self::Optimus
-    }
-}
-
 impl Display for GpuMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
