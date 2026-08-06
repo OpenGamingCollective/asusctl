@@ -8,10 +8,6 @@
 //!
 //! Step 1 needs to be applied only on fresh system boot.
 
-use dmi_id::DMIID;
-
-#[cfg(feature = "dbus")]
-use crate::error::SlashError;
 use crate::{SlashMode, SlashType};
 
 const PACKET_SIZE: usize = 32;
@@ -26,41 +22,6 @@ pub const PROD_ID2: u16 = 0x19b6;
 pub const PROD_ID2_STR: &str = "19B6";
 
 pub type SlashUsbPacket = [u8; PACKET_SIZE];
-
-/// `get_anime_type` is very broad, matching on part of the laptop board name
-/// only. For this reason `find_node()` must be used also to verify if the USB
-/// device is available.
-///
-/// The currently known USB device is `193B`.
-#[inline]
-pub fn get_slash_type() -> SlashType {
-    let dmi = DMIID::new()
-        .map_err(|_| SlashError::NoDevice)
-        .unwrap_or_default();
-    let board_name = dmi.board_name.to_uppercase();
-    if board_name.contains("G614F") {
-        SlashType::G614_2025
-    } else if [
-        "GA403W", "GA403UH", "GA403UM", "GA403UP", "GA403GM",
-    ]
-    .iter()
-    .any(|s| board_name.contains(s))
-    {
-        SlashType::GA403_2025
-    } else if board_name.contains("GA403") {
-        SlashType::GA403_2024
-    } else if board_name.contains("GA605K") {
-        SlashType::GA605_2025
-    } else if board_name.contains("GA605") {
-        SlashType::GA605_2024
-    } else if board_name.contains("GU605C") {
-        SlashType::GU605_2025
-    } else if board_name.contains("GU605") {
-        SlashType::GU605_2024
-    } else {
-        SlashType::Unsupported
-    }
-}
 
 pub const fn report_id(slash_type: SlashType) -> u8 {
     match slash_type {
