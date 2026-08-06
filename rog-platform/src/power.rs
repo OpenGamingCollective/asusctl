@@ -123,12 +123,6 @@ impl AsusPower {
 
     pub fn get_battery_cycle_count(&self) -> Result<i32> {
         let path = self.battery.join("cycle_count");
-        if !path.exists() {
-            return Err(PlatformError::Read(
-                path.to_string_lossy().into(),
-                std::io::Error::new(std::io::ErrorKind::NotFound, "file not found"),
-            ));
-        }
         let content = std::fs::read_to_string(&path)
             .map_err(|e| PlatformError::Read(path.to_string_lossy().into(), e))?;
         content.trim().parse::<i32>().map_err(|e| {
@@ -205,12 +199,6 @@ impl AsusPower {
 
     pub fn get_battery_status(&self) -> Result<String> {
         let path = self.battery.join("status");
-        if !path.exists() {
-            return Err(PlatformError::Read(
-                path.to_string_lossy().into(),
-                std::io::Error::new(std::io::ErrorKind::NotFound, "file not found"),
-            ));
-        }
         let content = std::fs::read_to_string(&path)
             .map_err(|e| PlatformError::Read(path.to_string_lossy().into(), e))?;
         Ok(content.trim().to_string())
