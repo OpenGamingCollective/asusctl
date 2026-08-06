@@ -345,19 +345,6 @@ impl CtrlPlatform {
         }
     }
 
-    /// Restart nvidia-powerd if the service unit exists on the system.
-    /// Called after nv_* attribute writes to apply new GPU TDP settings.
-    pub async fn restart_nvidia_powerd() {
-        // Check if the service is enabled by trying to start it; if the unit
-        // doesn't exist systemctl will report an error which we silently ignore.
-        let _ = Command::new("systemctl")
-            .args([
-                "try-restart",
-                "nvidia-powerd.service",
-            ])
-            .output();
-    }
-
     async fn update_policy_ac_or_bat(&self, power_plugged: bool, change_epp: bool) {
         if power_plugged && !self.config.lock().await.change_platform_profile_on_ac {
             debug!(

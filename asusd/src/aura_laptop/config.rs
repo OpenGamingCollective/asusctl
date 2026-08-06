@@ -139,13 +139,6 @@ impl AuraConfig {
         }
     }
 
-    pub fn get_multizone(&self, aura_type: AuraModeNum) -> Option<&[AuraEffect]> {
-        if let Some(multi) = &self.multizone {
-            return multi.get(&aura_type).map(|v| v.as_slice());
-        }
-        None
-    }
-
     /// Create a default for the `current_mode` if multizone and no config
     /// exists.
     pub fn create_multizone_default(&mut self) -> Result<(), RogError> {
