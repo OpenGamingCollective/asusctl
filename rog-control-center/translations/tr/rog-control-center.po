@@ -1,7 +1,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
-"POT-Creation-Date: 2026-07-20 18:55+0000\n"
+"POT-Creation-Date: 2026-08-16 04:08+0000\n"
 "PO-Revision-Date: 2024-05-11 10:20+0300\n"
 "Last-Translator: Winfried <winfriedhofmann@duck.com>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -11,593 +11,858 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#: rog-control-center/ui/pages/anime.slint:6
+#: rog-control-center/ui/main_window.slint:81
+msgctxt "Menu1"
+msgid "System Control"
+msgstr "Sistem Kontrol"
+
+#: rog-control-center/ui/main_window.slint:82
+#, fuzzy
+msgctxt "Menu_system"
+msgid "System Tuning"
+msgstr "Ayarı Etkinleştir"
+
+#: rog-control-center/ui/main_window.slint:83
+msgctxt "Menu2"
+msgid "Keyboard Aura"
+msgstr "Klavye Rengi"
+
+#: rog-control-center/ui/main_window.slint:84
+msgctxt "Menu3"
+msgid "AniMe Matrix"
+msgstr "AniMe Matrix"
+
+#: rog-control-center/ui/main_window.slint:85
+msgctxt "Menu4"
+msgid "Slash Lighting"
+msgstr "Slash Aydınlatma"
+
+#: rog-control-center/ui/main_window.slint:86
+msgctxt "Menu5"
+msgid "Fan Curves"
+msgstr "Fan Eğrileri"
+
+#: rog-control-center/ui/main_window.slint:87
+msgctxt "Menu6"
+msgid "GPU Configuration"
+msgstr "Grafik Kartı Yapılandırması"
+
+#: rog-control-center/ui/main_window.slint:88
+msgctxt "Menu9"
+msgid "Battery Info"
+msgstr "Pil Bilgisi"
+
+#: rog-control-center/ui/main_window.slint:89
+#, fuzzy
+msgctxt "Menu7"
+msgid "App Settings"
+msgstr "Uygulama Ayarları"
+
+#: rog-control-center/ui/main_window.slint:90
+#, fuzzy
+msgctxt "Menu8"
+msgid "About"
+msgstr "Hakkında"
+
+#: rog-control-center/ui/pages/about.slint:24
+#, fuzzy
+msgctxt "PageAbout"
+msgid "About"
+msgstr "Hakkında"
+
+#: rog-control-center/ui/pages/about.slint:80
+msgctxt "PageAbout"
+msgid ""
+"A powerful graphical interface for managing ASUS ROG, TUF, and ProArt "
+"laptops on Linux."
+msgstr ""
+"Linux üzerinde ASUS ROG, TUF ve ProArt dizüstü bilgisayarlarını yönetmek "
+"için güçlü bir grafik arayüz."
+
+#: rog-control-center/ui/pages/about.slint:88
+msgctxt "PageAbout"
+msgid ""
+"Official GUI for the asusctl toolset — seamless hardware tuning without the "
+"command line."
+msgstr ""
+"Asusctl araç seti için resmi GUI, komut satırı olmadan sorunsuz donanım "
+"ayarı."
+
+#: rog-control-center/ui/pages/about.slint:99
+#, fuzzy
+msgctxt "PageAbout"
+msgid "Key Features"
+msgstr "Temel Özellikler:"
+
+#: rog-control-center/ui/pages/about.slint:108
+msgctxt "PageAbout"
+msgid "Performance: Switch power profiles and customize fan curves."
+msgstr ""
+"Performans: Güç profillerini değiştirin ve fan eğrilerini özelleştirin."
+
+#: rog-control-center/ui/pages/about.slint:109
+msgctxt "PageAbout"
+msgid "Aura Sync: Control keyboard backlighting and LED effects."
+msgstr "Aura Sync: Klavye arka aydınlatmasını ve LED efektlerini kontrol edin."
+
+#: rog-control-center/ui/pages/about.slint:110
+msgctxt "PageAbout"
+msgid "Battery Health: Set charge limits to extend battery longevity."
+msgstr "Pil Sağlığı: Pil ömrünü uzatmak için şarj sınırları belirleyin."
+
+#: rog-control-center/ui/pages/about.slint:111
+msgctxt "PageAbout"
+msgid "Display: Toggle Panel Overdrive and refresh rates."
+msgstr "Ekran: Panel Hız Aşırtmasını ve yenileme hızlarını değiştirin."
+
+#: rog-control-center/ui/pages/about.slint:112
+msgctxt "PageAbout"
+msgid "AniMe Matrix: Control AniMe Matrix displays."
+msgstr "AniMe Matrix: AniMe Matrix ekranlarını kontrol edin."
+
+#: rog-control-center/ui/pages/about.slint:117
+#, fuzzy
+msgctxt "PageAbout"
+msgid "Requirements"
+msgstr "Gereksinimler:"
+
+#: rog-control-center/ui/pages/about.slint:125
+msgctxt "PageAbout"
+msgid ""
+"Kernel 6.19+ recommended (latest kernel always preferred). asusctl/asusd "
+"daemon required for hardware control."
+msgstr ""
+"Çekirdek 6.19+ önerilir (her zaman en son çekirdek tercih edilir). Donanım "
+"kontrolü için asusctl/asusd servisi gereklidir."
+
+#: rog-control-center/ui/pages/about.slint:135
+#, fuzzy
+msgctxt "PageAbout"
+msgid "License"
+msgstr "Lisans:"
+
+#: rog-control-center/ui/pages/about.slint:143
+msgctxt "PageAbout"
+msgid ""
+"Mozilla Public License 2.0 (MPL-2.0). Open source software by "
+"OpenGamingCollective."
+msgstr ""
+"Mozilla Public License 2.0 (MPL-2.0). OpenGamingCollective tarafından "
+"geliştirilen açık kaynaklı yazılım."
+
+#: rog-control-center/ui/pages/about.slint:153
+#, fuzzy
+msgctxt "PageAbout"
+msgid "Links"
+msgstr "Bağlantılar:"
+
+#: rog-control-center/ui/pages/home.slint:22
+msgctxt "PageHome"
+msgid "Home"
+msgstr "Ana Sayfa"
+
+#: rog-control-center/ui/pages/home.slint:82
+msgctxt "PageHome"
+msgid "System Usage"
+msgstr "Sistem Kullanımı"
+
+#: rog-control-center/ui/pages/home.slint:102
+#, fuzzy
+msgctxt "PageHome"
+msgid "Frequency"
+msgstr "Frekans:"
+
+#: rog-control-center/ui/pages/home.slint:107
+#, fuzzy
+msgctxt "PageHome"
+msgid "Usage"
+msgstr "Kullanım:"
+
+#: rog-control-center/ui/pages/home.slint:112
+#, fuzzy
+msgctxt "PageHome"
+msgid "Temperature"
+msgstr "Sıcaklık:"
+
+#: rog-control-center/ui/pages/home.slint:126
+#, fuzzy
+msgctxt "PageHome"
+msgid "Suspended"
+msgstr "Askıda"
+
+#: rog-control-center/ui/pages/home.slint:139
+#, fuzzy
+msgctxt "PageHome"
+msgid "TGP"
+msgstr "GPU"
+
+#: rog-control-center/ui/pages/home.slint:156
+msgctxt "PageHome"
+msgid "Fan"
+msgstr "Fan"
+
+#: rog-control-center/ui/pages/home.slint:158
+#, fuzzy
+msgctxt "PageHome"
+msgid "CPU Fan"
+msgstr "CPU Fanı:"
+
+#: rog-control-center/ui/pages/home.slint:167
+#, fuzzy
+msgctxt "PageHome"
+msgid "GPU Fan"
+msgstr "GPU Fanı:"
+
+#: rog-control-center/ui/pages/home.slint:172
+#, fuzzy
+msgctxt "PageHome"
+msgid "Mid Fan"
+msgstr "Orta Fan:"
+
+#: rog-control-center/ui/pages/home.slint:181
+#, fuzzy
+msgctxt "PageHome"
+msgid "Memory"
+msgstr "Bellek Durumu"
+
+#: rog-control-center/ui/pages/home.slint:209
+msgctxt "PageHome"
+msgid "Operation Mode"
+msgstr "Çalışma Modu"
+
+#: rog-control-center/ui/pages/slash.slint:405
+#, fuzzy
+msgctxt "PageSlash"
+msgid "Slash Lighting"
+msgstr "Slash Aydınlatma"
+
+#: rog-control-center/ui/pages/slash.slint:432
+#, fuzzy
+msgctxt "PageSlash"
+msgid "Active Slash Lighting"
+msgstr "Slash Aydınlatma"
+
+#: rog-control-center/ui/pages/slash.slint:445
+msgctxt "PageSlash"
+msgid "Effects"
+msgstr "Efektler"
+
+#: rog-control-center/ui/pages/slash.slint:445
+#, fuzzy
+msgctxt "PageSlash"
+msgid "Settings"
+msgstr "Uygulama Ayarları"
+
+#: rog-control-center/ui/pages/slash.slint:479
+msgctxt "PageSlash"
+msgid "Basic Effects"
+msgstr "Temel Efektler"
+
+#: rog-control-center/ui/pages/slash.slint:520
+#, fuzzy
+msgctxt "PageSlash"
+msgid "Interval"
+msgstr "Tümleşik"
+
+#: rog-control-center/ui/pages/slash.slint:528
+#, fuzzy
+msgctxt "PageSlash"
+msgid "Brightness"
+msgstr "Parlaklık"
+
+#: rog-control-center/ui/pages/slash.slint:548
+#, fuzzy
+msgctxt "PageSlash"
+msgid "Visibility Triggers"
+msgstr "Görünürlük tetikleyicileri"
+
+#: rog-control-center/ui/pages/slash.slint:553
+msgctxt "PageSlash"
+msgid "Show on boot"
+msgstr "Açılışta göster"
+
+#: rog-control-center/ui/pages/slash.slint:554
+msgctxt "PageSlash"
+msgid "Show on shutdown"
+msgstr "Kapanışta göster"
+
+#: rog-control-center/ui/pages/slash.slint:555
+msgctxt "PageSlash"
+msgid "Show on sleep"
+msgstr "Uykuda göster"
+
+#: rog-control-center/ui/pages/slash.slint:556
+#, fuzzy
+msgctxt "PageSlash"
+msgid "Show on battery"
+msgstr "Pille çalışırken kapat"
+
+#: rog-control-center/ui/pages/slash.slint:557
+msgctxt "PageSlash"
+msgid "Show low-battery warning"
+msgstr "Düşük pil uyarısını göster"
+
+#: rog-control-center/ui/pages/slash.slint:558
+#, fuzzy
+msgctxt "PageSlash"
+msgid "Show when lid is closed"
+msgstr "Kapak Kapatıldığında Kapat"
+
+#: rog-control-center/ui/pages/anime.slint:7
 msgctxt "Anime Brightness"
 msgid "Off"
 msgstr "Kapalı"
 
-#: rog-control-center/ui/pages/anime.slint:7
+#: rog-control-center/ui/pages/anime.slint:8
 msgctxt "Anime Brightness"
 msgid "Low"
 msgstr "Düşük"
 
-#: rog-control-center/ui/pages/anime.slint:8
+#: rog-control-center/ui/pages/anime.slint:9
 msgctxt "Anime Brightness"
 msgid "Med"
 msgstr "Orta"
 
-#: rog-control-center/ui/pages/anime.slint:9
+#: rog-control-center/ui/pages/anime.slint:10
 msgctxt "Anime Brightness"
 msgid "High"
 msgstr "Yüksek"
 
-#: rog-control-center/ui/pages/anime.slint:23
+#: rog-control-center/ui/pages/anime.slint:24
 msgctxt "AnimePageData"
 msgid "Glitch Construction"
-msgstr ""
+msgstr "Bozulmalı İnşa"
 
-#: rog-control-center/ui/pages/anime.slint:23
+#: rog-control-center/ui/pages/anime.slint:24
 msgctxt "AnimePageData"
 msgid "Static Emergence"
-msgstr ""
+msgstr "Statik Beliriş"
 
-#: rog-control-center/ui/pages/anime.slint:25
+#: rog-control-center/ui/pages/anime.slint:26
 msgctxt "AnimePageData"
 msgid "Binary Banner Scroll"
-msgstr ""
+msgstr "İkili Afiş Kaydırma"
 
-#: rog-control-center/ui/pages/anime.slint:25
+#: rog-control-center/ui/pages/anime.slint:26
 msgctxt "AnimePageData"
 msgid "Rog Logo Glitch"
-msgstr ""
+msgstr "ROG Logo Bozulması"
 
-#: rog-control-center/ui/pages/anime.slint:27
+#: rog-control-center/ui/pages/anime.slint:28
 msgctxt "AnimePageData"
 msgid "Banner Swipe"
-msgstr ""
+msgstr "Afiş Süpürmesi"
 
-#: rog-control-center/ui/pages/anime.slint:27
+#: rog-control-center/ui/pages/anime.slint:28
 msgctxt "AnimePageData"
 msgid "Starfield"
-msgstr ""
+msgstr "Yıldız Alanı"
 
-#: rog-control-center/ui/pages/anime.slint:29
+#: rog-control-center/ui/pages/anime.slint:30
 msgctxt "AnimePageData"
 msgid "Glitch Out"
-msgstr ""
+msgstr "Bozularak Kaybolma"
 
-#: rog-control-center/ui/pages/anime.slint:29
+#: rog-control-center/ui/pages/anime.slint:30
 msgctxt "AnimePageData"
 msgid "See Ya"
-msgstr ""
+msgstr "Görüşürüz"
 
-#: rog-control-center/ui/pages/anime.slint:47
+#: rog-control-center/ui/pages/anime.slint:48
 msgctxt "Anime Brightness"
 msgid "Brightness"
 msgstr "Parlaklık"
 
-#: rog-control-center/ui/pages/anime.slint:63
+#: rog-control-center/ui/pages/anime.slint:64
 msgctxt "PageAnime"
 msgid "Enable display"
 msgstr "Görüntüyü etkinleştir"
 
-#: rog-control-center/ui/pages/anime.slint:71
+#: rog-control-center/ui/pages/anime.slint:72
 msgctxt "PageAnime"
 msgid "Advanced"
 msgstr "Gelişmiş"
 
-#: rog-control-center/ui/pages/anime.slint:86
+#: rog-control-center/ui/pages/anime.slint:87
 msgctxt "PageAnime"
 msgid "Use built-in animations"
 msgstr "Yerleşik animasyonları kullanın"
 
-#: rog-control-center/ui/pages/anime.slint:144
+#: rog-control-center/ui/pages/anime.slint:145
 msgctxt "PageAnime"
 msgid "Set which builtin animations are played"
 msgstr "Hangi yerleşik animasyonların oynatılacağını ayarlayın"
 
-#: rog-control-center/ui/pages/anime.slint:148
+#: rog-control-center/ui/pages/anime.slint:149
 msgctxt "Anime built-in selection"
 msgid "Boot Animation"
-msgstr ""
+msgstr "Açılış Animasyonu"
 
-#: rog-control-center/ui/pages/anime.slint:158
+#: rog-control-center/ui/pages/anime.slint:159
 msgctxt "Anime built-in selection"
 msgid "Running Animation"
-msgstr ""
+msgstr "Çalışma Animasyonu"
 
-#: rog-control-center/ui/pages/anime.slint:168
+#: rog-control-center/ui/pages/anime.slint:169
 msgctxt "Anime built-in selection"
 msgid "Sleep Animation"
 msgstr "Uyku Animasyonu"
 
-#: rog-control-center/ui/pages/anime.slint:178
+#: rog-control-center/ui/pages/anime.slint:179
 msgctxt "Anime built-in selection"
 msgid "Shutdown Animation"
 msgstr "Kapatma Animasyonu"
 
-#: rog-control-center/ui/pages/anime.slint:219
+#: rog-control-center/ui/pages/anime.slint:220
 msgctxt "PageAnime"
 msgid "Advanced Display Settings"
 msgstr "Gelişmiş Görüntü Ayarları"
 
-#: rog-control-center/ui/pages/anime.slint:224
+#: rog-control-center/ui/pages/anime.slint:225
 msgctxt "PageAnime"
 msgid "Off when lid closed"
 msgstr "Kapak Kapatıldığında Kapat"
 
-#: rog-control-center/ui/pages/anime.slint:233
+#: rog-control-center/ui/pages/anime.slint:234
 msgctxt "PageAnime"
 msgid "Off when suspended"
 msgstr "Askıya alındığında kapat"
 
-#: rog-control-center/ui/pages/anime.slint:242
+#: rog-control-center/ui/pages/anime.slint:243
 msgctxt "PageAnime"
 msgid "Off when on battery"
 msgstr "Pille çalışırken kapat"
 
-#: rog-control-center/ui/pages/aura.slint:29
-msgctxt "PageAura"
-msgid "Brightness"
-msgstr "Parlaklık"
-
-#: rog-control-center/ui/pages/aura.slint:40
-msgctxt "PageAura"
-msgid "Aura mode"
-msgstr "Renk Modu"
-
-#: rog-control-center/ui/pages/aura.slint:65
-msgctxt "PageAura"
-msgid "Colour 1"
-msgstr "Renk 1"
-
-#: rog-control-center/ui/pages/aura.slint:90
-msgctxt "PageAura"
-msgid "Colour 2"
-msgstr "Renk 2"
-
-#: rog-control-center/ui/pages/aura.slint:120
-msgctxt "PageAura"
-msgid "Zone"
-msgstr ""
-
-#: rog-control-center/ui/pages/aura.slint:141
-msgctxt "PageAura"
-msgid "Direction"
-msgstr ""
-
-#: rog-control-center/ui/pages/aura.slint:162
-msgctxt "PageAura"
-msgid "Speed"
-msgstr "Hız"
-
-#: rog-control-center/ui/pages/aura.slint:185
-msgctxt "PageAura"
-msgid "Power Settings"
-msgstr "Güç Ayarları"
-
-#: rog-control-center/ui/pages/aura.slint:304
+#: rog-control-center/ui/pages/fans.slint:35
 #, fuzzy
-msgctxt "PageAura"
-msgid "Power Zones"
-msgstr "Güç Ayarları"
-
-#: rog-control-center/ui/pages/fans.slint:27
 msgctxt "FanTab"
-msgid "This fan is not avilable on this machine"
-msgstr ""
+msgid "This fan is not available on this machine"
+msgstr "Bu fan bu makinede kullanılamıyor"
 
-#: rog-control-center/ui/pages/fans.slint:42
+#: rog-control-center/ui/pages/fans.slint:47
 msgctxt "FanTab"
 msgid "Enabled"
 msgstr "Etkinleştirildi"
 
-#: rog-control-center/ui/pages/fans.slint:51
+#: rog-control-center/ui/pages/fans.slint:61
 msgctxt "FanTab"
 msgid "Apply"
 msgstr "Uygula"
 
-#: rog-control-center/ui/pages/fans.slint:59
-msgctxt "FanTab"
-msgid "Cancel"
-msgstr "Vazgeç"
-
-#: rog-control-center/ui/pages/fans.slint:67
+#: rog-control-center/ui/pages/fans.slint:77
 msgctxt "FanTab"
 msgid "Factory Default (all fans)"
-msgstr ""
+msgstr "Fabrika Varsayılanı (tüm fanlar)"
 
-#: rog-control-center/ui/pages/fans.slint:80
+#: rog-control-center/ui/pages/fans.slint:111
+msgctxt "PageFans"
+msgid "Fan Curves"
+msgstr "Fan Eğrileri"
+
+#: rog-control-center/ui/pages/fans.slint:131
+msgctxt "PageFans"
+msgid ""
+"Edit the fan curve for each performance profile and fan — this does not "
+"change the active profile."
+msgstr ""
+"Her performans profili ve fan için fan eğrisini düzenleyin, bu işlem etkin "
+"profili değiştirmez."
+
+#: rog-control-center/ui/pages/fans.slint:139
 msgctxt "PageFans"
 msgid "Balanced"
 msgstr "Dengeli"
-
-#: rog-control-center/ui/pages/fans.slint:83
-msgctxt "PageFans"
-msgid "CPU"
-msgstr ""
-
-#: rog-control-center/ui/pages/fans.slint:101
-msgctxt "PageFans"
-msgid "Mid"
-msgstr ""
-
-#: rog-control-center/ui/pages/fans.slint:119
-msgctxt "PageFans"
-msgid "GPU"
-msgstr ""
 
 #: rog-control-center/ui/pages/fans.slint:139
 msgctxt "PageFans"
 msgid "Performance"
 msgstr "Perfomans"
 
-#: rog-control-center/ui/pages/fans.slint:198
+#: rog-control-center/ui/pages/fans.slint:139
 msgctxt "PageFans"
 msgid "Quiet"
 msgstr "Sessiz"
 
-#: rog-control-center/ui/pages/slash.slint:51
-msgctxt "PageSlash"
-msgid "Slash lighting"
-msgstr ""
-
-#: rog-control-center/ui/pages/slash.slint:56
-msgctxt "PageSlash"
-msgid "Enable A-cover lighting"
-msgstr ""
-
-#: rog-control-center/ui/pages/slash.slint:64
+#: rog-control-center/ui/pages/battery.slint:27
 #, fuzzy
-msgctxt "PageSlash"
-msgid "Brightness"
-msgstr "Parlaklık"
+msgctxt "PageBattery"
+msgid "Battery"
+msgstr "Pil Bilgisi"
 
-#: rog-control-center/ui/pages/slash.slint:77
-msgctxt "PageSlash"
-msgid "Animation speed"
-msgstr ""
-
-#: rog-control-center/ui/pages/slash.slint:90
+#: rog-control-center/ui/pages/battery.slint:62
 #, fuzzy
-msgctxt "PageSlash"
-msgid "Animation"
-msgstr "Uyku Animasyonu"
+msgctxt "PageBattery"
+msgid "Charge Control"
+msgstr "Sistem Kontrol"
 
-#: rog-control-center/ui/pages/slash.slint:110
-msgctxt "PageSlash"
-msgid "Visibility triggers"
-msgstr ""
-
-#: rog-control-center/ui/pages/slash.slint:115
-msgctxt "PageSlash"
-msgid "Show on boot"
-msgstr ""
-
-#: rog-control-center/ui/pages/slash.slint:123
-msgctxt "PageSlash"
-msgid "Show on shutdown"
-msgstr ""
-
-#: rog-control-center/ui/pages/slash.slint:131
-msgctxt "PageSlash"
-msgid "Show on sleep"
-msgstr ""
-
-#: rog-control-center/ui/pages/slash.slint:139
+#: rog-control-center/ui/pages/battery.slint:78
 #, fuzzy
-msgctxt "PageSlash"
-msgid "Show on battery"
-msgstr "Pille çalışırken kapat"
+msgctxt "PageBattery"
+msgid "Enable Charge Limit"
+msgstr "Şarj limiti"
 
-#: rog-control-center/ui/pages/slash.slint:147
-msgctxt "PageSlash"
-msgid "Show low-battery warning"
-msgstr ""
-
-#: rog-control-center/ui/pages/slash.slint:155
+#: rog-control-center/ui/pages/battery.slint:93
 #, fuzzy
-msgctxt "PageSlash"
-msgid "Show when lid is closed"
-msgstr "Kapak Kapatıldığında Kapat"
+msgctxt "PageBattery"
+msgid "Charge Limit"
+msgstr "Şarj limiti"
 
-#: rog-control-center/ui/pages/slash.slint:170
-msgctxt "Slash_tip"
+#: rog-control-center/ui/pages/battery.slint:101
+msgctxt "PageBattery"
 msgid ""
-"Slash Lighting controls the A-cover LED strip found on supported Zephyrus "
-"models."
-msgstr ""
-"Slash Aydınlatma, desteklenen Zephyrus modellerindeki A-kapağı LED şeridini "
-"kontrol eder."
+"Limiting maximum charge to 80% can significantly extend battery lifespan."
+msgstr "Azami şarjı %80 ile sınırlamak pil ömrünü önemli ölçüde uzatabilir."
 
-#: rog-control-center/ui/pages/battery.slint:24
+#: rog-control-center/ui/pages/battery.slint:122
 msgctxt "PageBattery"
 msgid "Battery Information"
 msgstr "Pil Bilgisi"
 
-#: rog-control-center/ui/pages/battery.slint:29
+#: rog-control-center/ui/pages/battery.slint:141
 #, fuzzy
 msgctxt "PageBattery"
-msgid "Charge limit"
-msgstr "Şarj limiti"
-
-#: rog-control-center/ui/pages/battery.slint:54
-msgctxt "PageBattery"
-msgid "Battery Health (Capacity):"
+msgid "Battery Health"
 msgstr "Pil Sağlığı (Kapasite):"
 
-#: rog-control-center/ui/pages/battery.slint:67
+#: rog-control-center/ui/pages/battery.slint:164
 #, fuzzy
 msgctxt "PageBattery"
-msgid "Status:"
+msgid "Status"
 msgstr "Durum:"
 
-#: rog-control-center/ui/pages/battery.slint:80
+#: rog-control-center/ui/pages/battery.slint:169
+#, fuzzy
 msgctxt "PageBattery"
-msgid "Power Draw:"
+msgid "Power Draw"
 msgstr "Güç Tüketimi:"
 
-#: rog-control-center/ui/pages/battery.slint:93
+#: rog-control-center/ui/pages/battery.slint:174
+#, fuzzy
 msgctxt "PageBattery"
-msgid "Time to Full:"
+msgid "Time to Full"
 msgstr "Tam Şarja Kalan Süre:"
 
-#: rog-control-center/ui/pages/battery.slint:93
+#: rog-control-center/ui/pages/battery.slint:174
+#, fuzzy
 msgctxt "PageBattery"
-msgid "Time Remaining:"
+msgid "Time Remaining"
 msgstr "Kalan Süre:"
 
-#: rog-control-center/ui/pages/app_settings.slint:27
+#: rog-control-center/ui/pages/app_settings.slint:66
+#, fuzzy
+msgctxt "PageAppSettings"
+msgid "App Settings"
+msgstr "Uygulama Ayarları"
+
+#: rog-control-center/ui/pages/app_settings.slint:96
 msgctxt "PageAppSettings"
 msgid "Run in background after closing"
 msgstr "Kapatıldıktan sonra arka planda çalıştır"
 
-#: rog-control-center/ui/pages/app_settings.slint:35
+#: rog-control-center/ui/pages/app_settings.slint:101
 msgctxt "PageAppSettings"
 msgid "Start app in background (UI closed)"
 msgstr "Uygulamayı arka planda başlat (UI kapalı)"
 
-#: rog-control-center/ui/pages/app_settings.slint:43
+#: rog-control-center/ui/pages/app_settings.slint:106
 msgctxt "PageAppSettings"
 msgid "Enable system tray icon"
 msgstr "Sistem tepsisi simgesini etkinleştir"
 
-#: rog-control-center/ui/pages/app_settings.slint:51
+#: rog-control-center/ui/pages/app_settings.slint:111
 msgctxt "PageAppSettings"
 msgid "Enable dGPU notifications"
 msgstr "dGPU bildirimlerini etkinleştir"
 
-#: rog-control-center/ui/pages/app_settings.slint:59
+#: rog-control-center/ui/pages/app_settings.slint:116
 msgctxt "PageAppSettings"
 msgid "Start app on system startup"
 msgstr "Uygulamayı sistem açılışında başlat"
 
-#: rog-control-center/ui/pages/app_settings.slint:69
+#: rog-control-center/ui/pages/app_settings.slint:121
 #, fuzzy
 msgctxt "PageAppSettings"
 msgid "Start in background on startup"
 msgstr "Uygulamayı arka planda başlat (UI kapalı)"
 
-#: rog-control-center/ui/pages/system.slint:21
+#: rog-control-center/ui/pages/app_settings.slint:138
+msgctxt "PageAppSettings"
+msgid "Global Shortcut"
+msgstr "Genel Kısayol"
+
+#: rog-control-center/ui/pages/app_settings.slint:147
+msgctxt "PageAppSettings"
+msgid "Armory/ROG key to show/hide window (keep app running in background)"
+msgstr ""
+"Pencereyi göstermek/gizlemek için Armory/ROG tuşu (uygulama arka planda "
+"çalışmaya devam eder)"
+
+#: rog-control-center/ui/pages/app_settings.slint:156
+msgctxt "PageAppSettings"
+msgid "Setting up…"
+msgstr "Ayarlanıyor…"
+
+#: rog-control-center/ui/pages/app_settings.slint:158
+msgctxt "PageAppSettings"
+msgid "Shortcut active"
+msgstr "Kısayol etkin"
+
+#: rog-control-center/ui/pages/app_settings.slint:160
+msgctxt "PageAppSettings"
+msgid "No shortcut assigned"
+msgstr "Atanmış kısayol yok"
+
+#: rog-control-center/ui/pages/app_settings.slint:162
+msgctxt "PageAppSettings"
+msgid "Global shortcuts unavailable"
+msgstr "Genel kısayollar kullanılamıyor"
+
+#: rog-control-center/ui/pages/app_settings.slint:182
+msgctxt "PageAppSettings"
+msgid "Set up shortcut"
+msgstr "Kısayol ayarla"
+
+#: rog-control-center/ui/pages/app_settings.slint:183
+msgctxt "PageAppSettings"
+msgid "Configure shortcut"
+msgstr "Kısayolu yapılandır"
+
+#: rog-control-center/ui/pages/app_settings.slint:204
+msgctxt "PageAppSettings"
+msgid "Language"
+msgstr "Dil"
+
+#: rog-control-center/ui/pages/app_settings.slint:219
+msgctxt "PageAppSettings"
+msgid "Reload Window"
+msgstr "Pencereyi Yeniden Yükle"
+
+#: rog-control-center/ui/pages/aura.slint:38
+#, fuzzy
+msgctxt "PageAura"
+msgid "Lighting"
+msgstr "Slash Aydınlatma"
+
+#: rog-control-center/ui/pages/aura.slint:67
+msgctxt "PageAura"
+msgid "Basic Effects"
+msgstr "Temel Efektler"
+
+#: rog-control-center/ui/pages/aura.slint:86
+#, fuzzy
+msgctxt "PageAura"
+msgid "Settings"
+msgstr "Uygulama Ayarları"
+
+#: rog-control-center/ui/pages/aura.slint:111
+#, fuzzy
+msgctxt "PageAura"
+msgid "Reset Defaults"
+msgstr "Varsayınal"
+
+#: rog-control-center/ui/pages/aura.slint:210
+#, fuzzy
+msgctxt "PageAura"
+msgid "Color"
+msgstr "Renk 1"
+
+#: rog-control-center/ui/pages/aura.slint:221
+msgctxt "PageAura"
+msgid "Colour 1"
+msgstr "Renk 1"
+
+#: rog-control-center/ui/pages/aura.slint:247
+msgctxt "PageAura"
+msgid "Colour 2"
+msgstr "Renk 2"
+
+#: rog-control-center/ui/pages/aura.slint:276
+msgctxt "PageAura"
+msgid "Speed"
+msgstr "Hız"
+
+#: rog-control-center/ui/pages/aura.slint:339
+msgctxt "PageAura"
+msgid "Direction"
+msgstr "Yön"
+
+#: rog-control-center/ui/pages/aura.slint:383
+msgctxt "PageAura"
+msgid "Brightness"
+msgstr "Parlaklık"
+
+#: rog-control-center/ui/pages/aura.slint:487
+msgctxt "PageAura"
+msgid "Power Settings"
+msgstr "Güç Ayarları"
+
+#: rog-control-center/ui/pages/aura.slint:592
+msgctxt "PageAura"
+msgid "Legacy device power zones"
+msgstr "Eski cihaz güç bölgeleri"
+
+#: rog-control-center/ui/pages/aura.slint:598
+#, fuzzy
+msgctxt "PageAura"
+msgid "Power Zones"
+msgstr "Güç Ayarları"
+
+#: rog-control-center/ui/pages/gpu.slint:40
+msgctxt "PageGPU"
+msgid "Dedicated Output"
+msgstr "Harici GPU Çıkışı"
+
+#: rog-control-center/ui/pages/gpu.slint:41
+#, fuzzy
+msgctxt "PageGPU"
+msgid "Hybrid Output"
+msgstr "Hibrit"
+
+#: rog-control-center/ui/pages/gpu.slint:42
+#, fuzzy
+msgctxt "PageGPU"
+msgid "Integrated Mode"
+msgstr "Tümleşik"
+
+#: rog-control-center/ui/pages/gpu.slint:48
+msgctxt "PageGPU"
+msgid ""
+"Uses only the discrete GPU for all rendering. Best performance but higher "
+"power consumption."
+msgstr ""
+"Tüm görsel işlemler için yalnızca harici GPU'yu kullanır. En iyi performans "
+"ancak daha yüksek güç tüketimi."
+
+#: rog-control-center/ui/pages/gpu.slint:50
+msgctxt "PageGPU"
+msgid ""
+"Auto-switches between the discrete and integrated GPUs based on workload."
+msgstr "İş yüküne göre harici ve dahili GPU arasında otomatik geçiş yapar."
+
+#: rog-control-center/ui/pages/gpu.slint:52
+msgctxt "PageGPU"
+msgid ""
+"Completely disables discrete GPU for best power saving. Lower temps and "
+"noise but significantly reduced performance."
+msgstr ""
+"En iyi güç tasarrufu için harici GPU'yu tamamen devre dışı bırakır. Daha "
+"düşük sıcaklık ve gürültü ancak önemli ölçüde azalmış performans."
+
+#: rog-control-center/ui/pages/gpu.slint:74
+#, fuzzy
+msgctxt "PageGPU"
+msgid "GPU"
+msgstr "GPU"
+
+#: rog-control-center/ui/pages/gpu.slint:103
+#, fuzzy
+msgctxt "PageGPU"
+msgid "Display Mode"
+msgstr "Ekran Ayarları"
+
+#: rog-control-center/ui/pages/gpu.slint:139
+msgctxt "PageGPU"
+msgid "This device has no switchable GPU."
+msgstr "Bu cihazda değiştirilebilir GPU bulunmuyor."
+
+#: rog-control-center/ui/pages/gpu.slint:163
+msgctxt "PageGPU"
+msgid "Disable nvidia-powerd on battery"
+msgstr "Pilde nvidia-powerd'yi devre dışı bırak"
+
+#: rog-control-center/ui/pages/gpu.slint:169
+msgctxt "PageGPU"
+msgid "XG Mobile LED"
+msgstr "XG Mobile LED"
+
+#: rog-control-center/ui/pages/gpu.slint:183
+#, fuzzy
+msgctxt "PageGPU"
+msgid "Reserved GPU Memory (iGPU VRAM)"
+msgstr "Ayrılmış GPU belleği"
+
+#: rog-control-center/ui/pages/system.slint:26
 msgctxt "SystemPageData"
 msgid "Balanced"
 msgstr "Dengeli"
 
-#: rog-control-center/ui/pages/system.slint:21
+#: rog-control-center/ui/pages/system.slint:26
 msgctxt "SystemPageData"
 msgid "Performance"
 msgstr "Perfomans"
 
-#: rog-control-center/ui/pages/system.slint:21
+#: rog-control-center/ui/pages/system.slint:26
 msgctxt "SystemPageData"
 msgid "Quiet"
 msgstr "Sessiz"
 
-#: rog-control-center/ui/pages/system.slint:21
+#: rog-control-center/ui/pages/system.slint:26
 msgctxt "SystemPageData"
 msgid "LowPower"
-msgstr ""
+msgstr "Güç Tasarrufu"
 
-#: rog-control-center/ui/pages/system.slint:27
+#: rog-control-center/ui/pages/system.slint:32
 msgctxt "SystemPageData"
 msgid "Default"
 msgstr "Varsayınal"
 
-#: rog-control-center/ui/pages/system.slint:29
+#: rog-control-center/ui/pages/system.slint:34
 msgctxt "SystemPageData"
 msgid "BalancePerformance"
-msgstr ""
+msgstr "Dengeli Performans"
 
-#: rog-control-center/ui/pages/system.slint:30
+#: rog-control-center/ui/pages/system.slint:35
 msgctxt "SystemPageData"
 msgid "BalancePower"
-msgstr ""
+msgstr "Dengeli Tasarruf"
 
-#: rog-control-center/ui/pages/system.slint:31
+#: rog-control-center/ui/pages/system.slint:36
 msgctxt "SystemPageData"
 msgid "Power"
-msgstr ""
+msgstr "Performans"
 
 #. 3-state set per device; the index is the value written over dbus.
-#: rog-control-center/ui/pages/system.slint:63
+#: rog-control-center/ui/pages/system.slint:68
 #, fuzzy
 msgctxt "SystemPageData"
 msgid "Off"
 msgstr "Kapalı"
 
 #. 3-state set per device; the index is the value written over dbus.
-#: rog-control-center/ui/pages/system.slint:63
+#: rog-control-center/ui/pages/system.slint:68
 msgctxt "SystemPageData"
 msgid "Multi-zone"
 msgstr "Çoklu bölge"
 
 #. 3-state set per device; the index is the value written over dbus.
-#: rog-control-center/ui/pages/system.slint:63
+#: rog-control-center/ui/pages/system.slint:68
 msgctxt "SystemPageData"
 msgid "Multi-zone Strong"
 msgstr "Güçlü Çoklu bölge"
 
-#: rog-control-center/ui/pages/system.slint:207
+#: rog-control-center/ui/pages/system.slint:258
 #, fuzzy
 msgctxt "PageSystem"
-msgid "Power settings"
-msgstr "Güç Ayarları"
+msgid "System Tuning"
+msgstr "Ayarı Etkinleştir"
 
-#: rog-control-center/ui/pages/system.slint:229
-msgctxt "PageSystem"
-msgid "Hardware Monitor"
-msgstr "Donanım İzleyici"
-
-#: rog-control-center/ui/pages/system.slint:242
-msgctxt "PageSystem"
-msgid "CPU Status"
-msgstr "İşlemci Durumu"
-
-#: rog-control-center/ui/pages/system.slint:251
-msgctxt "PageSystem"
-msgid "Temperature:"
-msgstr "Sıcaklık:"
-
-#: rog-control-center/ui/pages/system.slint:264
-msgctxt "PageSystem"
-msgid "Usage:"
-msgstr "Kullanım:"
-
-#: rog-control-center/ui/pages/system.slint:277
-msgctxt "PageSystem"
-msgid "Frequency:"
-msgstr "Frekans:"
-
-#: rog-control-center/ui/pages/system.slint:296
-msgctxt "PageSystem"
-msgid "iGPU Status"
-msgstr "iGPU Durumu"
-
-#: rog-control-center/ui/pages/system.slint:290
-msgctxt "PageSystem"
-msgid "Memory Status"
-msgstr "Bellek Durumu"
-
-#: rog-control-center/ui/pages/system.slint:299
-msgctxt "PageSystem"
-msgid "RAM Usage:"
-msgstr "RAM Kullanımı:"
-
-#: rog-control-center/ui/pages/system.slint:359
-msgctxt "PageSystem"
-msgid "dGPU Status"
-msgstr "dGPU Durumu"
-
-#: rog-control-center/ui/pages/system.slint:316
-msgctxt "PageSystem"
-msgid "GPU Status"
-msgstr "Grafik Kartı Durumu"
-
-#: rog-control-center/ui/pages/system.slint:329
-msgctxt "PageSystem"
-msgid "N/A"
-msgstr "N/A"
-
-#: rog-control-center/ui/pages/system.slint:373
-#: rog-control-center/ui/pages/system.slint:386
-msgctxt "PageSystem"
-msgid "Suspended"
-msgstr "Askıda"
-
-#: rog-control-center/ui/pages/system.slint:351
+#: rog-control-center/ui/pages/system.slint:285
 #, fuzzy
 msgctxt "PageSystem"
-msgid "Fan Speeds"
-msgstr "Fan Hızları"
+msgid "Power Limits"
+msgstr "CPU Turbo Güç Limiti"
 
-#: rog-control-center/ui/pages/system.slint:360
-msgctxt "PageSystem"
-msgid "CPU Fan:"
-msgstr "CPU Fanı:"
-
-#: rog-control-center/ui/pages/system.slint:373
-msgctxt "PageSystem"
-msgid "GPU Fan:"
-msgstr "GPU Fanı:"
-
-#: rog-control-center/ui/pages/system.slint:386
-msgctxt "PageSystem"
-msgid "Mid Fan:"
-msgstr "Orta Fan:"
-
-#: rog-control-center/ui/pages/system.slint:403
-msgctxt "PageSystem"
-msgid "Platform Profile"
-msgstr ""
-
-#: rog-control-center/ui/pages/system.slint:413
-msgctxt "PageSystem"
-msgid "Advanced"
-msgstr "Gelişmiş"
-
-#: rog-control-center/ui/pages/system.slint:433
-msgctxt "PageSystem"
-msgid "Screenpad brightness"
-msgstr ""
-
-#: rog-control-center/ui/pages/system.slint:457
-msgctxt "PageSystem"
-msgid "Sync with primary"
-msgstr ""
-
-#: rog-control-center/ui/pages/system.slint:477
-#, fuzzy
-msgctxt "PageSystem"
-msgid "Armoury settings"
-msgstr "Güç Ayarları"
-
-#: rog-control-center/ui/pages/system.slint:487
-msgctxt "no_asus_armoury_driver_1"
-msgid "The asus-armoury driver is not loaded"
-msgstr ""
-
-#: rog-control-center/ui/pages/system.slint:494
-msgctxt "no_asus_armoury_driver_2"
-msgid "For advanced features you will require a kernel with this driver added."
-msgstr ""
-
-#: rog-control-center/ui/pages/system.slint:506
-msgctxt "PageSystem"
-msgid "Panel Overdrive"
-msgstr ""
-
-#: rog-control-center/ui/pages/system.slint:514
-msgctxt "PageSystem"
-msgid "POST boot sound"
-msgstr ""
-
-#: rog-control-center/ui/pages/system.slint:522
-#, fuzzy
-msgctxt "PageSystem"
-msgid "Screen Auto Brightness"
-msgstr "Parlaklık"
-
-#: rog-control-center/ui/pages/system.slint:530
-msgctxt "PageSystem"
-msgid "MCU Powersave"
-msgstr "MCU Güç Tasarrufu"
-
-#: rog-control-center/ui/pages/system.slint:539
-msgctxt "PageSystem"
-msgid "MiniLED Mode"
-msgstr ""
-
-#: rog-control-center/ui/pages/system.slint:557
+#: rog-control-center/ui/pages/system.slint:301
 msgctxt "ppt_warning"
-msgid "The following settings are not applied until the toggle is enabled."
-msgstr ""
+msgid "Power limits apply only while tuning is enabled"
+msgstr "Güç limitleri yalnızca ayar etkinken uygulanır"
 
-#: rog-control-center/ui/pages/system.slint:562
+#: rog-control-center/ui/pages/system.slint:312
 msgctxt "ppt_group_enabled"
 msgid "Enable Tuning"
-msgstr ""
+msgstr "Ayarı Etkinleştir"
 
-#: rog-control-center/ui/pages/system.slint:585
+#: rog-control-center/ui/pages/system.slint:339
 msgctxt "requires_fan_curve_warning"
 msgid ""
 "CPU power limits require an active custom fan curve. Enable a fan curve for "
@@ -607,96 +872,110 @@ msgstr ""
 "kilidini açmak için Fanlar sekmesinde etkin profil için bir fan eğrisi "
 "etkinleştirin."
 
-#: rog-control-center/ui/pages/system.slint:595
+#: rog-control-center/ui/pages/system.slint:349
 msgctxt "ppt_pl1_spl"
 msgid "CPU Sustained Power Limit"
-msgstr ""
+msgstr "CPU Sürekli Güç Limiti"
 
-#: rog-control-center/ui/pages/system.slint:597
+#: rog-control-center/ui/pages/system.slint:350
 msgctxt "ppt_pl1_spl_help"
 msgid ""
 "Long-term CPU power limit that affects sustained workload performance. "
 "Higher values may increase heat and power consumption."
 msgstr ""
+"Sürekli iş yükü performansını etkileyen uzun vadeli CPU güç limiti. Daha "
+"yüksek değerler ısıyı ve güç tüketimini artırabilir."
 
-#: rog-control-center/ui/pages/system.slint:613
+#: rog-control-center/ui/pages/system.slint:366
 msgctxt "ppt_pl2_sppt"
 msgid "CPU Turbo Power Limit"
-msgstr ""
+msgstr "CPU Turbo Güç Limiti"
 
-#: rog-control-center/ui/pages/system.slint:615
+#: rog-control-center/ui/pages/system.slint:367
 msgctxt "ppt_pl2_sppt_help"
 msgid ""
 "Short-term CPU power limit for boost periods. Controls maximum power during "
 "brief high-performance bursts."
 msgstr ""
+"Hızlandırma dönemleri için kısa vadeli CPU güç limiti. Kısa süreli yüksek "
+"performans patlamaları sırasında azami gücü kontrol eder."
 
-#: rog-control-center/ui/pages/system.slint:631
+#: rog-control-center/ui/pages/system.slint:383
 msgctxt "ppt_pl3_fppt"
 msgid "CPU Fast Burst Power Limit"
-msgstr ""
+msgstr "CPU Hızlı Ani Güç Limiti"
 
-#: rog-control-center/ui/pages/system.slint:633
+#: rog-control-center/ui/pages/system.slint:384
 msgctxt "ppt_pl3_fppt_help"
 msgid ""
 "Ultra-short duration power limit for instantaneous CPU bursts. Affects "
 "responsiveness during sudden workload spikes."
 msgstr ""
+"Anlık CPU patlamaları için ultra kısa süreli güç limiti. Ani iş yükü "
+"artışlarında tepki hızını etkiler."
 
-#: rog-control-center/ui/pages/system.slint:648
+#: rog-control-center/ui/pages/system.slint:400
 msgctxt "ppt_fppt"
 msgid "Fast Package Power Limit"
-msgstr ""
+msgstr "Hızlı Paket Güç Limiti"
 
-#: rog-control-center/ui/pages/system.slint:650
+#: rog-control-center/ui/pages/system.slint:401
 msgctxt "ppt_fppt_help"
 msgid ""
 "Ultra-short duration power limit for system package. Controls maximum power "
 "during millisecond-scale load spikes."
 msgstr ""
+"Sistem paketi için ultra kısa süreli güç limiti. Milisaniye ölçeğindeki yük "
+"artışlarında azami gücü kontrol eder."
 
-#: rog-control-center/ui/pages/system.slint:666
+#: rog-control-center/ui/pages/system.slint:417
 msgctxt "ppt_apu_sppt"
 msgid "APU Sustained Power Limit"
-msgstr ""
+msgstr "APU Sürekli Güç Limiti"
 
-#: rog-control-center/ui/pages/system.slint:668
+#: rog-control-center/ui/pages/system.slint:418
 msgctxt "ppt_apu_sppt_help"
 msgid ""
 "Long-term power limit for integrated graphics and CPU combined. Affects "
 "sustained performance of APU-based workloads."
 msgstr ""
+"Entegre grafik ve CPU'nun birleşik uzun vadeli güç limiti. APU tabanlı iş "
+"yüklerinin sürekli performansını etkiler."
 
-#: rog-control-center/ui/pages/system.slint:684
+#: rog-control-center/ui/pages/system.slint:434
 msgctxt "ppt_platform_sppt"
 msgid "Platform Sustained Power Limit"
-msgstr ""
+msgstr "Platform Sürekli Güç Limiti"
 
-#: rog-control-center/ui/pages/system.slint:686
+#: rog-control-center/ui/pages/system.slint:435
 msgctxt "ppt_platform_sppt_help"
 msgid ""
 "Overall system power limit for sustained operations. Controls total platform "
 "power consumption over extended periods."
 msgstr ""
+"Sürekli işlemler için genel sistem güç limiti. Uzun süreler boyunca toplam "
+"platform güç tüketimini kontrol eder."
 
-#: rog-control-center/ui/pages/system.slint:702
+#: rog-control-center/ui/pages/system.slint:451
 msgctxt "nv_dynamic_boost"
 msgid "GPU Power Boost"
-msgstr ""
+msgstr "GPU Güç Artışı"
 
-#: rog-control-center/ui/pages/system.slint:704
+#: rog-control-center/ui/pages/system.slint:452
 msgctxt "nv_dynamic_boost_help"
 msgid ""
 "Additional power allocation for GPU dynamic boost. Higher values increase "
 "GPU performance but generate more heat."
 msgstr ""
+"GPU dinamik hızlandırması için ek güç tahsisi. Daha yüksek değerler GPU "
+"performansını artırır ancak daha fazla ısı üretir."
 
-#: rog-control-center/ui/pages/system.slint:720
+#: rog-control-center/ui/pages/system.slint:468
 msgctxt "nv_tgp"
 msgid "GPU TGP"
-msgstr ""
+msgstr "GPU TGP"
 
-#: rog-control-center/ui/pages/system.slint:722
+#: rog-control-center/ui/pages/system.slint:469
 msgctxt "nv_tgp_help"
 msgid ""
 "Total graphics power limit for the dedicated NVIDIA GPU. Higher values can "
@@ -705,224 +984,133 @@ msgstr ""
 "Harici NVIDIA GPU için toplam grafik gücü sınırı. Daha yüksek değerler, ek "
 "ısı ve güç tüketimi karşılığında performansı artırabilir."
 
-#: rog-control-center/ui/pages/system.slint:738
+#: rog-control-center/ui/pages/system.slint:485
 msgctxt "nv_temp_target"
 msgid "GPU Temperature Limit"
-msgstr ""
+msgstr "GPU Sıcaklık Limiti"
 
-#: rog-control-center/ui/pages/system.slint:740
+#: rog-control-center/ui/pages/system.slint:486
 msgctxt "nv_temp_target_help"
 msgid ""
 "Maximum GPU temperature threshold in Celsius. GPU will throttle to maintain "
 "temperature below this limit."
 msgstr ""
+"Celsius cinsinden azami GPU sıcaklık eşiği. GPU, sıcaklığı bu limitin "
+"altında tutmak için frekansını düşürür."
 
-#: rog-control-center/ui/pages/system.slint:794
+#: rog-control-center/ui/pages/system.slint:504
 msgctxt "PageSystem"
-msgid "Energy Performance Preference linked to Throttle Policy"
+msgid "Device"
+msgstr "Cihaz"
+
+#: rog-control-center/ui/pages/system.slint:518
+msgctxt "no_asus_armoury_driver_1"
+msgid "The asus-armoury driver is not loaded"
+msgstr "asus-armoury sürücüsü yüklü değil"
+
+#: rog-control-center/ui/pages/system.slint:519
+msgctxt "no_asus_armoury_driver_2"
+msgid "For advanced features you will require a kernel with this driver added."
+msgstr ""
+"Gelişmiş özellikler için bu sürücünün eklendiği bir çekirdek gereklidir."
+
+#: rog-control-center/ui/pages/system.slint:545
+msgctxt "PageSystem"
+msgid "Panel Overdrive"
+msgstr "Panel Hız Aşırtma"
+
+#: rog-control-center/ui/pages/system.slint:560
+msgctxt "PageSystem"
+msgid "POST boot sound"
+msgstr "POST açılış sesi"
+
+#: rog-control-center/ui/pages/system.slint:585
+#, fuzzy
+msgctxt "PageSystem"
+msgid "Screen Auto Brightness"
+msgstr "Parlaklık"
+
+#: rog-control-center/ui/pages/system.slint:600
+msgctxt "PageSystem"
+msgid "MCU Powersave"
+msgstr "MCU Güç Tasarrufu"
+
+#: rog-control-center/ui/pages/system.slint:616
+msgctxt "PageSystem"
+msgid "Local Dimming"
+msgstr "Bölgesel Karartma"
+
+#: rog-control-center/ui/pages/system.slint:635
+#, fuzzy
+msgctxt "PageSystem"
+msgid "Screenpad"
+msgstr "Screenpad parlaklığı"
+
+#: rog-control-center/ui/pages/system.slint:642
+msgctxt "PageSystem"
+msgid "Screenpad brightness"
+msgstr "Screenpad parlaklığı"
+
+#: rog-control-center/ui/pages/system.slint:655
+msgctxt "PageSystem"
+msgid "Sync with primary"
+msgstr "Ana ekranla eşitle"
+
+#: rog-control-center/ui/pages/system.slint:666
+#, fuzzy
+msgctxt "PageSystem"
+msgid "Energy Performance Preference"
 msgstr "Güç Politikasına Bağlı Enerji Performansı Tercihi"
 
-#: rog-control-center/ui/pages/system.slint:798
+#: rog-control-center/ui/pages/system.slint:674
 msgctxt "PageSystem"
 msgid "Change EPP based on Throttle Policy"
 msgstr "EPP'yi Güç Politikasına göre değiştirin"
 
-#: rog-control-center/ui/pages/system.slint:806
+#: rog-control-center/ui/pages/system.slint:683
 msgctxt "PageSystem"
 msgid "EPP for Balanced Policy"
 msgstr "Dengeli Politika için EPP"
 
-#: rog-control-center/ui/pages/system.slint:816
+#: rog-control-center/ui/pages/system.slint:694
 msgctxt "PageSystem"
 msgid "EPP for Performance Policy"
 msgstr "Performans Politikası için EPP"
 
-#: rog-control-center/ui/pages/system.slint:826
+#: rog-control-center/ui/pages/system.slint:705
 msgctxt "PageSystem"
-msgid "EPP for "
-msgstr "için EPP "
+msgid "EPP for Quiet Policy"
+msgstr "Sessiz Politikası için EPP"
 
-#: rog-control-center/ui/pages/system.slint:826
-#, fuzzy
-msgctxt "PageSystem"
-msgid " Policy"
-msgstr " Politikası"
-
-#: rog-control-center/ui/pages/system.slint:845
+#: rog-control-center/ui/pages/system.slint:717
 msgctxt "PageSystem"
 msgid "Throttle Policy for power state"
 msgstr "Güç durumu için Güç Politikası"
 
-#: rog-control-center/ui/pages/system.slint:851
+#: rog-control-center/ui/pages/system.slint:725
 msgctxt "PageSystem"
 msgid "Throttle Policy on Battery"
 msgstr "Pil Güç Politikası"
 
-#: rog-control-center/ui/pages/system.slint:861
-#, fuzzy
+#: rog-control-center/ui/pages/system.slint:736
 msgctxt "PageSystem"
-msgid "Enabled"
-msgstr "Etkinleştirildi"
+msgid "Change policy when switching to battery"
+msgstr "Pile geçildiğinde politikayı değiştir"
 
-#: rog-control-center/ui/pages/system.slint:872
+#: rog-control-center/ui/pages/system.slint:745
 msgctxt "PageSystem"
 msgid "Throttle Policy on AC"
 msgstr "AC'de Güç Politikası"
 
-#: rog-control-center/ui/pages/about.slint:27
-msgctxt "PageAbout"
-msgid ""
-"\n"
-"A powerful graphical interface for managing ASUS ROG, TUF, and ProArt "
-"laptops on Linux. It acts as the official GUI for the asusctl toolset, "
-"allowing for seamless hardware tuning without the command line."
-msgstr ""
-"\n"
-"Linux üzerinde ASUS ROG, TUF ve ProArt dizüstü bilgisayarlarını yönetmek için güçlü bir grafik arayüz. Komut satırı olmadan sorunsuz donanım ayarı yapılmasına izin vererek asusctl araç seti için resmi GUI görevi görür."
-
-#: rog-control-center/ui/pages/about.slint:32
-msgctxt "PageAbout"
-msgid "Key Features:"
-msgstr "Temel Özellikler:"
-
-#: rog-control-center/ui/pages/about.slint:36
-msgctxt "PageAbout"
-msgid ""
-"      • Performance: Switch power profiles and customize fan curves.\n"
-"      • Aura Sync: Control keyboard backlighting and LED effects.\n"
-"      • Battery Health: Set charge limits to extend battery longevity.\n"
-"      • Display: Toggle Panel Overdrive and refresh rates.\n"
-"      • AniMe Matrix: Control AniMe Matrix displays."
-msgstr ""
-"      • Performans: Güç profillerini değiştirin ve fan eğrilerini özelleştirin.\n"
-"      • Aura Sync: Klavye arka aydınlatmasını ve LED efektlerini kontrol edin.\n"
-"      • Pil Sağlığı: Pil ömrünü uzatmak için şarj sınırları belirleyin.\n"
-"      • Ekran: Panel Hız Aşırtmasını (Overdrive) ve yenileme hızlarını değiştirin.\n"
-"      • AniMe Matrix: AniMe Matrix ekranlarını kontrol edin."
-
-#: rog-control-center/ui/pages/about.slint:41
-msgctxt "PageAbout"
-msgid "Requirements:"
-msgstr "Gereksinimler:"
-
-#: rog-control-center/ui/pages/about.slint:46
-msgctxt "PageAbout"
-msgid ""
-"      This software requires kernel version 6.19 or later. However due to "
-"active development, the latest kernel is always the recommended one."
-msgstr "      Bu yazılım, 6.19 veya üzeri bir çekirdek sürümü gerektirir. Ancak aktif geliştirme nedeniyle, her zaman en son çekirdek önerilir."
-
-#: rog-control-center/ui/pages/about.slint:51
-msgctxt "PageAbout"
-msgid "Work in progress:"
-msgstr "Yapılacak İşler:"
-
-#: rog-control-center/ui/pages/about.slint:55
-msgctxt "PageAbout"
-msgid ""
-"      • Theme the widgets\n"
-"      • Add a cpu/gpu temp/fan speed info bar\n"
-"      • Include fan speeds, temps in a bottom bar\n"
-"      • Screenpad controls\n"
-"      • ROG Ally specific settings"
-msgstr ""
-"      • Widget'ları temalandırın\n"
-"      • CPU/GPU sıcaklık/fan hızı bilgi çubuğu ekleyin\n"
-"      • Fan hızlarını, sıcaklıkları alt çubuğa dahil edin\n"
-"      • Screenpad kontrolleri\n"
-"      • ROG Ally'ye özel ayarlar"
-
-#: rog-control-center/ui/pages/about.slint:60
-msgctxt "PageAbout"
-msgid "License:"
-msgstr "Lisans:"
-
-#: rog-control-center/ui/pages/about.slint:64
-msgctxt "PageAbout"
-msgid ""
-"      This project is open-source software licensed under the Mozilla Public "
-"License 2.0 (MPL-2.0)."
-msgstr "      Bu proje, Mozilla Public License 2.0 (MPL-2.0) kapsamında lisanslanmış açık kaynaklı bir yazılımdır."
-
-#: rog-control-center/ui/pages/about.slint:69
-msgctxt "PageAbout"
-msgid "Links:"
-msgstr "Bağlantılar:"
-
-#: rog-control-center/ui/pages/about.slint:73
-msgctxt "PageAbout"
-msgid ""
-"      Source Code: https://github.com/OpenGamingCollective/asusctl\n"
-"      Website: https://asus-linux.org/"
-msgstr ""
-"      Kaynak Kod: https://github.com/OpenGamingCollective/asusctl\n"
-"      Web Sitesi: https://asus-linux.org/"
-
-#: rog-control-center/ui/pages/gpu.slint:29
-msgctxt "PageGPU"
-msgid "Integrated"
-msgstr "Tümleşik"
-
-#: rog-control-center/ui/pages/gpu.slint:29
-msgctxt "PageGPU"
-msgid "Hybrid"
-msgstr "Hibrit"
-
-#: rog-control-center/ui/pages/gpu.slint:29
-msgctxt "PageGPU"
-msgid "Ultimate"
-msgstr "Ultimate"
-
-#: rog-control-center/ui/pages/gpu.slint:48
-msgctxt "PageGPU"
-msgid "Internal/Discrete GPU"
-msgstr "Dahili/Harici Grafik Kartı"
-
-#: rog-control-center/ui/pages/gpu.slint:57
-msgctxt "PageGPU"
-msgid "This device has no switchable GPU."
-msgstr "Bu cihazda değiştirilebilir GPU bulunmuyor."
-
-#: rog-control-center/ui/pages/gpu.slint:69
-msgctxt "PageGPU"
-msgid ""
-"Note: Changes take effect after a reboot. The dropdown always shows the "
-"current mode."
-msgstr ""
-"Not: Değişiklikler yeniden başlattıktan sonra etkinleşir. Açılır menü her "
-"zaman geçerli modu gösterir."
-
-#: rog-control-center/ui/pages/gpu.slint:76
-msgctxt "PageGPU"
-msgid "GPU mode"
-msgstr "GPU modu"
-
-#: rog-control-center/ui/pages/gpu.slint:97
-msgctxt "PageGPU"
-msgid "Note: Reserved GPU memory changes take effect after a reboot."
-msgstr ""
-"Not: Ayrılmış GPU bellek değişiklikleri yeniden başlattıktan sonra "
-"etkinleşir."
-
-#: rog-control-center/ui/pages/gpu.slint:104
-msgctxt "PageGPU"
-msgid "Reserved GPU memory"
-msgstr "Ayrılmış GPU belleği"
-
-#: rog-control-center/ui/pages/gpu.slint:118
-msgctxt "PageGPU"
-msgid "XG Mobile LED"
-msgstr "XG Mobile LED"
-
-#: rog-control-center/ui/pages/gpu.slint:131
-msgctxt "PageGPU"
-msgid "Disable nvidia-powerd on battery"
-msgstr "Pilde nvidia-powerd'yi devre dışı bırak"
+#: rog-control-center/ui/pages/system.slint:756
+msgctxt "PageSystem"
+msgid "Change policy when switching to AC"
+msgstr "AC güce geçildiğinde politikayı değiştir"
 
 #: rog-control-center/ui/types/aura_types.slint:54
 msgctxt "Aura power zone"
 msgid "Logo"
-msgstr ""
+msgstr "Logo"
 
 #: rog-control-center/ui/types/aura_types.slint:55
 msgctxt "Aura power zone"
@@ -932,17 +1120,17 @@ msgstr "Klavye"
 #: rog-control-center/ui/types/aura_types.slint:56
 msgctxt "Aura power zone"
 msgid "Lightbar"
-msgstr ""
+msgstr "Işık Çubuğu"
 
 #: rog-control-center/ui/types/aura_types.slint:57
 msgctxt "Aura power zone"
 msgid "Lid"
-msgstr ""
+msgstr "Kapak"
 
 #: rog-control-center/ui/types/aura_types.slint:58
 msgctxt "Aura power zone"
 msgid "Rear Glow"
-msgstr ""
+msgstr "Arka Işık"
 
 #: rog-control-center/ui/types/aura_types.slint:59
 msgctxt "Aura power zone"
@@ -952,7 +1140,7 @@ msgstr "Klavye ve Aydınlatma"
 #: rog-control-center/ui/types/aura_types.slint:60
 msgctxt "Aura power zone"
 msgid "Ally"
-msgstr ""
+msgstr "Ally"
 
 #: rog-control-center/ui/types/aura_types.slint:70
 msgctxt "Aura brightness"
@@ -974,252 +1162,440 @@ msgctxt "Aura brightness"
 msgid "High"
 msgstr "Yüksek"
 
-#: rog-control-center/ui/types/aura_types.slint:78
+#: rog-control-center/ui/types/aura_types.slint:80
 msgctxt "Basic aura mode"
 msgid "Static"
 msgstr "Sabit"
 
-#: rog-control-center/ui/types/aura_types.slint:79
+#: rog-control-center/ui/types/aura_types.slint:81
 msgctxt "Basic aura mode"
 msgid "Breathe"
 msgstr "Nefes Alma"
 
-#: rog-control-center/ui/types/aura_types.slint:80
+#: rog-control-center/ui/types/aura_types.slint:82
 msgctxt "Basic aura mode"
 msgid "Strobe"
 msgstr "Flaş"
 
-#: rog-control-center/ui/types/aura_types.slint:81
+#: rog-control-center/ui/types/aura_types.slint:83
 msgctxt "Basic aura mode"
 msgid "Rainbow"
 msgstr "Gökkuşağı"
 
-#: rog-control-center/ui/types/aura_types.slint:82
-msgctxt "Basic aura mode"
-msgid "Star"
-msgstr ""
-
-#: rog-control-center/ui/types/aura_types.slint:83
-msgctxt "Basic aura mode"
-msgid "Rain"
-msgstr ""
-
 #: rog-control-center/ui/types/aura_types.slint:84
 msgctxt "Basic aura mode"
-msgid "Highlight"
-msgstr ""
+msgid "Star"
+msgstr "Yıldız"
 
 #: rog-control-center/ui/types/aura_types.slint:85
 msgctxt "Basic aura mode"
-msgid "Laser"
-msgstr ""
+msgid "Rain"
+msgstr "Yağmur"
 
 #: rog-control-center/ui/types/aura_types.slint:86
 msgctxt "Basic aura mode"
-msgid "Ripple"
-msgstr ""
+msgid "Highlight"
+msgstr "Vurgu"
 
 #: rog-control-center/ui/types/aura_types.slint:87
 msgctxt "Basic aura mode"
-msgid "Nothing"
-msgstr ""
+msgid "Laser"
+msgstr "Lazer"
 
 #: rog-control-center/ui/types/aura_types.slint:88
 msgctxt "Basic aura mode"
-msgid "Pulse"
-msgstr ""
+msgid "Ripple"
+msgstr "Dalgalanma"
 
 #: rog-control-center/ui/types/aura_types.slint:89
 msgctxt "Basic aura mode"
-msgid "Comet"
-msgstr ""
+msgid "Nothing"
+msgstr "Hiçbiri"
 
 #: rog-control-center/ui/types/aura_types.slint:90
 msgctxt "Basic aura mode"
+msgid "Pulse"
+msgstr "Atım"
+
+#: rog-control-center/ui/types/aura_types.slint:91
+msgctxt "Basic aura mode"
+msgid "Comet"
+msgstr "Kuyruklu Yıldız"
+
+#: rog-control-center/ui/types/aura_types.slint:92
+msgctxt "Basic aura mode"
 msgid "Flash"
-msgstr ""
-
-#: rog-control-center/ui/types/aura_types.slint:96
-msgctxt "Aura zone"
-msgid "None"
-msgstr "Hiçbiri"
-
-#: rog-control-center/ui/types/aura_types.slint:97
-msgctxt "Aura zone"
-msgid "Key1"
-msgstr ""
-
-#: rog-control-center/ui/types/aura_types.slint:98
-msgctxt "Aura zone"
-msgid "Key2"
-msgstr ""
-
-#: rog-control-center/ui/types/aura_types.slint:99
-msgctxt "Aura zone"
-msgid "Key3"
-msgstr ""
-
-#: rog-control-center/ui/types/aura_types.slint:100
-msgctxt "Aura zone"
-msgid "Key4"
-msgstr ""
-
-#: rog-control-center/ui/types/aura_types.slint:101
-msgctxt "Aura zone"
-msgid "Logo"
-msgstr ""
-
-#: rog-control-center/ui/types/aura_types.slint:102
-msgctxt "Aura zone"
-msgid "Lightbar Left"
-msgstr ""
-
-#: rog-control-center/ui/types/aura_types.slint:103
-msgctxt "Aura zone"
-msgid "Lightbar Right"
-msgstr ""
-
-#: rog-control-center/ui/types/aura_types.slint:106
-msgctxt "Aura direction"
-msgid "Right"
-msgstr "Sağ"
-
-#: rog-control-center/ui/types/aura_types.slint:107
-msgctxt "Aura direction"
-msgid "Left"
-msgstr "Sol"
-
-#: rog-control-center/ui/types/aura_types.slint:108
-msgctxt "Aura direction"
-msgid "Up"
-msgstr "Yukarı"
-
-#: rog-control-center/ui/types/aura_types.slint:109
-msgctxt "Aura direction"
-msgid "Down"
-msgstr "Aşağı"
-
-#: rog-control-center/ui/types/aura_types.slint:112
-msgctxt "Aura speed"
-msgid "Low"
-msgstr "Düşük"
-
-#: rog-control-center/ui/types/aura_types.slint:113
-msgctxt "Aura speed"
-msgid "Medium"
-msgstr "Orta"
-
-#: rog-control-center/ui/types/aura_types.slint:114
-msgctxt "Aura speed"
-msgid "High"
-msgstr "Yüksek"
+msgstr "Flaş"
 
 #: rog-control-center/ui/widgets/aura_power.slint:32
 msgctxt "AuraPowerGroup"
 msgid "Boot"
-msgstr ""
+msgstr "Açılış"
 
 #: rog-control-center/ui/widgets/aura_power.slint:42
 msgctxt "AuraPowerGroup"
 msgid "Awake"
-msgstr ""
+msgstr "Uyanık"
 
 #: rog-control-center/ui/widgets/aura_power.slint:52
 msgctxt "AuraPowerGroup"
 msgid "Sleep"
-msgstr ""
+msgstr "Uyku"
 
 #: rog-control-center/ui/widgets/aura_power.slint:62
 msgctxt "AuraPowerGroup"
 msgid "Shutdown"
-msgstr ""
+msgstr "Kapanış"
 
 #: rog-control-center/ui/widgets/aura_power.slint:100
 msgctxt "AuraPowerGroupOld"
 msgid "Zone Selection"
-msgstr ""
+msgstr "Bölge Seçimi"
 
 #: rog-control-center/ui/widgets/aura_power.slint:112
 msgctxt "AuraPowerGroupOld"
 msgid "Boot"
-msgstr ""
+msgstr "Açılış"
 
 #: rog-control-center/ui/widgets/aura_power.slint:122
 msgctxt "AuraPowerGroupOld"
 msgid "Awake"
-msgstr ""
+msgstr "Uyanık"
 
 #: rog-control-center/ui/widgets/aura_power.slint:132
 msgctxt "AuraPowerGroupOld"
 msgid "Sleep"
-msgstr ""
+msgstr "Uyku"
 
-#: rog-control-center/ui/widgets/common.slint:125
+#: rog-control-center/ui/widgets/common.slint:49
+#, fuzzy
+msgctxt "not_supported_short"
+msgid "N/A"
+msgstr "N/A"
+
+#: rog-control-center/ui/widgets/common.slint:131
 msgctxt "confirm_reset"
 msgid "Are you sure you want to reset this?"
-msgstr ""
+msgstr "Bunu sıfırlamak istediğinizden emin misiniz?"
 
-#: rog-control-center/ui/main_window.slint:80
-msgctxt "Menu1"
-msgid "System Control"
-msgstr "Sistem Kontrol"
+#: rog-control-center/ui/widgets/common.slint:334
+msgctxt "PopupNotification"
+msgid "More Info"
+msgstr "Daha Fazla Bilgi"
 
-#: rog-control-center/ui/main_window.slint:81
-msgctxt "Menu2"
-msgid "Keyboard Aura"
-msgstr "Klavye Rengi"
+#: rog-control-center/ui/widgets/sidebar.slint:219
+msgctxt "SideBar"
+msgid "Collapse"
+msgstr "Daralt"
 
-#: rog-control-center/ui/main_window.slint:82
-msgctxt "Menu3"
-msgid "AniMe Matrix"
-msgstr ""
+#: rog-control-center/ui/widgets/sidebar.slint:219
+msgctxt "SideBar"
+msgid "Expand"
+msgstr "Genişlet"
 
-#: rog-control-center/ui/main_window.slint:83
-msgctxt "Menu4"
-msgid "Slash Lighting"
-msgstr "Slash Aydınlatma"
-
-#: rog-control-center/ui/main_window.slint:84
-msgctxt "Menu5"
-msgid "Fan Curves"
-msgstr ""
-
-#: rog-control-center/ui/main_window.slint:85
-msgctxt "Menu6"
-msgid "GPU Configuration"
-msgstr "Grafik Kartı Yapılandırması"
-
-#: rog-control-center/ui/main_window.slint:86
-msgctxt "Menu9"
-msgid "Battery Info"
-msgstr "Pil Bilgisi"
-
-#: rog-control-center/ui/main_window.slint:87
+#: rog-control-center/ui/widgets/rog.slint:38
 #, fuzzy
-msgctxt "Menu7"
-msgid "App Settings"
-msgstr "Uygulama Ayarları"
+msgctxt "RogRebootBanner"
+msgid "Changes are staged. They will take effect after restarting."
+msgstr "Değişiklikler planlandı ve yeniden başlattıktan sonra etkili olacak."
 
-#: rog-control-center/ui/main_window.slint:88
-#, fuzzy
-msgctxt "Menu8"
-msgid "About"
-msgstr "Hakkında"
+#: rog-control-center/ui/widgets/rog.slint:238
+msgctxt "RogPowerSlider"
+msgid "OK"
+msgstr "Tamam"
 
-#: rog-control-center/ui/main_window.slint:97
+#: rog-control-center/ui/widgets/rog.slint:270
 #, fuzzy
-msgctxt "MainWindow"
-msgid "Quit App"
-msgstr "Çık"
+msgctxt "RogPowerSlider"
+msgid "Cancel"
+msgstr "Vazgeç"
+
+#: rog-control-center/ui/widgets/rog.slint:274
+msgctxt "RogPowerSlider"
+msgid "Reset"
+msgstr "Sıfırla"
+
+#: rog-control-center/ui/widgets/rog.slint:495
+msgctxt "RogDropdownRow"
+msgid "Not available"
+msgstr "Kullanılamıyor"
+
+#~ msgctxt "PageGPU"
+#~ msgid "Note: Reserved GPU memory changes take effect after a reboot."
+#~ msgstr ""
+#~ "Not: Ayrılmış GPU bellek değişiklikleri yeniden başlattıktan sonra "
+#~ "etkinleşir.Not: Ayrılmış GPU bellek değişiklikleri yeniden başlattıktan "
+#~ "sonra etkinleşir."
+
+#~ msgctxt "Aura zone"
+#~ msgid "None"
+#~ msgstr "Hiçbiri"
+
+#~ msgctxt "Aura zone"
+#~ msgid "Key1"
+#~ msgstr "Tuş1"
+
+#~ msgctxt "Aura zone"
+#~ msgid "Key2"
+#~ msgstr "Tuş2"
+
+#~ msgctxt "Aura zone"
+#~ msgid "Key3"
+#~ msgstr "Tuş3"
+
+#~ msgctxt "Aura zone"
+#~ msgid "Key4"
+#~ msgstr "Tuş4"
+
+#~ msgctxt "Aura zone"
+#~ msgid "Logo"
+#~ msgstr "Logo"
+
+#~ msgctxt "Aura zone"
+#~ msgid "Lightbar Left"
+#~ msgstr "Sol Işık Çubuğu"
+
+#~ msgctxt "Aura zone"
+#~ msgid "Lightbar Right"
+#~ msgstr "Sağ Işık Çubuğu"
+
+#~ msgctxt "Aura direction"
+#~ msgid "Right"
+#~ msgstr "Sağ"
+
+#~ msgctxt "Aura direction"
+#~ msgid "Left"
+#~ msgstr "Sol"
+
+#~ msgctxt "Aura direction"
+#~ msgid "Up"
+#~ msgstr "Yukarı"
+
+#~ msgctxt "Aura direction"
+#~ msgid "Down"
+#~ msgstr "Aşağı"
+
+#~ msgctxt "Aura speed"
+#~ msgid "Low"
+#~ msgstr "Düşük"
+
+#~ msgctxt "Aura speed"
+#~ msgid "Medium"
+#~ msgstr "Orta"
+
+#~ msgctxt "Aura speed"
+#~ msgid "High"
+#~ msgstr "Yüksek"
+
+#~ msgctxt "PageAura"
+#~ msgid "Aura mode"
+#~ msgstr "Renk Modu"
+
+#~ msgctxt "PageAura"
+#~ msgid "Zone"
+#~ msgstr "Bölge"
+
+#~ msgctxt "PageFans"
+#~ msgid "CPU"
+#~ msgstr "CPU"
+
+#~ msgctxt "PageFans"
+#~ msgid "Mid"
+#~ msgstr "Orta"
+
+#~ msgctxt "PageSlash"
+#~ msgid "Slash lighting"
+#~ msgstr "Slash Lighting"
+
+#~ msgctxt "PageSlash"
+#~ msgid "Enable A-cover lighting"
+#~ msgstr "A-kapağı aydınlatmasını etkinleştir"
+
+#~ msgctxt "PageSlash"
+#~ msgid "Animation speed"
+#~ msgstr "Animasyon hızı"
+
+#, fuzzy
+#~ msgctxt "PageSlash"
+#~ msgid "Animation"
+#~ msgstr "Uyku Animasyonu"
+
+#~ msgctxt "Slash_tip"
+#~ msgid ""
+#~ "Slash Lighting controls the A-cover LED strip found on supported Zephyrus "
+#~ "models."
+#~ msgstr ""
+#~ "Slash Aydınlatma, desteklenen Zephyrus modellerindeki A-kapağı LED "
+#~ "şeridini kontrol eder."
+
+#, fuzzy
+#~ msgctxt "PageSystem"
+#~ msgid "Power settings"
+#~ msgstr "Güç Ayarları"
+
+#~ msgctxt "PageSystem"
+#~ msgid "Hardware Monitor"
+#~ msgstr "Donanım İzleyici"
+
+#~ msgctxt "PageSystem"
+#~ msgid "CPU Status"
+#~ msgstr "İşlemci Durumu"
+
+#~ msgctxt "PageSystem"
+#~ msgid "iGPU Status"
+#~ msgstr "iGPU Durumu"
+
+#~ msgctxt "PageSystem"
+#~ msgid "RAM Usage:"
+#~ msgstr "RAM Kullanımı:"
+
+#~ msgctxt "PageSystem"
+#~ msgid "dGPU Status"
+#~ msgstr "dGPU Durumu"
+
+#~ msgctxt "PageSystem"
+#~ msgid "GPU Status"
+#~ msgstr "Grafik Kartı Durumu"
+
+#, fuzzy
+#~ msgctxt "PageSystem"
+#~ msgid "Fan Speeds"
+#~ msgstr "Fan Hızları"
+
+#~ msgctxt "PageSystem"
+#~ msgid "Platform Profile"
+#~ msgstr "Platform Profili"
+
+#~ msgctxt "PageSystem"
+#~ msgid "Advanced"
+#~ msgstr "Gelişmiş"
+
+#, fuzzy
+#~ msgctxt "PageSystem"
+#~ msgid "Armoury settings"
+#~ msgstr "Güç Ayarları"
+
+#~ msgctxt "PageSystem"
+#~ msgid "MiniLED Mode"
+#~ msgstr "MiniLED Modu"
+
+#~ msgctxt "ppt_warning"
+#~ msgid "The following settings are not applied until the toggle is enabled."
+#~ msgstr "Anahtar etkinleştirilene kadar aşağıdaki ayarlar uygulanmaz."
+
+#~ msgctxt "PageSystem"
+#~ msgid "EPP for "
+#~ msgstr "için EPP "
+
+#, fuzzy
+#~ msgctxt "PageSystem"
+#~ msgid " Policy"
+#~ msgstr " Politikası"
+
+#, fuzzy
+#~ msgctxt "PageSystem"
+#~ msgid "Enabled"
+#~ msgstr "Etkinleştirildi"
+
+#~ msgctxt "PageAbout"
+#~ msgid ""
+#~ "\n"
+#~ "A powerful graphical interface for managing ASUS ROG, TUF, and ProArt "
+#~ "laptops on Linux. It acts as the official GUI for the asusctl toolset, "
+#~ "allowing for seamless hardware tuning without the command line."
+#~ msgstr ""
+#~ "\n"
+#~ "Linux üzerinde ASUS ROG, TUF ve ProArt dizüstü bilgisayarlarını yönetmek "
+#~ "için güçlü bir grafik arayüz. Komut satırı olmadan sorunsuz donanım ayarı "
+#~ "yapılmasına izin vererek asusctl araç seti için resmi GUI görevi görür."
+
+#~ msgctxt "PageAbout"
+#~ msgid ""
+#~ "      • Performance: Switch power profiles and customize fan curves.\n"
+#~ "      • Aura Sync: Control keyboard backlighting and LED effects.\n"
+#~ "      • Battery Health: Set charge limits to extend battery longevity.\n"
+#~ "      • Display: Toggle Panel Overdrive and refresh rates.\n"
+#~ "      • AniMe Matrix: Control AniMe Matrix displays."
+#~ msgstr ""
+#~ "      • Performans: Güç profillerini değiştirin ve fan eğrilerini "
+#~ "özelleştirin.\n"
+#~ "      • Aura Sync: Klavye arka aydınlatmasını ve LED efektlerini kontrol "
+#~ "edin.\n"
+#~ "      • Pil Sağlığı: Pil ömrünü uzatmak için şarj sınırları belirleyin.\n"
+#~ "      • Ekran: Panel Hız Aşırtmasını (Overdrive) ve yenileme hızlarını "
+#~ "değiştirin.\n"
+#~ "      • AniMe Matrix: AniMe Matrix ekranlarını kontrol edin."
+
+#~ msgctxt "PageAbout"
+#~ msgid ""
+#~ "      This software requires kernel version 6.19 or later. However due to "
+#~ "active development, the latest kernel is always the recommended one."
+#~ msgstr ""
+#~ "      Bu yazılım, 6.19 veya üzeri bir çekirdek sürümü gerektirir. Ancak "
+#~ "aktif geliştirme nedeniyle, her zaman en son çekirdek önerilir."
+
+#~ msgctxt "PageAbout"
+#~ msgid "Work in progress:"
+#~ msgstr "Yapılacak İşler:"
+
+#~ msgctxt "PageAbout"
+#~ msgid ""
+#~ "      • Theme the widgets\n"
+#~ "      • Add a cpu/gpu temp/fan speed info bar\n"
+#~ "      • Include fan speeds, temps in a bottom bar\n"
+#~ "      • Screenpad controls\n"
+#~ "      • ROG Ally specific settings"
+#~ msgstr ""
+#~ "      • Widget'ları temalandırın\n"
+#~ "      • CPU/GPU sıcaklık/fan hızı bilgi çubuğu ekleyin\n"
+#~ "      • Fan hızlarını, sıcaklıkları alt çubuğa dahil edin\n"
+#~ "      • Screenpad kontrolleri\n"
+#~ "      • ROG Ally'ye özel ayarlar"
+
+#~ msgctxt "PageAbout"
+#~ msgid ""
+#~ "      This project is open-source software licensed under the Mozilla "
+#~ "Public License 2.0 (MPL-2.0)."
+#~ msgstr ""
+#~ "      Bu proje, Mozilla Public License 2.0 (MPL-2.0) kapsamında "
+#~ "lisanslanmış açık kaynaklı bir yazılımdır."
+
+#~ msgctxt "PageAbout"
+#~ msgid ""
+#~ "      Source Code: https://github.com/OpenGamingCollective/asusctl\n"
+#~ "      Website: https://asus-linux.org/"
+#~ msgstr ""
+#~ "      Kaynak Kod: https://github.com/OpenGamingCollective/asusctl\n"
+#~ "      Web Sitesi: https://asus-linux.org/"
+
+#~ msgctxt "PageGPU"
+#~ msgid "Ultimate"
+#~ msgstr "Ultimate"
+
+#~ msgctxt "PageGPU"
+#~ msgid "Internal/Discrete GPU"
+#~ msgstr "Dahili/Harici Grafik Kartı"
+
+#~ msgctxt "PageGPU"
+#~ msgid ""
+#~ "Note: Changes take effect after a reboot. The dropdown always shows the "
+#~ "current mode."
+#~ msgstr ""
+#~ "Not: Değişiklikler yeniden başlattıktan sonra etkinleşir. Açılır menü her "
+#~ "zaman geçerli modu gösterir."
+
+#~ msgctxt "PageGPU"
+#~ msgid "GPU mode"
+#~ msgstr "GPU modu"
+
+#, fuzzy
+#~ msgctxt "MainWindow"
+#~ msgid "Quit App"
+#~ msgstr "Çık"
 
 #~ msgctxt "PageAppSettings"
 #~ msgid "Auto-switch refresh rate on battery"
 #~ msgstr "Pildeyken yenileme hızını otomatik değiştir"
-
-#, fuzzy
-#~ msgctxt "PageSystem"
-#~ msgid "Display Settings"
-#~ msgstr "Ekran Ayarları"
 
 #~ msgctxt "PageSystem"
 #~ msgid "Refresh Rate:"
@@ -1232,7 +1608,3 @@ msgstr "Çık"
 #~ msgctxt "PageSystem"
 #~ msgid "System performance settings"
 #~ msgstr "Sistem Perfomans Ayarları"
-
-#~ msgctxt "PageSystem"
-#~ msgid "EPP for Quiet Policy"
-#~ msgstr "Sessiz Politikası için EPP"
