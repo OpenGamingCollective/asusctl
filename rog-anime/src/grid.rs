@@ -46,16 +46,6 @@ impl AnimeGrid {
         &mut self.data
     }
 
-    /// Fill the grid with a value
-    #[inline]
-    pub fn fill_with(&mut self, fill: u8) {
-        for row in self.data.iter_mut() {
-            for x in row.iter_mut() {
-                *x = fill;
-            }
-        }
-    }
-
     // pub fn debug_print(&self) {
     //     // this is the index from right. It is used to progressively shorten rows
     //     let mut prog_row_len = WIDTH - 2;
