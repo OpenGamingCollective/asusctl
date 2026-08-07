@@ -1,0 +1,12 @@
+usr/bin/asusd
+usr/bin/asusctl
+usr/bin/asus-shutdown
+usr/bin/asusd-user
+usr/lib/systemd/system/asusd.service
+usr/lib/systemd/system/asus-shutdown.service
+usr/lib/udev/rules.d/99-asusd.rules
+usr/share/dbus-1/system.d/asusd.conf
+usr/share/asusd/
+usr/share/asusctl/
+usr/share/icons/hicolor/512x512/apps/asus_notif_*.png
+usr/share/icons/hicolor/scalable/status/

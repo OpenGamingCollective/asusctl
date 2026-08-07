@@ -1,0 +1,11 @@
+asusctl (6.3.11-1) unstable; urgency=medium
+
+  * Initial Debian packaging, split into asusctl (CLI, asusd, asusd-user,
+    asus-shutdown) and rog-control-center (GUI).
+  * Build offline from a vendored crates tarball when one is present next to
+    the sources, otherwise let cargo fetch as usual. See README.Debian.
+  * Ship Cargo.lock inside that tarball: it is gitignored upstream, so a
+    release tarball made with git archive does not carry one, and
+    "cargo build --locked" has nothing to work with.
+
+ -- Alessandro Curci <hantarex@gmail.com>  Fri, 07 Aug 2026 20:05:00 +0200
