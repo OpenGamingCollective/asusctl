@@ -439,45 +439,6 @@ pub struct FlashSingleColour {
     pub zone: AuraZone,
 }
 
-/// Multi-zone colour settings
-#[derive(FromArgs, Debug, Clone, Default)]
-#[allow(dead_code)]
-#[argh(description = "multi-zone colour settings")]
-pub struct MultiZone {
-    #[argh(option, short = 'a', description = "set the RGB value e.g. ff00ff")]
-    pub colour1: Colour,
-
-    #[argh(option, short = 'b', description = "set the RGB value e.g. ff00ff")]
-    pub colour2: Colour,
-
-    #[argh(option, short = 'c', description = "set the RGB value e.g. ff00ff")]
-    pub colour3: Colour,
-
-    #[argh(option, short = 'd', description = "set the RGB value e.g. ff00ff")]
-    pub colour4: Colour,
-}
-
-/// Multi-colour with speed
-#[derive(FromArgs, Debug, Clone, Default)]
-#[allow(dead_code)]
-#[argh(description = "multi-colour with speed")]
-pub struct MultiColourSpeed {
-    #[argh(option, short = 'a', description = "set the RGB value e.g. ff00ff")]
-    pub colour1: Colour,
-
-    #[argh(option, short = 'b', description = "set the RGB value e.g. ff00ff")]
-    pub colour2: Colour,
-
-    #[argh(option, short = 'c', description = "set the RGB value e.g. ff00ff")]
-    pub colour3: Colour,
-
-    #[argh(option, short = 'd', description = "set the RGB value e.g. ff00ff")]
-    pub colour4: Colour,
-
-    #[argh(option, description = "set the speed: low, med, high")]
-    pub speed: Speed,
-}
-
 /// Builtin aura effects
 #[derive(FromArgs, Debug)]
 #[argh(subcommand)]
