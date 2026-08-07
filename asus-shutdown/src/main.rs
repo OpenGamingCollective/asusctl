@@ -152,23 +152,23 @@ async fn acquire_shutdown_inhibitor(manager: &ManagerProxy<'_>) -> Result<OwnedF
 }
 
 async fn print_dry_run_actions() {
-    println!("asus-shutdown dry-run mode (manual start)");
-    println!("Planned shutdown actions from asusd queue:");
+    info!("asus-shutdown dry-run mode (manual start)");
+    info!("Planned shutdown actions from asusd queue:");
 
     match fetch_pending_actions().await {
         Ok(actions) if actions.is_empty() => {
-            println!("- none");
+            info!("- none");
         }
         Ok(actions) => {
             for action in actions {
-                println!(
+                info!(
                     "- {} => {} (path: {})",
                     action.name, action.value, action.path
                 );
             }
         }
         Err(err) => {
-            println!("- could not query asusd queue: {err}");
+            warn!("- could not query asusd queue: {err}");
         }
     }
 }

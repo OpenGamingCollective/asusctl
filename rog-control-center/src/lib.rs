@@ -30,7 +30,7 @@ pub fn print_versions() {
     println!("     rog-aura v{}", rog_aura::VERSION);
     println!("     rog-dbus v{}", rog_dbus::VERSION);
     println!(" rog-profiles v{}", rog_profiles::VERSION);
-    println!("rog-platform v{}", rog_platform::VERSION);
+    println!(" rog-platform v{}", rog_platform::VERSION);
 }
 
 #[derive(PartialEq, Eq, Clone, Copy)]

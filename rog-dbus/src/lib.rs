@@ -47,7 +47,7 @@ where
         }
     }
     if paths.len() > 1 {
-        log::warn!("Multiple asusd interfaces devices found");
+        log::warn!("Multiple asusd interface devices found");
     }
     if !paths.is_empty() {
         let mut ctrl = Vec::new();
@@ -83,7 +83,7 @@ where
         }
     }
     if paths.len() > 1 {
-        log::warn!("Multiple asusd interfaces devices found");
+        log::warn!("Multiple asusd interface devices found");
     }
     if !paths.is_empty() {
         let mut ctrl = Vec::new();
@@ -91,7 +91,7 @@ where
         for path in paths {
             ctrl.push(
                 T::builder(&conn)
-                    .path(path.clone())?
+                    .path(path)?
                     .destination("xyz.ljones.Asusd")?
                     .build()?,
             );
