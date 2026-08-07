@@ -1,0 +1,91 @@
+Building asusctl for Debian and Ubuntu
+======================================
+
+Two build modes are supported, and debian/rules picks between them by looking
+for a vendored crates tarball next to the sources. The vendored mode is the one
+to use for anything you intend to ship; the plain checkout build is for
+convenience and is not reproducible.
+
+Offline, from a vendored tarball (recommended)
+----------------------------------------------
+
+Build hosts with no network access — Launchpad builders, sbuild with
+--no-network, official Debian buildds — need the dependencies inside the source
+package. Generate the tarball from the release tag, including the lock file
+cargo produces, and place it in the root of the source tree:
+
+    cargo vendor vendor
+    tar cJf vendor_asusctl_<upstream-version>.tar.xz vendor Cargo.lock
+
+    dpkg-buildpackage -b -uc -us
+
+The lock file has to travel with the crates it describes: without it
+"cargo build --locked" has nothing to check the vendored sources against and
+fails with "requires a lock file to be present first".
+
+This mode is also what makes the build repeatable. The tarball fixes the
+dependency versions once, so a source package that built yesterday still builds
+today regardless of what has been published to crates.io in the meantime.
+
+Vendor with the same cargo the package will be built with. The resolver honours
+rust-version, so a newer cargo can select crates an older one cannot compile.
+Beware that upstream ships rust-toolchain.toml pinning "stable", which the
+rustup shim obeys; RUSTUP_TOOLCHAIN, or calling a versioned binary such as
+cargo-1.93 directly, takes precedence over it.
+
+Note that the resolved versions depend on the state of crates.io at the moment
+cargo vendor runs, so two tarballs generated minutes apart are not necessarily
+identical. Generate one per release and keep it.
+
+From a git checkout (needs network, not pinned)
+-----------------------------------------------
+
+    dpkg-buildpackage -b -uc -us
+
+With no tarball present, cargo resolves and downloads dependencies as it
+normally would. This is handy while working on the packaging, but it is exposed
+to whatever crates.io looks like at that moment: Cargo.lock is gitignored
+upstream, so a checkout carries none, cargo writes a fresh one, and
+debian/rules removes it again on clean.
+
+That exposure is not theoretical. A dependency that publishes a breaking change
+without bumping its major version breaks every unpinned build at once — the
+same way it breaks "make build" and the PKGBUILD in distro-packaging, which
+also resolve from scratch. When that happens, pin the offending crate
+explicitly and vendor the result:
+
+    cargo generate-lockfile
+    cargo update -p <crate> --precise <version>
+    cargo vendor vendor
+    tar cJf vendor_asusctl_<upstream-version>.tar.xz vendor Cargo.lock
+
+debian/rules calls /usr/bin/cargo and sets RUSTC=/usr/bin/rustc explicitly, so
+the build uses the distribution toolchain even on a developer machine where
+rustup shims come first in PATH. Both are needed: cargo finds rustc through
+PATH unless RUSTC is set, and a rustup shim would follow upstream's
+rust-toolchain.toml and try to install the components it lists.
+
+Linker
+------
+
+Upstream's .cargo/config.toml routes linking through .cargo/linker-wrapper.sh,
+which uses mold or lld when either is installed. debian/rules overrides this to
+the system linker so that the resulting binaries do not depend on which linkers
+the build host happens to have.
+
+Services
+--------
+
+asusd.service has no [Install] section: it is activated by udev, through
+SYSTEMD_WANTS on the asus-nb-wmi driver. debhelper's generated maintainer
+scripts handle the units correctly, and no hand-written postinst or prerm is
+needed.
+
+Translations
+------------
+
+The compiled message catalogues only exist where the Makefile installs them,
+which releases up to 6.3.11 do not. They are therefore picked up in
+override_dh_install rather than listed in rog-control-center.install, since
+dh_install aborts on a pattern that matches nothing. Generating them requires
+msgfmt, hence the gettext build dependency.

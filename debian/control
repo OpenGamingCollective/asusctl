@@ -1,0 +1,45 @@
+Source: asusctl
+Section: utils
+Priority: optional
+Maintainer: Alessandro Curci <hantarex@gmail.com>
+Build-Depends:
+ debhelper-compat (= 13),
+ rustc (>= 1.82),
+ cargo,
+ libclang-dev,
+ libudev-dev,
+ gettext,
+ libfontconfig-dev,
+ cmake,
+ libxkbcommon-dev,
+ libseat-dev,
+ libinput-dev,
+ libgbm-dev,
+ pkgconf,
+ libzstd-dev
+Standards-Version: 4.7.4
+Homepage: https://asus-linux.org
+Vcs-Browser: https://github.com/OpenGamingCollective/asusctl
+Vcs-Git: https://github.com/OpenGamingCollective/asusctl.git
+Rules-Requires-Root: no
+
+Package: asusctl
+Architecture: amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: ASUS Linux laptop control daemon and CLI
+ asusd is a system daemon that provides a safe D-Bus interface
+ to control fan speeds, keyboard LEDs, performance profiles,
+ battery charge limits, and GPU modes on ASUS laptops.
+ .
+ Includes the asusctl CLI and the asusd and asusd-user daemons.
+
+Package: rog-control-center
+Architecture: amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}, asusctl (= ${binary:Version})
+Suggests: supergfxctl
+Description: GUI for asusctl - ASUS laptop control center
+ ROG Control Center is a graphical interface for managing
+ ASUS laptop features through the asusd daemon.
+ .
+ Provides controls for fan curves, keyboard LEDs, AniMe Matrix,
+ performance profiles, GPU mode switching, and power management.

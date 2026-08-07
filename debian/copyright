@@ -1,0 +1,31 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: asusctl
+Upstream-Contact: Luke Jones <luke@ljones.dev>
+Source: https://github.com/OpenGamingCollective/asusctl
+
+Files: *
+Copyright: 2020-2026 Luke Jones <luke@ljones.dev>
+License: MPL-2.0
+
+Files: rog-control-center/data/*.metainfo.xml
+Copyright: 2020-2026 Luke Jones <luke@ljones.dev>
+License: CC0-1.0
+Comment: The AppStream metadata declares metadata_license CC0-1.0; the
+ project itself remains MPL-2.0 (project_license in the same file).
+
+Files: debian/*
+Copyright: 2026 Alessandro Curci <hantarex@gmail.com>
+License: MPL-2.0
+
+License: MPL-2.0
+ This Source Code Form is subject to the terms of the Mozilla Public
+ License, v. 2.0. If a copy of the MPL was not distributed with this
+ file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+License: CC0-1.0
+ To the extent possible under law, the author has dedicated all copyright
+ and related and neighboring rights to this metadata to the public domain
+ worldwide. This metadata is distributed without any warranty.
+ .
+ The full text of the CC0 1.0 Universal legal code is available at
+ https://creativecommons.org/publicdomain/zero/1.0/legalcode
