@@ -408,7 +408,7 @@ mod tests {
         let path = data_path.as_path();
         for p in fs::read_dir(path)
             .map_err(|e| {
-                println!("{:?}, {e}", path);
+                log::warn!("{:?}, {e}", path);
                 e
             })
             .unwrap()

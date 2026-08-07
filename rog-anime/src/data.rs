@@ -4,7 +4,7 @@ use std::thread::sleep;
 use std::time::{Duration, Instant};
 
 use dmi_id::DMIID;
-use log::info;
+use log::{info, warn};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "dbus")]
 use zbus::zvariant::{OwnedValue, Type, Value};
@@ -317,7 +317,7 @@ pub fn run_animation(frames: &AnimeGif, callback: &dyn Fn(AnimeDataBuffer) -> Re
         fade_out_step = 1.0 / fade_out.as_secs_f32();
 
         if time.total_fade_time() > run_time {
-            println!("Total fade in/out time larger than gif run time. Setting fades to half");
+            warn!("Total fade in/out time larger than gif run time. Setting fades to half");
             fade_in = run_time / 2;
             fade_in_step = 1.0 / (run_time / 2).as_secs_f32();
 
