@@ -164,9 +164,6 @@ pub struct Device {
     dev_path: PathBuf,
     /// Whether this device is the discrete GPU.
     is_dgpu: bool,
-    /// Kernel name, e.g. `0000:01:00.0`.
-    #[allow(dead_code)]
-    name: String,
     /// Vendor:Device PCI ID string.
     pci_id: String,
 }
@@ -315,7 +312,6 @@ impl Device {
                             devices.push(Self {
                                 dev_path: PathBuf::from(device.syspath()),
                                 is_dgpu: dgpu,
-                                name: sysname.to_string(),
                                 pci_id: id.to_string(),
                             });
                         }
@@ -656,7 +652,6 @@ mod tests {
         Device {
             dev_path,
             is_dgpu: true,
-            name: "0000:01:00.0".to_string(),
             pci_id: "10DE:2820".to_string(),
         }
     }
