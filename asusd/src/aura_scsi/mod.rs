@@ -27,7 +27,12 @@ impl ScsiAura {
     pub async fn write_effect(&self, effect: &AuraEffect) -> Result<(), RogError> {
         let mut tasks: Vec<Task> = effect.into();
         for task in &mut tasks {
-            self.device.lock().await.perform(task).ok();
+            // Surface the ioctl errno instead of dropping it — an EPERM/EIO
+            // here was previously invisible, so asusd reported success while
+            // no SCSI traffic ever reached the device.
+            if let Err(e) = self.device.lock().await.perform(task) {
+                log::warn!("SCSI perform failed: {e}");
+            }
         }
         Ok(())
     }

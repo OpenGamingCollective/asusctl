@@ -276,6 +276,31 @@ impl DeviceManager {
         Ok(devices)
     }
 
+    /// Resolve the `/dev/sgN` (scsi_generic) node backing a block device.
+    ///
+    /// Walks up from the block device to its owning scsi_device and reads the
+    /// `scsi_generic/sgN` child. Works for whole-disk (`/dev/sda`) and
+    /// partition (`/dev/sda1`) nodes alike, since the scsi_device is a common
+    /// ancestor. Returns None if no sg node exists (e.g. the `sg` module is
+    /// not loaded).
+    fn sg_node_for_block(device: &Device) -> Option<String> {
+        let mut current = device.parent();
+        while let Some(d) = current {
+            if let Ok(entries) = std::fs::read_dir(d.syspath().join("scsi_generic")) {
+                for entry in entries.flatten() {
+                    if let Some(name) = entry.file_name().to_str() {
+                        let node = format!("/dev/{name}");
+                        if std::path::Path::new(&node).exists() {
+                            return Some(node);
+                        }
+                    }
+                }
+            }
+            current = d.parent();
+        }
+        None
+    }
+
     async fn init_scsi(
         connection: &Connection,
         device: &Device,
@@ -289,8 +314,40 @@ impl DeviceManager {
                     .property_value("ID_MODEL_ID")
                     .unwrap_or_default()
                     .to_string_lossy();
-                if let Some(dev_str) = dev_node.as_os_str().to_str() {
-                    if let Ok(dev_type) = DeviceHandle::maybe_scsi(dev_str, &prod_id).await {
+                // SG_IO with vendor commands on the block node (/dev/sdX)
+                // requires CAP_SYS_RAWIO, which the hardened asusd unit drops
+                // (every ioctl EPERMs and is silently swallowed by write_effect).
+                // The scsi_generic /dev/sgN node gates access at open() via
+                // file permissions instead, so it works with no capabilities,
+                // the same path sg3_utils / OpenRGB use.
+                //
+                // On hotplug the sg node can appear just after the block node,
+                // so retry briefly before falling back to the block device
+                // (which would EPERM). At startup the node already exists, so
+                // the first attempt succeeds with no delay.
+                let mut sg_node = None;
+                for attempt in 0..8u8 {
+                    if let Some(sg) = Self::sg_node_for_block(device) {
+                        sg_node = Some(sg);
+                        break;
+                    }
+                    if attempt < 7 {
+                        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                    }
+                }
+                let dev_str = match sg_node {
+                    Some(sg) => Some(sg),
+                    None => {
+                        warn!(
+                            "No /dev/sgN for SCSI device after retries; falling back to block \
+                             node {:?} (SG_IO will EPERM unless asusd has CAP_SYS_RAWIO)",
+                            dev_node
+                        );
+                        dev_node.as_os_str().to_str().map(|s| s.to_string())
+                    }
+                };
+                if let Some(dev_str) = dev_str {
+                    if let Ok(dev_type) = DeviceHandle::maybe_scsi(&dev_str, &prod_id).await {
                         if let DeviceHandle::Scsi(scsi) = dev_type.clone() {
                             let ctrl = ScsiZbus::new(scsi);
                             if ctrl
