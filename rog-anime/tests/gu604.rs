@@ -320,7 +320,7 @@ mod tests {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("tests/data/gu604-diagonal.png");
 
-        let matrix = AnimeDiagonal::from_png(&path, None, 255.0, AnimeType::GU604).unwrap();
+        let matrix = AnimeDiagonal::from_png(&path, 255.0, AnimeType::GU604).unwrap();
         let data = matrix.into_data_buffer(AnimeType::GU604).unwrap();
         let pkt = AnimePacketType::try_from(data).unwrap();
 

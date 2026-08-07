@@ -21,7 +21,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let matrix = AnimeDiagonal::from_png(
         Path::new(&args[1]),
-        None,
         args[2].parse::<f32>().unwrap(),
         AnimeType::GA401,
     )?;

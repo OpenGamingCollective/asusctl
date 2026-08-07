@@ -320,7 +320,7 @@ mod tests {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("tests/data/ga402-diagonal.png");
 
-        let matrix = AnimeDiagonal::from_png(&path, None, 255.0, AnimeType::GA402).unwrap();
+        let matrix = AnimeDiagonal::from_png(&path, 255.0, AnimeType::GA402).unwrap();
         let data = matrix.into_data_buffer(AnimeType::GA402).unwrap();
         let pkt = AnimePacketType::try_from(data).unwrap();
 
@@ -480,7 +480,7 @@ mod tests {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("tests/data/ga402-diagonal-fullbright.png");
 
-        let matrix = AnimeDiagonal::from_png(&path, None, 255.0, AnimeType::GA402).unwrap();
+        let matrix = AnimeDiagonal::from_png(&path, 255.0, AnimeType::GA402).unwrap();
         let data = matrix.into_data_buffer(AnimeType::GA402).unwrap();
         let pkt = AnimePacketType::try_from(data).unwrap();
 

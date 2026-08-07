@@ -83,7 +83,7 @@ impl ActionData {
                 brightness,
             } => match time {
                 AnimTime::Infinite => {
-                    let image = AnimeDiagonal::from_png(file, None, *brightness, anime_type)?;
+                    let image = AnimeDiagonal::from_png(file, *brightness, anime_type)?;
                     let data = image.into_data_buffer(anime_type)?;
                     ActionData::Image(Box::new(data))
                 }

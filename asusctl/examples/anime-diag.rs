@@ -16,7 +16,7 @@ fn main() {
     let proxy = AnimeProxyBlocking::new(&conn).unwrap();
 
     for step in (2..50).rev() {
-        let mut matrix = AnimeDiagonal::new(AnimeType::GA401, None);
+        let mut matrix = AnimeDiagonal::new(AnimeType::GA401);
         for c in (0..60).step_by(step) {
             for i in matrix.get_mut().iter_mut() {
                 i[c] = 50;

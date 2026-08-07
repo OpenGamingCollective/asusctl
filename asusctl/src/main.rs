@@ -406,12 +406,8 @@ fn handle_anime(cmd: &AnimeCommand) -> Result<(), Box<dyn std::error::Error>> {
                     }
                     verify_brightness(image.bright);
 
-                    let matrix = AnimeDiagonal::from_png(
-                        Path::new(&image.path),
-                        None,
-                        image.bright,
-                        anime_type,
-                    )?;
+                    let matrix =
+                        AnimeDiagonal::from_png(Path::new(&image.path), image.bright, anime_type)?;
 
                     proxy.write(matrix.into_data_buffer(anime_type)?)?;
                 }

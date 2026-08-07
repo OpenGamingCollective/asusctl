@@ -1,7 +1,6 @@
 //! This is full of crap code which is basically bruteforced
 
 use std::path::Path;
-use std::time::Duration;
 
 use log::error;
 
@@ -11,16 +10,14 @@ use crate::AnimeType;
 
 /// Mostly intended to be used with ASUS gifs, but can be used for other
 /// purposes (like images)
-#[allow(dead_code)]
-pub struct AnimeDiagonal(AnimeType, Vec<Vec<u8>>, Option<Duration>);
+pub struct AnimeDiagonal(AnimeType, Vec<Vec<u8>>);
 
 impl AnimeDiagonal {
     #[inline]
-    pub fn new(anime_type: AnimeType, duration: Option<Duration>) -> Self {
+    pub fn new(anime_type: AnimeType) -> Self {
         Self(
             anime_type,
             vec![vec![0; anime_type.width()]; anime_type.height()],
-            duration,
         )
     }
 
@@ -45,12 +42,7 @@ impl AnimeDiagonal {
     /// or updated via scale, position, or angle then displayed again after
     /// `update()`.
     #[inline]
-    pub fn from_png(
-        path: &Path,
-        duration: Option<Duration>,
-        bright: f32,
-        anime_type: AnimeType,
-    ) -> Result<Self> {
+    pub fn from_png(path: &Path, bright: f32, anime_type: AnimeType) -> Result<Self> {
         let data = std::fs::read(path).map_err(|e| {
             error!("Could not open {path:?}: {e:?}");
             e
@@ -59,7 +51,7 @@ impl AnimeDiagonal {
         let decoder = png_pong::Decoder::new(data)?.into_steps();
         let png_pong::Step { raster, delay: _ } = decoder.last().ok_or(AnimeError::NoFrames)??;
 
-        let mut matrix = AnimeDiagonal::new(anime_type, duration);
+        let mut matrix = AnimeDiagonal::new(anime_type);
 
         match &raster {
             png_pong::PngRaster::Gray8(ras) => {

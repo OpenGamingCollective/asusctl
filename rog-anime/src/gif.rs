@@ -102,7 +102,7 @@ impl AnimeGif {
         brightness: f32,
         anime_type: AnimeType,
     ) -> Result<Self> {
-        let mut matrix = AnimeDiagonal::new(anime_type, None);
+        let mut matrix = AnimeDiagonal::new(anime_type);
 
         let mut decoder = gif::DecodeOptions::new();
         // Configure the decoder such that it will expand the image to RGBA.
@@ -156,7 +156,7 @@ impl AnimeGif {
         duration: AnimTime,
         brightness: f32,
     ) -> Result<Self> {
-        let image = AnimeDiagonal::from_png(file_name, None, brightness, anime_type)?;
+        let image = AnimeDiagonal::from_png(file_name, brightness, anime_type)?;
 
         let mut total = Duration::from_millis(1000);
         if let AnimTime::Fade(fade) = duration {
