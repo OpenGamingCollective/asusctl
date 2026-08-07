@@ -24,6 +24,8 @@ pub struct Config {
     pub start_fullscreen: bool,
     pub fullscreen_width: u32,
     pub fullscreen_height: u32,
+    #[serde(default)]
+    pub language: String,
     // This field must be last
     pub notifications: EnabledNotifications,
 }
@@ -40,6 +42,7 @@ impl Default for Config {
             start_fullscreen: false,
             fullscreen_width: 1920,
             fullscreen_height: 1080,
+            language: String::new(),
             notifications: EnabledNotifications::default(),
             ac_command: String::new(),
             bat_command: String::new(),
@@ -100,6 +103,7 @@ impl From<Config461> for Config {
             start_fullscreen: false,
             fullscreen_width: 1920,
             fullscreen_height: 1080,
+            language: String::new(),
             notifications: c.enabled_notifications,
         }
     }

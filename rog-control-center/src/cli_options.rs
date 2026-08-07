@@ -30,4 +30,7 @@ pub struct CliStart {
     /// put ROGCC in layout viewing mode - this is helpful for finding existing layouts that might match your laptop
     #[argh(switch)]
     pub layout_viewing: bool,
+    /// skip the single-instance D-Bus guard (used internally by the reload-window handoff)
+    #[argh(switch)]
+    pub no_single_instance: bool,
 }

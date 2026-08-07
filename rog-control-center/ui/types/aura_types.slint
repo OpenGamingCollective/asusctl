@@ -74,6 +74,8 @@ export global AuraPageData {
     ];
     in-out property <int> brightness;
     callback cb_brightness(int);
+    // Set the animation speed (0..2, Low/Medium/High) for the current mode.
+    callback cb_speed(int);
     in-out property <[string]> mode_names: [
         @tr("Basic aura mode" => "Static"),
         @tr("Basic aura mode" => "Breathe"),
@@ -92,6 +94,13 @@ export global AuraPageData {
     in-out property <[string]> available_mode_names: [ @tr("Basic aura mode" => "Static"), @tr("Basic aura mode" => "Breathe"), @tr("Basic aura mode" => "Strobe") ];
     in-out property <int> current_available_mode: 0;
     in-out property <[int]> supported_basic_modes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12];
+    // Index (into supported_basic_modes / available_mode_names) of each curated
+    // quick-effect button, or -1 when the device doesn't support that mode.
+    // Set from setup_aura once the supported set is known.
+    in-out property <int> idx-static: 0;
+    in-out property <int> idx-breathe: 1;
+    in-out property <int> idx-flash: -1;
+    in-out property <int> idx-rainbow: -1;
     in-out property <[string]> zone_names: [
         @tr("Aura zone" => "None"),
         @tr("Aura zone" => "Key1"),

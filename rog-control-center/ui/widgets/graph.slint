@@ -1,9 +1,12 @@
-import { Palette } from "std-widgets.slint";
+import { Theme } from "../globals.slint";
 
 export struct Node { x: length, y: length}
 
 export component Graph inherits Rectangle {
     in-out property <[Node]> nodes;
+    // Read-only mode (e.g. fan curve disabled → BIOS default): dim and ignore drag.
+    in property <bool> enabled: true;
+    opacity: root.enabled ? 1.0 : 0.4;
     in property <Node> node_min: { x: 0px, y: 0px };
     in property <Node> node_max: { x: 100px, y: 255px };
     property <length> graph_padding: 40px;
@@ -44,7 +47,7 @@ export component Graph inherits Rectangle {
         for n in 11: Path {
             viewbox-width: self.width / 1px;
             viewbox-height: self.height / 1px;
-            stroke: Palette.alternate-foreground.darker(200%);
+            stroke: Theme.line-soft;
             stroke-width: 1px;
             MoveTo {
                 x: scale_x_to_graph(n * 10px) / 1px;
@@ -60,7 +63,7 @@ export component Graph inherits Rectangle {
         }
 
         for n in 11: Text {
-            color: Palette.accent-background;
+            color: Theme.text-dim;
             font-size <=> root.axis_font_size;
             text: "\{n * 10}c";
             x: scale_x_to_graph(n * 10px) - self.width / 3;
@@ -70,7 +73,7 @@ export component Graph inherits Rectangle {
         for n in 11: Path {
             viewbox-width: self.width / 1px;
             viewbox-height: self.height / 1px;
-            stroke: Palette.alternate-foreground.darker(200%);
+            stroke: Theme.line-soft;
             stroke-width: 1px;
             MoveTo {
                 x: 0;
@@ -86,7 +89,7 @@ export component Graph inherits Rectangle {
         }
 
         for n in 11: Text {
-            color: Palette.accent-background;
+            color: Theme.text-dim;
             font-size <=> root.axis_font_size;
             text: "\{n * 10}%";
             x: - self.width;
@@ -97,7 +100,7 @@ export component Graph inherits Rectangle {
             if idx + 1 != nodes.length: Path {
                 viewbox-width: self.width / 1px;
                 viewbox-height: self.height / 1px;
-                stroke: Palette.control-foreground;
+                stroke: Theme.rog-red;
                 stroke-width: 2px;
                 MoveTo {
                     x: scale_x_to_graph(nodes[idx].x) / 1px;
@@ -114,19 +117,19 @@ export component Graph inherits Rectangle {
         for n[idx] in nodes: Rectangle {
             states [
                 pressed when touch.pressed: {
-                    point.background: Palette.selection-background;
-                    tip.background: Palette.selection-background;
+                    point.background: #FFFFFF;
+                    tip.background: Theme.bg-elevated;
                     tip.opacity: 1.0;
                 }
                 hover when touch.has-hover: {
-                    point.background: Palette.accent-background;
-                    tip.background: Palette.accent-background;
+                    point.background: Theme.rog-red;
+                    tip.background: Theme.rog-red;
                     tip.opacity: 1.0;
                 }
             ]
             //
             point := Rectangle {
-                background: Palette.control-foreground;
+                background: Theme.rog-red;
                 x: scale_x_to_graph(n.x) - self.width / 2;
                 y: graph.height - scale_y_to_graph(n.y) - self.height / 2;
                 width: 18px;
@@ -135,6 +138,7 @@ export component Graph inherits Rectangle {
                 property <length> pad: 1px;
 
                 touch := TouchArea {
+                    enabled: root.enabled;
                     function check() {
                         if idx + 1 < nodes.length && idx > 0 {
                             if n.x + scale_x_to_node(self.mouse-x - self.pressed-x) > nodes[idx + 1].x {
@@ -189,7 +193,7 @@ export component Graph inherits Rectangle {
             }
 
             tip := Rectangle {
-                background: Palette.control-foreground;
+                background: Theme.bg-elevated;
                 opacity: 0.3;
                 border-radius: 12px;
                 x: final_x_pos();
@@ -225,7 +229,7 @@ export component Graph inherits Rectangle {
                 }
                 //
                 label := Text {
-                    color: Palette.accent-foreground;
+                    color: Theme.text-primary;
                     font-size: 14px;
                     text: "\{Math.floor(n.x / 1px)}c, \{fan_pct()}%";
                 }

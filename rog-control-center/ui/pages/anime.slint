@@ -1,5 +1,6 @@
 import { SystemDropdown, SystemToggle } from "../widgets/common.slint";
 import { Palette, GroupBox, VerticalBox, Button, HorizontalBox } from "std-widgets.slint";
+import { RogPage } from "../widgets/rog.slint";
 
 export global AnimePageData {
     in-out property <[string]> brightness_names: [
@@ -31,7 +32,7 @@ export global AnimePageData {
     callback cb_builtin_animations(int, int, int, int);
 }
 
-export component PageAnime inherits Rectangle {
+export component PageAnime inherits RogPage {
     property <bool> show_fade_cover: false;
     property <bool> show_display_advanced: false;
     property <bool> show_builtin_advanced: false;

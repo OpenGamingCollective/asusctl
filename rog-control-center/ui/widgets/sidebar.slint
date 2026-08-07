@@ -1,143 +1,119 @@
-// Copyright © SixtyFPS GmbH <info@slint.dev>
-// SPDX-License-Identifier: MIT
+// rog-control-center — AC-style sidebar (matched against the AC f001 screenshot)
+// Narrow icon bar (~56px): ROG logo + icon nav + quit button.
+// Selected state: #5A2025 dark-red fill + a left red indicator bar.
+//
+// New menu entry = one NavItemData row in `model` (no separate icon array to
+// keep in sync). The for-repeater scales automatically.
+import { ScrollView } from "std-widgets.slint";
+import { Theme } from "../globals.slint";
 
-import { Palette, VerticalBox } from "std-widgets.slint";
+// One nav entry: title (i18n + a11y label) + icon. Add new pages here only.
+export struct NavItemData {
+    title: string,
+    icon: image,
+}
 
-component SideBarItem inherits Rectangle {
-    in property <bool> selected;
-    in property <bool> has-focus;
-    in-out property <string> text <=> label.text;
-    callback clicked <=> touch.clicked;
-    min-height: self.visible ? l.preferred-height : 0px;
-    // min-width: self.visible ? l.preferred-width + 10px : 0px;
-    states [
-        pressed when touch.pressed: {
-            state.opacity: 0.8;
-        }
-        hover when touch.has-hover: {
-            state.opacity: 0.6;
-        }
-        selected when root.selected: {
-            state.opacity: 1;
-        }
-        focused when root.has-focus: {
-            state.opacity: 0.8;
-        }
-    ]
+// — Single nav item: icon + selected red bar —
+export component NavItem inherits Rectangle {
+    in property <bool> selected: false;
+    in property <image> icon;
+    in property <bool> enabled: true;
+    callback clicked();
+    width: 100%;
+    height: 48px;
+    accessible-role: tab;
+    accessible-item-selectable: true;
+    accessible-item-selected: root.selected;
+    accessible-action-default => { root.clicked(); }
+    background: root.selected ? Theme.sidebar-selected : transparent;
 
-    state := Rectangle {
-        opacity: 0;
-        background: Palette.selection-background;
-        animate opacity { duration: 150ms; }
-        height: 100%;
-    }
-
-    l := HorizontalLayout {
-        x: 4px;
+    // Left red indicator (only when selected)
+    if root.selected: Rectangle {
+        x: 0px;
         y: (parent.height - self.height) / 2;
-        padding-left: 8px;
-        padding-right: 8px;
-        padding-top: 6px;
-        padding-bottom: 6px;
-        spacing: 0px;
-        label := Text {
-            color: Palette.foreground;
-            vertical-alignment: center;
-            font-size: 14px;
-        }
+        width: 3px;
+        height: 32px;
+        background: Theme.rog-red;
+        border-radius: 1.5px;
     }
 
-    touch := TouchArea {
+    // Icon (centered)
+    Image {
+        source: root.icon;
+        colorize: root.enabled ? (root.selected ? Theme.text-primary : Theme.text-secondary) : Theme.fg-disabled;
+        width: 22px;
+        height: 22px;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        image-fit: contain;
+    }
+
+    ta := TouchArea {
         width: 100%;
         height: 100%;
+        enabled: root.enabled;
+        clicked => { root.clicked(); }
     }
 }
 
+component HorizontalDivider inherits Rectangle {
+    height: 1px;
+    width: 100%;
+    background: Theme.divider;
+}
+
+// — AC-style sidebar —
 export component SideBar inherits Rectangle {
-    in property <[string]> model: [];
-    in property <[bool]> available: [];
+    in property <[NavItemData]> model;
+    in property <[bool]> available;
     in property <bool> is_tuf: false;
     out property <int> current-item: 0;
-    out property <int> current-focused: fs.has-focus ? fs.focused-tab : -1;
 
-    // The currently focused tab
-    width: 180px;
-    forward-focus: fs;
-    accessible-role: tab;
-    accessible-delegate-focus: root.current-focused >= 0 ? root.current-focused : root.current-item;
-    Rectangle {
-        background: Palette.alternate-background;
-        fs := FocusScope {
-            key-pressed(event) => {
-                if (event.text == "\n") {
-                    root.current-item = root.current-focused;
-                    return accept;
-                }
-                if (event.text == Key.UpArrow) {
-                    self.focused-tab = Math.max(self.focused-tab - 1,  0);
-                    return accept;
-                }
-                if (event.text == Key.DownArrow) {
-                    self.focused-tab = Math.min(self.focused-tab + 1, root.model.length - 1);
-                    return accept;
-                }
-                return reject;
-            }
-            key-released(event) => {
-                if (event.text == " ") {
-                    root.current-item = root.current-focused;
-                    return accept;
-                }
-                return reject;
-            }
-            property <int> focused-tab: 0;
-            x: 0;
-            width: 0;
-            // Do not react on clicks
-        }
-    }
+    background: Theme.sidebar-bg;
+    width: 56px;
+    clip: true;
 
-    VerticalBox {
-        spacing: 4px;
-        padding: 0px;
-        alignment: start;
+    VerticalLayout {
+        spacing: 2px;
+        padding-top: 12px;
+        padding-bottom: 8px;
 
-        Image {
-            height: 100px;
-            // TODO: change if TUF on the logo in the menu on the main page
-            // If running on a TUF model, replace the ROG red with TUF orange
-            // (add data/tuf-control-center.png and switch here when available)
-            source: @image-url("../../data/rog-control-center.png");
-            horizontal-alignment: center;
-            image-fit: contain;
-        }
-
+        // — ROG logo —
         Rectangle {
-            height: 1px;
-            background: Palette.border;
-        }
-
-        navigation := VerticalLayout {
-            spacing: 2px;
-            alignment: start;
-            vertical-stretch: 0;
-            for item[index] in root.model: SideBarItem {
-                visible: root.available[index];
-                clicked => {
-                    root.current-item = index;
-                }
-                has-focus: index == root.current-focused;
-                text: item;
-                selected: index == root.current-item;
+            height: 64px;
+            width: 100%;
+            background: transparent;
+            Image {
+                source: @image-url("../../data/rog-sidebar-logo.png");
+                width: 36px;
+                height: 36px;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                image-fit: contain;
             }
         }
 
-        VerticalLayout {
-            bottom := VerticalBox {
-                padding-left: 0px;
-                padding-top: 0px;
-                padding-bottom: 0px;
-                @children
+        // Divider
+        HorizontalDivider { }
+
+        // — Nav item list. Scrolls vertically when the window is too short to
+        // fit every entry, instead of clipping or collapsing the icons. The logo
+        // stays pinned at top; the list fills the remaining space. —
+        ScrollView {
+            vertical-stretch: 1;
+            VerticalLayout {
+                spacing: 2px;
+                alignment: start;
+                accessible-role: tab-list;
+                accessible-orientation: Orientation.vertical;
+                accessible-item-count: root.model.length;
+                for item[index] in root.model: NavItem {
+                    enabled: index < root.available.length && root.available[index];
+                    icon: item.icon;
+                    accessible-label: item.title;
+                    selected: index == root.current-item;
+                    clicked => { root.current-item = index; }
+                }
             }
         }
     }

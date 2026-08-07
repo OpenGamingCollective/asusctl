@@ -114,6 +114,17 @@ pub fn setup_aura_page(
                     .set_supported_basic_modes(raws.as_slice().into());
                 h.global::<AuraPageData>()
                     .set_available_mode_names(mode_names.as_slice().into());
+                // Position of each curated quick-effect in the supported list
+                // (-1 when unsupported) so the AC-style button row can gate and
+                // highlight them correctly regardless of device mode set.
+                let idx_of = |raw: i32| {
+                    raws.iter().position(|&r| r == raw).map(|p| p as i32).unwrap_or(-1)
+                };
+                let g = h.global::<AuraPageData>();
+                g.set_idx_static(idx_of(0));
+                g.set_idx_breathe(idx_of(1));
+                g.set_idx_flash(idx_of(12));
+                g.set_idx_rainbow(idx_of(3));
                 if let Some(d) = d_slint {
                     h.global::<AuraPageData>().invoke_update_led_mode_data(d);
                     if let Some(cm) = raw_mode {
@@ -182,6 +193,19 @@ pub fn setup_aura_page(
                         let r = pp.set_led_mode_data(raw).await;
                         show_toast("LED mode applied".into(), "LED mode failed".into(), t, r);
                     });
+                });
+
+                // Speed slider: stamp the new speed onto the active effect,
+                // mirror it in the UI, then run the existing apply path (which
+                // also pushes to hardware and toasts) so the write logic stays
+                // in one place.
+                let w_speed = weak.clone();
+                h.global::<AuraPageData>().on_cb_speed(move |speed| {
+                    let Some(ui) = w_speed.upgrade() else { return };
+                    let mut data = ui.global::<AuraPageData>().get_led_mode_data();
+                    data.speed = speed;
+                    ui.global::<AuraPageData>().set_led_mode_data(data);
+                    ui.global::<AuraPageData>().invoke_apply_led_mode_data();
                 });
                 h.invoke_external_colour_change();
             })

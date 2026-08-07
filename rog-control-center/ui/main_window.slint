@@ -1,6 +1,7 @@
 import { Palette, Button, VerticalBox } from "std-widgets.slint";
-import { AppSize } from "globals.slint";
+import { AppSize, Theme } from "globals.slint";
 import { PageSystem, SystemPageData, AttrMinMax } from "pages/system.slint";
+import { PageHome } from "pages/home.slint";
 import { SideBar } from "widgets/sidebar.slint";
 import { PageAbout } from "pages/about.slint";
 import { PageFans } from "pages/fans.slint";
@@ -21,7 +22,8 @@ import { PageAppSettings, AppSettingsPageData, GlobalShortcutStatus } from "page
 export { AppSize, AttrMinMax, SystemPageData, AnimePageData, SlashPageData, AppSettingsPageData, GlobalShortcutStatus, GPUPageData }
 
 export component MainWindow inherits Window {
-    title: "ROG Control";
+    title: "ROG Control Center";
+    in property <string> app-version: "";
     always-on-top: true;
     default-font-family: "Noto Sans";
     default-font-size: 14px;
@@ -29,6 +31,7 @@ export component MainWindow inherits Window {
     icon: @image-url("../data/rog-control-center.png");
     in property <[bool]> sidebar_items_avilable: [
         true,
+        true, // System (power limits / tuning)
         true,
         true,
         true,
@@ -38,10 +41,8 @@ export component MainWindow inherits Window {
         true, // App Settings
         true, // About
     ];
-    private property <bool> show_notif;
     // TODO: change if TUF on the logo in the menu on the main page
     in property <bool> is_tuf: false;
-    private property <bool> fade_cover;
     private property <bool> toast: false;
     private property <string> toast_text: "I show when something is waiting";
     callback show_toast(string);
@@ -56,104 +57,124 @@ export component MainWindow inherits Window {
             toast_text = "";
         }
     }
-    callback exit-app();
-    callback show_notification(bool);
-    show_notification(yes) => {
-        show_notif = yes;
-        fade_cover = yes;
-    }
     callback external_colour_change();
     external_colour_change() => {
-        aura.external_colour_change();
         aura.external_colour_change();
     }
     min-height: AppSize.height;
     min-width: AppSize.width;
-    background: Palette.alternate-background;
+    // Default open size — taller than the handheld-friendly min so the dashboard
+    // has room on normal laptops. Resizable between min and max.
+    preferred-width: 1000px;
+    preferred-height: 700px;
+    // Explicit larger max so the window is resizable (pages bind their height to
+    // root.height, which otherwise makes Slint treat the window as a fixed size
+    // — GNOME then refuses edge-resizing past the default, only fullscreen works).
+    max-width: 2560px;
+    max-height: 2000px;
+    background: Theme.bg-base;
 
     HorizontalLayout {
         padding: 0px;
-        VerticalLayout {
-            padding: 0px;
-            side-bar := SideBar {
-                model: [
-                    @tr("Menu1" => "System Control"),
-                    @tr("Menu2" => "Keyboard Aura"),
-                    @tr("Menu3" => "AniMe Matrix"),
-                    @tr("Menu4" => "Slash Lighting"),
-                    @tr("Menu5" => "Fan Curves"),
-                    @tr("Menu6" => "GPU Configuration"),
-                    @tr("Menu9" => "Battery Info"),
-                    @tr("Menu7" => "App Settings"),
-                    @tr("Menu8" => "About"),
-                ];
-                available: root.sidebar_items_avilable;
-                is_tuf: root.is_tuf;
-            }
-
-            Button {
-                height: 40px;
-                width: side-bar.width;
-                text: @tr("Quit App");
-                clicked() => {
-                    root.exit-app();
-                }
-            }
+        side-bar := SideBar {
+            // Title + icon travel together as one model — no separate icon array
+            // to keep in sync when entries are added or reordered.
+            model: [
+                { title: @tr("Menu1" => "System Control"), icon: @image-url("images/nav-home.svg") },
+                { title: @tr("Menu_system" => "System Tuning"), icon: @image-url("images/ic-cpu.svg") },
+                { title: @tr("Menu2" => "Keyboard Aura"), icon: @image-url("images/nav-keyboard.svg") },
+                { title: @tr("Menu3" => "AniMe Matrix"), icon: @image-url("images/nav-matrix.svg") },
+                { title: @tr("Menu4" => "Slash Lighting"), icon: @image-url("images/nav-slash.svg") },
+                { title: @tr("Menu5" => "Fan Curves"), icon: @image-url("images/nav-fan.svg") },
+                { title: @tr("Menu6" => "GPU Configuration"), icon: @image-url("images/nav-gpu.svg") },
+                { title: @tr("Menu9" => "Battery Info"), icon: @image-url("images/nav-battery.svg") },
+                { title: @tr("Menu7" => "App Settings"), icon: @image-url("images/nav-apps.svg") },
+                { title: @tr("Menu8" => "About"), icon: @image-url("images/nav-about.svg") },
+            ];
+            available: root.sidebar_items_avilable;
+            is_tuf: root.is_tuf;
         }
 
         Rectangle {
-            background: Palette.background;
-            if(side-bar.current-item == 0): page := PageSystem {
-                width: root.width - side-bar.width;
-                height: root.height + 12px;
+            background: Theme.bg-base;
+            // All pages stay mounted; the active one is driven to opacity 1,
+            // others to 0, with a crossfade. `visible` keeps a page rendered
+            // only while it is active or still fading out, so inactive pages
+            // cost nothing to draw.
+            page := PageHome {
+                // Responsive width: fill small windows, cap at 1100px and center on large ones.
+                width: root.width - side-bar.width > 1100px ? 1100px : root.width - side-bar.width;
+                height: root.height;
+                x: root.width - side-bar.width > 1100px ? ((root.width - side-bar.width) - 1100px) / 2 : 0px;
+                opacity: side-bar.current-item == 0 ? 1 : 0;
+                visible: side-bar.current-item == 0 || self.opacity > 0;
             }
 
-            /*if(side-bar.current-item == 1):*/ aura := PageAura {
+            // System Tuning — power limits / device toggles / Screenpad. Standard
+            // RogPage layout (52px titlebar + ScrollView), same as the other pages.
+            PageSystem {
                 width: root.width - side-bar.width;
-                height: root.height + 12px;
-                visible: side-bar.current-item == 1;
+                height: root.height;
+                opacity: side-bar.current-item == 1 ? 1 : 0;
+                visible: side-bar.current-item == 1 || self.opacity > 0;
             }
 
-            if(side-bar.current-item == 2): PageAnime {
+            aura := PageAura {
                 width: root.width - side-bar.width;
                 height: root.height + 12px;
-                visible: side-bar.current-item == 2;
+                opacity: side-bar.current-item == 2 ? 1 : 0;
+                visible: side-bar.current-item == 2 || self.opacity > 0;
             }
 
-            if(side-bar.current-item == 3): PageSlash {
+            PageAnime {
                 width: root.width - side-bar.width;
                 height: root.height + 12px;
-                visible: side-bar.current-item == 3;
+                opacity: side-bar.current-item == 3 ? 1 : 0;
+                visible: side-bar.current-item == 3 || self.opacity > 0;
             }
 
-            if(side-bar.current-item == 4): fans := PageFans {
+            PageSlash {
                 width: root.width - side-bar.width;
                 height: root.height + 12px;
-                visible: side-bar.current-item == 4;
+                page-active: side-bar.current-item == 4;
+                opacity: side-bar.current-item == 4 ? 1 : 0;
+                visible: side-bar.current-item == 4 || self.opacity > 0;
             }
 
-            if(side-bar.current-item == 5): PageGPU {
+            fans := PageFans {
                 width: root.width - side-bar.width;
                 height: root.height + 12px;
-                visible: side-bar.current-item == 5;
+                opacity: side-bar.current-item == 5 ? 1 : 0;
+                visible: side-bar.current-item == 5 || self.opacity > 0;
             }
 
-            if(side-bar.current-item == 6): PageBattery {
+            PageGPU {
                 width: root.width - side-bar.width;
                 height: root.height + 12px;
-                visible: side-bar.current-item == 6;
+                opacity: side-bar.current-item == 6 ? 1 : 0;
+                visible: side-bar.current-item == 6 || self.opacity > 0;
             }
 
-            if(side-bar.current-item == 7): PageAppSettings {
+            PageBattery {
                 width: root.width - side-bar.width;
                 height: root.height + 12px;
-                visible: side-bar.current-item == 7;
+                opacity: side-bar.current-item == 7 ? 1 : 0;
+                visible: side-bar.current-item == 7 || self.opacity > 0;
             }
 
-            if(side-bar.current-item == 8): PageAbout {
+            PageAppSettings {
                 width: root.width - side-bar.width;
                 height: root.height + 12px;
-                visible: side-bar.current-item == 8;
+                opacity: side-bar.current-item == 8 ? 1 : 0;
+                visible: side-bar.current-item == 8 || self.opacity > 0;
+            }
+
+            PageAbout {
+                width: root.width - side-bar.width;
+                height: root.height + 12px;
+                app-version: root.app-version;
+                opacity: side-bar.current-item == 9 ? 1 : 0;
+                visible: side-bar.current-item == 9 || self.opacity > 0;
             }
 
             if toast: Rectangle {
@@ -181,53 +202,6 @@ export component MainWindow inherits Window {
                         text: root.toast_text;
                     }
                 }
-            }
-        }
-    }
-
-    if fade_cover: Rectangle {
-        x: 0px;
-        y: 0px;
-        width: root.width;
-        height: root.height;
-        background: Colors.rgba(25,33,23,20);
-        opacity: 0.7;
-        TouchArea {
-            height: 100%;
-            width: 100%;
-            clicked => {
-                // toolbar-dropdown.close();
-                if (show_notif) {
-                    show_notif = false;
-                }
-                fade_cover = false;
-            }
-        }
-    }
-
-
-    // // TODO: or use Dialogue
-    if show_notif: Rectangle {
-        x: root.width / 8;
-        y: root.height / 8;
-        height: (root.height / 8) * 6;
-        width: (root.width / 8) * 6;
-        TouchArea {
-            height: 100%;
-            width: 100%;
-            clicked => {
-                show_notif = false;
-                exit-app();
-            }
-        }
-
-        // TODO: add properties to display
-        Rectangle {
-            height: 100%;
-            width: 100%;
-            background: Palette.background;
-            Text {
-                text: "Click here to exit";
             }
         }
     }

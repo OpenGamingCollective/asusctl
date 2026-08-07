@@ -1,137 +1,180 @@
-import { Palette, TabWidget, Button, CheckBox, ScrollView } from "std-widgets.slint";
-import { Graph, Node } from "../widgets/graph.slint";
-import { SystemToggle, SystemDropdown } from "../widgets/common.slint";
-import { Profile, FanType, FanPageData } from "../types/fan_types.slint";
+// PageGPU — GPU Configuration page matching AC video frame (f004, 12s mark)
+// Layout: titlebar + backend-provided display mode cards + process list
+// Pattern: alignment:start, HorizontalLayout, no ScrollView, natural height
+// Data: all from GPUPageData global (D-Bus backed)
+import { RogCard, RogDropdownRow, RogSlashMark, RogToggle, RogDisplayModeCard, RogPage } from "../widgets/rog.slint";
+import { Theme } from "../globals.slint";
 
 export global GPUPageData {
-    in-out property <int> gpu_mode_index: 0; // index into gpu_modes
-    in-out property <[string]> gpu_modes: []; // available modes, in display order
-    in-out property <bool> gpu_switchable: false; // false when no GPU switch exists
-    in-out property <bool> gpu_dropdown_enabled: true; // false when GPU switch is in progress
+    in-out property <int> gpu_mode_index: 0;
+    in-out property <[string]> gpu_modes: [];
+    in-out property <bool> gpu_switchable: false;
+    in-out property <bool> gpu_dropdown_enabled: true;
     callback cb_set_gpu_mode(int);
 
-    in-out property <bool> has_xgm_led: false; // true when XG Mobile LED is present
-    in-out property <bool> xgm_led_enabled: false; // current LED state
+    in-out property <bool> has_xgm_led: false;
+    in-out property <bool> xgm_led_enabled: false;
     callback cb_set_xgm_led_enabled(bool);
 
     in-out property <bool> disable_nvidia_powerd_on_battery: true;
     callback cb_disable_nvidia_powerd_on_battery(bool);
 
-    in-out property <int> apu_mem_index: -1; // -1 when apu_mem is not available
-    in-out property <[string]> apu_mem_choices: []; // available choices, in display order
-    in-out property <bool> apu_mem_present: false; // false when apu_mem is not available
+    in-out property <int> apu_mem_index: -1;
+    in-out property <[string]> apu_mem_choices: [];
+    in-out property <bool> apu_mem_present: false;
     callback cb_set_apu_mem(int);
 }
 
-export component PageGPU inherits Rectangle {
+export component PageGPU inherits RogPage {
+    background: Theme.bg-base;
     clip: true;
 
-    property <[string]> modes_all: [@tr("Integrated"), @tr("Hybrid"), @tr("Ultimate")];
-    property <[string]> modes_dgpu: [@tr("Integrated"), @tr("Hybrid")];
-    property <[string]> modes_mux: [@tr("Hybrid"), @tr("Ultimate")];
+    // Backend GpuMode enum (setup_gpu.rs) is exactly: Integrated, Hybrid, Ultimate.
+    // Unknown values fall through and show their raw backend string — never lie
+    // about a mode we don't recognize.
+    function mode-title(mode: string) -> string {
+        return mode == "Ultimate" ? @tr("Dedicated Output")
+            : mode == "Hybrid" ? @tr("Hybrid Output")
+            : mode == "Integrated" ? @tr("Integrated Mode")
+            : mode;
+    }
 
-    ScrollView {
+    function mode-description(mode: string) -> string {
+        return mode == "Ultimate"
+            ? @tr("Uses only the discrete GPU for all rendering. Best performance but higher power consumption.")
+            : mode == "Hybrid"
+                ? @tr("Auto-switches between the discrete and integrated GPUs based on workload.")
+                : mode == "Integrated"
+                    ? @tr("Completely disables discrete GPU for best power saving. Lower temps and noise but significantly reduced performance.")
+                    : "";
+    }
+
+    function mode-icon(mode: string) -> image {
+        return mode == "Ultimate" ? @image-url("../images/ic-gpu-dedicated.svg")
+            : mode == "Integrated" ? @image-url("../images/ic-gpu-integrated.svg")
+            : @image-url("../images/ic-gpu-hybrid.svg");
+    }
+
+    // ====== Titlebar ======
+    titlebar := Rectangle {
+        y: 0px;
+        height: 52px;
+        width: 100%;
+        background: Theme.bg-base;
+        HorizontalLayout {
+            spacing: 12px;
+            x: 24px;
+            y: (parent.height - 24px) / 2;
+            height: 24px;
+            Text {
+                text: @tr("GPU");
+                color: Theme.text-primary;
+                font-size: 20px;
+                font-weight: 700;
+                vertical-alignment: center;
+            }
+        }
+    }
+
+    // ====== Content area ======
+    content := Rectangle {
+        y: titlebar.height;
+        width: 100%;
+
         VerticalLayout {
-            padding: 12px;
-            spacing: 8px;
+            padding-left: 24px;
+            padding-right: 24px;
+            padding-top: 12px;
+            padding-bottom: 24px;
+            spacing: 20px;
+            alignment: start;
 
+            // ---- Display Mode section ----
             Rectangle {
-                background: Palette.alternate-background;
-                border-color: Palette.border;
-                border-width: 1px;
-                border-radius: 2px;
-                height: 36px;
-                Text {
-                    font-size: 16px;
-                    color: Palette.control-foreground;
-                    horizontal-alignment: TextHorizontalAlignment.center;
-                    text: @tr("Internal/Discrete GPU");
+                height: 24px;
+                HorizontalLayout {
+                    spacing: 8px;
+                    RogSlashMark { count: 3; bar-w: 4px; bar-color: Theme.rog-red; }
+                    Text {
+                        text: @tr("Display Mode");
+                        color: Theme.text-primary;
+                        font-size: 14px;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                    }
                 }
             }
 
-            if !GPUPageData.gpu_switchable: HorizontalLayout {
-                padding-right: 10px;
-                padding-left: 10px;
-                Text {
-                    font-size: 16px;
+            // Explicit geometry keeps every option equal regardless of translated text width.
+            mode-row := Rectangle {
+                height: 200px;
+                clip: true;
+
+                for mode[i] in GPUPageData.gpu_modes: RogDisplayModeCard {
+                    x: i * ((mode-row.width + 16px) / GPUPageData.gpu_modes.length);
+                    width: (mode-row.width - 16px * (GPUPageData.gpu_modes.length - 1))
+                        / GPUPageData.gpu_modes.length;
+                    height: 200px;
+                    icon: root.mode-icon(mode);
+                    title: root.mode-title(mode);
+                    description: root.mode-description(mode);
+                    selected: i == GPUPageData.gpu_mode_index;
+                    enabled: GPUPageData.gpu_switchable && GPUPageData.gpu_dropdown_enabled;
+                    clicked => {
+                        if i != GPUPageData.gpu_mode_index {
+                            GPUPageData.gpu_mode_index = i;
+                            GPUPageData.cb_set_gpu_mode(i);
+                        }
+                    }
+                }
+
+                if GPUPageData.gpu_modes.length == 0: Text {
                     text: @tr("This device has no switchable GPU.");
+                    color: Theme.text-dim;
+                    font-size: 13px;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
                 }
             }
 
-            if GPUPageData.gpu_switchable: HorizontalLayout {
-                padding-right: 10px;
-                padding-left: 10px;
-                alignment: LayoutAlignment.space-between;
-                Rectangle {
-                    height: 32px;
-                    Text {
-                        font-size: 16px;
-                        text: @tr("Note: Changes take effect after a reboot. The dropdown always shows the current mode.");
+            // ---- Process List Section ----
+            // TODO: live GPU-process viewer. asusd exposes no process API,
+            // so this needs an nvidia-smi scanner in setup_gpu.rs first.
+            RogCard {
+                width: 100%;
+                VerticalLayout {
+                    padding: Theme.pad-card;
+                    spacing: 14px;
+
+                    RogToggle {
+                        label: @tr("Disable nvidia-powerd on battery");
+                        checked <=> GPUPageData.disable_nvidia_powerd_on_battery;
+                        toggled(v) => { GPUPageData.cb_disable_nvidia_powerd_on_battery(v); }
                     }
-                }
-            }
 
-            if GPUPageData.gpu_switchable: HorizontalLayout {
-                SystemDropdown {
-                    text: @tr("GPU mode");
-                    model: GPUPageData.gpu_modes.length == 3 ? root.modes_all : (
-                        GPUPageData.gpu_modes.length == 2 && GPUPageData.gpu_modes[0] == "Integrated" ? root.modes_dgpu : root.modes_mux
-                    );
-                    current_index <=> GPUPageData.gpu_mode_index;
-                    current_value: self.model[self.current_index];
-                    enabled <=> GPUPageData.gpu_dropdown_enabled;
-                    selected => {
-                        GPUPageData.cb_set_gpu_mode(GPUPageData.gpu_mode_index)
+                    if GPUPageData.has_xgm_led: RogToggle {
+                        label: @tr("XG Mobile LED");
+                        checked <=> GPUPageData.xgm_led_enabled;
+                        toggled(v) => { GPUPageData.cb_set_xgm_led_enabled(v); }
                     }
-                }
-            }
 
-            if GPUPageData.apu_mem_present: HorizontalLayout {
-                padding-right: 10px;
-                padding-left: 10px;
-                alignment: LayoutAlignment.space-between;
-                Rectangle {
-                    height: 32px;
-                    Text {
-                        font-size: 16px;
-                        text: @tr("Note: Reserved GPU memory changes take effect after a reboot.");
-                    }
-                }
-            }
-
-            if GPUPageData.apu_mem_present: HorizontalLayout {
-                SystemDropdown {
-                    text: @tr("Reserved GPU memory");
-                    model <=> GPUPageData.apu_mem_choices;
-                    current_index <=> GPUPageData.apu_mem_index;
-                    current_value: GPUPageData.apu_mem_choices[GPUPageData.apu_mem_index];
-                    selected => {
-                        GPUPageData.cb_set_apu_mem(GPUPageData.apu_mem_index)
-                    }
-                }
-            }
-
-            if GPUPageData.has_xgm_led: HorizontalLayout {
-                padding-right: 10px;
-                padding-left: 10px;
-                SystemToggle {
-                    text: @tr("XG Mobile LED");
-                    checked <=> GPUPageData.xgm_led_enabled;
-                    toggled(checked) => {
-                        GPUPageData.cb_set_xgm_led_enabled(checked);
-                    }
-                }
-            }
-
-            // Disable nvidia-powerd on battery toggle
-            HorizontalLayout {
-                padding-right: 10px;
-                padding-left: 10px;
-                SystemToggle {
-                    text: @tr("Disable nvidia-powerd on battery");
-                    checked <=> GPUPageData.disable_nvidia_powerd_on_battery;
-                    toggled(checked) => {
-                        GPUPageData.cb_disable_nvidia_powerd_on_battery(checked);
+                    // Guard the index: apu_mem_index defaults to -1 and the model
+                    // is filled asynchronously, so only build the row once both
+                    // are valid — otherwise choices[index] indexes out of range.
+                    if GPUPageData.apu_mem_present
+                        && GPUPageData.apu_mem_choices.length > 0
+                        && GPUPageData.apu_mem_index >= 0
+                        && GPUPageData.apu_mem_index < GPUPageData.apu_mem_choices.length: VerticalLayout {
+                        spacing: 10px;
+                        RogDropdownRow {
+                            label: @tr("Reserved GPU Memory (iGPU VRAM)");
+                            combo-min-width: 140px;
+                            current-index <=> GPUPageData.apu_mem_index;
+                            current-value: GPUPageData.apu_mem_choices[GPUPageData.apu_mem_index];
+                            model: GPUPageData.apu_mem_choices;
+                            selected(i) => { GPUPageData.cb_set_apu_mem(i); }
+                        }
+                        Text { text: @tr("Note: Reserved GPU memory changes take effect after a reboot."); color: Theme.text-dim; font-size: 11px; }
                     }
                 }
             }

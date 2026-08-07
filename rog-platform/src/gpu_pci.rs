@@ -620,6 +620,50 @@ pub fn get_gpu_usage_pct() -> f32 {
     0.0
 }
 
+/// Current dGPU graphics clock in MHz, if a source reads successfully. NVML
+/// (NVIDIA) first, then the open-nvidia sysfs node `gpu_current_freq` (already
+/// in MHz) on the discrete NVIDIA card only. `None` when no source is available.
+/// The amdgpu `freq1_input` hwmon node is intentionally NOT consulted here: it
+/// reports the integrated GPU on hybrid laptops, not the dGPU.
+pub fn get_gpu_frequency_mhz() -> Option<f32> {
+    if let Ok(nvml) = nvml_wrapper::Nvml::init() {
+        if let Ok(device) = nvml.device_by_index(0) {
+            if let Ok(clock) =
+                device.clock_info(nvml_wrapper::enum_wrappers::device::Clock::Graphics)
+            {
+                return Some(clock as f32);
+            }
+        }
+    }
+    // Sysfs fallback: gpu_current_freq is exposed by the open-nvidia node and is
+    // already in MHz. Only read it from the discrete NVIDIA card (vendor
+    // 0x10de) so an AMD APU's amdgpu node is never mistaken for the dGPU.
+    if let Ok(entries) = std::fs::read_dir("/sys/class/drm") {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let is_card = path
+                .file_name()
+                .map(|n| n.to_string_lossy().starts_with("card"))
+                .unwrap_or(false);
+            if !is_card {
+                continue;
+            }
+            let is_nvidia = std::fs::read_to_string(path.join("device/vendor"))
+                .map(|v| v.trim() == "0x10de")
+                .unwrap_or(false);
+            if !is_nvidia {
+                continue;
+            }
+            if let Ok(s) = std::fs::read_to_string(path.join("device/gpu_current_freq")) {
+                if let Ok(v) = s.trim().parse::<f32>() {
+                    return Some(v);
+                }
+            }
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;

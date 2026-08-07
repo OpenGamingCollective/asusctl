@@ -1,8 +1,109 @@
+// rog-control-center — Armoury Crate-style design tokens (rebuilt from scratch).
+// Colour values are reverse-engineered from AC 6.5.7 (SVG stats + dll hex), not eyeballed.
+
+import { Palette } from "std-widgets.slint";
+
 export global AppSize {
     out property <length> width: 900px;
-    out property <length> height: 500px;
+    out property <length> height: 560px;
 }
 
-export global IconImages {
-    //out property <image> two_t: @image-url("images/parameters/2t.png");
+export global Theme {
+    // System color-scheme preference. Derived reactively from the backend's
+    // StyleMetrics, so every token below flips live with the desktop's
+    // dark/light setting — no Rust or init glue needed.
+    out property <bool> dark: Palette.color-scheme == ColorScheme.dark;
+
+    // — Brand pair (AC red + blue, unchanged across themes) —
+    out property <color> rog-red:   #FF1929;   // brand / selected / CTA
+    out property <color> rog-blue:  #148AC4;   // secondary brand / hover / progress
+
+    // — Icon / interaction states (AC _n/_h/_p/_d) —
+    out property <color> fg-normal:   dark ? #F2F2F2 : #2B2B2B;
+    out property <color> fg-hover:    #148AC4;
+    out property <color> fg-pressed:  #FF1929;
+    out property <color> fg-disabled: dark ? #4D4D4D : #B0B0B0;
+
+    // — Text hierarchy —
+    out property <color> text-primary:   dark ? #F2F2F2 : #1F1F1F;
+    out property <color> text-secondary: dark ? #B3B3B3 : #5A5A5A;
+    out property <color> text-dim:       dark ? #6A6A6A : #8E8E8E;
+
+    // — Background layers (dark: near-black base + lighter cards; light: light base + white cards) —
+    out property <color> bg-base:     dark ? #0A0A0A : #F4F4F4;   // window base
+    out property <color> bg-panel:    dark ? #070707 : #FFFFFF;   // sidebar / panels
+    out property <color> bg-card:     dark ? #161616 : #FFFFFF;   // cards
+    out property <color> bg-elevated: dark ? #242424 : #E4E4E4;   // raised / inputs / hover
+    out property <color> toggle-off:  dark ? #3A3A3A : #C8C8C8;   // toggle switch track (off state)
+    out property <color> bg-preview:  dark ? #100d0f : #ECECEC;   // slash page preview panel
+
+    // — Status colours (saturated, read fine on either theme) —
+    out property <color> state-good:   #4CAF50;  // green: ok
+    out property <color> state-warn:   #FF9E1B;  // orange: warning
+    out property <color> state-danger: #FF1929;  // red: danger
+    out property <color> state-accent: #E6A81D;  // gold: accent
+
+    // — Dark variants (glow / shadow) — glows softened on light backgrounds
+    out property <color> red-deep:     #4D080C;
+    out property <color> blue-deep:    #08364C;
+    out property <color> rog-red-glow:  dark ? #FF192955 : #FF192930;
+    out property <color> rog-blue-glow: dark ? #148AC455 : #148AC430;
+
+    // — Dividers (very subtle) —
+    out property <color> divider: dark ? #2A2A2A : #D8D8D8;
+    out property <color> line:    dark ? #575757 : #BEBEBE;   // progress track / strong divider (AC HTML)
+    out property <color> line-soft: dark ? #343434 : #E0E0E0;
+
+    // — Meter gradient (AC meter purple → red) —
+    out property <color> meter-start: #6437FF;   // progress bar purple end
+    out property <color> meter-end:   #FF1929;   // progress bar red end (= rog-red)
+
+    // — Chrome (from AC HTML) —
+    out property <color> titlebar-bg: dark ? #181818 : #F0F0F0;
+    out property <color> sidebar-bg:  dark ? #161616 : #F4F4F4;
+    out property <color> sidebar-selected: dark ? #5A2025 : #FAD9DC;  // selected nav item fill (dark-red / light-red)
+
+    // — Operation-mode selected state —
+    out property <color> mode-selected:        dark ? #2A1114 : #F8DDE0;
+    out property <color> mode-selected-strong: dark ? #4D1117 : #F2C2C8;
+
+    // — Legacy compat for common.slint (kept for the transition, not for the new look) —
+    out property <color> border:        dark ? #2A2A2A : #D8D8D8;
+    out property <color> border-accent: #FF1929;
+    out property <color> bg-app:        dark ? #1A1A1A : #EAEAEA;
+    out property <color> bg-card-hover: dark ? #2E2E2E : #E8E8E8;
+    out property <color> accent:        #FF1929;
+    out property <color> accent-soft:   #FF5566;
+    out property <color> accent-glow:   dark ? #FF192955 : #FF192930;
+    out property <color> success:       #4CAF50;
+    out property <color> warn:          #FF9E1B;
+    out property <color> danger:        #FF1929;
+
+    // — Aura reset colour (factory-default white for "Reset Defaults" button) —
+    out property <color> aura-reset-colour: #FFFFFF;
+
+    // — Corner radii —
+    out property <length> radius-card: 8px;
+    out property <length> radius-item: 4px;
+    out property <length> radius-pill:  14px;
+
+    // — Spacing —
+    out property <length> space-xs: 4px;
+    out property <length> space-sm: 8px;
+    out property <length> space:    12px;
+    out property <length> space-lg: 20px;
+    out property <length> pad-card: 16px;
+
+    // — Font sizes —
+    out property <length> font-xs:  11px;
+    out property <length> font-sm:  13px;
+    out property <length> font-md:  15px;
+    out property <length> font-lg:  20px;
+    out property <length> font-xl:  28px;
+    out property <length> font-2xl: 38px;   // dashboard big number
+
+    // Temperature threshold colour (>80 red / >65 orange / else green) — pure, usable in bindings
+    public pure function temp-color(temp: float) -> color {
+        return temp > 80.0 ? #FF1929 : (temp > 65.0 ? #FF9E1B : #4CAF50);
+    }
 }

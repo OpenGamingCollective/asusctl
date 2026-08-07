@@ -1,9 +1,11 @@
 import { Palette, VerticalBox , StandardButton, Button, HorizontalBox, ComboBox, Switch, Slider} from "std-widgets.slint";
+import { Theme } from "../globals.slint";
 
 export component RogItem inherits Rectangle {
-    border-color: Palette.border;
+    border-color: Theme.border;
     border-width: 1px;
-    border-radius: 2px;
+    border-radius: Theme.radius-item;
+    background: Theme.bg-card;
     min-height: 44px;
     max-height: 44px;
 }
@@ -18,6 +20,10 @@ export component SystemSlider inherits RogItem {
 
     in property <string> help_text;
     in property <bool> enabled: true;
+    // When false the device exposes no value for this control: render the row
+    // greyed-out with an "N/A" marker instead of hiding it, so users can see
+    // the option exists but is unsupported on their hardware.
+    in property <bool> available: true;
     in property <bool> has_reset: false;
     callback cb_do_reset();
 
@@ -31,7 +37,7 @@ export component SystemSlider inherits RogItem {
                 Text {
                     font-size: 14px;
                     vertical-alignment: TextVerticalAlignment.center;
-                    color: Palette.control-foreground;
+                    color: root.available ? Theme.text-primary : Theme.fg-disabled;
                     text: root.text;
                 }
 
@@ -39,15 +45,15 @@ export component SystemSlider inherits RogItem {
                     font-size: 14px;
                     horizontal-alignment: TextHorizontalAlignment.right;
                     vertical-alignment: TextVerticalAlignment.center;
-                    color: Palette.control-foreground;
-                    text: "\{Math.round(root.value)}";
+                    color: root.available ? Theme.text-primary : Theme.fg-disabled;
+                    text: root.available ? "\{Math.round(root.value)}" : @tr("not_supported_short" => "N/A");
                 }
             }
         }
 
         HorizontalBox {
             padding-right: 10px;
-            slider := Slider {
+            if root.available: Slider {
                 enabled: root.enabled;
                 maximum: root.maximum;
                 minimum: root.minimum;
@@ -65,8 +71,8 @@ export component SystemSlider inherits RogItem {
                 drop-shadow-blur: 10px;
                 drop-shadow-color: black;
                 border-radius: 10px;
-                border-color: Palette.accent-background;
-                background: Palette.background;
+                border-color: Theme.rog-red;
+                background: Theme.bg-card;
                 Dialog {
                     title: root.title;
                     VerticalBox {
@@ -115,8 +121,8 @@ export component SystemSlider inherits RogItem {
                 drop-shadow-blur: 10px;
                 drop-shadow-color: black;
                 border-radius: 10px;
-                border-color: Palette.accent-background;
-                background: Palette.background;
+                border-color: Theme.rog-red;
+                background: Theme.bg-card;
                 Dialog {
                     Text {
                         max-width: 420px;
@@ -140,7 +146,7 @@ export component SystemSlider inherits RogItem {
         }
 
         reset := HorizontalBox {
-            if (has_reset): StandardButton {
+            if (has_reset && root.available): StandardButton {
                 kind: StandardButtonKind.reset;
                 enabled: root.enabled;
                 clicked => {
@@ -164,7 +170,7 @@ export component SystemToggle inherits RogItem {
             Text {
                 font-size: 14px;
                 vertical-alignment: TextVerticalAlignment.center;
-                color: Palette.control-foreground;
+                color: Theme.text-primary;
                 text: root.text;
             }
         }
@@ -196,7 +202,7 @@ export component SystemToggleInt inherits RogItem {
             Text {
                 font-size: 14px;
                 vertical-alignment: TextVerticalAlignment.center;
-                color: Palette.control-foreground;
+                color: Theme.text-primary;
                 text: root.text;
             }
         }
@@ -227,7 +233,7 @@ export component SystemToggleVert inherits RogItem {
             font-size: 14px;
             vertical-alignment: TextVerticalAlignment.bottom;
             horizontal-alignment: TextHorizontalAlignment.center;
-            color: Palette.control-foreground;
+            color: Theme.text-primary;
             text: root.text;
         }
 
@@ -260,7 +266,7 @@ export component SystemDropdown inherits RogItem {
             Text {
                 font-size: 14px;
                 vertical-alignment: TextVerticalAlignment.center;
-                color: Palette.control-foreground;
+                color: Theme.text-primary;
                 text: root.text;
             }
         }
@@ -295,8 +301,8 @@ export component PopupNotification {
         // TODO: add properties to display
         Rectangle {
             border-width: 2px;
-            border-color: Palette.accent-background;
-            background: Palette.background;
+            border-color: Theme.rog-red;
+            background: Theme.bg-card;
 
             VerticalLayout {
                 Dialog {
@@ -304,14 +310,14 @@ export component PopupNotification {
                         alignment: start;
                         Text {
                             text: heading;
-                            color: Palette.control-foreground;
+                            color: Theme.text-primary;
                             font-size: 32px;
                             font-weight: 900;
                         }
 
                         Text {
                             text: content;
-                            color: Palette.control-foreground;
+                            color: Theme.text-primary;
                             font-size: 18px;
                         }
                     }
@@ -325,7 +331,7 @@ export component PopupNotification {
                     }
 
                     Button {
-                        text: "More Info";
+                        text: @tr("More Info");
                         dialog-button-role: action;
                     }
                 }

@@ -1,0 +1,286 @@
+// PageHome — Dashboard page matching AC system-page.html reference
+// Layout: HorizontalLayout 2-col (left 360px fixed + right flexible), no ScrollView (avoids binding loops)
+// Font: Inter Display for product name
+// Data: all from SystemPageData, no hardcoded values
+import { RogProductCard, RogSlashMark, RogMetric, RogReading, RogStatRow, RogPage } from "../widgets/rog.slint";
+import { Theme } from "../globals.slint";
+import { SystemPageData } from "system.slint";
+
+export component PageHome inherits RogPage {
+    background: Theme.bg-base;
+    clip: true;
+
+    // Product name from SystemPageData (backend reads /sys/class/dmi/id/product_name)
+
+    // ====== Titlebar ======
+    titlebar := Rectangle {
+        y: 0px;
+        height: 52px;
+        width: 100%;
+        background: Theme.bg-base;
+        Text {
+            text: @tr("Home");
+            color: Theme.text-primary;
+            font-size: 20px;
+            font-weight: 700;
+            x: 32px;
+            y: 13px;
+        }
+    }
+
+    // ====== Dashboard — fills remaining window height so the vertical flex
+    // gaps inside the right column can grow in fullscreen. ======
+    dashboard := Rectangle {
+        y: titlebar.height;
+        width: 100%;
+        height: parent.height - titlebar.height;
+
+        VerticalLayout {
+            padding-left: 24px;
+            padding-right: 24px;
+            padding-top: 12px;
+            padding-bottom: 24px;
+            spacing: 0px;
+
+            HorizontalLayout {
+                spacing: 36px;
+
+                // Left column: product card (kept square)
+                VerticalLayout {
+                    width: 360px;
+                    alignment: start;
+
+                    product-card := RogProductCard {
+                        width: 100%;
+                        // Keep the card square: height tracks the column width.
+                        height: parent.width;
+                        name: SystemPageData.product_name != "" ? SystemPageData.product_name : "ROG Laptop";
+                        // CPU + GPU straight off the backend — no hardcoded specs.
+                        details: [
+                            SystemPageData.cpu_name,
+                            SystemPageData.has_dgpu ? SystemPageData.dgpu_name : SystemPageData.igpu_name,
+                        ];
+                    }
+                }
+
+                // Right column: System Usage + Operation Mode.
+                // No `alignment` (default distributes free space by stretch).
+                    // Content blocks have vertical-stretch:0 so they keep their
+                    // natural height; only the flex spacers grow in fullscreen.
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 20px;
+
+                    // System Usage header
+                    Rectangle {
+                        height: 24px;
+                        vertical-stretch: 0;
+                        HorizontalLayout {
+                            spacing: 8px;
+                            RogSlashMark {}
+                            Text {
+                                text: @tr("System Usage");
+                                color: Theme.text-primary;
+                                font-size: 14px;
+                                font-weight: 600;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+
+                    // Row 1: CPU | GPU — cards capped so they don't over-widen;
+                    // the fixed 36px middle gap stays as it was.
+                    HorizontalLayout {
+                        vertical-stretch: 0;
+                        spacing: 36px;
+
+                        cpu-metric := RogMetric {
+                            horizontal-stretch: 1;
+                            max-width: 340px;
+                            title: "CPU";
+                            RogReading {
+                                label: @tr("Frequency");
+                                value: SystemPageData.cpu_freq_mhz > 0.0 ? "\{Math.round(SystemPageData.cpu_freq_mhz)} MHz" : "--";
+                                progress: SystemPageData.cpu_freq_mhz / 5000.0;
+                            }
+                            RogReading {
+                                label: @tr("Usage");
+                                value: SystemPageData.cpu_usage_val >= 0.0 ? "\{Math.round(SystemPageData.cpu_usage_val)} %" : "--";
+                                progress: SystemPageData.cpu_usage_val / 100.0;
+                            }
+                            RogStatRow {
+                                label: @tr("Temperature");
+                                value: SystemPageData.cpu_temp_val > 0.0 ? "\{Math.round(SystemPageData.cpu_temp_val)} °C" : "--";
+                            }
+                        }
+
+                        if SystemPageData.has_dgpu: RogMetric {
+                            horizontal-stretch: 1;
+                            max-width: 340px;
+                            title: "dGPU";
+                            // When the dGPU is suspended or its clock can't be read
+                            // (NVML absent/asleep), show "Sleeping" on every field
+                            // instead of a mix of "--" and "0 %" that looks broken.
+                            RogReading {
+                                label: @tr("Frequency");
+                                value: SystemPageData.gpu_freq_mhz > 0.0 ? "\{Math.round(SystemPageData.gpu_freq_mhz)} MHz" : @tr("Sleeping");
+                                progress: SystemPageData.gpu_freq_mhz / 2500.0;
+                            }
+                            RogReading {
+                                label: @tr("Usage");
+                                value: SystemPageData.gpu_freq_mhz > 0.0 ? "\{Math.round(SystemPageData.gpu_usage_val)} %" : @tr("Sleeping");
+                                progress: SystemPageData.gpu_usage_val / 100.0;
+                            }
+                            RogStatRow {
+                                label: @tr("Temperature");
+                                value: SystemPageData.gpu_freq_mhz > 0.0 ? "\{Math.round(SystemPageData.gpu_temp_val)} °C" : @tr("Sleeping");
+                            }
+                            RogStatRow {
+                                label: @tr("TGP");
+                                value: SystemPageData.gpu_freq_mhz > 0.0 ? "\{Math.round(SystemPageData.nv_tgp.current)} W" : @tr("Sleeping");
+                            }
+                        }
+                    }
+
+                    // Vertical flex gap: grows in fullscreen, keeps the rows apart.
+                    Rectangle { vertical-stretch: 1; min-height: 0px; }
+
+                    // Row 2: Fan | Memory
+                    HorizontalLayout {
+                        vertical-stretch: 0;
+                        spacing: 36px;
+
+                        fan-metric := RogMetric {
+                            horizontal-stretch: 1;
+                            max-width: 340px;
+                            title: @tr("Fan");
+                            RogReading {
+                                label: @tr("CPU Fan");
+                                // 0 RPM is a real reading (idle/stopped fan); only the
+                                // -1 sentinel from the backend means "no sensor".
+                                value: "\{SystemPageData.cpu_fan_rpm} RPM";
+                                progress: Math.max(0, SystemPageData.cpu_fan_rpm) / 5000.0;
+                            }
+                            // Hide the GPU / mid fan rows entirely when the sensor is
+                            // absent (-1 sentinel) instead of leaving a "--" placeholder.
+                            if SystemPageData.gpu_fan_rpm >= 0: RogReading {
+                                label: @tr("GPU Fan");
+                                value: "\{SystemPageData.gpu_fan_rpm} RPM";
+                                progress: SystemPageData.gpu_fan_rpm / 5000.0;
+                            }
+                            if SystemPageData.mid_fan_rpm >= 0: RogReading {
+                                label: @tr("Mid Fan");
+                                value: "\{SystemPageData.mid_fan_rpm} RPM";
+                                progress: SystemPageData.mid_fan_rpm / 5000.0;
+                            }
+                        }
+
+                        mem-metric := RogMetric {
+                            horizontal-stretch: 1;
+                            max-width: 340px;
+                            title: @tr("Memory");
+                            RogReading {
+                                label: "RAM";
+                                value: SystemPageData.ram_usage_val >= 0.0 ? "\{Math.round(SystemPageData.ram_usage_val)} %" : "--";
+                                progress: SystemPageData.ram_usage_val / 100.0;
+                            }
+                        }
+                    }
+
+                    // Vertical flex gap before the mode section.
+                    Rectangle { vertical-stretch: 1; min-height: 0px; }
+
+                    // Operation Mode section — switches the real asusd platform
+                    // profile. Buttons are generated from the device's actual
+                    // profiles (platform_profile_indexes), so the count matches
+                    // the hardware instead of a hardcoded AC-style set. ev is the
+                    // profile enum value (passed to cb_platform_profile); p is the
+                    // position (used for layout, label lookup and the active check).
+                    VerticalLayout {
+                        vertical-stretch: 0;
+                        spacing: 12px;
+
+                        if SystemPageData.platform_profile_indexes.length > 0: Rectangle {
+                            height: 24px;
+                            HorizontalLayout {
+                                spacing: 8px;
+                                RogSlashMark {}
+                                Text {
+                                    text: @tr("Operation Mode");
+                                    color: Theme.text-primary;
+                                    font-size: 14px;
+                                    font-weight: 600;
+                                    vertical-alignment: center;
+                                }
+                                Rectangle { horizontal-stretch: 1; }
+                            }
+                        }
+
+                        if SystemPageData.platform_profile_indexes.length > 0: Rectangle {
+                            height: 104px;
+                            width: 100%;
+                            for ev[p] in SystemPageData.platform_profile_indexes: Rectangle {
+                                x: p * (parent.width / SystemPageData.platform_profile_indexes.length);
+                                y: 0px;
+                                width: parent.width / SystemPageData.platform_profile_indexes.length;
+                                height: 100%;
+
+                                if SystemPageData.platform_profile == p: Rectangle {
+                                    x: 0px; y: 0px;
+                                    width: 100%; height: 100%;
+                                    background: Theme.mode-selected;
+                                    border-radius: 4px;
+                                    drop-shadow-blur: 16px;
+                                    drop-shadow-color: Theme.rog-red-glow;
+                                }
+
+                                Image {
+                                    // Icon by power intensity: Quiet/LowPower → silent,
+                                    // Balanced → performance, Performance → turbo, Custom → manual.
+                                    source: ev == 0 ? @image-url("../images/mode-performance.svg") :
+                                            ev == 1 ? @image-url("../images/mode-turbo.svg") :
+                                            ev == 2 ? @image-url("../images/mode-silent.svg") :
+                                            ev == 3 ? @image-url("../images/mode-silent.svg") :
+                                            ev == 4 ? @image-url("../images/mode-manual.svg") :
+                                            @image-url("../images/mode-performance.svg");
+                                    colorize: SystemPageData.platform_profile == p ? Theme.text-primary : Theme.text-secondary;
+                                    width: 32px; height: 32px;
+                                    image-fit: contain;
+                                    x: (parent.width - self.width) / 2;
+                                    y: 12px;
+                                }
+
+                                Text {
+                                    text: SystemPageData.platform_profile_choices[p];
+                                    color: SystemPageData.platform_profile == p ? Theme.text-primary : Theme.text-secondary;
+                                    font-size: 14px;
+                                    width: parent.width;
+                                    horizontal-alignment: center;
+                                    y: 54px;
+                                }
+
+                                if SystemPageData.platform_profile == p: Rectangle {
+                                    x: (parent.width - 40px) / 2;
+                                    y: parent.height - 6px;
+                                    width: 40px; height: 3px;
+                                    background: Theme.rog-red;
+                                    drop-shadow-blur: 10px;
+                                    drop-shadow-offset-y: -4px;
+                                    drop-shadow-color: Theme.rog-red-glow;
+                                }
+
+                                TouchArea {
+                                    width: 100%; height: 100%;
+                                    mouse-cursor: pointer;
+                                    clicked => {
+                                        SystemPageData.cb_platform_profile(ev);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
