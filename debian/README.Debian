@@ -14,14 +14,26 @@ Build hosts with no network access — Launchpad builders, sbuild with
 package. Generate the tarball from the release tag, including the lock file
 cargo produces, and place it in the root of the source tree:
 
-    cargo vendor vendor
-    tar cJf vendor_asusctl_<upstream-version>.tar.xz vendor Cargo.lock
+    cargo vendor vendor > cargo-vendor-config.toml
+    tar cJf vendor_asusctl_<upstream-version>.tar.xz \
+        vendor Cargo.lock cargo-vendor-config.toml
 
     dpkg-buildpackage -b -uc -us
 
-The lock file has to travel with the crates it describes: without it
-"cargo build --locked" has nothing to check the vendored sources against and
-fails with "requires a lock file to be present first".
+Three things go into that tarball, and all three are needed.
+
+The crates themselves, obviously. The lock file, because it has to travel with
+the crates it describes: without it "cargo build --locked" has nothing to check
+the vendored sources against and fails with "requires a lock file to be present
+first". And the source replacement map that cargo vendor prints on stdout,
+which debian/rules installs as the cargo configuration after rewriting its
+"directory" path.
+
+That last one matters more than it looks. The map lists every git source the
+lock file refers to, and writing those entries by hand goes stale the moment
+upstream adds or drops a git dependency — at which point --frozen --locked
+fails, because cargo finds a source it has no replacement for. Letting cargo
+generate the map keeps it correct by construction.
 
 This mode is also what makes the build repeatable. The tarball fixes the
 dependency versions once, so a source package that built yesterday still builds
@@ -56,8 +68,9 @@ explicitly and vendor the result:
 
     cargo generate-lockfile
     cargo update -p <crate> --precise <version>
-    cargo vendor vendor
-    tar cJf vendor_asusctl_<upstream-version>.tar.xz vendor Cargo.lock
+    cargo vendor vendor > cargo-vendor-config.toml
+    tar cJf vendor_asusctl_<upstream-version>.tar.xz \
+        vendor Cargo.lock cargo-vendor-config.toml
 
 debian/rules calls /usr/bin/cargo and sets RUSTC=/usr/bin/rustc explicitly, so
 the build uses the distribution toolchain even on a developer machine where
