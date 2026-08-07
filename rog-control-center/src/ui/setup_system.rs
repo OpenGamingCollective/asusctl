@@ -197,38 +197,10 @@ pub fn setup_system_page(
     });
 }
 
-macro_rules! convert_value {
-    (bool, $value:expr) => {
-        $value == 1
-    };
-    (i32, $value:expr) => {
-        $value as i32
-    };
-    (f32, $value:expr) => {
-        $value as f32
-    };
-}
-
-macro_rules! convert_to_dbus {
-    (bool, $value:expr) => {
-        if $value {
-            1
-        } else {
-            0
-        }
-    };
-    (i32, $value:expr) => {
-        $value as i32
-    };
-    (f32, $value:expr) => {
-        $value as i32
-    };
-}
-
 macro_rules! init_property {
-    ($property:ident, $handle:expr, $value:expr, $type:tt) => {{
+    ($property:ident, $handle:expr, $value:expr) => {{
         concat_idents!(setter = set_, $property {
-            $handle.global::<SystemPageData>().setter(convert_value!($type, $value));
+            $handle.global::<SystemPageData>().setter($value);
         });
     }};
 }
@@ -275,7 +247,7 @@ macro_rules! init_minmax_property {
 
 // For handling callbacks from UI value changes
 macro_rules! setup_callback {
-    ($property:ident, $handle:expr, $attr:expr, $type:tt) => {
+    ($property:ident, $handle:expr, $attr:expr) => {
         let handle_copy = $handle.as_weak();
         let proxy_copy = $attr.clone();
         concat_idents!(on_callback = on_cb_, $property {
@@ -289,7 +261,7 @@ macro_rules! setup_callback {
                             format!("{} successfully set to {}", stringify!($property), v).into(),
                             format!("Setting {} failed", stringify!($property)).into(),
                             handle_copy,
-                            proxy_copy.set_current_value(convert_to_dbus!($type, v)).await,
+                            proxy_copy.set_current_value(v).await,
                         );
                     });
                 });
@@ -315,7 +287,7 @@ macro_rules! setup_callback_restore_default {
 }
 
 macro_rules! setup_external {
-    ($property:ident, $type:tt, $handle:expr, $attr:expr, $value:expr) => {{
+    ($property:ident, $handle:expr, $attr:expr, $value:expr) => {{
         // EXTERNAL CHANGES
         let handle_copy = $handle.as_weak();
         let proxy_copy = $attr.clone();
@@ -329,7 +301,7 @@ macro_rules! setup_external {
                             .upgrade_in_event_loop(move |handle| {
                                 handle
                                     .global::<SystemPageData>()
-                                    .setter(convert_value!($type, out));
+                                    .setter(out);
                             })
                             .ok();
                     }
@@ -749,79 +721,79 @@ pub fn setup_system_page_callbacks(ui: &MainWindow, _states: Arc<Mutex<Config>>)
                             FirmwareAttribute::CoresEfficiency => {}
                             FirmwareAttribute::PptPl1Spl => {
                                 init_minmax_property!(ppt_pl1_spl, handle, attr);
-                                setup_callback!(ppt_pl1_spl, handle, attr, i32);
+                                setup_callback!(ppt_pl1_spl, handle, attr);
                                 setup_callback_restore_default!(ppt_pl1_spl, handle, attr);
                                 setup_minmax_external!(ppt_pl1_spl, handle, attr, platform);
                             }
                             FirmwareAttribute::PptPl2Sppt => {
                                 init_minmax_property!(ppt_pl2_sppt, handle, attr);
-                                setup_callback!(ppt_pl2_sppt, handle, attr, i32);
+                                setup_callback!(ppt_pl2_sppt, handle, attr);
                                 setup_callback_restore_default!(ppt_pl2_sppt, handle, attr);
                                 setup_minmax_external!(ppt_pl2_sppt, handle, attr, platform);
                             }
                             FirmwareAttribute::PptPl3Fppt => {
                                 init_minmax_property!(ppt_pl3_fppt, handle, attr);
-                                setup_callback!(ppt_pl3_fppt, handle, attr, i32);
+                                setup_callback!(ppt_pl3_fppt, handle, attr);
                                 setup_callback_restore_default!(ppt_pl3_fppt, handle, attr);
                                 setup_minmax_external!(ppt_pl3_fppt, handle, attr, platform);
                             }
                             FirmwareAttribute::PptFppt => {
                                 init_minmax_property!(ppt_fppt, handle, attr);
-                                setup_callback!(ppt_fppt, handle, attr, i32);
+                                setup_callback!(ppt_fppt, handle, attr);
                                 setup_callback_restore_default!(ppt_fppt, handle, attr);
                                 setup_minmax_external!(ppt_fppt, handle, attr, platform);
                             }
                             FirmwareAttribute::PptApuSppt => {
                                 init_minmax_property!(ppt_apu_sppt, handle, attr);
-                                setup_callback!(ppt_apu_sppt, handle, attr, i32);
+                                setup_callback!(ppt_apu_sppt, handle, attr);
                                 setup_callback_restore_default!(ppt_apu_sppt, handle, attr);
                                 setup_minmax_external!(ppt_apu_sppt, handle, attr, platform);
                             }
                             FirmwareAttribute::PptPlatformSppt => {
                                 init_minmax_property!(ppt_platform_sppt, handle, attr);
-                                setup_callback!(ppt_platform_sppt, handle, attr, i32);
+                                setup_callback!(ppt_platform_sppt, handle, attr);
                                 setup_callback_restore_default!(ppt_platform_sppt, handle, attr);
                                 setup_minmax_external!(ppt_platform_sppt, handle, attr, platform);
                             }
                             FirmwareAttribute::NvDynamicBoost => {
                                 init_minmax_property!(nv_dynamic_boost, handle, attr);
-                                setup_callback!(nv_dynamic_boost, handle, attr, i32);
+                                setup_callback!(nv_dynamic_boost, handle, attr);
                                 setup_callback_restore_default!(nv_dynamic_boost, handle, attr);
                                 setup_minmax_external!(nv_dynamic_boost, handle, attr, platform);
                             }
                             FirmwareAttribute::NvTempTarget => {
                                 init_minmax_property!(nv_temp_target, handle, attr);
-                                setup_callback!(nv_temp_target, handle, attr, i32);
+                                setup_callback!(nv_temp_target, handle, attr);
                                 setup_callback_restore_default!(nv_temp_target, handle, attr);
                                 setup_minmax_external!(nv_temp_target, handle, attr, platform);
                             }
                             FirmwareAttribute::DgpuBaseTgp => {}
                             FirmwareAttribute::DgpuTgp => {
                                 init_minmax_property!(nv_tgp, handle, attr);
-                                setup_callback!(nv_tgp, handle, attr, i32);
+                                setup_callback!(nv_tgp, handle, attr);
                                 setup_callback_restore_default!(nv_tgp, handle, attr);
                                 setup_minmax_external!(nv_tgp, handle, attr, platform);
                             }
                             FirmwareAttribute::ChargeMode => {}
                             FirmwareAttribute::BootSound => {
-                                init_property!(boot_sound, handle, value, i32);
-                                setup_callback!(boot_sound, handle, attr, i32);
-                                setup_external!(boot_sound, i32, handle, attr, value)
+                                init_property!(boot_sound, handle, value);
+                                setup_callback!(boot_sound, handle, attr);
+                                setup_external!(boot_sound, handle, attr, value)
                             }
                             FirmwareAttribute::ScreenAutoBrightness => {
-                                init_property!(screen_auto_brightness, handle, value, i32);
-                                setup_callback!(screen_auto_brightness, handle, attr, i32);
-                                setup_external!(screen_auto_brightness, i32, handle, attr, value)
+                                init_property!(screen_auto_brightness, handle, value);
+                                setup_callback!(screen_auto_brightness, handle, attr);
+                                setup_external!(screen_auto_brightness, handle, attr, value)
                             }
                             FirmwareAttribute::McuPowersave => {
-                                init_property!(mcu_powersave, handle, value, i32);
-                                setup_callback!(mcu_powersave, handle, attr, i32);
-                                setup_external!(mcu_powersave, i32, handle, attr, value)
+                                init_property!(mcu_powersave, handle, value);
+                                setup_callback!(mcu_powersave, handle, attr);
+                                setup_external!(mcu_powersave, handle, attr, value)
                             }
                             FirmwareAttribute::PanelOverdrive => {
-                                init_property!(panel_overdrive, handle, value, i32);
-                                setup_callback!(panel_overdrive, handle, attr, i32);
-                                setup_external!(panel_overdrive, i32, handle, attr, value)
+                                init_property!(panel_overdrive, handle, value);
+                                setup_callback!(panel_overdrive, handle, attr);
+                                setup_external!(panel_overdrive, handle, attr, value)
                             }
                             FirmwareAttribute::PanelHdMode => {}
                             FirmwareAttribute::EgpuConnected => {}
@@ -829,9 +801,9 @@ pub fn setup_system_page_callbacks(ui: &MainWindow, _states: Arc<Mutex<Config>>)
                             FirmwareAttribute::DgpuDisable => {}
                             FirmwareAttribute::GpuMuxMode => {}
                             FirmwareAttribute::MiniLedMode => {
-                                init_property!(mini_led_mode, handle, value, i32);
-                                setup_callback!(mini_led_mode, handle, attr, i32);
-                                setup_external!(mini_led_mode, i32, handle, attr, value);
+                                init_property!(mini_led_mode, handle, value);
+                                setup_callback!(mini_led_mode, handle, attr);
+                                setup_external!(mini_led_mode, handle, attr, value);
 
                                 // possible_values count tells us how many dimming
                                 // modes the device has: 2 (MODE1) or 3 (MODE2).
