@@ -477,7 +477,8 @@ pub fn get_gpu_names() -> (String, String) {
                             let device_id = parts.next().unwrap_or("").to_lowercase();
 
                             let mut model_name = String::new();
-                            if vendor == "1002" && !device_id.is_empty() {
+                            if vendor.eq_ignore_ascii_case(AMD_PCI_VENDOR) && !device_id.is_empty()
+                            {
                                 let revision_path = device.syspath().join("revision");
                                 let revision = std::fs::read_to_string(revision_path)
                                     .unwrap_or_default()
@@ -502,7 +503,7 @@ pub fn get_gpu_names() -> (String, String) {
                                 model_name = "Unknown GPU".to_string();
                             }
 
-                            let is_dgpu = id_val.starts_with("10DE")
+                            let is_dgpu = vendor.eq_ignore_ascii_case(NVIDIA_PCI_VENDOR)
                                 || model_name.contains("GeForce")
                                 || model_name.contains("Radeon RX")
                                 || model_name.contains("Discrete");
