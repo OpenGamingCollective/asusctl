@@ -325,22 +325,25 @@ pub enum Properties {
 }
 
 pub fn get_fan_rpms() -> (i32, i32, i32) {
-    let mut cpu = 0;
-    let mut gpu = 0;
-    let mut mid = 0;
+    // -1 = sensor absent / unreadable; 0 = the fan is genuinely stopped.
+    // Distinguishing them lets the UI show "0 RPM" for an idle fan instead of
+    // treating a legit zero as "no reading".
+    let mut cpu = -1;
+    let mut gpu = -1;
+    let mut mid = -1;
     if let Ok(entries) = std::fs::read_dir("/sys/class/hwmon") {
         for entry in entries.flatten() {
             let path = entry.path();
             if let Ok(name) = std::fs::read_to_string(path.join("name")) {
                 if name.trim() == "asus" {
                     if let Ok(v) = std::fs::read_to_string(path.join("fan1_input")) {
-                        cpu = v.trim().parse().unwrap_or(0);
+                        cpu = v.trim().parse::<i32>().ok().filter(|rpm| *rpm >= 0).unwrap_or(-1);
                     }
                     if let Ok(v) = std::fs::read_to_string(path.join("fan2_input")) {
-                        gpu = v.trim().parse().unwrap_or(0);
+                        gpu = v.trim().parse::<i32>().ok().filter(|rpm| *rpm >= 0).unwrap_or(-1);
                     }
                     if let Ok(v) = std::fs::read_to_string(path.join("fan3_input")) {
-                        mid = v.trim().parse().unwrap_or(0);
+                        mid = v.trim().parse::<i32>().ok().filter(|rpm| *rpm >= 0).unwrap_or(-1);
                     }
                     break;
                 }
