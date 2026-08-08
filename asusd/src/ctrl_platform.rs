@@ -273,6 +273,35 @@ impl CtrlPlatform {
         }
     }
 
+    /// Map a configured profile onto one the kernel actually offers.
+    ///
+    /// The default config uses Quiet, 6.11+ renamed it to LowPower, and some
+    /// laptops have neither. Returns `None` when `configured` is usable as-is.
+    /// Custom is userspace-only and never in choices, so it is left alone.
+    ///
+    /// This only computes: nothing is written here, so a profile that turns
+    /// out to be unappliable is never persisted.
+    fn normalize_profile(&self, configured: PlatformProfile) -> Option<PlatformProfile> {
+        if configured == PlatformProfile::Custom {
+            return None;
+        }
+
+        let choices = self.platform.get_platform_profile_choices().ok()?;
+        if choices.is_empty() || choices.contains(&configured) {
+            return None;
+        }
+
+        // Prefer low-power, else the least aggressive one available.
+        [
+            PlatformProfile::LowPower,
+            PlatformProfile::Quiet,
+            PlatformProfile::Balanced,
+            PlatformProfile::Performance,
+        ]
+        .into_iter()
+        .find(|p| choices.contains(p))
+    }
+
     async fn select_power_profile_for_source(&self, power_plugged: bool) -> PlatformProfile {
         let configured = if power_plugged {
             self.config.lock().await.platform_profile_on_ac
@@ -280,44 +309,34 @@ impl CtrlPlatform {
             self.config.lock().await.platform_profile_on_battery
         };
 
-        // The configured profile may not exist here: the default is Quiet,
-        // 6.11+ renamed it to LowPower, and some laptops have neither.
-        // Normalize at apply-time so AC/BAT transitions still work. Custom is
-        // userspace-only and never in choices, so leave it alone.
-        if let Ok(choices) = self.platform.get_platform_profile_choices() {
-            if configured != PlatformProfile::Custom
-                && !choices.is_empty()
-                && !choices.contains(&configured)
-            {
-                // Prefer low-power, else the least aggressive one available.
-                let fallback = [
-                    PlatformProfile::LowPower,
-                    PlatformProfile::Quiet,
-                    PlatformProfile::Balanced,
-                    PlatformProfile::Performance,
-                ]
-                .into_iter()
-                .find(|p| choices.contains(p));
-
-                if let Some(fallback) = fallback {
-                    let mut cfg = self.config.lock().await;
-                    if power_plugged {
-                        cfg.platform_profile_on_ac = fallback;
-                    } else {
-                        cfg.platform_profile_on_battery = fallback;
-                    }
-                    cfg.write();
-                    warn!(
-                        "Configured profile {configured} is unavailable on this hardware, falling \
-                         back to {fallback} for {}",
-                        if power_plugged { "AC" } else { "battery" }
-                    );
-                    return fallback;
-                }
+        match self.normalize_profile(configured) {
+            Some(fallback) => {
+                warn!(
+                    "Configured profile {configured} is unavailable on this hardware, falling \
+                     back to {fallback} for {}",
+                    if power_plugged { "AC" } else { "battery" }
+                );
+                fallback
             }
+            None => configured,
         }
+    }
 
-        configured
+    /// Persist the profile that was actually applied for this power source.
+    async fn store_applied_profile(&self, power_plugged: bool, profile: PlatformProfile) {
+        let mut cfg = self.config.lock().await;
+        let changed = if power_plugged {
+            let changed = cfg.platform_profile_on_ac != profile;
+            cfg.platform_profile_on_ac = profile;
+            changed
+        } else {
+            let changed = cfg.platform_profile_on_battery != profile;
+            cfg.platform_profile_on_battery = profile;
+            changed
+        };
+        if changed {
+            cfg.write();
+        }
     }
 
     /// Manage nvidia-powerd service based on current power state and config.
@@ -382,6 +401,8 @@ impl CtrlPlatform {
             warn!("Failed to set platform profile {throttle:?} on AC/BAT change: {err}");
             return;
         }
+        // Only now that the hardware took it is it worth recording.
+        self.store_applied_profile(power_plugged, throttle).await;
         self.check_and_set_epp(epp, change_epp);
     }
 }
@@ -599,19 +620,12 @@ impl CtrlPlatform {
         #[zbus(signal_context)] ctxt: SignalEmitter<'_>,
         policy: PlatformProfile,
     ) -> Result<(), FdoErr> {
-        // If the requested profile isn't available on this platform, and it's
-        // `Quiet`, fall back to `LowPower` so we don't write an unavailable
-        // profile into the config file.
-        let mut chosen = policy;
-        if let Ok(choices) = self.platform.get_platform_profile_choices() {
-            if chosen == PlatformProfile::Quiet && !choices.contains(&PlatformProfile::Quiet) {
-                chosen = PlatformProfile::LowPower;
-            }
-        }
+        // Map onto something this hardware has, so an unavailable profile is
+        // never written to the config file.
+        let chosen = self.normalize_profile(policy).unwrap_or(policy);
 
-        self.config.lock().await.platform_profile_on_battery = chosen;
         self.set_platform_profile(ctxt, chosen).await?;
-        self.config.lock().await.write();
+        self.store_applied_profile(false, chosen).await;
         Ok(())
     }
 
@@ -639,16 +653,10 @@ impl CtrlPlatform {
         policy: PlatformProfile,
     ) -> Result<(), FdoErr> {
         // Mirror the same fallback behavior for AC profile changes.
-        let mut chosen = policy;
-        if let Ok(choices) = self.platform.get_platform_profile_choices() {
-            if chosen == PlatformProfile::Quiet && !choices.contains(&PlatformProfile::Quiet) {
-                chosen = PlatformProfile::LowPower;
-            }
-        }
+        let chosen = self.normalize_profile(policy).unwrap_or(policy);
 
-        self.config.lock().await.platform_profile_on_ac = chosen;
         self.set_platform_profile(ctxt, chosen).await?;
-        self.config.lock().await.write();
+        self.store_applied_profile(true, chosen).await;
         Ok(())
     }
 
