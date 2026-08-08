@@ -22,7 +22,7 @@ use std::time::Duration;
 
 use dmi_id::DMIID;
 use futures_util::stream::StreamExt;
-use log::{debug, info, warn};
+use log::{debug, error, info, warn};
 use logind_zbus::manager::ManagerProxy;
 use tokio::time::sleep;
 use zbus::object_server::{Interface, SignalEmitter};
@@ -68,14 +68,14 @@ macro_rules! task_watch_item {
         async fn fn_name(
             &self,
             signal_ctxt: SignalEmitter<'static>,
-        ) -> Result<(), RogError> {
+        ) -> Result<Option<tokio::task::JoinHandle<()>>, RogError> {
             use futures_util::StreamExt;
 
             let ctrl = self.clone();
             concat_idents::concat_idents!(watch_fn = monitor_, $name {
                 match self.$self_inner.watch_fn() {
                     Ok(watch) => {
-                        tokio::spawn(async move {
+                        let handle = tokio::spawn(async move {
                             let mut buffer = [0; 32];
                             if let Ok(stream) = watch.into_event_stream(&mut buffer) {
                                 stream.for_each(|_| async {
@@ -95,11 +95,14 @@ macro_rules! task_watch_item {
                                 log::error!("Failed to create event stream for {}", $name_str);
                             }
                         });
+                        Ok(Some(handle))
                     }
-                    Err(e) => info!("inotify watch failed: {}. You can ignore this if your device does not support the feature", e),
+                    Err(e) => {
+                        info!("inotify watch failed: {}. You can ignore this if your device does not support the feature", e);
+                        Ok(None)
+                    }
                 }
-            });
-            Ok(())
+            })
         }
         });
     };
@@ -112,14 +115,14 @@ macro_rules! task_watch_item_notify {
         async fn fn_name(
             &self,
             signal_ctxt: SignalEmitter<'static>,
-        ) -> Result<(), RogError> {
+        ) -> Result<Option<tokio::task::JoinHandle<()>>, RogError> {
             use futures_util::StreamExt;
 
             let ctrl = self.clone();
             concat_idents::concat_idents!(watch_fn = monitor_, $name {
                 match self.$self_inner.watch_fn() {
                     Ok(watch) => {
-                        tokio::spawn(async move {
+                        let handle = tokio::spawn(async move {
                             let mut buffer = [0; 32];
                             if let Ok(stream) = watch.into_event_stream(&mut buffer) {
                                 stream.for_each(|_| async {
@@ -129,11 +132,14 @@ macro_rules! task_watch_item_notify {
                                 }).await;
                             }
                         });
+                        Ok(Some(handle))
                     }
-                    Err(e) => info!("inotify watch failed: {}. You can ignore this if your device does not support the feature", e),
+                    Err(e) => {
+                        info!("inotify watch failed: {}. You can ignore this if your device does not support the feature", e);
+                        Ok(None)
+                    }
                 }
-            });
-            Ok(())
+            })
         }
         });
     };
@@ -199,6 +205,17 @@ pub trait CtrlTask {
         signal: SignalEmitter<'static>,
     ) -> impl Future<Output = Result<(), RogError>> + Send;
 
+    /// Helper to spawn a background task that drains JoinSet and logs any task errors.
+    fn spawn_task_supervisor(name: &'static str, mut tasks: tokio::task::JoinSet<()>) {
+        tokio::spawn(async move {
+            while let Some(res) = tasks.join_next().await {
+                if let Err(err) = res {
+                    warn!("{name} background task ended with error: {err:?}");
+                }
+            }
+        });
+    }
+
     // /// Create a timed repeating task
     // async fn repeating_task(&self, millis: u64, mut task: impl FnMut() + Send +
     // 'static) {     use std::time::Duration;
@@ -213,6 +230,12 @@ pub trait CtrlTask {
     /// Free helper method to create tasks to run on: sleep, wake, shutdown,
     /// boot
     ///
+    /// # Ownership & Lifetime Contract
+    /// Callers receive an owned [`tokio::task::JoinSet`]. Callers **must** hand off
+    /// ownership to a task supervisor (e.g. via `spawn_task_supervisor`) before
+    /// performing any fallible operations with `?`. Dropping the returned `JoinSet`
+    /// immediately aborts all spawned system event listeners.
+    ///
     /// The closures can potentially block, so execution time should be the
     /// minimal possible such as save a variable.
     fn create_sys_event_tasks<Fut1, Fut2, Fut3, Fut4, F1, F2, F3, F4>(
@@ -221,82 +244,136 @@ pub trait CtrlTask {
         mut on_prepare_for_shutdown: F2,
         mut on_lid_change: F3,
         mut on_external_power_change: F4,
-    ) -> impl Future<Output = ()> + Send
+    ) -> impl Future<Output = Result<tokio::task::JoinSet<()>, RogError>> + Send
     where
         F1: FnMut(bool) -> Fut1 + Send + 'static,
         F2: FnMut(bool) -> Fut2 + Send + 'static,
         F3: FnMut(bool) -> Fut3 + Send + 'static,
         F4: FnMut(bool) -> Fut4 + Send + 'static,
-        Fut1: Future<Output = ()> + Send,
-        Fut2: Future<Output = ()> + Send,
-        Fut3: Future<Output = ()> + Send,
-        Fut4: Future<Output = ()> + Send,
+        Fut1: Future<Output = ()> + Send + 'static,
+        Fut2: Future<Output = ()> + Send + 'static,
+        Fut3: Future<Output = ()> + Send + 'static,
+        Fut4: Future<Output = ()> + Send + 'static,
     {
-        async {
-            let connection = Connection::system()
-                .await
-                .expect("Controller could not create dbus connection");
+        async move {
+            let connection = Connection::system().await.map_err(RogError::Zbus)?;
 
             let manager = ManagerProxy::builder(&connection)
                 .cache_properties(CacheProperties::No)
                 .build()
                 .await
-                .expect("Controller could not create ManagerProxy");
+                .map_err(RogError::Zbus)?;
+
+            let mut set = tokio::task::JoinSet::new();
 
             let manager1 = manager.clone();
-            tokio::spawn(async move {
-                if let Ok(mut notif) = manager1.receive_prepare_for_shutdown().await {
-                    while let Some(event) = notif.next().await {
-                        // blocks thread :|
-                        if let Ok(args) = event.args() {
-                            debug!("Doing on_prepare_for_shutdown({})", args.start);
-                            on_prepare_for_shutdown(args.start).await;
+            set.spawn(async move {
+                match manager1.receive_prepare_for_shutdown().await {
+                    Ok(mut notif) => {
+                        while let Some(event) = notif.next().await {
+                            match event.args() {
+                                Ok(args) => {
+                                    debug!("Doing on_prepare_for_shutdown({})", args.start);
+                                    on_prepare_for_shutdown(args.start).await;
+                                }
+                                Err(err) => {
+                                    error!("Prepare for shutdown event args error: {err}");
+                                }
+                            }
                         }
+                        warn!("Prepare for shutdown notification stream closed");
+                    }
+                    Err(err) => {
+                        error!("Failed to subscribe to prepare_for_shutdown signal: {err}");
                     }
                 }
             });
 
             let manager2 = manager.clone();
-            tokio::spawn(async move {
-                if let Ok(mut notif) = manager2.receive_prepare_for_sleep().await {
-                    while let Some(event) = notif.next().await {
-                        // blocks thread :|
-                        if let Ok(args) = event.args() {
-                            debug!("Doing on_prepare_for_sleep({})", args.start);
-                            on_prepare_for_sleep(args.start).await;
+            set.spawn(async move {
+                match manager2.receive_prepare_for_sleep().await {
+                    Ok(mut notif) => {
+                        while let Some(event) = notif.next().await {
+                            match event.args() {
+                                Ok(args) => {
+                                    debug!("Doing on_prepare_for_sleep({})", args.start);
+                                    on_prepare_for_sleep(args.start).await;
+                                }
+                                Err(err) => {
+                                    error!("Prepare for sleep event args error: {err}");
+                                }
+                            }
                         }
+                        warn!("Prepare for sleep notification stream closed");
+                    }
+                    Err(err) => {
+                        error!("Failed to subscribe to prepare_for_sleep signal: {err}");
                     }
                 }
             });
 
             let manager3 = manager.clone();
-            tokio::spawn(async move {
-                let mut last_power = manager3.on_external_power().await.unwrap_or_default();
+            set.spawn(async move {
+                let mut last_power = match manager3.on_external_power().await {
+                    Ok(p) => p,
+                    Err(err) => {
+                        error!("Failed to read initial on_external_power property: {err}");
+                        false
+                    }
+                };
 
+                let mut in_error_state = false;
                 loop {
-                    if let Ok(next) = manager3.on_external_power().await {
-                        if next != last_power {
-                            last_power = next;
-                            on_external_power_change(next).await;
+                    match manager3.on_external_power().await {
+                        Ok(next) => {
+                            in_error_state = false;
+                            if next != last_power {
+                                last_power = next;
+                                on_external_power_change(next).await;
+                            }
+                        }
+                        Err(err) => {
+                            if !in_error_state {
+                                warn!("Failed to read on_external_power property: {err}");
+                                in_error_state = true;
+                            }
                         }
                     }
                     sleep(Duration::from_secs(2)).await;
                 }
             });
 
-            tokio::spawn(async move {
-                let mut last_lid = manager.lid_closed().await.unwrap_or_default();
-                // need to loop on these as they don't emit signals
+            set.spawn(async move {
+                let mut last_lid = match manager.lid_closed().await {
+                    Ok(l) => l,
+                    Err(err) => {
+                        error!("Failed to read initial lid_closed property: {err}");
+                        false
+                    }
+                };
+
+                let mut in_error_state = false;
                 loop {
-                    if let Ok(next) = manager.lid_closed().await {
-                        if next != last_lid {
-                            last_lid = next;
-                            on_lid_change(next).await;
+                    match manager.lid_closed().await {
+                        Ok(next) => {
+                            in_error_state = false;
+                            if next != last_lid {
+                                last_lid = next;
+                                on_lid_change(next).await;
+                            }
+                        }
+                        Err(err) => {
+                            if !in_error_state {
+                                warn!("Failed to read lid_closed property: {err}");
+                                in_error_state = true;
+                            }
                         }
                     }
                     sleep(Duration::from_secs(2)).await;
                 }
             });
+
+            Ok(set)
         }
     }
 }

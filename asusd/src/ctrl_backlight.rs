@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use config_traits::StdConfig;
-use log::{info, warn};
+use log::{error, info, warn};
 use rog_platform::backlight::{Backlight, BacklightType};
 use tokio::sync::Mutex;
 use zbus::fdo::Error as FdoErr;
@@ -150,41 +150,31 @@ impl CtrlBacklight {
         }
     }
 
-    pub async fn start_watch_primary(&self) -> Result<(), RogError> {
+    pub async fn start_watch_primary(
+        &self,
+    ) -> Result<Option<tokio::task::JoinHandle<()>>, RogError> {
         if self.get_backlight(&BacklightType::Screenpad).is_none() {
-            return Ok(());
-        }
-
-        if let Some(sync) = self.config.lock().await.screenpad_sync_primary {
-            if !sync {
-                return Ok(());
-            }
+            return Ok(None);
         }
 
         if let Some(backlight) = self.get_backlight(&BacklightType::Primary) {
             let watch = backlight.monitor_brightness()?;
 
             let backlights = self.clone();
-            tokio::spawn(async move {
+            let handle = tokio::spawn(async move {
                 let mut last_level = 0;
                 let mut buffer = [0; 32];
                 use futures_util::StreamExt;
                 if let Ok(mut stream) = watch.into_event_stream(&mut buffer) {
                     loop {
-                        let _ = stream.next().await;
+                        if stream.next().await.is_none() {
+                            info!("Primary backlight event stream closed");
+                            break;
+                        }
 
                         let sync = backlights.config.lock().await.screenpad_sync_primary;
-                        if let Some(sync) = sync {
-                            if !sync {
-                                continue;
-                            }
-                        } else if backlights
-                            .config
-                            .lock()
-                            .await
-                            .screenpad_sync_primary
-                            .is_none()
-                        {
+                        if !sync.unwrap_or(false) {
+                            tokio::time::sleep(Duration::from_millis(300)).await;
                             continue;
                         }
 
@@ -203,16 +193,14 @@ impl CtrlBacklight {
                         // other processes cause "MODIFY" event and make this spin 100%, so sleep
                         tokio::time::sleep(Duration::from_millis(300)).await;
                     }
-                    // watch
-                    //     .into_event_stream(&mut buffer)
-                    //     .unwrap()
-                    //     .for_each(|_| async {})
-                    //     .await;
+                } else {
+                    error!("Primary backlight watcher: into_event_stream initialization failed");
                 }
             });
+            return Ok(Some(handle));
         }
 
-        Ok(())
+        Ok(None)
     }
 }
 
