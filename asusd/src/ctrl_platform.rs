@@ -280,25 +280,39 @@ impl CtrlPlatform {
             self.config.lock().await.platform_profile_on_battery
         };
 
-        // Older configs may still contain Quiet on devices that only support LowPower.
-        // Normalize at apply-time so AC/BAT transitions still work correctly.
-        if configured == PlatformProfile::Quiet {
-            if let Ok(choices) = self.platform.get_platform_profile_choices() {
-                if !choices.contains(&PlatformProfile::Quiet)
-                    && choices.contains(&PlatformProfile::LowPower)
-                {
+        // The configured profile may not exist here: the default is Quiet,
+        // 6.11+ renamed it to LowPower, and some laptops have neither.
+        // Normalize at apply-time so AC/BAT transitions still work. Custom is
+        // userspace-only and never in choices, so leave it alone.
+        if let Ok(choices) = self.platform.get_platform_profile_choices() {
+            if configured != PlatformProfile::Custom
+                && !choices.is_empty()
+                && !choices.contains(&configured)
+            {
+                // Prefer low-power, else the least aggressive one available.
+                let fallback = [
+                    PlatformProfile::LowPower,
+                    PlatformProfile::Quiet,
+                    PlatformProfile::Balanced,
+                    PlatformProfile::Performance,
+                ]
+                .into_iter()
+                .find(|p| choices.contains(p));
+
+                if let Some(fallback) = fallback {
                     let mut cfg = self.config.lock().await;
                     if power_plugged {
-                        cfg.platform_profile_on_ac = PlatformProfile::LowPower;
+                        cfg.platform_profile_on_ac = fallback;
                     } else {
-                        cfg.platform_profile_on_battery = PlatformProfile::LowPower;
+                        cfg.platform_profile_on_battery = fallback;
                     }
                     cfg.write();
                     warn!(
-                        "Configured profile Quiet is unavailable, falling back to LowPower for {}",
+                        "Configured profile {configured} is unavailable on this hardware, falling \
+                         back to {fallback} for {}",
                         if power_plugged { "AC" } else { "battery" }
                     );
-                    return PlatformProfile::LowPower;
+                    return fallback;
                 }
             }
         }
