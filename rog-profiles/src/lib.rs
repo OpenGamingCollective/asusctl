@@ -197,22 +197,22 @@ impl FanCurveProfiles {
     pub fn set_profile_curves_enabled(&mut self, profile: PlatformProfile, enabled: bool) {
         match profile {
             PlatformProfile::Balanced => {
-                for curve in self.balanced.iter_mut() {
+                for curve in &mut self.balanced {
                     curve.enabled = enabled;
                 }
             }
             PlatformProfile::Performance => {
-                for curve in self.performance.iter_mut() {
+                for curve in &mut self.performance {
                     curve.enabled = enabled;
                 }
             }
             PlatformProfile::Quiet | PlatformProfile::LowPower => {
-                for curve in self.quiet.iter_mut() {
+                for curve in &mut self.quiet {
                     curve.enabled = enabled;
                 }
             }
             PlatformProfile::Custom => {
-                for curve in self.custom.iter_mut() {
+                for curve in &mut self.custom {
                     curve.enabled = enabled;
                 }
             }
@@ -227,7 +227,7 @@ impl FanCurveProfiles {
     ) {
         match profile {
             PlatformProfile::Balanced => {
-                for curve in self.balanced.iter_mut() {
+                for curve in &mut self.balanced {
                     if curve.fan == fan {
                         curve.enabled = enabled;
                         break;
@@ -235,7 +235,7 @@ impl FanCurveProfiles {
                 }
             }
             PlatformProfile::Performance => {
-                for curve in self.performance.iter_mut() {
+                for curve in &mut self.performance {
                     if curve.fan == fan {
                         curve.enabled = enabled;
                         break;
@@ -243,7 +243,7 @@ impl FanCurveProfiles {
                 }
             }
             PlatformProfile::Quiet | PlatformProfile::LowPower => {
-                for curve in self.quiet.iter_mut() {
+                for curve in &mut self.quiet {
                     if curve.fan == fan {
                         curve.enabled = enabled;
                         break;
@@ -251,7 +251,7 @@ impl FanCurveProfiles {
                 }
             }
             PlatformProfile::Custom => {
-                for curve in self.custom.iter_mut() {
+                for curve in &mut self.custom {
                     if curve.fan == fan {
                         curve.enabled = enabled;
                         break;
@@ -277,7 +277,7 @@ impl FanCurveProfiles {
     ) -> Result<(), ProfileError> {
         match profile {
             PlatformProfile::Balanced => {
-                for this_curve in self.balanced.iter_mut() {
+                for this_curve in &mut self.balanced {
                     if this_curve.fan == curve.fan {
                         *this_curve = curve;
                         break;
@@ -285,7 +285,7 @@ impl FanCurveProfiles {
                 }
             }
             PlatformProfile::Performance => {
-                for this_curve in self.performance.iter_mut() {
+                for this_curve in &mut self.performance {
                     if this_curve.fan == curve.fan {
                         *this_curve = curve;
                         break;
@@ -293,7 +293,7 @@ impl FanCurveProfiles {
                 }
             }
             PlatformProfile::Quiet | PlatformProfile::LowPower => {
-                for this_curve in self.quiet.iter_mut() {
+                for this_curve in &mut self.quiet {
                     if this_curve.fan == curve.fan {
                         *this_curve = curve;
                         break;
@@ -301,7 +301,7 @@ impl FanCurveProfiles {
                 }
             }
             PlatformProfile::Custom => {
-                for this_curve in self.custom.iter_mut() {
+                for this_curve in &mut self.custom {
                     if this_curve.fan == curve.fan {
                         *this_curve = curve;
                         break;
