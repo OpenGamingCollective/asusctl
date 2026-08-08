@@ -522,6 +522,40 @@ pub fn get_gpu_names() -> (String, String) {
     )
 }
 
+/// Identify the dGPU once via `Device::find()` (PCI vendor + connected-panel
+/// check) and return its DRM card directory, e.g.
+/// `/sys/devices/.../0000:01:00.0/drm/cardN`.
+///
+/// The telemetry fallbacks below use this instead of scanning `/sys/class/drm`
+/// blindly. On hybrid laptops the first DRM card exposing a given sysfs node is
+/// the iGPU (typically amdgpu on `card0`), so an unfiltered scan reports the
+/// iGPU where the dGPU was asked for.
+fn dgpu_drm_card_dir() -> Option<PathBuf> {
+    let dgpu = Device::find().ok()?.into_iter().find(|d| d.is_dgpu())?;
+    let drm_dir = dgpu.dev_path().join("drm");
+    fs::read_dir(&drm_dir)
+        .ok()?
+        .filter_map(|e| e.ok())
+        .find_map(|e| {
+            let name = e.file_name().into_string().ok()?;
+            // Skip connector dirs such as `card1-eDP-1`.
+            (name.starts_with("card") && !name.contains('-')).then_some(e.path())
+        })
+}
+
+/// First hwmon directory exposed by the dGPU, e.g.
+/// `/sys/devices/.../0000:01:00.0/hwmon/hwmonN`. Used so the temperature
+/// fallback does not pick up an amdgpu iGPU's hwmon on hybrid laptops.
+fn dgpu_hwmon_dir() -> Option<PathBuf> {
+    let dgpu = Device::find().ok()?.into_iter().find(|d| d.is_dgpu())?;
+    let hwmon_dir = dgpu.dev_path().join("hwmon");
+    fs::read_dir(&hwmon_dir)
+        .ok()?
+        .filter_map(|e| e.ok())
+        .next()
+        .map(|e| e.path())
+}
+
 pub fn get_igpu_temp() -> f32 {
     if let Ok(entries) = std::fs::read_dir("/sys/class/hwmon") {
         for entry in entries.flatten() {
@@ -579,18 +613,14 @@ pub fn get_gpu_temp() -> f32 {
             }
         }
     }
-    if let Ok(entries) = std::fs::read_dir("/sys/class/hwmon") {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if let Ok(name) = std::fs::read_to_string(path.join("name")) {
-                let name = name.trim();
-                if name == "amdgpu" || name == "nouveau" {
-                    if let Ok(temp_str) = std::fs::read_to_string(path.join("temp1_input")) {
-                        if let Ok(temp_val) = temp_str.trim().parse::<f32>() {
-                            return temp_val / 1000.0;
-                        }
-                    }
-                }
+    // NVML unavailable: read temp1_input from the dGPU's own hwmon. The
+    // previous loop grabbed the first amdgpu/nouveau hwmon it found, which on
+    // hybrid laptops is the iGPU.
+    if let Some(hwmon) = dgpu_hwmon_dir() {
+        let temp_path = hwmon.join("temp1_input");
+        if let Ok(temp_str) = fs::read_to_string(&temp_path) {
+            if let Ok(temp_val) = temp_str.trim().parse::<f32>() {
+                return temp_val / 1000.0;
             }
         }
     }
@@ -605,15 +635,14 @@ pub fn get_gpu_usage_pct() -> f32 {
             }
         }
     }
-    if let Ok(entries) = std::fs::read_dir("/sys/class/drm") {
-        for entry in entries.flatten() {
-            let path = entry.path().join("device/gpu_busy_percent");
-            if path.exists() {
-                if let Ok(val_str) = std::fs::read_to_string(path) {
-                    if let Ok(val) = val_str.trim().parse::<f32>() {
-                        return val;
-                    }
-                }
+    // NVML unavailable: read gpu_busy_percent from the dGPU's DRM card. The
+    // previous loop grabbed the first DRM card exposing this node, which on
+    // hybrid AMD APUs is the iGPU (amdgpu on card0).
+    if let Some(card) = dgpu_drm_card_dir() {
+        let busy_path = card.join("device/gpu_busy_percent");
+        if let Ok(val_str) = fs::read_to_string(&busy_path) {
+            if let Ok(val) = val_str.trim().parse::<f32>() {
+                return val;
             }
         }
     }
