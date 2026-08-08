@@ -1044,6 +1044,15 @@
         power_zones: [Keyboard],
     ),
     (
+        device_name: "GU606",
+        product_id: "",
+        layout_name: "ga401q",
+        basic_modes: [Static, Breathe, RainbowCycle, RainbowWave, Pulse],
+        basic_zones: [],
+        advanced_type: Zoned([SingleZone]),
+        power_zones: [Keyboard],
+    ),
+    (
         device_name: "GV301Q",
         product_id: "",
         layout_name: "ga401q",
