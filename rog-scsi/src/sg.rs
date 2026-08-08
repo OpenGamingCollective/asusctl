@@ -103,10 +103,9 @@ impl Default for Task {
     }
 }
 
-// SAFETY: Task manages its internal buffers and SgIoHdr raw pointers. The raw pointers
-// are updated prior to any ioctl execution to point directly to owned heap vectors, making
-// Send and Sync safe across thread boundaries.
+// SAFETY: Task manages its internal buffers and SgIoHdr raw pointers, making Send safe across thread boundaries.
 unsafe impl Send for Task {}
+// SAFETY: Task contains no interior mutability and access to SG ioctl data is thread-safe.
 unsafe impl Sync for Task {}
 
 impl Task {
