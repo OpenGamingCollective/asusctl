@@ -18,7 +18,7 @@ pub fn list_iface_blocking() -> Result<Vec<String>, Box<dyn std::error::Error>> 
     let f = zbus::blocking::fdo::ObjectManagerProxy::new(&conn, "xyz.ljones.Asusd", "/")?;
     let interfaces = f.get_managed_objects()?;
     let mut ifaces = Vec::new();
-    for v in interfaces.iter() {
+    for v in &interfaces {
         for k in v.1.keys() {
             ifaces.push(k.to_string());
         }
@@ -36,7 +36,7 @@ where
     let f = zbus::fdo::ObjectManagerProxy::new(&conn, "xyz.ljones.Asusd", "/").await?;
     let interfaces = f.get_managed_objects().await?;
     let mut paths = Vec::new();
-    for v in interfaces.iter() {
+    for v in &interfaces {
         // let o: Vec<zbus::names::OwnedInterfaceName> = v.1.keys().map(|e|
         // e.to_owned()).collect(); println!("{}, {:?}", v.0, o);
         for k in v.1.keys() {
@@ -75,7 +75,7 @@ where
     let f = zbus::blocking::fdo::ObjectManagerProxy::new(&conn, "xyz.ljones.Asusd", "/")?;
     let interfaces = f.get_managed_objects()?;
     let mut paths = Vec::new();
-    for v in interfaces.iter() {
+    for v in &interfaces {
         for k in v.1.keys() {
             if k.as_str() == iface_name {
                 paths.push(v.0.clone());
