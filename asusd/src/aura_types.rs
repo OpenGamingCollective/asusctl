@@ -103,10 +103,7 @@ impl DeviceHandle {
     }
 
     /// Try AniMe Matrix HID. If one exists it is initialsed and returned.
-    pub async fn maybe_anime_hid(
-        _device: Arc<Mutex<HidRaw>>,
-        _prod_id: &str,
-    ) -> Result<Self, RogError> {
+    pub fn maybe_anime_hid(_device: Arc<Mutex<HidRaw>>, _prod_id: &str) -> Result<Self, RogError> {
         // TODO: can't use HIDRAW for anime at the moment
         Err(RogError::NotFound(
             "Can't use anime over hidraw yet. Skip.".to_string(),
@@ -205,7 +202,7 @@ impl DeviceHandle {
             backlight,
             config: Arc::new(Mutex::new(config)),
         };
-        aura.do_initialization().await?;
+        aura.do_initialization()?;
         Ok(Self::Aura(aura))
     }
 }

@@ -288,7 +288,7 @@ fn handle_brightness(cmd: &BrightnessCommand) -> Result<(), Box<dyn std::error::
 
     match &cmd.command {
         BrightnessSubCommand::Set(s) => {
-            for aura in aura_proxies.iter() {
+            for aura in &aura_proxies {
                 if let Some(level) = s.level.level() {
                     aura.set_brightness(rog_aura::LedBrightness::from(level))?;
                 } else {
@@ -298,7 +298,7 @@ fn handle_brightness(cmd: &BrightnessCommand) -> Result<(), Box<dyn std::error::
             }
         }
         BrightnessSubCommand::Get(_) => {
-            for aura in aura_proxies.iter() {
+            for aura in &aura_proxies {
                 let level = aura.brightness()?;
                 println!("Current keyboard led brightness: {level:?}");
             }
@@ -306,13 +306,13 @@ fn handle_brightness(cmd: &BrightnessCommand) -> Result<(), Box<dyn std::error::
             return Ok(());
         }
         BrightnessSubCommand::Next(_) => {
-            for aura in aura_proxies.iter() {
+            for aura in &aura_proxies {
                 let brightness = aura.brightness()?;
                 aura.set_brightness(brightness.next())?;
             }
         }
         BrightnessSubCommand::Prev(_) => {
-            for aura in aura_proxies.iter() {
+            for aura in &aura_proxies {
                 let brightness = aura.brightness()?;
                 aura.set_brightness(brightness.prev())?;
             }
@@ -711,7 +711,7 @@ fn handle_led_power2(power: &LedPowerCommand2) -> Result<(), Box<dyn std::error:
             let mut states = aura.led_power()?;
             let mut set =
                 |zone: PowerZones, boot_v: bool, awake_v: bool, sleep_v: bool, shutdown_v: bool| {
-                    for state in states.states.iter_mut() {
+                    for state in &mut states.states {
                         if state.zone == zone {
                             state.boot = boot_v;
                             state.awake = awake_v;
@@ -840,7 +840,7 @@ fn handle_fan_curve(
     if cmd.get_enabled {
         let profile = plat_proxy.platform_profile()?;
         let curves = fan_proxy.fan_curve_data(profile)?;
-        for curve in curves.iter() {
+        for curve in &curves {
             println!("{}", String::from(curve));
         }
     }
@@ -992,7 +992,7 @@ fn handle_armoury_command(
             if let Ok(attrs) =
                 find_iface_blocking::<AsusArmouryProxyBlocking>("xyz.ljones.AsusArmoury")
             {
-                for attr in attrs.iter() {
+                for attr in &attrs {
                     print_firmware_attr(attr)?;
                 }
             }
@@ -1002,7 +1002,7 @@ fn handle_armoury_command(
             let mut found = false;
             let attrs = find_iface_blocking::<AsusArmouryProxyBlocking>("xyz.ljones.AsusArmoury")
                 .map_err(|e| format!("Could not reach asusd armoury interface: {e}"))?;
-            for attr in attrs.iter() {
+            for attr in &attrs {
                 let name = attr.name()?;
                 if <&str>::from(name) == g.property {
                     print_firmware_attr(attr)?;
@@ -1018,7 +1018,7 @@ fn handle_armoury_command(
             let mut found = false;
             let attrs = find_iface_blocking::<AsusArmouryProxyBlocking>("xyz.ljones.AsusArmoury")
                 .map_err(|e| format!("Could not reach asusd armoury interface: {e}"))?;
-            for attr in attrs.iter() {
+            for attr in &attrs {
                 let name = attr.name()?;
                 if <&str>::from(name) == s.property {
                     let mut value: i32 = s.value;

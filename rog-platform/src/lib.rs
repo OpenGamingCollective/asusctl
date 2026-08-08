@@ -49,7 +49,7 @@ pub fn read_attr_bool(device: &Device, attr_name: &str) -> Result<bool> {
 }
 
 pub fn write_attr_bool(device: &mut Device, attr: &str, value: bool) -> Result<()> {
-    let value = if value { 1 } else { 0 };
+    let value = i32::from(value);
     device
         .set_attribute_value(attr, value.to_string())
         .map_err(|e| {

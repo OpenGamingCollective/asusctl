@@ -271,7 +271,7 @@ impl AsusArmouryAttribute {
     }
 
     #[zbus(property)]
-    async fn available_attrs(&self) -> Vec<String> {
+    fn available_attrs(&self) -> Vec<String> {
         let mut attrs = Vec::new();
         if !matches!(self.attr.default_value(), AttrValue::None) {
             attrs.push("default_value".to_string());
@@ -309,7 +309,7 @@ impl AsusArmouryAttribute {
 
     /// If return is `-1` then there is no default value
     #[zbus(property)]
-    async fn default_value(&self) -> i32 {
+    fn default_value(&self) -> i32 {
         match self.attr.default_value() {
             AttrValue::Integer(i) => *i,
             _ => -1,
@@ -350,17 +350,17 @@ impl AsusArmouryAttribute {
     }
 
     #[zbus(property)]
-    async fn min_value(&self) -> i32 {
+    fn min_value(&self) -> i32 {
         Self::resolve_i32_value(self.attr.refresh_min_value(), self.attr.min_value())
     }
 
     #[zbus(property)]
-    async fn max_value(&self) -> i32 {
+    fn max_value(&self) -> i32 {
         Self::resolve_i32_value(self.attr.refresh_max_value(), self.attr.max_value())
     }
 
     #[zbus(property)]
-    async fn scalar_increment(&self) -> i32 {
+    fn scalar_increment(&self) -> i32 {
         Self::resolve_i32_value(
             self.attr.refresh_scalar_increment(),
             self.attr.scalar_increment(),
@@ -368,7 +368,7 @@ impl AsusArmouryAttribute {
     }
 
     #[zbus(property)]
-    async fn possible_values(&self) -> Vec<i32> {
+    fn possible_values(&self) -> Vec<i32> {
         match self.attr.possible_values() {
             AttrValue::EnumInt(i) => i.clone(),
             _ => Vec::default(),
@@ -405,7 +405,9 @@ impl AsusArmouryAttribute {
         /*
         // This code would override the current_value with queued GPU value if present
         // but I don't want to do that for now because it would cause confusion where
-        // current_value doesn't reflect actual firmware state until apply_queued_gpu_value is called. Instead, queued GPU values are only visible through the queued_gpu_value property and are applied on shutdown without affecting current_value.
+        // current_value doesn't reflect actual firmware state until apply_queued_gpu_value is called.
+        // Instead, queued GPU values are only visible through the queued_gpu_value property and are
+        // applied on shutdown without affecting current_value.
         if self.name().property_type() == FirmwareAttributeType::Gpu {
             if let Some(saved_value) = self.queued_gpu.lock().await.get(&self.name()) {
                 return Ok(*saved_value);
@@ -650,7 +652,7 @@ pub async fn set_config_or_default(
     profile: PlatformProfile,
 ) {
     let mut changed = false;
-    for attr in attrs.attributes().iter() {
+    for attr in attrs.attributes() {
         let name: FirmwareAttribute = attr.name().into();
         match name.property_type() {
             FirmwareAttributeType::Ppt => {

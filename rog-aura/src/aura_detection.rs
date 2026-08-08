@@ -243,7 +243,7 @@ mod tests {
         let mut tmp_sort = tmp.clone();
         tmp_sort.0.sort_by(|a, b| a.product_id.cmp(&b.product_id));
         tmp_sort.0.sort_by(|a, b| a.device_name.cmp(&b.device_name));
-        for model in tmp_sort.0.iter_mut() {
+        for model in &mut tmp_sort.0 {
             model.basic_modes.sort_by_key(|a| *a as u8);
         }
         if tmp != tmp_sort {
@@ -283,7 +283,6 @@ mod tests {
                 modes.insert(entry.basic_modes, vec![entry.device_name]);
             }
         }
-        dbg!(modes);
         Ok(())
 
         // let my_config = PrettyConfig::new().depth_limit(2);

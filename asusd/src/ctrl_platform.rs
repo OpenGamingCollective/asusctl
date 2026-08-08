@@ -370,6 +370,8 @@ impl CtrlPlatform {
         }
         self.check_and_set_epp(epp, change_epp);
     }
+
+    task_watch_item!(charge_control_end_threshold "charge_control_end_threshold" power);
 }
 
 #[interface(name = "xyz.ljones.Platform")]
@@ -801,7 +803,7 @@ impl CtrlPlatform {
                         // restore default
                         attr.set_current_value(&value)?;
                         if let AttrValue::Integer(i) = value {
-                            *tune = i
+                            *tune = i;
                         }
                     }
                 }
@@ -895,14 +897,14 @@ impl ReloadAndNotify for CtrlPlatform {
 
 impl crate::Reloadable for CtrlPlatform {
     async fn reload(&mut self) -> Result<(), RogError> {
-        info!("Begin Platform settings restore");
+        info!("Reloading CtrlPlatform");
         if self.power.has_charge_control_end_threshold() {
             // self.restore_charge_limit().await;
             let limit = self.config.lock().await.charge_control_end_threshold;
             info!("reloading charge_control_end_threshold to {limit}");
             self.power.set_charge_control_end_threshold(limit)?;
         } else {
-            warn!("No charge_control_end_threshold found")
+            warn!("No charge_control_end_threshold found");
         }
 
         if let Ok(power_plugged) = self.power.get_online() {
@@ -917,10 +919,6 @@ impl crate::Reloadable for CtrlPlatform {
 
         Ok(())
     }
-}
-
-impl CtrlPlatform {
-    task_watch_item!(charge_control_end_threshold "charge_control_end_threshold" power);
 }
 
 impl CtrlTask for CtrlPlatform {

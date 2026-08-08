@@ -12,7 +12,7 @@ fn main() {
     let anime_type = get_anime_type();
     let mut matrix = AnimeDataBuffer::new(anime_type);
     matrix.data_mut()[1] = 100; // start = 1
-    for n in matrix.data_mut()[2..32].iter_mut() {
+    for n in &mut matrix.data_mut()[2..32] {
         *n = 250;
     }
     matrix.data_mut()[32] = 100; // end
@@ -123,7 +123,7 @@ fn main() {
     matrix.data_mut()[1226] = 100; // start
     matrix.data_mut()[1234] = 100; // end
     matrix.data_mut()[1236] = 100; // start
-    for n in matrix.data_mut()[1237..1244].iter_mut() {
+    for n in &mut matrix.data_mut()[1237..1244] {
         *n = 250;
     }
     matrix.data_mut()[1244] = 100; // end

@@ -50,7 +50,7 @@ impl AniMe {
     }
 
     /// Will fail if something is already holding the config lock
-    async fn do_init_cache(&mut self) {
+    fn do_init_cache(&mut self) {
         if let Ok(mut config) = self.config.try_lock() {
             if let Err(e) = self.cache.init_from_config(&config, config.anime_type) {
                 error!(
@@ -63,13 +63,13 @@ impl AniMe {
                 debug!("Initialised AniMe cache");
             }
         } else {
-            error!("AniMe Matrix could not init cache")
+            error!("AniMe Matrix could not init cache");
         }
     }
 
     /// Initialise the device if required.
     pub async fn do_initialization(&mut self) -> Result<(), RogError> {
-        self.do_init_cache().await;
+        self.do_init_cache();
         let pkts = pkts_for_init();
         self.write_bytes(&pkts[0]).await?;
         self.write_bytes(&pkts[1]).await?;

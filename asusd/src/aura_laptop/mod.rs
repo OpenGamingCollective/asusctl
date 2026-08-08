@@ -24,7 +24,7 @@ pub struct Aura {
 
 impl Aura {
     /// Initialise the device if required.
-    pub async fn do_initialization(&self) -> Result<(), RogError> {
+    pub fn do_initialization(&self) -> Result<(), RogError> {
         Ok(())
     }
 
@@ -202,13 +202,13 @@ impl Aura {
                     hid_raw.write_bytes(&init)?;
                     config.per_key_mode_active = true;
                 }
-                for row in effect.iter() {
+                for row in effect {
                     hid_raw.write_bytes(row)?;
                 }
             }
         } else if matches!(config.led_type, rog_aura::AuraDeviceType::LaptopKeyboardTuf) {
             if let Some(tuf) = &self.backlight {
-                for row in effect.iter() {
+                for row in effect {
                     let r = row[9];
                     let g = row[10];
                     let b = row[11];

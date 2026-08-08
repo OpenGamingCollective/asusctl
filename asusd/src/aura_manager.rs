@@ -158,7 +158,7 @@ impl DeviceManager {
                                     .start_tasks(connection, path.clone())
                                     .await
                                     .map_err(|e| {
-                                        error!("Failed to start Slash tasks: {e:?}, not adding this device")
+                                        error!("Failed to start Slash tasks: {e:?}, not adding this device");
                                     })
                                     .is_ok()
                                 {
@@ -174,9 +174,7 @@ impl DeviceManager {
                         if let Ok(dev_type) = DeviceHandle::maybe_anime_hid(
                             dev.clone(),
                             usb_id.to_str().unwrap_or_default(),
-                        )
-                        .await
-                        {
+                        ) {
                             if let DeviceHandle::AniMe(anime) = dev_type.clone() {
                                 let path =
                                     dbus_path_for_dev(&usb_device).unwrap_or(dbus_path_for_anime());
@@ -185,7 +183,7 @@ impl DeviceManager {
                                     .start_tasks(connection, path.clone())
                                     .await
                                     .map_err(|e| {
-                                        error!("Failed to start AniMe tasks: {e:?}, not adding this device")
+                                        error!("Failed to start AniMe tasks: {e:?}, not adding this device");
                                     })
                                     .is_ok()
                                 {
@@ -212,7 +210,7 @@ impl DeviceManager {
                                     .start_tasks(connection, path.clone())
                                     .await
                                     .map_err(|e| {
-                                        error!("Failed to start Aura tasks: {e:?}, not adding this device")
+                                        error!("Failed to start Aura tasks: {e:?}, not adding this device");
                                     })
                                     .is_ok()
                                 {
@@ -299,7 +297,7 @@ impl DeviceManager {
                                 .map_err(|e| {
                                     error!(
                                         "Failed to start SCSI tasks: {e:?}, not adding this device"
-                                    )
+                                    );
                                 })
                                 .is_ok()
                             {
@@ -369,7 +367,7 @@ impl DeviceManager {
         let mut do_anime = true;
         let mut do_slash = true;
         let mut do_kb_backlight = true;
-        for dev in devices.iter() {
+        for dev in &devices {
             if matches!(dev.device, DeviceHandle::Slash(_)) {
                 do_slash = false;
             }
@@ -390,7 +388,7 @@ impl DeviceManager {
                         .start_tasks(connection, path.clone())
                         .await
                         .map_err(|e| {
-                            error!("Failed to start Slash tasks: {e:?}, not adding this device")
+                            error!("Failed to start Slash tasks: {e:?}, not adding this device");
                         })
                         .is_ok()
                     {
@@ -451,7 +449,7 @@ impl DeviceManager {
                             .map_err(|e| {
                                 error!(
                                     "Failed to start TUF Aura tasks: {e:?}, not adding this device"
-                                )
+                                );
                             })
                             .is_ok()
                         {

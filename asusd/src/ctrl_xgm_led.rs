@@ -78,13 +78,13 @@ impl CtrlXgmLed {
 impl CtrlXgmLed {
     /// Whether the XG Mobile LED is enabled (on).
     #[zbus(property)]
-    async fn xgm_led_enabled(&self) -> Result<bool, FdoErr> {
-        Ok(self.get_led_enabled())
+    fn xgm_led_enabled(&self) -> bool {
+        self.get_led_enabled()
     }
 
     /// Enable or disable the XG Mobile LED.
     #[zbus(property)]
-    async fn set_xgm_led_enabled(&self, enabled: bool) -> Result<(), zbus::Error> {
+    fn set_xgm_led_enabled(&self, enabled: bool) -> Result<(), zbus::Error> {
         self.set_led_enabled_inner(enabled).map_err(Into::into)
     }
 }

@@ -84,7 +84,7 @@ impl AuraZbus {
 
     /// Total levels of brightness available
     #[zbus(property)]
-    async fn supported_brightness(&self) -> Vec<LedBrightness> {
+    fn supported_brightness(&self) -> Vec<LedBrightness> {
         vec![
             LedBrightness::Off,
             LedBrightness::Low,
@@ -114,7 +114,7 @@ impl AuraZbus {
 
     /// The current mode data
     #[zbus(property)]
-    async fn led_mode(&self) -> Result<AuraModeNum, ZbErr> {
+    fn led_mode(&self) -> Result<AuraModeNum, ZbErr> {
         // entirely possible to deadlock here, so use try instead of lock()
         // let ctrl = self.0.lock().await;
         // Ok(config.current_mode)
@@ -144,7 +144,7 @@ impl AuraZbus {
 
     /// The current mode data
     #[zbus(property)]
-    async fn led_mode_data(&self) -> Result<AuraEffect, ZbErr> {
+    fn led_mode_data(&self) -> Result<AuraEffect, ZbErr> {
         // entirely possible to deadlock here, so use try instead of lock()
         if let Ok(config) = self.0.config.try_lock() {
             let mode = config.current_mode;
@@ -207,7 +207,7 @@ impl AuraZbus {
         let mut config = self.0.config.lock().await;
         for opt in options.states {
             let zone = opt.zone;
-            for state in config.enabled.states.iter_mut() {
+            for state in &mut config.enabled.states {
                 if state.zone == zone {
                     *state = opt;
                     break;

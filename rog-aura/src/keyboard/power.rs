@@ -184,7 +184,7 @@ impl LaptopAuraPower {
     /// |00000000| 00000000| 00000000| 00001000|shut_rear_|
     fn new_to_bytes(&self) -> Vec<u8> {
         let mut a: u32 = 0;
-        for state in self.states.iter() {
+        for state in &self.states {
             a |= state.new_to_byte();
         }
         vec![
@@ -200,8 +200,8 @@ impl LaptopAuraPower {
         match aura_type {
             AuraDeviceType::Unknown | AuraDeviceType::Ally | AuraDeviceType::LaptopKeyboard2021 => {
                 let mut states = Vec::new();
-                for zone in support_data.power_zones.iter() {
-                    states.push(AuraPowerState::default_for(*zone))
+                for zone in &support_data.power_zones {
+                    states.push(AuraPowerState::default_for(*zone));
                 }
                 Self { states }
             }
@@ -210,8 +210,8 @@ impl LaptopAuraPower {
                 // Previously this collapsed Keyboard+Lightbar into a single
                 // KeyboardAndLightbar zone, which prevented independent control.
                 let mut states = Vec::new();
-                for zone in support_data.power_zones.iter() {
-                    states.push(AuraPowerState::default_for(*zone))
+                for zone in &support_data.power_zones {
+                    states.push(AuraPowerState::default_for(*zone));
                 }
                 Self { states }
             }

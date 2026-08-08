@@ -254,9 +254,7 @@ impl KeyLayout {
 
         Ok(tmp)
     }
-}
 
-impl KeyLayout {
     pub fn default_layout() -> Self {
         Self {
             locale: "US".to_owned(),

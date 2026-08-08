@@ -480,7 +480,6 @@ mod tests {
     fn find_attributes() {
         let attrs = FirmwareAttributes::new();
         for attr in attrs.attributes() {
-            dbg!(attr.name());
             match attr.name().into() {
                 FirmwareAttribute::DgpuDisable => {
                     assert!(!attr.help().is_empty());
