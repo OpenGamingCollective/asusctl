@@ -116,9 +116,15 @@ impl VirtAnimeMatrix {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    let env = env_logger::Env::default().default_filter_or("info,tracing=error,zbus=error");
+    env_logger::Builder::from_env(env)
+        .target(env_logger::Target::Stdout)
+        .format_timestamp(None)
+        .init();
+
     let args: Vec<String> = env::args().collect();
     if args.len() <= 1 {
-        println!("Must supply arg, one of <GA401, GA402, GU604, G835L>");
+        log::warn!("Must supply arg, one of <GA401, GA402, GU604, G835L>");
         return Ok(());
     }
     let anime_type = AnimeType::from_str(&args[1])?;

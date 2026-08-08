@@ -26,7 +26,7 @@ use tokio::runtime::Runtime;
 async fn main() -> Result<()> {
     // Ensure tracing spans are quiet by default unless user overrides
     if std::env::var_os("RUST_LOG").is_none() {
-        std::env::set_var("RUST_LOG", "warn,tracing=error,zbus=error");
+        std::env::set_var("RUST_LOG", "info,tracing=error,zbus=error");
     }
     let mut logger = env_logger::Builder::new();
     logger
@@ -82,12 +82,12 @@ async fn main() -> Result<()> {
     let asusd_version = match platform_proxy.version() {
         Ok(v) => v,
         Err(e) => {
-            eprintln!("Could not get asusd version: {e:?}\nIs asusd.service running?");
+            error!("Could not get asusd version: {e:?}. Is asusd.service running?");
             std::process::exit(1);
         }
     };
     if asusd_version != self_version {
-        println!("Version mismatch: asusctl = {self_version}, asusd = {asusd_version}");
+        warn!("Version mismatch: asusctl = {self_version}, asusd = {asusd_version}");
         // return Ok(());
     }
 

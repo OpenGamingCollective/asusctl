@@ -1,7 +1,9 @@
 use argh::FromArgs;
+use log::{info, warn};
 use rog_dbus::find_iface_blocking;
 use rog_dbus::zbus_slash::SlashProxyBlocking;
 use rog_slash::SlashMode;
+use zbus::blocking::Connection;
 
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "slash", description = "slash ledbar commands")]
@@ -66,7 +68,10 @@ pub struct SlashSetCommand {
 #[argh(subcommand, name = "list", description = "list available animations")]
 pub struct SlashListCommand {}
 
-pub fn handle_slash_set(cmd: &SlashSetCommand) -> Result<(), Box<dyn std::error::Error>> {
+pub fn handle_slash_set(
+    cmd: &SlashSetCommand,
+    _conn: &Connection,
+) -> Result<(), Box<dyn std::error::Error>> {
     if cmd.brightness.is_none()
         && cmd.interval.is_none()
         && cmd.show_on_boot.is_none()
@@ -78,7 +83,7 @@ pub fn handle_slash_set(cmd: &SlashSetCommand) -> Result<(), Box<dyn std::error:
         && !cmd.enable
         && !cmd.disable
     {
-        println!("Missing arg; run 'asusctl slash set --help' for usage");
+        warn!("Missing arg; run 'asusctl slash set --help' for usage");
         return Ok(());
     }
 
@@ -119,7 +124,7 @@ pub fn handle_slash_set(cmd: &SlashSetCommand) -> Result<(), Box<dyn std::error:
     Ok(())
 }
 
-pub fn handle_slash_get() -> Result<(), Box<dyn std::error::Error>> {
+pub fn handle_slash_get(_conn: &Connection) -> Result<(), Box<dyn std::error::Error>> {
     let slashes = find_iface_blocking::<SlashProxyBlocking>("xyz.ljones.Slash")?;
     for proxy in &slashes {
         let enabled = proxy.enabled()?;
@@ -136,14 +141,14 @@ pub fn handle_slash_get() -> Result<(), Box<dyn std::error::Error>> {
             "Slash LED: {}",
             if enabled { "enabled" } else { "disabled" }
         );
-        println!("Brightness: {}", brightness);
-        println!("Interval: {}", interval);
-        println!("Mode: {}", mode);
-        println!("Show on boot: {}", show_on_boot);
-        println!("Show on shutdown: {}", show_on_shutdown);
-        println!("Show on sleep: {}", show_on_sleep);
-        println!("Show on battery: {}", show_on_battery);
-        println!("Show battery warning: {}", show_battery_warning);
+        println!("Brightness: {brightness}");
+        println!("Interval: {interval}");
+        println!("Mode: {mode}");
+        println!("Show on boot: {show_on_boot}");
+        println!("Show on shutdown: {show_on_shutdown}");
+        println!("Show on sleep: {show_on_sleep}");
+        println!("Show on battery: {show_on_battery}");
+        println!("Show battery warning: {show_battery_warning}");
     }
 
     Ok(())
@@ -152,6 +157,6 @@ pub fn handle_slash_get() -> Result<(), Box<dyn std::error::Error>> {
 pub fn handle_slash_list() {
     let res = SlashMode::list();
     for p in &res {
-        println!("{p}");
+        info!("{p}");
     }
 }
