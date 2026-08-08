@@ -28,6 +28,10 @@ pub(crate) fn to_device(sys_path: &Path) -> Result<Device> {
         .map_err(|e| PlatformError::Udev("Couldn't transform syspath to device".to_owned(), e))
 }
 
+pub(crate) fn read_sysfs_parsed<T: std::str::FromStr>(path: impl AsRef<Path>) -> Option<T> {
+    std::fs::read_to_string(path).ok()?.trim().parse::<T>().ok()
+}
+
 pub fn has_attr(device: &Device, attr_name: &str) -> bool {
     for attr in device.attributes() {
         if attr.name() == attr_name {

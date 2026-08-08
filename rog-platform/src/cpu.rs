@@ -6,7 +6,7 @@ use zbus::zvariant::{OwnedValue, Type, Value};
 
 use crate::error::{PlatformError, Result};
 use crate::platform::PlatformProfile;
-use crate::{read_attr_string, to_device};
+use crate::{read_attr_string, read_sysfs_parsed, to_device};
 
 const ATTR_AVAILABLE_GOVERNORS: &str = "cpufreq/scaling_available_governors";
 const ATTR_GOVERNOR: &str = "cpufreq/scaling_governor";
@@ -317,21 +317,16 @@ pub fn get_cpu_temp() -> f32 {
             if let Ok(name) = std::fs::read_to_string(path.join("name")) {
                 let name = name.trim();
                 if name == "k10temp" || name == "coretemp" || name == "zenpower" {
-                    if let Ok(temp_str) = std::fs::read_to_string(path.join("temp1_input")) {
-                        if let Ok(temp_val) = temp_str.trim().parse::<f32>() {
-                            return temp_val / 1000.0;
-                        }
+                    if let Some(temp_val) = read_sysfs_parsed::<f32>(path.join("temp1_input")) {
+                        return temp_val / 1000.0;
                     }
                 }
             }
         }
     }
-    if let Ok(temp_str) = std::fs::read_to_string("/sys/class/thermal/thermal_zone0/temp") {
-        if let Ok(temp_val) = temp_str.trim().parse::<f32>() {
-            return temp_val / 1000.0;
-        }
-    }
-    0.0
+    read_sysfs_parsed::<f32>("/sys/class/thermal/thermal_zone0/temp")
+        .map(|t| t / 1000.0)
+        .unwrap_or(-1.0)
 }
 
 pub fn get_cpu_frequency_mhz() -> f32 {
@@ -342,11 +337,9 @@ pub fn get_cpu_frequency_mhz() -> f32 {
             let name = entry.file_name().to_string_lossy().into_owned();
             if name.starts_with("cpu") && name[3..].chars().all(|c| c.is_ascii_digit()) {
                 let freq_path = entry.path().join("cpufreq/scaling_cur_freq");
-                if let Ok(freq_str) = std::fs::read_to_string(freq_path) {
-                    if let Ok(freq_khz) = freq_str.trim().parse::<f32>() {
-                        total_freq += freq_khz / 1000.0;
-                        count += 1;
-                    }
+                if let Some(freq_khz) = read_sysfs_parsed::<f32>(freq_path) {
+                    total_freq += freq_khz / 1000.0;
+                    count += 1;
                 }
             }
         }
@@ -368,7 +361,7 @@ pub fn get_cpu_frequency_mhz() -> f32 {
     if count > 0 {
         total_freq / count as f32
     } else {
-        0.0
+        -1.0
     }
 }
 

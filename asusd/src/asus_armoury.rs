@@ -65,12 +65,7 @@ impl AsusArmouryAttribute {
     }
 
     fn resolve_i32_value(refreshed: Option<i32>, cached: &AttrValue) -> i32 {
-        refreshed
-            .or(match cached {
-                AttrValue::Integer(i) => Some(*i),
-                _ => None,
-            })
-            .unwrap_or(-1)
+        refreshed.or_else(|| cached.as_i32()).unwrap_or(-1)
     }
 
     pub async fn emit_limits(&self, connection: &Connection) -> Result<(), RogError> {
@@ -291,18 +286,17 @@ impl AsusArmouryAttribute {
         match self.attr.current_value() {
             Ok(value) => {
                 self.logged_read_error.store(false, Ordering::Relaxed);
-                if matches!(value, AttrValue::Integer(_)) {
+                if value.as_i32().is_some() {
                     attrs.push("current_value".to_string());
                 }
             }
-            Err(e) => {
-                if !self.logged_read_error.swap(true, Ordering::Relaxed) {
-                    error!(
-                        "Firmware attribute '{}' is not supported or failed to read: {e:?}",
-                        self.attr.name()
-                    );
-                }
+            Err(e) if !self.logged_read_error.swap(true, Ordering::Relaxed) => {
+                error!(
+                    "Firmware attribute '{}' is not supported or failed to read: {e:?}",
+                    self.attr.name()
+                );
             }
+            _ => {}
         }
         attrs
     }
@@ -332,8 +326,8 @@ impl AsusArmouryAttribute {
             let mut config = self.config.lock().await;
             let tuning = config.select_tunings(power_plugged == 1, profile);
             if let Some(tune) = tuning.group.get_mut(&self.name()) {
-                if let AttrValue::Integer(i) = self.attr.default_value() {
-                    *tune = *i;
+                if let Some(i) = self.attr.default_value().as_i32() {
+                    *tune = i;
                 }
             }
             if tuning.enabled {
@@ -394,8 +388,8 @@ impl AsusArmouryAttribute {
                     return Ok(*tune);
                 }
             }
-            if let AttrValue::Integer(i) = self.attr.default_value() {
-                return Ok(*i);
+            if let Some(i) = self.attr.default_value().as_i32() {
+                return Ok(i);
             }
             return Err(fdo::Error::Failed(
                 "Could not read current value".to_string(),
@@ -415,7 +409,7 @@ impl AsusArmouryAttribute {
 
         if let Ok(value) = self.attr.current_value() {
             self.logged_read_error.store(false, Ordering::Relaxed);
-            if let AttrValue::Integer(i) = value {
+            if let Some(i) = value.as_i32() {
                 return Ok(i);
             }
         }
@@ -673,8 +667,8 @@ pub async fn set_config_or_default(
                             error!("Failed to set {}: {e}", <&str>::from(name));
                         })
                         .ok();
-                    if let AttrValue::Integer(i) = default {
-                        tuning.group.insert(name, *i);
+                    if let Some(i) = default.as_i32() {
+                        tuning.group.insert(name, i);
                         info!(
                             "Set default tuning config for {} = {:?}",
                             <&str>::from(name),

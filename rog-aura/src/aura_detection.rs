@@ -133,13 +133,18 @@ impl LedSupportFile {
             if file.is_empty() {
                 warn!("{} is empty", ASUS_LED_MODE_USER_CONF);
             } else {
-                if let Ok(mut tmp) = ron::from_str::<LedSupportFile>(&file) {
-                    data.0.append(&mut tmp.0);
+                match ron::from_str::<LedSupportFile>(&file) {
+                    Ok(mut tmp) => {
+                        data.0.append(&mut tmp.0);
+                        info!(
+                            "Loaded user-defined LED support data from {}",
+                            ASUS_LED_MODE_USER_CONF
+                        );
+                    }
+                    Err(e) => {
+                        error!("Could not deserialise {}: {}", ASUS_LED_MODE_USER_CONF, e);
+                    }
                 }
-                info!(
-                    "Loaded user-defined LED support data from {}",
-                    ASUS_LED_MODE_USER_CONF
-                );
             }
         }
         // Load and append the default LED support data
