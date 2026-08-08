@@ -5,7 +5,7 @@
 //! "dGPU status changed" notifications).
 
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, LazyLock, Mutex};
 
 use ksni::{Icon, TrayMethods};
 use log::info;
@@ -26,7 +26,12 @@ struct Icons {
     gpu_integrated: Icon,
 }
 
-static ICONS: OnceLock<Icons> = OnceLock::new();
+static ICONS: LazyLock<Icons> = LazyLock::new(|| Icons {
+    rog_blue: read_icon(Path::new("asus_notif_blue.png")),
+    rog_red: read_icon(Path::new("asus_notif_red.png")),
+    rog_white: read_icon(Path::new("asus_notif_white.png")),
+    gpu_integrated: read_icon(Path::new("rog-control-center.png")),
+});
 
 fn read_icon(file: &Path) -> Icon {
     let mut path = PathBuf::from(TRAY_ICON_PATH);
@@ -163,11 +168,9 @@ pub fn init_tray(
     mut gpu_status: watch::Receiver<GfxPower>,
 ) {
     tokio::spawn(async move {
-        let rog_red = read_icon(&PathBuf::from("asus_notif_red.png"));
-
         let tray_init = AsusTray {
             current_title: TRAY_LABEL.to_string(),
-            current_icon: rog_red.clone(),
+            current_icon: ICONS.rog_red.clone(),
             window,
         };
 
@@ -184,28 +187,16 @@ pub fn init_tray(
         };
 
         info!("Tray started");
-        let rog_blue = read_icon(&PathBuf::from("asus_notif_blue.png"));
-        let rog_white = read_icon(&PathBuf::from("asus_notif_white.png"));
-        let gpu_integrated = read_icon(&PathBuf::from("rog-control-center.png"));
-        ICONS.get_or_init(|| Icons {
-            rog_blue,
-            rog_red: rog_red.clone(),
-            rog_white,
-            gpu_integrated,
-        });
-
         info!("Started ROGTray with local GPU status monitor");
 
         // Set initial state from the channel's current value
         let power = *gpu_status.borrow_and_update();
-        if let Some(icons) = ICONS.get() {
-            let (icon, title) = map_power_to_icon(power, gpu_mode(power), icons);
-            tray.update(|tray: &mut AsusTray| {
-                tray.current_icon = icon;
-                tray.current_title = title;
-            })
-            .await;
-        }
+        let (icon, title) = map_power_to_icon(power, gpu_mode(power), &ICONS);
+        tray.update(|tray: &mut AsusTray| {
+            tray.current_icon = icon;
+            tray.current_title = title;
+        })
+        .await;
 
         // Update the tray icon whenever the dGPU status monitor publishes a
         // change. The timer wakes the loop even when the GPU status is
@@ -220,14 +211,12 @@ pub fn init_tray(
                         return;
                     }
                     let power = *gpu_status.borrow_and_update();
-                    if let Some(icons) = ICONS.get() {
-                        let (icon, title) = map_power_to_icon(power, gpu_mode(power), icons);
-                        tray.update(|tray: &mut AsusTray| {
-                            tray.current_icon = icon;
-                            tray.current_title = title;
-                        })
-                        .await;
-                    }
+                    let (icon, title) = map_power_to_icon(power, gpu_mode(power), &ICONS);
+                    tray.update(|tray: &mut AsusTray| {
+                        tray.current_icon = icon;
+                        tray.current_title = title;
+                    })
+                    .await;
                 }
                 _ = config_check.tick() => {}
             }

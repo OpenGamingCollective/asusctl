@@ -96,13 +96,7 @@ impl AuraConfig {
                         direction: Direction::Left,
                     });
                 }
-                if let Some(m) = config.multizone.as_mut() {
-                    m.insert(*n, default);
-                } else {
-                    let mut tmp = BTreeMap::new();
-                    tmp.insert(*n, default);
-                    config.multizone = Some(tmp);
-                }
+                config.multizone.get_or_insert_default().insert(*n, default);
             }
         }
         config
@@ -157,13 +151,9 @@ impl AuraConfig {
             return Err(RogError::AuraEffectNotSupported);
         }
 
-        if let Some(multizones) = self.multizone.as_mut() {
-            multizones.insert(self.current_mode, default);
-        } else {
-            let mut tmp = BTreeMap::new();
-            tmp.insert(self.current_mode, default);
-            self.multizone = Some(tmp);
-        }
+        self.multizone
+            .get_or_insert_default()
+            .insert(self.current_mode, default);
         Ok(())
     }
 
@@ -172,13 +162,11 @@ impl AuraConfig {
     pub fn load_and_update_config(prod_id: &str) -> AuraConfig {
         // New loads data from the DB also
         let mut config_init = AuraConfig::new(prod_id);
-        // config_init.set_filename(prod_id);
         let mut config_loaded = config_init.clone().load();
         // update the initialised data with what we loaded from disk
-        for mode_init in &mut config_init.builtins {
-            // update init values from loaded values if they exist
-            if let Some(loaded) = config_loaded.builtins.get(mode_init.0) {
-                *mode_init.1 = loaded.clone();
+        for (mode, effect) in &mut config_init.builtins {
+            if let Some(loaded) = config_loaded.builtins.get(mode) {
+                *effect = loaded.clone();
             }
         }
         // Then replace just incase the initialised data contains new modes added
@@ -188,11 +176,13 @@ impl AuraConfig {
         config_loaded.ally_fix = config_init.ally_fix;
 
         for enabled_init in &mut config_init.enabled.states {
-            for enabled in &mut config_loaded.enabled.states {
-                if enabled.zone == enabled_init.zone {
-                    *enabled_init = *enabled;
-                    break;
-                }
+            if let Some(enabled) = config_loaded
+                .enabled
+                .states
+                .iter()
+                .find(|e| e.zone == enabled_init.zone)
+            {
+                *enabled_init = *enabled;
             }
         }
         config_loaded.enabled = config_init.enabled;
@@ -200,18 +190,14 @@ impl AuraConfig {
         if let (Some(mut multizone_init), Some(multizone_loaded)) =
             (config_init.multizone, config_loaded.multizone.as_mut())
         {
-            for mode in multizone_init.iter_mut() {
-                // update init values from loaded values if they exist
-                if let Some(loaded) = multizone_loaded.get(mode.0) {
-                    let mut new_set = Vec::new();
-                    let data = LedSupportData::get_data(prod_id);
-                    // only reuse a zone mode if the mode is supported
-                    for mode in loaded {
-                        if data.basic_modes.contains(&mode.mode) {
-                            new_set.push(mode.clone());
-                        }
-                    }
-                    *mode.1 = new_set;
+            let data = LedSupportData::get_data(prod_id);
+            for (mode, mode_effects) in multizone_init.iter_mut() {
+                if let Some(loaded) = multizone_loaded.get(mode) {
+                    *mode_effects = loaded
+                        .iter()
+                        .filter(|m| data.basic_modes.contains(&m.mode))
+                        .cloned()
+                        .collect();
                 }
             }
             *multizone_loaded = multizone_init;
@@ -224,7 +210,7 @@ impl AuraConfig {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{Mutex, MutexGuard, OnceLock};
+    use std::sync::{Mutex, MutexGuard};
 
     use rog_aura::keyboard::AuraPowerState;
     use rog_aura::{
@@ -235,13 +221,10 @@ mod tests {
 
     // Global mutex to serialize tests that rely on process-wide environment
     // variables
-    static TEST_MUTEX: OnceLock<Mutex<()>> = OnceLock::new();
+    static TEST_MUTEX: Mutex<()> = Mutex::new(());
 
     fn test_lock() -> MutexGuard<'static, ()> {
-        TEST_MUTEX
-            .get_or_init(|| Mutex::new(()))
-            .lock()
-            .expect("TEST_MUTEX poisoned")
+        TEST_MUTEX.lock().expect("TEST_MUTEX poisoned")
     }
 
     #[test]

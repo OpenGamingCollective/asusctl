@@ -577,7 +577,7 @@ fn collect_discrete_gpu_state() -> Result<Vec<DiscreteGpu>, Box<dyn std::error::
 }
 
 fn render_node_map() -> Result<HashMap<PathBuf, Vec<PathBuf>>, Box<dyn std::error::Error>> {
-    let mut render_map = HashMap::new();
+    let mut render_map: HashMap<PathBuf, Vec<PathBuf>> = HashMap::new();
 
     for entry in fs::read_dir("/sys/class/drm")? {
         let entry = entry?;
@@ -594,7 +594,7 @@ fn render_node_map() -> Result<HashMap<PathBuf, Vec<PathBuf>>, Box<dyn std::erro
 
         render_map
             .entry(device_path)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(PathBuf::from(format!("/dev/dri/{render}")));
     }
 
