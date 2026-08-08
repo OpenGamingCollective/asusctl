@@ -125,7 +125,13 @@ pub fn handle_slash_get() -> Result<(), Box<dyn std::error::Error>> {
         let enabled = proxy.enabled()?;
         let brightness = proxy.brightness()?;
         let interval = proxy.interval()?;
-        let mode = proxy.mode()?;
+        let mode_raw = proxy.mode()?;
+        let mode_name = SlashMode::try_from(mode_raw)
+            .map(|m| m.to_string())
+            .unwrap_or_else(|e| {
+                log::warn!("Unknown slash mode byte 0x{mode_raw:02x}: {e}");
+                format!("unknown(0x{mode_raw:02x})")
+            });
         let show_on_boot = proxy.show_on_boot()?;
         let show_on_shutdown = proxy.show_on_shutdown()?;
         let show_on_sleep = proxy.show_on_sleep()?;
@@ -138,7 +144,7 @@ pub fn handle_slash_get() -> Result<(), Box<dyn std::error::Error>> {
         );
         println!("Brightness: {}", brightness);
         println!("Interval: {}", interval);
-        println!("Mode: {}", mode);
+        println!("Mode: {}", mode_name);
         println!("Show on boot: {}", show_on_boot);
         println!("Show on shutdown: {}", show_on_shutdown);
         println!("Show on sleep: {}", show_on_sleep);

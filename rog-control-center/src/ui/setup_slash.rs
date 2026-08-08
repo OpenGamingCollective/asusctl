@@ -54,8 +54,32 @@ pub fn setup_slash_page(ui: &MainWindow, _states: Arc<Mutex<Config>>) {
             set_ui_props_async!(handle, slash, SlashPageData, show_battery_warning);
             set_ui_props_async!(handle, slash, SlashPageData, show_on_lid_closed);
 
-            if let Ok(mode) = slash.mode().await {
-                let idx = slash_mode_to_index(mode);
+            // Read the persisted mode, retrying once briefly — a single read right
+            // after (re)start can race with asusd and fail. The mode-changed listener
+            // below picks up subsequent changes, but won't recover an initial failure,
+            // so one short retry is kept as a safety net.
+            let mut mode: Option<SlashMode> = None;
+            match slash.mode().await {
+                Ok(raw) => match SlashMode::try_from(raw) {
+                    Ok(m) => mode = Some(m),
+                    Err(e) => log::warn!("slash mode at startup: unknown byte 0x{raw:02x}: {e}"),
+                },
+                Err(e) => {
+                    log::warn!("slash mode unreadable at startup: {e}; retrying once");
+                    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                    if let Ok(raw) = slash.mode().await {
+                        match SlashMode::try_from(raw) {
+                            Ok(m) => mode = Some(m),
+                            Err(e) => log::warn!(
+                                "slash mode at startup (retry): unknown byte 0x{raw:02x}: {e}"
+                            ),
+                        }
+                    }
+                }
+            }
+            if let Some(m) = mode {
+                let idx = slash_mode_to_index(m);
+                log::info!("slash mode at startup: {:?} (index {})", m, idx);
                 let choices = slash_modes();
                 handle
                     .upgrade_in_event_loop(move |handle| {
@@ -64,6 +88,8 @@ pub fn setup_slash_page(ui: &MainWindow, _states: Arc<Mutex<Config>>) {
                         global.set_mode(idx);
                     })
                     .ok();
+            } else {
+                log::error!("slash mode unreadable after retries; UI will show Static");
             }
 
             handle
@@ -98,13 +124,20 @@ pub fn setup_slash_page(ui: &MainWindow, _states: Arc<Mutex<Config>>) {
                         let mut x = slash_copy.receive_mode_changed().await;
                         use futures_util::StreamExt;
                         while let Some(e) = x.next().await {
-                            if let Ok(out) = e.get().await {
-                                let idx = slash_mode_to_index(out);
-                                handle_copy
-                                    .upgrade_in_event_loop(move |handle| {
-                                        handle.global::<SlashPageData>().set_mode(idx);
-                                    })
-                                    .ok();
+                            if let Ok(raw) = e.get().await {
+                                match SlashMode::try_from(raw) {
+                                    Ok(out) => {
+                                        let idx = slash_mode_to_index(out);
+                                        handle_copy
+                                            .upgrade_in_event_loop(move |handle| {
+                                                handle.global::<SlashPageData>().set_mode(idx);
+                                            })
+                                            .ok();
+                                    }
+                                    Err(e) => log::warn!(
+                                        "setup_slash: received unknown slash mode 0x{raw:02x}: {e}"
+                                    ),
+                                }
                             }
                         }
                     });

@@ -27,7 +27,7 @@ pub trait Slash {
 
     /// Slash modes property
     #[zbus(property)]
-    fn mode(&self) -> zbus::Result<SlashMode>;
+    fn mode(&self) -> zbus::Result<u8>;
     #[zbus(property)]
     fn set_mode(&self, value: SlashMode) -> zbus::Result<()>;
 

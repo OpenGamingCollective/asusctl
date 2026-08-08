@@ -95,6 +95,7 @@ impl FromStr for SlashType {
 }
 
 #[cfg_attr(feature = "dbus", derive(Type, Value, OwnedValue))]
+#[repr(u8)]
 #[derive(Debug, Default, PartialEq, Eq, Copy, Clone, Deserialize, Serialize)]
 pub enum SlashMode {
     Static = 0x06,
@@ -138,6 +139,34 @@ impl FromStr for SlashMode {
             "Start" => Ok(SlashMode::Start),
             "Buzzer" => Ok(SlashMode::Buzzer),
             _ => Ok(SlashMode::Bounce),
+        }
+    }
+}
+
+impl TryFrom<u8> for SlashMode {
+    type Error = SlashError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0x06 => Ok(SlashMode::Static),
+            0x10 => Ok(SlashMode::Bounce),
+            0x12 => Ok(SlashMode::Slash),
+            0x13 => Ok(SlashMode::Loading),
+            0x1d => Ok(SlashMode::BitStream),
+            0x1a => Ok(SlashMode::Transmission),
+            0x19 => Ok(SlashMode::Flow),
+            0x25 => Ok(SlashMode::Flux),
+            0x24 => Ok(SlashMode::Phantom),
+            0x26 => Ok(SlashMode::Spectrum),
+            0x32 => Ok(SlashMode::Hazard),
+            0x33 => Ok(SlashMode::Interfacing),
+            0x34 => Ok(SlashMode::Ramp),
+            0x42 => Ok(SlashMode::GameOver),
+            0x43 => Ok(SlashMode::Start),
+            0x44 => Ok(SlashMode::Buzzer),
+            _ => Err(SlashError::ParseError(format!(
+                "Unknown SlashMode discriminant: 0x{value:02x}"
+            ))),
         }
     }
 }
