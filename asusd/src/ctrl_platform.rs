@@ -491,15 +491,17 @@ impl CtrlPlatform {
         let policy = PlatformProfile::next(policy, &choices);
 
         if self.platform.has_platform_profile() {
-            let change_epp = self.config.lock().await.platform_profile_linked_epp;
-            let epp = self.get_config_epp_for_throttle(policy).await;
-            self.check_and_set_epp(epp, change_epp);
+            // Profile first: with EPP first, a rejected profile leaves the
+            // machine on the EPP of a profile it never applied.
             self.platform
                 .set_platform_profile(policy.into())
                 .map_err(|err| {
                     warn!("platform_profile {}", err);
                     FdoErr::Failed(format!("RogPlatform: platform_profile: {err}"))
                 })?;
+            let change_epp = self.config.lock().await.platform_profile_linked_epp;
+            let epp = self.get_config_epp_for_throttle(policy).await;
+            self.check_and_set_epp(epp, change_epp);
             self.enable_ppt_group_changed(&ctxt).await?;
             Ok(self.platform_profile_changed(&ctxt).await?)
         } else {
@@ -528,12 +530,8 @@ impl CtrlPlatform {
     ) -> Result<(), FdoErr> {
         // TODO: watch for external changes
         if self.platform.has_platform_profile() {
-            let change_epp = self.config.lock().await.platform_profile_linked_epp;
-            let epp = self.get_config_epp_for_throttle(policy).await;
-            self.check_and_set_epp(epp, change_epp);
-
-            self.config.lock().await.write();
-
+            // Check before writing anything, so a rejected profile can't
+            // leave EPP behind.
             let choices = self.platform.get_platform_profile_choices()?;
             if !choices.contains(&policy) {
                 return Err(FdoErr::NotSupported(format!(
@@ -548,6 +546,13 @@ impl CtrlPlatform {
                     warn!("platform_profile {}", err);
                     FdoErr::Failed(format!("RogPlatform: platform_profile: {err}"))
                 })?;
+
+            let change_epp = self.config.lock().await.platform_profile_linked_epp;
+            let epp = self.get_config_epp_for_throttle(policy).await;
+            self.check_and_set_epp(epp, change_epp);
+
+            self.config.lock().await.write();
+
             self.enable_ppt_group_changed(&ctxt).await?;
             Ok(())
         } else {
