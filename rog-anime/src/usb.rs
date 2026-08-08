@@ -273,7 +273,7 @@ pub const fn pkts_for_init() -> [[u8; PACKET_SIZE]; 2] {
     packets[0][0] = DEV_PAGE; // This is the USB page we're using throughout
     let mut count = 0;
     // TODO: memcpy or slice copy
-    let bytes = "ASUS Tech.Inc.".as_bytes();
+    let bytes = b"ASUS Tech.Inc.";
     while count < bytes.len() {
         packets[0][count + 1] = bytes[count];
         count += 1;
