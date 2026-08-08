@@ -79,7 +79,7 @@ where
     let f = fdo::ObjectManagerProxy::new(&conn, "xyz.ljones.Asusd", "/")?;
     let interfaces = f.get_managed_objects()?;
     let mut paths = Vec::new();
-    for v in interfaces.iter() {
+    for v in &interfaces {
         // let o: Vec<zbus::names::OwnedInterfaceName> = v.1.keys().map(|e|
         // e.to_owned()).collect(); println!("{}, {:?}", v.0, o);
         for k in v.1.keys() {
@@ -117,7 +117,7 @@ where
     let f = zbus::fdo::ObjectManagerProxy::new(&conn, "xyz.ljones.Asusd", "/").await?;
     let interfaces = f.get_managed_objects().await?;
     let mut paths = Vec::new();
-    for v in interfaces.iter() {
+    for v in &interfaces {
         // let o: Vec<zbus::names::OwnedInterfaceName> = v.1.keys().map(|e|
         // e.to_owned()).collect(); println!("{}, {:?}", v.0, o);
         for k in v.1.keys() {
