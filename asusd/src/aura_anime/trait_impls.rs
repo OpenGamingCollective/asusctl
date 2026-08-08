@@ -88,7 +88,7 @@ impl AniMeZbus {
 
     /// Set base brightness level
     #[zbus(property)]
-    async fn brightness(&self) -> Brightness {
+    fn brightness(&self) -> Brightness {
         if let Ok(config) = self.0.config.try_lock() {
             return config.display_brightness;
         }
@@ -120,7 +120,7 @@ impl AniMeZbus {
     }
 
     #[zbus(property)]
-    async fn builtins_enabled(&self) -> bool {
+    fn builtins_enabled(&self) -> bool {
         if let Ok(config) = self.0.config.try_lock() {
             return config.builtin_anims_enabled;
         }
@@ -165,7 +165,7 @@ impl AniMeZbus {
     }
 
     #[zbus(property)]
-    async fn builtin_animations(&self) -> Animations {
+    fn builtin_animations(&self) -> Animations {
         if let Ok(config) = self.0.config.try_lock() {
             return config.builtin_anims;
         }
@@ -198,7 +198,7 @@ impl AniMeZbus {
     }
 
     #[zbus(property)]
-    async fn enable_display(&self) -> bool {
+    fn enable_display(&self) -> bool {
         if let Ok(config) = self.0.config.try_lock() {
             return config.display_enabled;
         }
@@ -221,7 +221,7 @@ impl AniMeZbus {
     }
 
     #[zbus(property)]
-    async fn off_when_unplugged(&self) -> bool {
+    fn off_when_unplugged(&self) -> bool {
         if let Ok(config) = self.0.config.try_lock() {
             return config.off_when_unplugged;
         }
@@ -248,7 +248,7 @@ impl AniMeZbus {
     }
 
     #[zbus(property)]
-    async fn off_when_suspended(&self) -> bool {
+    fn off_when_suspended(&self) -> bool {
         if let Ok(config) = self.0.config.try_lock() {
             return config.off_when_suspended;
         }
@@ -264,7 +264,7 @@ impl AniMeZbus {
     }
 
     #[zbus(property)]
-    async fn off_when_lid_closed(&self) -> bool {
+    fn off_when_lid_closed(&self) -> bool {
         if let Ok(config) = self.0.config.try_lock() {
             return config.off_when_lid_closed;
         }

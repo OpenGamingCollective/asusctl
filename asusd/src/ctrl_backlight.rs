@@ -301,7 +301,7 @@ impl CtrlBacklight {
     }
 
     #[zbus(property)]
-    async fn screenpad_power(&self) -> Result<bool, FdoErr> {
+    fn screenpad_power(&self) -> Result<bool, FdoErr> {
         if let Some(backlight) = self.get_backlight(&BacklightType::Screenpad) {
             let power = backlight.get_bl_power().map_err(|e| {
                 warn!("Failed to get backlight power: {}", e);
@@ -320,12 +320,10 @@ impl CtrlBacklight {
         power: bool,
     ) -> Result<(), zbus::Error> {
         if let Some(backlight) = self.get_backlight(&BacklightType::Screenpad) {
-            backlight
-                .set_bl_power(if power { 0 } else { 1 })
-                .map_err(|e| {
-                    warn!("Failed to set backlight power: {}", e);
-                    FdoErr::Failed(format!("Failed to set backlight power: {}", e))
-                })?;
+            backlight.set_bl_power(i32::from(!power)).map_err(|e| {
+                warn!("Failed to set backlight power: {}", e);
+                FdoErr::Failed(format!("Failed to set backlight power: {}", e))
+            })?;
             self.screenpad_power_changed(&ctxt).await?;
             Ok(())
         } else {

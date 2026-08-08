@@ -200,7 +200,7 @@ impl AuraConfig {
         if let (Some(mut multizone_init), Some(multizone_loaded)) =
             (config_init.multizone, config_loaded.multizone.as_mut())
         {
-            for mode in multizone_init.iter_mut() {
+            for mode in &mut multizone_init {
                 // update init values from loaded values if they exist
                 if let Some(loaded) = multizone_loaded.get(mode.0) {
                     let mut new_set = Vec::new();
