@@ -94,18 +94,11 @@ mod tests {
         let dmi = DMIID::new().unwrap();
 
         assert_ne!(dmi.id_model, "Unknown".to_string());
-        dbg!(dmi.id_model);
         assert_ne!(dmi.dmi_family, "Unknown".to_string());
-        dbg!(dmi.dmi_family);
         assert_ne!(dmi.dmi_vendor, "Unknown".to_string());
-        dbg!(dmi.dmi_vendor);
         assert_ne!(dmi.board_name, "Unknown".to_string());
-        dbg!(dmi.board_name);
         assert_ne!(dmi.board_vendor, "Unknown".to_string());
-        dbg!(dmi.board_vendor);
         assert_ne!(dmi.product_family, "Unknown".to_string());
-        dbg!(dmi.product_family);
         assert_ne!(dmi.product_name, "Unknown".to_string());
-        dbg!(dmi.product_name);
     }
 }
