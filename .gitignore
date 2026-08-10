@@ -33,3 +33,6 @@ AGENTS.md
 
 # Git should not follow this IN ANY CASE
 Cargo.lock
+
+# Mdbook
+book

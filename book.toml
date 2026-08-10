@@ -1,0 +1,4 @@
+[book]
+src = "docs"
+title = "Asusctl Documentation"
+description = "Documentation for Asusctl"
