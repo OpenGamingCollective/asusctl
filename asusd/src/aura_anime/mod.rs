@@ -31,6 +31,7 @@ pub struct AniMe {
     thread_exit: Arc<AtomicBool>,
     // Set to false when the thread exits
     thread_running: Arc<AtomicBool>,
+    pub cancel_token: Arc<Mutex<Option<tokio_util::sync::CancellationToken>>>,
 }
 
 impl AniMe {
@@ -46,6 +47,7 @@ impl AniMe {
             cache: AniMeConfigCached::default(),
             thread_exit: Arc::new(AtomicBool::new(false)),
             thread_running: Arc::new(AtomicBool::new(false)),
+            cancel_token: Arc::new(Mutex::new(None)),
         }
     }
 

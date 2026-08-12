@@ -13,10 +13,12 @@ use zbus::proxy::CacheProperties;
 use zbus::zvariant::OwnedObjectPath;
 use zbus::{interface, Connection};
 
+use tokio_util::sync::CancellationToken;
+
 use super::config::AniMeConfig;
 use super::AniMe;
 use crate::error::RogError;
-use crate::Reloadable;
+use crate::{CtrlTask, Reloadable};
 
 async fn get_logind_manager<'a>() -> ManagerProxy<'a> {
     let connection = Connection::system()
@@ -42,19 +44,39 @@ impl AniMeZbus {
         mut self,
         connection: &Connection,
         path: OwnedObjectPath,
+        cancel_token: CancellationToken,
     ) -> Result<(), RogError> {
-        // let task = zbus.clone();
+        *self.0.cancel_token.lock().await = Some(cancel_token.clone());
         self.reload()
             .await
             .unwrap_or_else(|err| warn!("Controller error: {}", err));
         connection
             .object_server()
-            .at(path.clone(), self)
+            .at(path.clone(), self.clone())
             .await
             .map_err(|e| {
                 error!("Couldn't add server at path: {path}, {e:?}");
                 e
             })?;
+
+        let res = async {
+            let signal_ctx = SignalEmitter::new(connection, path.clone().into_inner())?;
+            self.create_tasks(signal_ctx).await?;
+            Ok::<(), RogError>(())
+        }
+        .await;
+
+        if let Err(err) = res {
+            error!("Failed post-registration tasks for {path}: {err:?}, removing object");
+            cancel_token.cancel();
+            connection
+                .object_server()
+                .remove::<AniMeZbus, _>(&path)
+                .await
+                .ok();
+            return Err(err);
+        }
+
         debug!("start_tasks was successful");
         Ok(())
     }
@@ -306,144 +328,175 @@ impl AniMeZbus {
     }
 }
 
+/// Computes the effective display enable state and brightness according to policy precedence:
+/// 1. Master switch (`display_enabled == false`) -> Always disabled (`false, Brightness::Off`).
+/// 2. System suspend (`sleeping == true` and `off_when_suspended == true`) -> Disabled (`false, Brightness::Off`).
+/// 3. Lid closed (`lid_closed == true` and `off_when_lid_closed == true`) -> Disabled (`false, Brightness::Off`).
+/// 4. Battery / Unplugged (`power_plugged == false`):
+///    - If `off_when_unplugged == true` -> Disabled (`false, Brightness::Off`).
+///    - Else -> Enabled with `brightness_on_battery` (`true, brightness_on_battery`).
+/// 5. AC Power / Default -> Enabled with `display_brightness` (`true, display_brightness`).
+pub fn compute_effective_state(
+    config: &AniMeConfig,
+    lid_closed: bool,
+    power_plugged: bool,
+    sleeping: bool,
+) -> (bool, Brightness) {
+    if !config.display_enabled {
+        return (false, Brightness::Off);
+    }
+    if sleeping && config.off_when_suspended {
+        return (false, Brightness::Off);
+    }
+    if lid_closed && config.off_when_lid_closed {
+        return (false, Brightness::Off);
+    }
+    if !power_plugged && config.off_when_unplugged {
+        return (false, Brightness::Off);
+    }
+
+    let brightness = if power_plugged {
+        config.display_brightness
+    } else {
+        config.brightness_on_battery
+    };
+
+    if brightness == Brightness::Off {
+        (false, Brightness::Off)
+    } else {
+        (true, brightness)
+    }
+}
+
+impl AniMe {
+    pub async fn apply_effective_state(
+        &self,
+        lid_closed: bool,
+        power_plugged: bool,
+        sleeping: bool,
+        resuming: bool,
+    ) -> Result<(), RogError> {
+        let config = self.config.lock().await.clone();
+        let (enable, brightness) =
+            compute_effective_state(&config, lid_closed, power_plugged, sleeping);
+
+        self.thread_exit.store(true, Ordering::Release);
+
+        self.write_bytes(&pkt_set_brightness(brightness))
+            .await
+            .map_err(|err| warn!("apply_effective_state::brightness {}", err))
+            .ok();
+
+        self.write_bytes(&pkt_set_enable_display(enable))
+            .await
+            .map_err(|err| warn!("apply_effective_state::enable_display {}", err))
+            .ok();
+
+        if config.builtin_anims_enabled {
+            self.write_bytes(&pkt_set_enable_powersave_anim(enable))
+                .await
+                .map_err(|err| warn!("apply_effective_state::powersave_anim {}", err))
+                .ok();
+        } else if resuming && enable {
+            self.write_bytes(&pkt_set_enable_powersave_anim(false))
+                .await
+                .ok();
+            let inner = self.clone();
+            let action = self.cache.wake.clone();
+            let token = self.cancel_token.lock().await.clone();
+            let thread_exit = self.thread_exit.clone();
+            // Non-blocking wake animation task tied to CancellationToken
+            tokio::spawn(async move {
+                // allow the new animation thread to start by clearing the exit flag
+                thread_exit.store(false, Ordering::Release);
+                if let Some(token) = token {
+                    tokio::select! {
+                        _ = token.cancelled() => {
+                            debug!("AniMe wake animation task cancelled due to device removal");
+                            thread_exit.store(true, Ordering::Release);
+                        }
+                        _ = inner.run_thread(action, true) => {}
+                    }
+                } else {
+                    inner.run_thread(action, true).await;
+                }
+            });
+        }
+
+        Ok(())
+    }
+}
+
 impl crate::CtrlTask for AniMeZbus {
     fn zbus_path() -> &'static str {
-        "ANIME_ZBUS_PATH"
+        "/xyz/ljones/aura/anime"
     }
 
     async fn create_tasks(&self, _: SignalEmitter<'static>) -> Result<(), RogError> {
+        let cancel_token = match self.0.cancel_token.lock().await.clone() {
+            Some(token) => token,
+            None => {
+                error!("AniMeZbus::create_tasks failed: no CancellationToken associated with AniMe instance");
+                return Err(RogError::Zbus(
+                    zbus::fdo::Error::Failed("Missing CancellationToken".into()).into(),
+                ));
+            }
+        };
+
         let inner1 = self.0.clone();
         let inner2 = self.0.clone();
         let inner3 = self.0.clone();
         let inner4 = self.0.clone();
-        self.create_sys_event_tasks(
-            move |sleeping| {
-                // on_sleep
-                let inner = inner1.clone();
-                async move {
-                    let config = inner.config.lock().await.clone();
-                    if config.display_enabled {
-                        inner.thread_exit.store(true, Ordering::Release); // ensure clean slate
 
+        let _handles = self
+            .create_sys_event_tasks(
+                cancel_token,
+                move |sleeping: bool, lid_closed: bool, power_plugged: bool| {
+                    let inner = inner1.clone();
+                    async move {
                         inner
-                            .write_bytes(&pkt_set_enable_display(
-                                !(sleeping && config.off_when_suspended),
-                            ))
+                            .apply_effective_state(lid_closed, power_plugged, sleeping, !sleeping)
                             .await
-                            .map_err(|err| {
-                                warn!("create_sys_event_tasks::off_when_suspended {}", err);
-                            })
-                            .ok();
-
-                        if config.builtin_anims_enabled {
-                            inner
-                                .write_bytes(&pkt_set_enable_powersave_anim(
-                                    !(sleeping && config.off_when_suspended),
-                                ))
-                                .await
-                                .map_err(|err| {
-                                    warn!("create_sys_event_tasks::off_when_suspended {}", err);
-                                })
-                                .ok();
-                        } else if !sleeping && !config.builtin_anims_enabled {
-                            // Run custom wake animation
-                            inner
-                                .write_bytes(&pkt_set_enable_powersave_anim(false))
-                                .await
-                                .ok(); // ensure builtins are disabled
-
-                            inner.run_thread(inner.cache.wake.clone(), true).await;
-                        }
-                    }
-                }
-            },
-            move |shutting_down| {
-                // on_shutdown
-                let inner = inner2.clone();
-                async move {
-                    let AniMeConfig {
-                        display_enabled,
-                        builtin_anims_enabled,
-                        ..
-                    } = *inner.config.lock().await;
-                    if display_enabled && !builtin_anims_enabled {
-                        if shutting_down {
-                            inner.run_thread(inner.cache.shutdown.clone(), true).await;
-                        } else {
-                            inner.run_thread(inner.cache.boot.clone(), true).await;
-                        }
-                    }
-                }
-            },
-            move |lid_closed| {
-                let inner = inner3.clone();
-                // on lid change
-                async move {
-                    let AniMeConfig {
-                        off_when_lid_closed,
-                        builtin_anims_enabled,
-                        ..
-                    } = *inner.config.lock().await;
-                    if off_when_lid_closed {
-                        if builtin_anims_enabled {
-                            inner
-                                .write_bytes(&pkt_set_enable_powersave_anim(!lid_closed))
-                                .await
-                                .map_err(|err| {
-                                    warn!("create_sys_event_tasks::off_when_suspended {}", err);
-                                })
-                                .ok();
-                        }
-                        inner
-                            .write_bytes(&pkt_set_enable_display(!lid_closed))
-                            .await
-                            .map_err(|err| {
-                                warn!("create_sys_event_tasks::off_when_lid_closed {}", err);
-                            })
                             .ok();
                     }
-                }
-            },
-            move |power_plugged| {
-                let inner = inner4.clone();
-                // on power change
-                async move {
-                    let AniMeConfig {
-                        off_when_unplugged,
-                        builtin_anims_enabled,
-                        brightness_on_battery,
-                        ..
-                    } = *inner.config.lock().await;
-                    if off_when_unplugged {
-                        if builtin_anims_enabled {
-                            inner
-                                .write_bytes(&pkt_set_enable_powersave_anim(power_plugged))
-                                .await
-                                .map_err(|err| {
-                                    warn!("create_sys_event_tasks::off_when_suspended {}", err);
-                                })
-                                .ok();
+                },
+                move |shutting_down: bool, _lid_closed: bool, _power_plugged: bool| {
+                    let inner = inner2.clone();
+                    async move {
+                        let AniMeConfig {
+                            display_enabled,
+                            builtin_anims_enabled,
+                            ..
+                        } = *inner.config.lock().await;
+                        if display_enabled && !builtin_anims_enabled {
+                            if shutting_down {
+                                inner.run_thread(inner.cache.shutdown.clone(), true).await;
+                            } else {
+                                inner.run_thread(inner.cache.boot.clone(), true).await;
+                            }
                         }
+                    }
+                },
+                move |lid_closed: bool, power_plugged: bool| {
+                    let inner = inner3.clone();
+                    async move {
                         inner
-                            .write_bytes(&pkt_set_enable_display(power_plugged))
+                            .apply_effective_state(lid_closed, power_plugged, false, false)
                             .await
-                            .map_err(|err| {
-                                warn!("create_sys_event_tasks::off_when_unplugged {}", err);
-                            })
-                            .ok();
-                    } else {
-                        inner
-                            .write_bytes(&pkt_set_brightness(brightness_on_battery))
-                            .await
-                            .map_err(|err| {
-                                warn!("create_sys_event_tasks::off_when_unplugged {}", err);
-                            })
                             .ok();
                     }
-                }
-            },
-        )
-        .await;
+                },
+                move |power_plugged: bool, lid_closed: bool| {
+                    let inner = inner4.clone();
+                    async move {
+                        inner
+                            .apply_effective_state(lid_closed, power_plugged, false, false)
+                            .await
+                            .ok();
+                    }
+                },
+            )
+            .await;
 
         Ok(())
     }
@@ -451,61 +504,141 @@ impl crate::CtrlTask for AniMeZbus {
 
 impl crate::Reloadable for AniMeZbus {
     async fn reload(&mut self) -> Result<(), RogError> {
-        let AniMeConfig {
-            builtin_anims_enabled,
-            builtin_anims,
-            display_enabled,
-            display_brightness,
-            off_when_lid_closed,
-            off_when_unplugged,
-            ..
-        } = *self.0.config.lock().await;
+        let config = self.0.config.lock().await.clone();
 
-        // Set builtins
-        if builtin_anims_enabled {
+        if config.builtin_anims_enabled {
             self.0
                 .write_bytes(&pkt_set_builtin_animations(
-                    builtin_anims.boot,
-                    builtin_anims.awake,
-                    builtin_anims.sleep,
-                    builtin_anims.shutdown,
+                    config.builtin_anims.boot,
+                    config.builtin_anims.awake,
+                    config.builtin_anims.sleep,
+                    config.builtin_anims.shutdown,
                 ))
                 .await?;
         }
-        // Builtins enabled or na?
-        self.0
-            .set_builtins_enabled(builtin_anims_enabled, display_brightness)
-            .await?;
 
-        let manager = get_logind_manager().await;
+        let connection = match Connection::system().await {
+            Ok(c) => c,
+            Err(e) => {
+                warn!("Reloadable::reload: could not create dbus connection: {e:?}");
+                return Ok(());
+            }
+        };
+        let manager = match ManagerProxy::builder(&connection)
+            .cache_properties(CacheProperties::No)
+            .build()
+            .await
+        {
+            Ok(m) => m,
+            Err(e) => {
+                warn!("Reloadable::reload: could not create ManagerProxy: {e:?}");
+                return Ok(());
+            }
+        };
+
         let lid_closed = manager.lid_closed().await.unwrap_or_default();
         let power_plugged = manager.on_external_power().await.unwrap_or_default();
 
-        let turn_off =
-            (lid_closed && off_when_lid_closed) || (!power_plugged && off_when_unplugged);
-        self.0
-            .write_bytes(&pkt_set_enable_display(!turn_off))
-            .await
-            .map_err(|err| {
-                warn!("create_sys_event_tasks::reload {}", err);
-            })
-            .ok();
+        let (enable, brightness) =
+            compute_effective_state(&config, lid_closed, power_plugged, false);
 
-        if turn_off || !display_enabled {
-            self.0.write_bytes(&pkt_set_enable_display(false)).await?;
-            // early return so we don't run animation thread
-            return Ok(());
-        }
-
-        if !builtin_anims_enabled && !self.0.cache.boot.is_empty() {
+        if config.builtin_anims_enabled {
+            self.0.set_builtins_enabled(enable, brightness).await?;
+        } else {
             self.0
-                .write_bytes(&pkt_set_enable_powersave_anim(false))
-                .await
-                .ok();
-
-            let action = self.0.cache.boot.clone();
-            self.0.run_thread(action, true).await;
+                .apply_effective_state(lid_closed, power_plugged, false, false)
+                .await?;
         }
+
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rog_anime::usb::{pkt_set_brightness, pkt_set_enable_display, Brightness};
+
+    #[test]
+    fn test_compute_effective_state_policy_precedence_and_transitions() {
+        // Master switch disabled
+        let config_disabled = AniMeConfig {
+            display_enabled: false,
+            display_brightness: Brightness::High,
+            ..Default::default()
+        };
+        assert_eq!(
+            compute_effective_state(&config_disabled, false, true, false),
+            (false, Brightness::Off)
+        );
+
+        // Policy precedence and state transitions
+        let config = AniMeConfig {
+            display_enabled: true,
+            display_brightness: Brightness::High,
+            brightness_on_battery: Brightness::Low,
+            off_when_suspended: true,
+            off_when_lid_closed: true,
+            off_when_unplugged: true,
+            ..Default::default()
+        };
+
+        // AC, Lid open -> (true, High)
+        assert_eq!(
+            compute_effective_state(&config, false, true, false),
+            (true, Brightness::High)
+        );
+
+        // Suspend -> (false, Off)
+        assert_eq!(
+            compute_effective_state(&config, false, true, true),
+            (false, Brightness::Off)
+        );
+
+        // Lid closed -> (false, Off)
+        assert_eq!(
+            compute_effective_state(&config, true, true, false),
+            (false, Brightness::Off)
+        );
+
+        // Unplugged on battery -> (false, Off)
+        assert_eq!(
+            compute_effective_state(&config, false, false, false),
+            (false, Brightness::Off)
+        );
+    }
+
+    #[test]
+    fn test_compute_effective_state_off_when_unplugged_false_battery_low() {
+        let config = AniMeConfig {
+            display_enabled: true,
+            off_when_unplugged: false,
+            brightness_on_battery: Brightness::Low,
+            ..Default::default()
+        };
+
+        let (enable, brightness) = compute_effective_state(&config, false, false, false);
+        assert!(enable);
+        assert_eq!(brightness, Brightness::Low);
+    }
+
+    #[test]
+    fn test_compute_effective_state_brightness_on_battery_off() {
+        let config = AniMeConfig {
+            display_enabled: true,
+            off_when_unplugged: false,
+            brightness_on_battery: Brightness::Off,
+            ..Default::default()
+        };
+
+        let (enable, brightness) = compute_effective_state(&config, false, false, false);
+        assert!(!enable);
+        assert_eq!(brightness, Brightness::Off);
+
+        let bright_pkt = pkt_set_brightness(brightness);
+        assert_eq!(bright_pkt[3], 0x00); // Brightness::Off
+
+        let display_pkt = pkt_set_enable_display(enable);
+        assert_eq!(display_pkt[3], 0x80); // Disabled
     }
 }
