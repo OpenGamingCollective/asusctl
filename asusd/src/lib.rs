@@ -217,86 +217,143 @@ pub trait CtrlTask {
     /// minimal possible such as save a variable.
     fn create_sys_event_tasks<Fut1, Fut2, Fut3, Fut4, F1, F2, F3, F4>(
         &self,
+        cancel_token: tokio_util::sync::CancellationToken,
         mut on_prepare_for_sleep: F1,
         mut on_prepare_for_shutdown: F2,
         mut on_lid_change: F3,
         mut on_external_power_change: F4,
-    ) -> impl Future<Output = ()> + Send
+    ) -> impl Future<Output = Vec<tokio::task::JoinHandle<()>>> + Send
     where
-        F1: FnMut(bool) -> Fut1 + Send + 'static,
-        F2: FnMut(bool) -> Fut2 + Send + 'static,
-        F3: FnMut(bool) -> Fut3 + Send + 'static,
-        F4: FnMut(bool) -> Fut4 + Send + 'static,
+        F1: FnMut(bool, bool, bool) -> Fut1 + Send + 'static,
+        F2: FnMut(bool, bool, bool) -> Fut2 + Send + 'static,
+        F3: FnMut(bool, bool) -> Fut3 + Send + 'static,
+        F4: FnMut(bool, bool) -> Fut4 + Send + 'static,
         Fut1: Future<Output = ()> + Send,
         Fut2: Future<Output = ()> + Send,
         Fut3: Future<Output = ()> + Send,
         Fut4: Future<Output = ()> + Send,
     {
-        async {
-            let connection = Connection::system()
-                .await
-                .expect("Controller could not create dbus connection");
+        async move {
+            let connection = match Connection::system().await {
+                Ok(c) => c,
+                Err(e) => {
+                    warn!("create_sys_event_tasks: could not create dbus connection: {e:?}");
+                    return Vec::new();
+                }
+            };
 
-            let manager = ManagerProxy::builder(&connection)
+            let manager = match ManagerProxy::builder(&connection)
                 .cache_properties(CacheProperties::No)
                 .build()
                 .await
-                .expect("Controller could not create ManagerProxy");
+            {
+                Ok(m) => m,
+                Err(e) => {
+                    warn!("create_sys_event_tasks: could not create ManagerProxy: {e:?}");
+                    return Vec::new();
+                }
+            };
 
+            let token1 = cancel_token.clone();
             let manager1 = manager.clone();
-            tokio::spawn(async move {
-                if let Ok(mut notif) = manager1.receive_prepare_for_shutdown().await {
-                    while let Some(event) = notif.next().await {
-                        // blocks thread :|
-                        if let Ok(args) = event.args() {
-                            debug!("Doing on_prepare_for_shutdown({})", args.start);
-                            on_prepare_for_shutdown(args.start).await;
+            let h1 = tokio::spawn(async move {
+                match manager1.receive_prepare_for_shutdown().await {
+                    Ok(mut notif) => loop {
+                        tokio::select! {
+                            _ = token1.cancelled() => break,
+                            event = notif.next() => {
+                                match event {
+                                    Some(event) => {
+                                        if let Ok(args) = event.args() {
+                                            debug!("Doing on_prepare_for_shutdown({})", args.start);
+                                            let lid = manager1.lid_closed().await.unwrap_or_default();
+                                            let power = manager1.on_external_power().await.unwrap_or_default();
+                                            on_prepare_for_shutdown(args.start, lid, power).await;
+                                        }
+                                    }
+                                    None => break,
+                                }
+                            }
                         }
+                    },
+                    Err(e) => {
+                        warn!("create_sys_event_tasks: subscription to receive_prepare_for_shutdown failed: {e:?}");
                     }
                 }
             });
 
+            let token2 = cancel_token.clone();
             let manager2 = manager.clone();
-            tokio::spawn(async move {
-                if let Ok(mut notif) = manager2.receive_prepare_for_sleep().await {
-                    while let Some(event) = notif.next().await {
-                        // blocks thread :|
-                        if let Ok(args) = event.args() {
-                            debug!("Doing on_prepare_for_sleep({})", args.start);
-                            on_prepare_for_sleep(args.start).await;
+            let h2 = tokio::spawn(async move {
+                match manager2.receive_prepare_for_sleep().await {
+                    Ok(mut notif) => loop {
+                        tokio::select! {
+                            _ = token2.cancelled() => break,
+                            event = notif.next() => {
+                                match event {
+                                    Some(event) => {
+                                        if let Ok(args) = event.args() {
+                                            debug!("Doing on_prepare_for_sleep({})", args.start);
+                                            let lid = manager2.lid_closed().await.unwrap_or_default();
+                                            let power = manager2.on_external_power().await.unwrap_or_default();
+                                            on_prepare_for_sleep(args.start, lid, power).await;
+                                        }
+                                    }
+                                    None => break,
+                                }
+                            }
                         }
+                    },
+                    Err(e) => {
+                        warn!("create_sys_event_tasks: subscription to receive_prepare_for_sleep failed: {e:?}");
                     }
                 }
             });
 
+            let token3 = cancel_token.clone();
             let manager3 = manager.clone();
-            tokio::spawn(async move {
+            let h3 = tokio::spawn(async move {
                 let mut last_power = manager3.on_external_power().await.unwrap_or_default();
 
                 loop {
-                    if let Ok(next) = manager3.on_external_power().await {
-                        if next != last_power {
-                            last_power = next;
-                            on_external_power_change(next).await;
+                    tokio::select! {
+                        _ = token3.cancelled() => break,
+                        _ = sleep(Duration::from_secs(2)) => {
+                            if let Ok(next) = manager3.on_external_power().await {
+                                if next != last_power {
+                                    last_power = next;
+                                    let lid = manager3.lid_closed().await.unwrap_or_default();
+                                    on_external_power_change(next, lid).await;
+                                }
+                            }
                         }
                     }
-                    sleep(Duration::from_secs(2)).await;
                 }
             });
 
-            tokio::spawn(async move {
-                let mut last_lid = manager.lid_closed().await.unwrap_or_default();
-                // need to loop on these as they don't emit signals
+            let token4 = cancel_token.clone();
+            let manager4 = manager.clone();
+            let h4 = tokio::spawn(async move {
+                let mut last_lid = manager4.lid_closed().await.unwrap_or_default();
                 loop {
-                    if let Ok(next) = manager.lid_closed().await {
-                        if next != last_lid {
-                            last_lid = next;
-                            on_lid_change(next).await;
+                    tokio::select! {
+                        _ = token4.cancelled() => break,
+                        _ = sleep(Duration::from_secs(2)) => {
+                            if let Ok(next) = manager4.lid_closed().await {
+                                if next != last_lid {
+                                    last_lid = next;
+                                    let power = manager4.on_external_power().await.unwrap_or_default();
+                                    on_lid_change(next, power).await;
+                                }
+                            }
                         }
                     }
-                    sleep(Duration::from_secs(2)).await;
                 }
             });
+
+            vec![
+                h1, h2, h3, h4,
+            ]
         }
     }
 }
