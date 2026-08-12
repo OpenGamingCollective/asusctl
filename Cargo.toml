@@ -71,6 +71,7 @@ tokio = { version = "^1.53.1", default-features = false, features = [
   "rt",
   "rt-multi-thread",
 ] }
+tokio-util = "^0.7.18"
 udev = { version = "^0.9.3", features = ["mio"] }
 uhid-virt = "^0.0.8"
 zbus = "^5.18.0"
