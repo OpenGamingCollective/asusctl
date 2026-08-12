@@ -4,6 +4,7 @@ use config_traits::StdConfig;
 use log::{debug, error, info, warn};
 use rog_aura::keyboard::{AuraLaptopUsbPackets, LaptopAuraPower};
 use rog_aura::{AuraDeviceType, AuraEffect, AuraModeNum, AuraZone, LedBrightness, PowerZones};
+use tokio_util::sync::CancellationToken;
 use zbus::fdo::Error as ZbErr;
 use zbus::object_server::SignalEmitter;
 use zbus::zvariant::OwnedObjectPath;
@@ -27,22 +28,41 @@ impl AuraZbus {
     pub async fn start_tasks(
         mut self,
         connection: &Connection,
-        // _signal_ctx: SignalEmitter<'static>,
         path: OwnedObjectPath,
+        cancel_token: CancellationToken,
     ) -> Result<(), RogError> {
-        // let task = zbus.clone();
-        // let signal_ctx = signal_ctx.clone();
+        *self.0.cancel_token.lock().await = Some(cancel_token.clone());
         self.reload()
             .await
             .unwrap_or_else(|err| warn!("Controller error: {}", err));
         connection
             .object_server()
-            .at(path.clone(), self)
+            .at(path.clone(), self.clone())
             .await
-            .map_err(|e| error!("Couldn't add server at path: {path}, {e:?}"))
-            .ok();
-        // TODO: skip this until we keep handles to tasks so they can be killed
-        // task.create_tasks(signal_ctx).await
+            .map_err(|e| {
+                error!("Couldn't add server at path: {path}, {e:?}");
+                e
+            })?;
+
+        // Run post-registration steps and rollback object registration on failure
+        let res = async {
+            let signal_ctx = SignalEmitter::new(connection, path.clone().into_inner())?;
+            self.create_tasks(signal_ctx).await?;
+            Ok::<(), RogError>(())
+        }
+        .await;
+
+        if let Err(err) = res {
+            error!("Failed post-registration tasks for {path}: {err:?}, removing object");
+            cancel_token.cancel();
+            connection
+                .object_server()
+                .remove::<AuraZbus, _>(&path)
+                .await
+                .ok();
+            return Err(err);
+        }
+
         Ok(())
     }
 }
@@ -241,96 +261,80 @@ impl CtrlTask for AuraZbus {
     }
 
     async fn create_tasks(&self, _: SignalEmitter<'static>) -> Result<(), RogError> {
+        let cancel_token = match self.0.cancel_token.lock().await.clone() {
+            Some(token) => token,
+            None => {
+                error!("AuraZbus::create_tasks failed: no CancellationToken associated with Aura instance");
+                return Err(RogError::Zbus(
+                    zbus::fdo::Error::Failed("Missing CancellationToken".into()).into(),
+                ));
+            }
+        };
         let inner1 = self.0.clone();
         let inner3 = self.0.clone();
-        self.create_sys_event_tasks(
-            move |sleeping| {
-                let inner1 = inner1.clone();
-                // unwrap as we want to bomb out of the task
-                async move {
-                    if !sleeping {
-                        info!("CtrlKbdLedTask reloading brightness and modes");
-                        if let Some(backlight) = &inner1.backlight {
-                            backlight
-                                .lock()
+        let _handles = self
+            .create_sys_event_tasks(
+                cancel_token,
+                move |sleeping: bool, _lid_closed: bool, _power_plugged: bool| {
+                    let inner1 = inner1.clone();
+                    // unwrap as we want to bomb out of the task
+                    async move {
+                        if !sleeping {
+                            info!("CtrlKbdLedTask reloading brightness and modes");
+                            if let Some(backlight) = &inner1.backlight {
+                                backlight
+                                    .lock()
+                                    .await
+                                    .set_brightness(inner1.config.lock().await.brightness.into())
+                                    .map_err(|e| {
+                                        error!("CtrlKbdLedTask: {e}");
+                                        e
+                                    })
+                                    .unwrap();
+                            }
+                            let mut config = inner1.config.lock().await;
+                            inner1
+                                .write_current_config_mode(&mut config)
                                 .await
-                                .set_brightness(inner1.config.lock().await.brightness.into())
+                                .map_err(|e| {
+                                    error!("CtrlKbdLedTask: {e}");
+                                    e
+                                })
+                                .unwrap();
+                        } else if sleeping {
+                            inner1
+                                .update_config()
+                                .await
                                 .map_err(|e| {
                                     error!("CtrlKbdLedTask: {e}");
                                     e
                                 })
                                 .unwrap();
                         }
-                        let mut config = inner1.config.lock().await;
-                        inner1
-                            .write_current_config_mode(&mut config)
-                            .await
-                            .map_err(|e| {
-                                error!("CtrlKbdLedTask: {e}");
-                                e
-                            })
-                            .unwrap();
-                    } else if sleeping {
-                        inner1
-                            .update_config()
-                            .await
-                            .map_err(|e| {
-                                error!("CtrlKbdLedTask: {e}");
-                                e
-                            })
-                            .unwrap();
                     }
-                }
-            },
-            move |_shutting_down| {
-                let inner3 = inner3.clone();
-                async move {
-                    info!("CtrlKbdLedTask reloading brightness and modes");
-                    if let Some(backlight) = &inner3.backlight {
-                        // unwrap as we want to bomb out of the task
-                        backlight
-                            .lock()
-                            .await
-                            .set_brightness(inner3.config.lock().await.brightness.into())
-                            .map_err(|e| {
-                                error!("CtrlKbdLedTask: {e}");
-                                e
-                            })
-                            .unwrap();
+                },
+                move |_shutting_down: bool, _lid_closed: bool, _power_plugged: bool| {
+                    let inner3 = inner3.clone();
+                    async move {
+                        info!("CtrlKbdLedTask reloading brightness and modes");
+                        if let Some(backlight) = &inner3.backlight {
+                            // unwrap as we want to bomb out of the task
+                            backlight
+                                .lock()
+                                .await
+                                .set_brightness(inner3.config.lock().await.brightness.into())
+                                .map_err(|e| {
+                                    error!("CtrlKbdLedTask: {e}");
+                                    e
+                                })
+                                .unwrap();
+                        }
                     }
-                }
-            },
-            move |_lid_closed| {
-                // on lid change
-                async move {}
-            },
-            move |_power_plugged| {
-                // power change
-                async move {}
-            },
-        )
-        .await;
-
-        // let ctrl2 = self.0.clone();
-        // let ctrl = self.0.lock().await;
-        // if ctrl.led_node.has_brightness_control() {
-        //     let watch = ctrl.led_node.monitor_brightness()?;
-        //     tokio::spawn(async move {
-        //         let mut buffer = [0; 32];
-        //         watch
-        //             .into_event_stream(&mut buffer)
-        //             .unwrap()
-        //             .for_each(|_| async {
-        //                 if let Some(lock) = ctrl2.try_lock() {
-        //                     load_save(true, lock).unwrap(); // unwrap as we want
-        //                                                     // to
-        //                                                     // bomb out of the
-        //                                                     // task
-        //                 }
-        //             })
-        //             .await;
-        //     });
-        // }
+                },
+                move |_lid_closed: bool, _power_plugged: bool| async move {},
+                move |_power_plugged: bool, _lid_closed: bool| async move {},
+            )
+            .await;
 
         Ok(())
     }

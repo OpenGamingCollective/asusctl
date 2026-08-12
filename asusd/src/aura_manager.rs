@@ -13,6 +13,7 @@ use mio::{Events, Interest, Poll, Token};
 use rog_platform::error::PlatformError;
 use rog_platform::hid_raw::HidRaw;
 use tokio::sync::Mutex;
+use tokio_util::sync::CancellationToken;
 use udev::{Device, MonitorBuilder};
 use zbus::zvariant::{ObjectPath, OwnedObjectPath};
 use zbus::Connection;
@@ -93,6 +94,7 @@ pub struct AsusDevice {
     device: DeviceHandle,
     dbus_path: OwnedObjectPath,
     hid_key: Option<String>,
+    cancel_token: CancellationToken,
 }
 
 pub struct DeviceManager {
@@ -197,6 +199,7 @@ impl DeviceManager {
                                         device: dev_type,
                                         dbus_path: path,
                                         hid_key: Some(hid_key.clone()),
+                                        cancel_token: CancellationToken::new(),
                                     });
                                 }
                             }
@@ -212,8 +215,9 @@ impl DeviceManager {
                                 let path =
                                     dbus_path_for_dev(&usb_device).unwrap_or(dbus_path_for_anime());
                                 let ctrl = AniMeZbus::new(anime);
+                                let cancel_token = CancellationToken::new();
                                 if ctrl
-                                    .start_tasks(connection, path.clone())
+                                    .start_tasks(connection, path.clone(), cancel_token.clone())
                                     .await
                                     .map_err(|e| {
                                         error!("Failed to start AniMe tasks: {e:?}, not adding this device")
@@ -224,6 +228,7 @@ impl DeviceManager {
                                         device: dev_type,
                                         dbus_path: path,
                                         hid_key: Some(hid_key.clone()),
+                                        cancel_token,
                                     });
                                 }
                             }
@@ -239,8 +244,9 @@ impl DeviceManager {
                                 let path =
                                     dbus_path_for_dev(&usb_device).unwrap_or(dbus_path_for_tuf());
                                 let ctrl = AuraZbus::new(aura);
+                                let cancel_token = CancellationToken::new();
                                 if ctrl
-                                    .start_tasks(connection, path.clone())
+                                    .start_tasks(connection, path.clone(), cancel_token.clone())
                                     .await
                                     .map_err(|e| {
                                         error!("Failed to start Aura tasks: {e:?}, not adding this device")
@@ -251,6 +257,7 @@ impl DeviceManager {
                                         device: dev_type,
                                         dbus_path: path,
                                         hid_key: Some(hid_key),
+                                        cancel_token,
                                     });
                                 }
                             }
@@ -342,6 +349,7 @@ impl DeviceManager {
                                     device: dev_type,
                                     dbus_path: path,
                                     hid_key: None,
+                                    cancel_token: CancellationToken::new(),
                                 });
                             }
                         }
@@ -433,6 +441,7 @@ impl DeviceManager {
                             device: dev_type,
                             dbus_path: path,
                             hid_key: None,
+                            cancel_token: CancellationToken::new(),
                         });
                     }
                 }
@@ -447,8 +456,9 @@ impl DeviceManager {
                 if let DeviceHandle::AniMe(anime) = dev_type.clone() {
                     let path = dbus_path_for_anime();
                     let ctrl = AniMeZbus::new(anime);
+                    let cancel_token = CancellationToken::new();
                     if ctrl
-                        .start_tasks(connection, path.clone())
+                        .start_tasks(connection, path.clone(), cancel_token.clone())
                         .await
                         .map_err(|e| error!("Failed to start tasks: {e:?}, not adding this device"))
                         .is_ok()
@@ -457,6 +467,7 @@ impl DeviceManager {
                             device: dev_type,
                             dbus_path: path,
                             hid_key: None,
+                            cancel_token,
                         });
                     }
                 }
@@ -480,8 +491,9 @@ impl DeviceManager {
                     if let DeviceHandle::Aura(aura) = dev_type.clone() {
                         let path = dbus_path_for_tuf();
                         let ctrl = AuraZbus::new(aura);
+                        let cancel_token = CancellationToken::new();
                         if ctrl
-                            .start_tasks(connection, path.clone())
+                            .start_tasks(connection, path.clone(), cancel_token.clone())
                             .await
                             .map_err(|e| {
                                 error!(
@@ -494,6 +506,7 @@ impl DeviceManager {
                                 device: dev_type,
                                 dbus_path: path,
                                 hid_key: None,
+                                cancel_token,
                             });
                         }
                     }
@@ -578,6 +591,7 @@ impl DeviceManager {
                                     };
                                     info!("removing: {path:?}");
                                     let dev = devices.lock().await.remove(index);
+                                    dev.cancel_token.cancel();
                                     let path = path.clone();
                                     if let DeviceHandle::Scsi(_) = dev.device {
                                         conn_copy
@@ -597,7 +611,35 @@ impl DeviceManager {
                                         devices.lock().await.append(&mut vec![new_devs]);
                                     }
                                 }
-                            };
+                            }
+                        }
+
+                        if subsys == "usb" && action == "remove" {
+                            let removals: Vec<usize> = devices
+                                .lock()
+                                .await
+                                .iter()
+                                .enumerate()
+                                .filter_map(|(i, dev)| {
+                                    if dev.dbus_path == dbus_path_for_anime()
+                                        && matches!(dev.device, DeviceHandle::AniMe(_))
+                                    {
+                                        Some(i)
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect();
+                            for index in removals.iter().rev() {
+                                let dev = devices.lock().await.remove(*index);
+                                dev.cancel_token.cancel();
+                                let path = dev.dbus_path.clone();
+                                let res = conn_copy
+                                    .object_server()
+                                    .remove::<AniMeZbus, _>(&path)
+                                    .await;
+                                info!("AuraManager removed USB AniMe: {path:?}, {res:?}");
+                            }
                         }
 
                         if subsys == "hidraw" {
@@ -638,6 +680,7 @@ impl DeviceManager {
                                     // Iter in reverse so as to not screw up indexing
                                     for index in removals.iter().rev() {
                                         let dev = devices.lock().await.remove(*index);
+                                        dev.cancel_token.cancel();
                                         let path = dev.dbus_path.clone();
                                         let res = match dev.device {
                                             DeviceHandle::Aura(_) => {

@@ -204,6 +204,7 @@ impl DeviceHandle {
             hid: device,
             backlight,
             config: Arc::new(Mutex::new(config)),
+            cancel_token: Arc::new(Mutex::new(None)),
         };
         aura.do_initialization().await?;
         Ok(Self::Aura(aura))

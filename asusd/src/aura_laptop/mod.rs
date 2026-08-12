@@ -20,6 +20,7 @@ pub struct Aura {
     pub hid: Option<Arc<Mutex<HidRaw>>>,
     pub backlight: Option<Arc<Mutex<KeyboardBacklight>>>,
     pub config: Arc<Mutex<AuraConfig>>,
+    pub cancel_token: Arc<Mutex<Option<tokio_util::sync::CancellationToken>>>,
 }
 
 impl Aura {
