@@ -613,7 +613,19 @@ pub async fn start_attributes_zbus(
                 "Skipping attribute '{}' due to reload error: {e:?}",
                 attr.attr.name()
             );
-            break;
+            // Self-heal: drop the failing key from persisted config so
+            // successive boots converge instead of accumulating dead
+            // entries that re-trigger the same reload failure. Fixes #132.
+            let key: FirmwareAttribute = attr.attr.name().into();
+            let mut cfg = config.lock().await;
+            if cfg.armoury_settings.remove(&key).is_some() {
+                cfg.write();
+                info!(
+                    "Dropped unappliable persisted value for '{}' after reload error",
+                    attr.attr.name()
+                );
+            }
+            continue;
         }
 
         let attr_name = attr.attribute_name();

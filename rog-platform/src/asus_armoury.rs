@@ -352,7 +352,13 @@ define_attribute_getters!(
 
         apu_mem: Norestore,
 
-        charge_mode: Immediate,
+        // charge_mode is kernel-side read-only: the asus-armoury driver
+        // declares it via ASUS_ATTR_GROUP_ENUM_INT_RO and exposes a 0444
+        // sysfs node with no store handler. It is a status mirror of the
+        // firmware's current charging state, not a control. Any write
+        // attempt returns EACCES even as root, and previously that error
+        // aborted attribute registration on the DBus interface (#132).
+        charge_mode: ReadOnly,
     }
 );
 
