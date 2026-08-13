@@ -29,10 +29,10 @@ pub const fn report_id(slash_type: SlashType) -> u8 {
         SlashType::GA403_2024 => REPORT_ID_193B,
         SlashType::GA605_2025 => REPORT_ID_19B6,
         SlashType::GA605_2024 => REPORT_ID_19B6,
+        SlashType::GU405_2026 => REPORT_ID_19B6,
         SlashType::GU605_2025 => REPORT_ID_19B6,
         SlashType::GU605_2024 => REPORT_ID_193B,
         SlashType::GU606_2026 => REPORT_ID_19B6,
-        SlashType::GU405_2026 => REPORT_ID_19B6,
         SlashType::G614_2025 => REPORT_ID_19B6,
         SlashType::Unsupported => REPORT_ID_19B6,
     }
