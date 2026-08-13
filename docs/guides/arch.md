@@ -217,7 +217,7 @@ Install that package, put your laptop in Setup Mode > Advanced Mode (F7) > Secur
 
 ```bash
 sudo sbctl create-keys
-sudo sbctl enroll-keys -m
+sudo sbctl enroll-keys --microsoft
 ```
 
 ##### Grub bootloader
