@@ -50,12 +50,6 @@ Before adding the repo you need to add the repo sign key to your pacman-key. Run
 # Ayush key
 sudo pacman-key --recv-keys F79100EF8C802DAB81C323BB8EEA5962FE510E19
 sudo pacman-key --lsign-key F79100EF8C802DAB81C323BB8EEA5962FE510E19
-
-# dragoon keys
-sudo pacman-key --recv-keys 8F654886F17D497FEFE3DB448B15A6B0E9A3FA35
-sudo pacman-key --finger 8F654886F17D497FEFE3DB448B15A6B0E9A3FA35
-sudo pacman-key --lsign-key 8F654886F17D497FEFE3DB448B15A6B0E9A3FA35
-sudo pacman-key --finger 8F654886F17D497FEFE3DB448B15A6B0E9A3FA35
 ```
 
 This should show output similar to this:
@@ -68,8 +62,8 @@ This should show output similar to this:
 If you still have problems you can do it the less proper way by running those commands
 
 ```bash
-wget "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x8b15a6b0e9a3fa35" -O g14.sec
-sudo pacman-key -a g14.sec
+wget "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x8b15a6b0e9a3fa35" -O ogc.sec
+sudo pacman-key -a ogc.sec
 ```
 
 After that to get the repo add to your `/etc/pacman.conf` at the end:
@@ -77,13 +71,6 @@ After that to get the repo add to your `/etc/pacman.conf` at the end:
 ```bash
 [ogc]
 Server = https://pacman.opengamingcollective.org
-```
-
-You could use a mirror instead if the origin has slow connection. Following is a list of available servers:
-
-```bash
-https://arch.asus-linux.org # Main site
-https://naru.jhyub.dev/$repo # Republic of Korea (currently out-of-sync)
 ```
 
 Once done you can then install from there asusctl, rog-control-center and the kernel. After adding the repo run a full system update before you go to install tools from the repo:
