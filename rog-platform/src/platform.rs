@@ -154,18 +154,107 @@ pub enum PlatformProfile {
 }
 
 impl PlatformProfile {
+    /// Cycle order. `Custom` is excluded, it never appears in
+    /// `platform_profile_choices`.
+    const CYCLE_ORDER: [Self; 4] = [
+        Self::Balanced,
+        Self::Performance,
+        Self::Quiet,
+        Self::LowPower,
+    ];
+
+    /// Next profile to cycle to, limited to what the kernel offers. Laptops
+    /// with only balanced and performance used to get Quiet here and fail.
     pub fn next(current: Self, choices: &[Self]) -> Self {
-        match current {
-            Self::Balanced => Self::Performance,
-            Self::Performance => {
-                if choices.contains(&Self::LowPower) {
-                    Self::LowPower
-                } else {
-                    Self::Quiet
-                }
-            }
-            Self::Quiet | Self::LowPower | Self::Custom => Self::Balanced,
+        let available: Vec<Self> = Self::CYCLE_ORDER
+            .iter()
+            .copied()
+            .filter(|p| choices.contains(p))
+            .collect();
+
+        if available.is_empty() {
+            // Nothing reported, keep the old behaviour.
+            return match current {
+                Self::Balanced => Self::Performance,
+                Self::Performance => Self::Quiet,
+                Self::Quiet | Self::LowPower | Self::Custom => Self::Balanced,
+            };
         }
+
+        match available.iter().position(|p| *p == current) {
+            Some(idx) => available[(idx + 1) % available.len()],
+            // Not in the cycle (e.g. Custom): start over.
+            None => available[0],
+        }
+    }
+}
+
+#[cfg(test)]
+mod platform_profile_tests {
+    use super::PlatformProfile;
+
+    #[test]
+    fn cycles_only_through_available_profiles() {
+        // Only balanced + performance, as on the GU606AX.
+        let choices = [
+            PlatformProfile::Balanced,
+            PlatformProfile::Performance,
+        ];
+        assert_eq!(
+            PlatformProfile::next(PlatformProfile::Balanced, &choices),
+            PlatformProfile::Performance
+        );
+        // Was Quiet before, which this hardware doesn't have.
+        assert_eq!(
+            PlatformProfile::next(PlatformProfile::Performance, &choices),
+            PlatformProfile::Balanced
+        );
+    }
+
+    #[test]
+    fn cycles_through_low_power_when_offered() {
+        let choices = [
+            PlatformProfile::Balanced,
+            PlatformProfile::Performance,
+            PlatformProfile::LowPower,
+        ];
+        assert_eq!(
+            PlatformProfile::next(PlatformProfile::Performance, &choices),
+            PlatformProfile::LowPower
+        );
+        assert_eq!(
+            PlatformProfile::next(PlatformProfile::LowPower, &choices),
+            PlatformProfile::Balanced
+        );
+    }
+
+    #[test]
+    fn cycles_through_quiet_on_older_kernels() {
+        let choices = [
+            PlatformProfile::Balanced,
+            PlatformProfile::Performance,
+            PlatformProfile::Quiet,
+        ];
+        assert_eq!(
+            PlatformProfile::next(PlatformProfile::Performance, &choices),
+            PlatformProfile::Quiet
+        );
+        assert_eq!(
+            PlatformProfile::next(PlatformProfile::Quiet, &choices),
+            PlatformProfile::Balanced
+        );
+    }
+
+    #[test]
+    fn unknown_current_profile_restarts_the_cycle() {
+        let choices = [
+            PlatformProfile::Balanced,
+            PlatformProfile::Performance,
+        ];
+        assert_eq!(
+            PlatformProfile::next(PlatformProfile::Custom, &choices),
+            PlatformProfile::Balanced
+        );
     }
 }
 
