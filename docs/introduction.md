@@ -72,7 +72,7 @@ Due to display signal routing on Asus ROG laptops, and the setup process dealing
 
 ### Disable nouveau
 
-You might encounter the issue about nouveau crashing the installation: this can be solved by adding a boot parameter `modprobe.blacklist=nouveau` to the kernel cmdline before booting the installation media. To edit the installation media boot entry just press e on it and then put the blacklist parameter at the end off all parameters. Example:
+You might encounter the issue about nouveau crashing the installation: this can be solved by adding the boot parameters `rd.driver.blacklist=nouveau,nova_core modprobe.blacklist=nouveau,nova_core` to the kernel cmdline before booting the installation media. To edit the installation media boot entry just press e on it and then put the blacklist parameters at the end of all parameters. Example:
 
 ![GRUB entry with Nouveau disabled](assets/guides/shared/nouveau-grub.png)
 
