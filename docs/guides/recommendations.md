@@ -18,13 +18,22 @@ This rule applies to almost the entire project, but rogcc runs on Wayland;
 
 Read docs for more details: [PPD Documentation](https://gitlab.gnome.org/Infrastructure/Mirrors/lorry-mirrors/gitlab_freedesktop_org/hadess/power-profiles-daemon)
 
-If you followed any guide, you should have daemon power profiles, which have two functions that are disabled by default: Panel power savings and AMDGPU Dynamic power management. These are dedicated to AMD iGPU, and you must follow these steps:
+If you followed any guide, you should have daemon power profiles, which have two functions that are disabled by default: Panel power savings and AMDGPU Dynamic power management. These actions apply only to laptops with integrated Radeon graphics. Check which of them are available on your device:
+
+```bash
+powerprofilesctl list-actions
+```
+
+Only enable the actions that are shown as available in the output, following the steps below.
 
 ### Panel power savings
 
 ```bash
 powerprofilesctl configure-action amdgpu_panel_power --enable
 ```
+
+> [!NOTE]
+> `amdgpu_panel_power` only takes effect while running on battery, and only with the balanced or power-saver profile active.
 
 Check if it is working:
 
@@ -39,6 +48,9 @@ This option should be above 0, It just dims the screen a little to save battery 
 ```bash
 powerprofilesctl configure-action amdgpu_dpm --enable
 ```
+
+> [!NOTE]
+> `amdgpu_dpm` lowers the clocks only under the power-saver profile. Select the power-saver profile (e.g. `powerprofilesctl set power-saver`) before expecting `power_dpm_force_performance_level` to report low.
 
 Check if it is working:
 
@@ -55,7 +67,7 @@ This option is the most important, because in battery it needs to say low. With 
 
 You can enable audio powersaving features:
 
-```bash
+```conf
 /etc/modprobe.d/audio.conf
 
 # enable audio power savings
