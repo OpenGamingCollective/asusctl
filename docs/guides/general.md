@@ -36,6 +36,6 @@ Before starting your adventure, make sure your distro is:
 - updated, utilizing Kernel version >= 6.19
 - installed with GPU drivers
 - remove any distro provided methods of graphics switching (like supergfxd, envycontrol)
-- reboot
+- reboot after removing the conflicting graphics-switching tools
 
 For dGPU control, look into [Cardwire](https://opengamingcollective.github.io/cardwire/).
