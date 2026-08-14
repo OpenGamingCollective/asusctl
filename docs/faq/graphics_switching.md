@@ -1,4 +1,4 @@
-# Graphics & Switchting
+# Graphics & Switching
 
 ## Contents
 
