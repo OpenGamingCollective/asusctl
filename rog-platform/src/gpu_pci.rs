@@ -155,6 +155,40 @@ pub fn is_display_class(pci_class: &str) -> bool {
     u32::from_str_radix(pci_class, 16).is_ok_and(|class| class >> 16 == 0x03)
 }
 
+fn read_hwmon_temp(dir: &Path) -> Option<f32> {
+    fs::read_to_string(dir.join("temp1_input"))
+        .ok()?
+        .trim()
+        .parse::<f32>()
+        .ok()
+        .map(|t| t / 1000.0)
+}
+
+fn read_drm_busy(dir: &Path) -> Option<f32> {
+    fs::read_to_string(dir.join("device/gpu_busy_percent"))
+        .or_else(|_| fs::read_to_string(dir.join("gpu_busy_percent")))
+        .ok()?
+        .trim()
+        .parse::<f32>()
+        .ok()
+}
+
+fn read_nvml_temp() -> Option<f32> {
+    let nvml = nvml_wrapper::Nvml::init().ok()?;
+    let device = nvml.device_by_index(0).ok()?;
+    let temp = device
+        .temperature(nvml_wrapper::enum_wrappers::device::TemperatureSensor::Gpu)
+        .ok()?;
+    Some(temp as f32)
+}
+
+fn read_nvml_usage() -> Option<f32> {
+    let nvml = nvml_wrapper::Nvml::init().ok()?;
+    let device = nvml.device_by_index(0).ok()?;
+    let rates = device.utilization_rates().ok()?;
+    Some(rates.gpu as f32)
+}
+
 // --- Device ---
 
 /// A PCI GPU device.
@@ -183,18 +217,8 @@ impl Device {
 
     /// Read a file underneath the sys object.
     fn read_file(path: PathBuf) -> Result<String> {
-        let path = path
-            .canonicalize()
-            .map_err(|e| PlatformError::Read(path.to_string_lossy().to_string(), e))?;
-        let mut data = String::new();
-        let mut file = fs::OpenOptions::new()
-            .read(true)
-            .open(&path)
-            .map_err(|e| PlatformError::Read(path.to_string_lossy().to_string(), e))?;
-        trace!("read_file: {file:?}");
-        file.read_to_string(&mut data)
-            .map_err(|e| PlatformError::Read(path.to_string_lossy().to_string(), e))?;
-        Ok(data)
+        fs::read_to_string(&path)
+            .map_err(|e| PlatformError::Read(path.to_string_lossy().to_string(), e))
     }
 
     /// Read the runtime power status from sysfs.
@@ -224,14 +248,10 @@ impl Device {
         }
 
         // 1. Direct hwmon directory under device path
-        let hwmon_dir = self.dev_path.join("hwmon");
-        if let Ok(entries) = fs::read_dir(&hwmon_dir) {
+        if let Ok(entries) = fs::read_dir(self.dev_path.join("hwmon")) {
             for entry in entries.flatten() {
-                let temp_path = entry.path().join("temp1_input");
-                if let Ok(temp_str) = fs::read_to_string(temp_path) {
-                    if let Ok(temp_val) = temp_str.trim().parse::<f32>() {
-                        return Some(temp_val / 1000.0);
-                    }
+                if let Some(temp) = read_hwmon_temp(&entry.path()) {
+                    return Some(temp);
                 }
             }
         }
@@ -246,11 +266,8 @@ impl Device {
                         || p.starts_with(&self.dev_path)
                 });
                 if is_match {
-                    let temp_path = path.join("temp1_input");
-                    if let Ok(temp_str) = fs::read_to_string(temp_path) {
-                        if let Ok(temp_val) = temp_str.trim().parse::<f32>() {
-                            return Some(temp_val / 1000.0);
-                        }
+                    if let Some(temp) = read_hwmon_temp(&path) {
+                        return Some(temp);
                     }
                 }
             }
@@ -258,14 +275,8 @@ impl Device {
 
         // 3. Fallback to NVML if this is an NVIDIA device and hwmon is not available
         if self.pci_id.to_uppercase().starts_with(NVIDIA_PCI_VENDOR) {
-            if let Ok(nvml) = nvml_wrapper::Nvml::init() {
-                if let Ok(device) = nvml.device_by_index(0) {
-                    if let Ok(temp) = device
-                        .temperature(nvml_wrapper::enum_wrappers::device::TemperatureSensor::Gpu)
-                    {
-                        return Some(temp as f32);
-                    }
-                }
+            if let Some(temp) = read_nvml_temp() {
+                return Some(temp);
             }
         }
 
@@ -285,26 +296,15 @@ impl Device {
         }
 
         // 1. Direct gpu_busy_percent under device path
-        let direct_busy = self.dev_path.join("gpu_busy_percent");
-        if direct_busy.exists() {
-            if let Ok(val_str) = fs::read_to_string(direct_busy) {
-                if let Ok(val) = val_str.trim().parse::<f32>() {
-                    return Some(val);
-                }
-            }
+        if let Some(busy) = read_drm_busy(&self.dev_path) {
+            return Some(busy);
         }
 
         // 2. DRM card directories under device path
-        let drm_dir = self.dev_path.join("drm");
-        if let Ok(entries) = fs::read_dir(&drm_dir) {
+        if let Ok(entries) = fs::read_dir(self.dev_path.join("drm")) {
             for entry in entries.flatten() {
-                let busy_path = entry.path().join("device/gpu_busy_percent");
-                if busy_path.exists() {
-                    if let Ok(val_str) = fs::read_to_string(busy_path) {
-                        if let Ok(val) = val_str.trim().parse::<f32>() {
-                            return Some(val);
-                        }
-                    }
+                if let Some(busy) = read_drm_busy(&entry.path()) {
+                    return Some(busy);
                 }
             }
         }
@@ -319,13 +319,8 @@ impl Device {
                         || p.starts_with(&self.dev_path)
                 });
                 if is_match {
-                    let busy_path = path.join("device/gpu_busy_percent");
-                    if busy_path.exists() {
-                        if let Ok(val_str) = fs::read_to_string(busy_path) {
-                            if let Ok(val) = val_str.trim().parse::<f32>() {
-                                return Some(val);
-                            }
-                        }
+                    if let Some(busy) = read_drm_busy(&path) {
+                        return Some(busy);
                     }
                 }
             }
@@ -333,12 +328,8 @@ impl Device {
 
         // 4. Fallback to NVML if this is an NVIDIA device and DRM busy is not available
         if self.pci_id.to_uppercase().starts_with(NVIDIA_PCI_VENDOR) {
-            if let Ok(nvml) = nvml_wrapper::Nvml::init() {
-                if let Ok(device) = nvml.device_by_index(0) {
-                    if let Ok(rates) = device.utilization_rates() {
-                        return Some(rates.gpu as f32);
-                    }
-                }
+            if let Some(usage) = read_nvml_usage() {
+                return Some(usage);
             }
         }
 
@@ -488,39 +479,25 @@ fn lscpi(vendor_device: &str) -> Result<String> {
 pub fn find_connected_displays(gpu_path: &Path) -> Result<Vec<String>> {
     let drm_path = gpu_path.join("drm");
 
-    // Find card directory (card0 or card1)
     let card_dir = drm_path
         .read_dir()
         .map_err(|e| PlatformError::Read(drm_path.to_string_lossy().to_string(), e))?
-        .find_map(|entry| {
-            let entry = entry.ok()?;
-            let name = entry.file_name().into_string().ok()?;
-            if name.starts_with("card") {
-                Some(entry.path())
-            } else {
-                None
-            }
-        })
+        .flatten()
+        .find(|entry| entry.file_name().to_string_lossy().starts_with("card"))
+        .map(|entry| entry.path())
         .ok_or(PlatformError::NotSupported)?;
 
-    // Collect display names
-    let displays: Vec<String> = card_dir
+    let displays = card_dir
         .read_dir()
         .map_err(|e| PlatformError::Read(card_dir.to_string_lossy().to_string(), e))?
+        .flatten()
         .filter_map(|entry| {
-            let entry = entry.ok()?;
             let name = entry.file_name().into_string().ok()?;
-
-            if name.contains('-') {
-                // Check connection status
-                let status_path = entry.path().join("status");
-                let status = fs::read_to_string(status_path).ok()?;
-
-                if status.trim() == "connected" {
-                    name.split_once('-').map(|(_, display)| display.to_string())
-                } else {
-                    None
-                }
+            if name.contains('-')
+                && fs::read_to_string(entry.path().join("status"))
+                    .is_ok_and(|status| status.trim() == "connected")
+            {
+                name.split_once('-').map(|(_, display)| display.to_string())
             } else {
                 None
             }
@@ -539,48 +516,37 @@ pub fn find_connected_displays(gpu_path: &Path) -> Result<Vec<String>> {
 /// 2. Direct PCI device detection (if dGPU devices are found)
 /// 3. ASUS gpu_mux_mode attribute
 pub fn get_gpu_power_status() -> GfxPower {
-    if asus_dgpu_disable_exists() {
-        if let Ok(disabled) = asus_dgpu_disabled() {
-            if disabled {
-                return GfxPower::AsusDisabled;
-            }
-        }
+    if asus_dgpu_disabled().unwrap_or(false) {
+        return GfxPower::AsusDisabled;
     }
 
-    let devices = Device::find().unwrap_or_default();
-
-    if let Some(dgpu) = devices.iter().find(|d| d.is_dgpu()) {
+    if let Some(dgpu) = Device::find()
+        .ok()
+        .and_then(|devs| devs.into_iter().find(|d| d.is_dgpu()))
+    {
         return dgpu.get_runtime_status().unwrap_or(GfxPower::Unknown);
     }
 
-    // No dGPU devices found — check the MUX attribute
-    if asus_gpu_mux_exists() {
-        if let Ok(discreet) = asus_gpu_mux_discreet() {
-            if discreet {
-                return GfxPower::AsusMuxDiscreet;
-            }
-        }
+    if asus_gpu_mux_discreet().unwrap_or(false) {
+        return GfxPower::AsusMuxDiscreet;
     }
 
     GfxPower::Unknown
 }
 
 fn lookup_amdgpu_name(device_id: &str, revision: &str) -> Option<String> {
-    if let Ok(content) = std::fs::read_to_string("/usr/share/libdrm/amdgpu.ids") {
-        for line in content.lines() {
-            let line = line.trim();
-            if line.starts_with('#') || line.is_empty() {
-                continue;
-            }
-            let parts: Vec<&str> = line.split(',').collect();
-            if parts.len() >= 3 {
-                let d_id = parts[0].trim().to_lowercase();
-                let r_id = parts[1].trim().to_lowercase();
-                let name = parts[2].trim().to_string();
-                if d_id == device_id && r_id == revision && !name.is_empty() {
-                    return Some(name);
-                }
-            }
+    let content = fs::read_to_string("/usr/share/libdrm/amdgpu.ids").ok()?;
+    for line in content.lines().map(str::trim) {
+        if line.starts_with('#') || line.is_empty() {
+            continue;
+        }
+        let parts: Vec<&str> = line.split(',').map(str::trim).collect();
+        if parts.len() >= 3
+            && parts[0].eq_ignore_ascii_case(device_id)
+            && parts[1].eq_ignore_ascii_case(revision)
+            && !parts[2].is_empty()
+        {
+            return Some(parts[2].to_string());
         }
     }
     None
@@ -657,124 +623,41 @@ pub fn get_gpu_names() -> (String, String) {
 }
 
 pub fn get_igpu_temp() -> f32 {
-    let devices = Device::find().unwrap_or_default();
-    if let Some(igpu) = devices.iter().find(|d| !d.is_dgpu()) {
-        if let Some(temp) = igpu.get_temp() {
-            return temp;
-        }
-    }
-    if let Ok(entries) = std::fs::read_dir("/sys/class/hwmon") {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if let Ok(name) = std::fs::read_to_string(path.join("name")) {
-                let name = name.trim();
-                if name == "amdgpu"
-                    || name == "i915"
-                    || name == "xe"
-                    || name == "k10temp"
-                    || name == "coretemp"
-                {
-                    if let Ok(temp_str) = std::fs::read_to_string(path.join("temp1_input")) {
-                        if let Ok(temp_val) = temp_str.trim().parse::<f32>() {
-                            return temp_val / 1000.0;
-                        }
-                    }
-                }
-            }
-        }
-    }
-    -1.0
+    Device::find()
+        .ok()
+        .and_then(|devs| devs.into_iter().find(|d| !d.is_dgpu()))
+        .and_then(|d| d.get_temp())
+        .unwrap_or(-1.0)
 }
 
 pub fn get_igpu_usage_pct() -> f32 {
-    let devices = Device::find().unwrap_or_default();
-    if let Some(igpu) = devices.iter().find(|d| !d.is_dgpu()) {
-        if let Some(usage) = igpu.get_usage_pct() {
-            return usage;
-        }
-    }
-    if let Ok(entries) = std::fs::read_dir("/sys/class/drm") {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            let name = path
-                .file_name()
-                .map(|n| n.to_string_lossy().into_owned())
-                .unwrap_or_default();
-            if name.starts_with("card") {
-                let busy_path = path.join("device/gpu_busy_percent");
-                if busy_path.exists() {
-                    if let Ok(vendor_str) = std::fs::read_to_string(path.join("device/vendor")) {
-                        let vendor = vendor_str.trim();
-                        if vendor == "0x1002" || vendor == "0x8086" {
-                            if let Ok(val_str) = std::fs::read_to_string(busy_path) {
-                                if let Ok(val) = val_str.trim().parse::<f32>() {
-                                    return val;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    -1.0
+    Device::find()
+        .ok()
+        .and_then(|devs| devs.into_iter().find(|d| !d.is_dgpu()))
+        .and_then(|d| d.get_usage_pct())
+        .unwrap_or(-1.0)
 }
 
 pub fn get_gpu_temp() -> f32 {
     if get_gpu_power_status() != GfxPower::Active {
         return 0.0;
     }
-    let devices = Device::find().unwrap_or_default();
-    if let Some(dgpu) = devices.iter().find(|d| d.is_dgpu()) {
-        if let Some(temp) = dgpu.get_temp() {
-            return temp;
-        }
-    }
-    if let Ok(entries) = std::fs::read_dir("/sys/class/hwmon") {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if let Ok(name) = std::fs::read_to_string(path.join("name")) {
-                let name = name.trim();
-                if name == "amdgpu"
-                    || name == "nouveau"
-                    || name == "nvidia"
-                    || name == "nvidia_hwmon"
-                {
-                    if let Ok(temp_str) = std::fs::read_to_string(path.join("temp1_input")) {
-                        if let Ok(temp_val) = temp_str.trim().parse::<f32>() {
-                            return temp_val / 1000.0;
-                        }
-                    }
-                }
-            }
-        }
-    }
-    0.0
+    Device::find()
+        .ok()
+        .and_then(|devs| devs.into_iter().find(|d| d.is_dgpu()))
+        .and_then(|d| d.get_temp())
+        .unwrap_or(0.0)
 }
 
 pub fn get_gpu_usage_pct() -> f32 {
     if get_gpu_power_status() != GfxPower::Active {
         return 0.0;
     }
-    let devices = Device::find().unwrap_or_default();
-    if let Some(dgpu) = devices.iter().find(|d| d.is_dgpu()) {
-        if let Some(usage) = dgpu.get_usage_pct() {
-            return usage;
-        }
-    }
-    if let Ok(entries) = std::fs::read_dir("/sys/class/drm") {
-        for entry in entries.flatten() {
-            let path = entry.path().join("device/gpu_busy_percent");
-            if path.exists() {
-                if let Ok(val_str) = std::fs::read_to_string(path) {
-                    if let Ok(val) = val_str.trim().parse::<f32>() {
-                        return val;
-                    }
-                }
-            }
-        }
-    }
-    0.0
+    Device::find()
+        .ok()
+        .and_then(|devs| devs.into_iter().find(|d| d.is_dgpu()))
+        .and_then(|d| d.get_usage_pct())
+        .unwrap_or(0.0)
 }
 
 #[cfg(test)]
