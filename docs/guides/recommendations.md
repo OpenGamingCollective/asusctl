@@ -44,7 +44,7 @@ ls /sys/class/drm/card*-eDP-*/amdgpu/panel_power_savings
 Then read it:
 
 ```bash
-cat /sys/class/drm/card*/card*-eDP-*/amdgpu/panel_power_savings
+cat /sys/class/drm/card*-eDP-*/amdgpu/panel_power_savings
 ```
 
 This option should be above 0, It just dims the screen a little to save battery life, but it depends on your screen model.
