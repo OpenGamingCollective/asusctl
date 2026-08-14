@@ -622,42 +622,46 @@ pub fn get_gpu_names() -> (String, String) {
     )
 }
 
-pub fn get_igpu_temp() -> f32 {
-    Device::find()
-        .ok()
-        .and_then(|devs| devs.into_iter().find(|d| !d.is_dgpu()))
-        .and_then(|d| d.get_temp())
-        .unwrap_or(-1.0)
+/// Telemetry metrics for both integrated and discrete GPUs.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct GpuTelemetry {
+    pub igpu_temp: f32,
+    pub igpu_usage: f32,
+    pub dgpu_temp: f32,
+    pub dgpu_usage: f32,
 }
 
-pub fn get_igpu_usage_pct() -> f32 {
-    Device::find()
-        .ok()
-        .and_then(|devs| devs.into_iter().find(|d| !d.is_dgpu()))
-        .and_then(|d| d.get_usage_pct())
-        .unwrap_or(-1.0)
-}
-
-pub fn get_gpu_temp() -> f32 {
-    if get_gpu_power_status() != GfxPower::Active {
-        return 0.0;
+impl Default for GpuTelemetry {
+    fn default() -> Self {
+        Self {
+            igpu_temp: -1.0,
+            igpu_usage: -1.0,
+            dgpu_temp: 0.0,
+            dgpu_usage: 0.0,
+        }
     }
-    Device::find()
-        .ok()
-        .and_then(|devs| devs.into_iter().find(|d| d.is_dgpu()))
-        .and_then(|d| d.get_temp())
-        .unwrap_or(0.0)
 }
 
-pub fn get_gpu_usage_pct() -> f32 {
-    if get_gpu_power_status() != GfxPower::Active {
-        return 0.0;
+/// Retrieve telemetry metrics for all detected GPUs in a single udev scan.
+pub fn get_gpu_telemetry() -> GpuTelemetry {
+    let mut telemetry = GpuTelemetry::default();
+    let dgpu_active = get_gpu_power_status() == GfxPower::Active;
+
+    if let Ok(devices) = Device::find() {
+        for device in devices {
+            if device.is_dgpu() {
+                if dgpu_active {
+                    telemetry.dgpu_temp = device.get_temp().unwrap_or(0.0);
+                    telemetry.dgpu_usage = device.get_usage_pct().unwrap_or(0.0);
+                }
+            } else {
+                telemetry.igpu_temp = device.get_temp().unwrap_or(-1.0);
+                telemetry.igpu_usage = device.get_usage_pct().unwrap_or(-1.0);
+            }
+        }
     }
-    Device::find()
-        .ok()
-        .and_then(|devs| devs.into_iter().find(|d| d.is_dgpu()))
-        .and_then(|d| d.get_usage_pct())
-        .unwrap_or(0.0)
+
+    telemetry
 }
 
 #[cfg(test)]

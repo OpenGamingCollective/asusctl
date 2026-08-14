@@ -143,13 +143,14 @@ pub fn setup_system_page(
             };
 
             let cpu_temp = rog_platform::cpu::get_cpu_temp();
-            let gpu_temp = rog_platform::gpu_pci::get_gpu_temp();
-            let igpu_temp = rog_platform::gpu_pci::get_igpu_temp();
+            let gpu_telemetry = rog_platform::gpu_pci::get_gpu_telemetry();
+            let gpu_temp = gpu_telemetry.dgpu_temp;
+            let igpu_temp = gpu_telemetry.igpu_temp;
             let (cpu_fan, gpu_fan, mid_fan) = rog_platform::platform::get_fan_rpms();
             let cpu_freq = rog_platform::cpu::get_cpu_frequency_mhz();
             let ram_usage = rog_platform::cpu::get_ram_usage_pct();
-            let gpu_usage = rog_platform::gpu_pci::get_gpu_usage_pct();
-            let igpu_usage = rog_platform::gpu_pci::get_igpu_usage_pct();
+            let gpu_usage = gpu_telemetry.dgpu_usage;
+            let igpu_usage = gpu_telemetry.igpu_usage;
 
             let curr_ticks = rog_platform::cpu::read_cpu_ticks();
             let cpu_usage = if let (Some(p), Some(c)) = (&prev_ticks, &curr_ticks) {
