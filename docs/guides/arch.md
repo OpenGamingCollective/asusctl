@@ -52,8 +52,10 @@ Before adding the repo you need to add the repo sign key to your pacman-key. Run
 ```bash
 # Ayush key
 sudo pacman-key --recv-keys F79100EF8C802DAB81C323BB8EEA5962FE510E19
+sudo pacman-key --finger F79100EF8C802DAB81C323BB8EEA5962FE510E19
 sudo pacman-key --lsign-key F79100EF8C802DAB81C323BB8EEA5962FE510E19
 ```
+
 
 This should show output similar to this:
 
@@ -65,9 +67,12 @@ This should show output similar to this:
 If you still have problems you can do it the less proper way by running those commands
 
 ```bash
-wget "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x8b15a6b0e9a3fa35" -O ogc.sec
+wget "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xf79100ef8c802dab81c323bb8eea5962fe510e19" -O ogc.sec
+gpg --show-keys ogc.sec
 sudo pacman-key -a ogc.sec
 ```
+
+Verify that the fingerprint shown by `gpg --show-keys` matches the one published on a trusted source before importing, HTTPS alone does not guarantee the key's identity.
 
 After that to get the repo add to your `/etc/pacman.conf` at the end:
 
