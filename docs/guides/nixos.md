@@ -12,9 +12,9 @@
 
 ## Disclaimer
 
-This guide expects some previous knowledge about NixOS and it's configuration system.
+This guide expects some previous knowledge about NixOS and its configuration system.
 
-Please note that NixOS in not officially supported by this project, and any issues specific to them shall be reported on the nixpkgs's [GitHub page](https://github.com/NixOS/nixpkgs/issues).
+Please note that NixOS is not officially supported by this project, and any issues specific to it shall be reported on the nixpkgs [GitHub page](https://github.com/NixOS/nixpkgs/issues).
 
 ## Requirement
 
