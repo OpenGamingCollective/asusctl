@@ -35,10 +35,16 @@ powerprofilesctl configure-action amdgpu_panel_power --enable
 > [!NOTE]
 > `amdgpu_panel_power` only takes effect while running on battery, and only with the balanced or power-saver profile active.
 
-Check if it is working:
+Check if it is working. First, find the path to the `panel_power_savings` file for your internal display, as the card and connector names vary per device:
 
 ```bash
-cat /sys/class/drm/card2/card2-eDP-2/amdgpu/panel_power_savings
+ls /sys/class/drm/card*-eDP-*/amdgpu/panel_power_savings
+```
+
+Then read it:
+
+```bash
+cat /sys/class/drm/card*/card*-eDP-*/amdgpu/panel_power_savings
 ```
 
 This option should be above 0, It just dims the screen a little to save battery life, but it depends on your screen model.
