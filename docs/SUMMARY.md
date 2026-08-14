@@ -17,3 +17,8 @@
 - [Missing TDP or LED Control](guides/missing-tdp-or-leds.md)
 
 # FAQ
+
+- [General](faq/general.md)
+- [Asusctl](faq/asusctl.md)
+- [Graphics](faq/graphics_switching.md)
+- [Keyboard](faq/keyboard.md)
