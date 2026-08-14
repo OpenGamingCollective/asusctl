@@ -10,6 +10,7 @@ This guide covers the Fedora Atomic Desktops (Silverblue, Kinoite, Sway Atomic, 
   - [Enabling the Terra Repository](#enabling-the-terra-repository)
   - [Asusctl](#asusctl)
   - [ROG Control Center](#rog-control-center)
+  - [Graphics Switching](#graphics-switching)
   - [After rebooting](#after-rebooting)
 - [Optional Steps](#optional-steps)
   - [Installing RPM Fusion](#installing-rpm-fusion)
@@ -77,6 +78,43 @@ rpm-ostree install asusctl-rog-gui
 ![ROG Control Center fan curve](../assets/guides/shared/rog-control-center-fan-curve.png)
 
 now reboot your system to apply the changes
+
+#### Graphics Switching
+
+It is now possible to manage your graphics card using `asusctl` or the ROG Control Center. You can check if your device supports graphics switching by running the following command:
+
+```bash
+asusctl armoury list
+```
+
+If your device supports disabling of the dGPU, you should see an entry that looks like the following:
+
+```bash
+dgpu_disable:
+  current: [(0),1]
+```
+
+Here, a current value of 0 means that your dgpu is not disabled (i.e., enabled).
+
+You can set whether you want to utilize your dGPU by modifying the setting under the `GPU Configuration` tab in the ROG Control Center. Alternatively, use the command `asusctl armoury set dgpu_disable 1` to disable the dgpu, and 0 to re-enable it.
+
+> [!NOTE]
+> Due to how Linux systems are configured to use the dGPU, you must reboot your system after changing your dGPU configuration. If you wish to power off your dgpu without rebooting, you should use an alternative program such as Cardwire (see below).
+
+##### Cardwire
+
+Cardwire is the community's new replacement for the now-deprecated supergfxctl.
+
+> [!CAUTION]
+> Cardwire is currently still considered EXPERIMENTAL. If you choose to install this tool, expect rough edges and quirks. For support, join our Discord server.
+
+Cardwire is available on the Terra repository. You can install it with:
+
+```bash
+rpm-ostree install cardwire cardwire-gui
+```
+
+For installation and usage instructions, refer to the [documentation](https://opengamingcollective.github.io/cardwire/).
 
 #### After rebooting
 

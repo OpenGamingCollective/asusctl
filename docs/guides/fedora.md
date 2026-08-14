@@ -21,7 +21,6 @@ For simple USB stick flashing: [Fedora Media Writer](https://getfedora.org/en/wo
 - [Optional Steps](#optional-steps)
   - [Installing RPM Fusion](#installing-rpm-fusion)
   - [Hardware Accelerated codecs](#hardware-accelerated-codecs)
-  - [Cardwire](#cardwire)
   - [Enabling Secure Boot](#enabling-secure-boot)
     - [Install the required tools](#install-the-required-tools)
     - [Initiate the key enrollment](#initiate-the-key-enrollment)
@@ -200,7 +199,22 @@ Here, a current value of 0 means that your dgpu is not disabled (i.e., enabled).
 You can set whether you want to utilize your dGPU by modifying the setting under the `GPU Configuration` tab in the ROG Control Center. Alternatively, use the command `asusctl armoury set dgpu_disable 1` to disable the dgpu, and 0 to re-enable it.
 
 > [!NOTE]
-> Due to how Linux systems are configured to use the dGPU, you must reboot your system after changing your dGPU configuration. If you wish to power off your dgpu without rebooting, you should use an alternative program such as [Cardwire](#cardwire).
+> Due to how Linux systems are configured to use the dGPU, you must reboot your system after changing your dGPU configuration. If you wish to power off your dgpu without rebooting, you should use an alternative program such as Cardwire (see below).
+
+##### Cardwire
+
+Cardwire is the community's new replacement for the now-deprecated supergfxctl.
+
+> [!CAUTION]
+> Cardwire is currently still considered EXPERIMENTAL. If you choose to install this tool, expect rough edges and quirks. For support, join our Discord server.
+
+Cardwire is available for install on the Terra repo. You can install it with:
+
+```bash
+sudo dnf install cardwire
+```
+
+For installation and usage instructions, refer to the [documentation](https://opengamingcollective.github.io/cardwire/).
 
 ### Optional Steps
 
@@ -217,21 +231,6 @@ sudo dnf install https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-releas
 Fedora does not include the codecs needed to use Vaapi on Intel, AMD or Nvidia in its repositories due to potential legal issues. Therefore, you need to install the codecs in your system (Flatpak and containers (like distrobox, toolbx, docker, podman, etc.) must install their own codecs, as they do not share the system ones).
 
 You need [RPM-Fusion](#installing-rpm-fusion) repos and follow [this guide](<https://rpmfusion.org/Howto/Multimedia?highlight=(%5CbCategoryHowto%5Cb)>).
-
-#### Cardwire
-
-Cardwire is the community's new replacement for the now-deprecated supergfxctl.
-
-> [!CAUTION]
-> Cardwire is currently still considered EXPERIMENTAL. If you choose to install this tool, expect rough edges and quirks. For support, join our Discord server.
-
-Cardwire is available for install on the terra repo. You can install it with:
-
-```bash
-sudo dnf install cardwire
-```
-
-For installation and usage instructions, refer to the [documentation](https://opengamingcollective.github.io/cardwire/).
 
 #### Enabling Secure Boot
 
