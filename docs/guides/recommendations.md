@@ -78,14 +78,7 @@ You can enable audio powersaving features. Create or edit `/etc/modprobe.d/audio
 options snd_hda_intel power_save=1
 ```
 
-For the setting to take effect, reload the module or reboot:
-
-```bash
-sudo modprobe -r snd_hda_intel && sudo modprobe snd_hda_intel
-```
-
-> [!NOTE]
-> Reloading `snd_hda_intel` may interrupt audio playback.
+For the setting to take effect, reboot the system.
 
 ### Wi-Fi powersaving
 
@@ -94,3 +87,5 @@ If your wireless card is managed by `iwlwifi`, you can enable Wi-Fi power saving
 ```conf
 options iwlwifi power_save=1
 ```
+
+For the setting to take effect, reboot the system.
