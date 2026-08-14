@@ -1,0 +1,234 @@
+# Fedora Workstation Setup Guide
+
+> A friendly guide for setting up Fedora Workstation on ASUS laptops
+
+Newcomers should start by reading the [Intro](../introduction.md) guide.
+For additional information not covered by this guide, consult the official [Fedora Documentation](https://docs.fedoraproject.org/en-US/beginners-guide/).
+For simple USB stick flashing: [Fedora Media Writer](https://getfedora.org/en/workstation/download/)
+
+## Contents
+
+### About Fedora Versions
+
+This guide is updated for the current stable release of Fedora.
+
+However, please be aware:
+
+- You need to keep Fedora up to date. If you are 2 versions behind, your OS is no longer supported by Fedora (updates, security, etc.)
+- E.g. If Fedora 43 is the current stable release, and you are on Fedora 41, your OS is unsupported.
+
+### Installation
+
+1. Download the latest Fedora Workstation (or KDE Plasma Edition) ISO file from the [official Fedora website](https://getfedora.org/en/workstation/download/) and write it to a USB stick.
+
+> [!NOTE]
+> If you want something else than GNOME or KDE as your Desktop Environment, you can check out [Fedora Spins](https://spins.fedoraproject.org/).
+
+2. If you have difficulties starting the live environment from USB, in the Fedora boot menu select: Troubleshooting → Start Fedora in basic graphics mode
+
+3. Follow the steps of the installer, and remove the USB stick when you reboot
+
+4. After rebooting, the installer will present a series of dialog boxes to configure wireless networking, privacy, third party repositories, cloud services, and finally a local user account. Ensure that third party repositories are enabled, so that the proprietary NVIDIA drivers can be installed (covered later in this guide).
+
+### Setup
+
+#### Using the Terminal
+
+This guide requires typing _terminal commands_. To type them, start the Terminal application, which opens a window that has a command prompt.
+
+To open the Terminal, simply press the Windows/Super key to bring up the Start Menu (KDE) or the Activities view (GNOME), and start typing "term" in the search box. Click on the search result.
+![alt text](../assets/fedora_term.png)
+
+Commands that have _sudo_ in front are administrator commands, and may require you to type in your password.
+
+#### Update Fedora
+
+The first thing you want to do is definitely make sure your OS is up-to-date, which can address some issues like WiFi not being functional.
+
+> [!TIP]
+> If you have trouble getting WiFi or Wired Internet to work (commonly seen on newly released products), use your phone hotspot via USB to get internet access.
+
+Simply run this in the terminal then reboot and you are good to go
+
+```bash
+sudo dnf update -y
+```
+
+Or if you don't want to use terminal:
+
+1. Open the "Software" application. (KDE Users should use "Discover")
+2. Navigate to Updates tab
+3. Click the Refresh-button in the top left corner
+4. Download all available updates
+   ![alt text](../assets/fedora_updater.png)
+5. After the updates have been downloaded, click the "Restart & Update" button
+
+![alt text](../assets/fedora_updater_restart.png)
+
+Wait until the updates are installed.
+
+> [!NOTE]
+> It is recommended to restart the system to avoid problems with outdated packages loaded into RAM.
+
+#### Enabling the Terra Repository
+
+ASUS Linux packages and tools are currently packaged on the Terra Repository for Fedora. Add the Terra repo with the following commands:
+
+```bash
+sudo dnf install --nogpgcheck --repofrompath 'terra,https://repos.fyralabs.com/terra$releasever' terra-release
+```
+
+> [!WARNING]
+> For previous users who have enabled the community-maintained COPR repository, this repository is no longer maintained and should not be used. You can migrate to the new Terra repository by using the above command, and by deleting the old copr repository with `sudo dnf copr remove lukenukem/asus-linux`. Don't forget to reinstall all ASUS Linux tools.
+
+#### Asusctl
+
+This section covers installing asusctl and its supporting software. This enables controls for the Asus ROG hardware on the laptop.
+
+```bash
+sudo dnf install asusctl
+```
+
+Enable and start the systemd service:
+
+```bash
+systemctl enable --now asusd.service
+```
+
+To avoid [problems with tuned](https://gitlab.com/asus-linux/asusctl/-/issues/724), you should use ppd.
+
+```bash
+sudo dnf swap tuned-ppd power-profiles-daemon --allowerasing
+systemctl enable --now power-profiles-daemon.service
+```
+
+> [!WARNING]
+> This part is outdated, it will be updated soon
+
+#### ROG Control Center
+
+ROG Control Center is a GUI tool that can be used to configure asusctl. After adding the Terra repository as described above, you can now install the tool:
+
+```bash
+sudo dnf install asusctl-rog-gui
+```
+
+> [!NOTE]
+> For complete functionality and driver support, it is recommended to use a Kernel version of 6.19 or greater.
+
+#### Install Nvidia Graphics Drivers
+
+> [!NOTE]
+> AMD dGPU laptop owners can skip this section.
+
+> [!IMPORTANT]
+> If you have secure boot enabled at this point, you must disable it to continue. Once you're finished installing drivers, see the section on enabling Secure Boot later to re-enable it.
+
+1. If you didn't enable third-party repositories during the initial install wizard, you can use the following command to enable the RPM Fusion repositories required to install the Nvidia drivers:
+
+```bash
+sudo dnf install https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
+```
+
+> [!NOTE]
+> For Laptops with NVIDIA card older than Turing, install the Negativo17 instead.
+
+2. Install the Nvidia drivers:
+
+```bash
+sudo dnf install akmod-nvidia xorg-x11-drv-nvidia-cuda
+```
+
+> [!IMPORTANT]
+> Please remember to wait after the RPM transaction ends to allow the kmod be built. This can take up to 5 minutes on older systems, and about 2 minutes on newer systems.
+
+3. Reboot your system
+
+For more details, see the official documentation for [RPM Fusion](<https://rpmfusion.org/Howto/NVIDIA?highlight=(%5CbCategoryHowto%5Cb)>).
+
+#### Graphics Switching
+
+It is now possible to manage your graphics card using the ASUS GPU with `asusctl` or the ROG Control Center. You can check if your device supports graphics switching by running the following command:
+
+```bash
+asusctl armoury list
+```
+
+If your device supports disabling of the dGPU, you should see an entry that looks like the following:
+
+```bash
+dgpu_disable:
+  current: [(0),1]
+```
+
+Here, a current value of 0 means that your dgpu is not disabled (i.e., enabled).
+
+You can set whether you want to utilize your dGPU by modifying the setting under the `GPU Configuration` tab in the ROG Control Center. Alternatively, use the command `asusctl armoury set dgpu_disable 1` to disable the dgpu, and 0 to re-enable it.
+
+> [!NOTE]
+> Due to how Linux systems are configured to use the dGPU, you must reboot your system after changing your dGPU configuration. If you wish to power off your dgpu without rebooting, you should use an alternative program such as [Cardwire]().
+
+### Optional Steps
+
+#### Installing RPM Fusion
+
+Usually, when you enable third-party repositories, RPM-Fusion is enabled automatically. However, if it is not, you can follow [this guide](https://rpmfusion.org/Configuration).
+
+```bash
+sudo dnf install https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
+```
+
+#### Hardware Accelerated codecs
+
+Fedora does not include the codecs needed to use Vaapi on Intel, AMD or Nvidia in its repositories due to potential legal issues. Therefore, you need to install the codecs in your system (Flatpak and containers (like distrobox, toolbx, docker, podman, etc.) must install their own codecs, as they do not share the system ones).
+
+You need [RPM-Fusion](#installing-rpm-fusion) repos and follow [this guide](<https://rpmfusion.org/Howto/Multimedia?highlight=(%5CbCategoryHowto%5Cb)>).
+
+#### Cardwire
+
+Cardwire is the community's new replacement for the now-deprecated supergfxd.
+
+> [!CAUTION]
+> Cardwire is currently still considered EXPERIMENTAL. If you choose to install this tool, expect rough edges and quirks. For support, join our Discord server.
+
+Cardwire is available for install on the terra repo. You can install it with:
+
+```bash
+sudo dnf install cardwire
+```
+
+For installation and usage instructions, refer to the [documentation](https://opengamingcollective.github.io/cardwire/).
+
+#### Enabling Secure Boot
+
+With Fedora 36 and above, it has become super easy to auto sign kernel modules and enable secure boot. To enable auto signing follow these steps:
+
+##### Install the required tools
+
+```bash
+sudo dnf install kmodtool akmods mokutil openssl
+```
+
+##### Initiate the key enrollment
+
+> [!NOTE]
+> This step requires a password, it doesn't need to be fancy. You'll just need it once during the enrollment.
+
+```bash
+sudo kmodgenca -a
+sudo mokutil --import /etc/pki/akmods/certs/public_key.der
+```
+
+##### Reboot to enroll the key
+
+When you reboot, the MOK Manager will appear, just hit "Enroll MOK" and enter the password set in step 2. After that is completed choose "Continue boot".
+
+##### Rebuild the kernel module
+
+If you installed the nvidia drivers before key enrollment, you must run the following command
+
+```bash
+sudo akmods --force --rebuild
+
+sudo dracut --force
+```
