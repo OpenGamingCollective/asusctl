@@ -12,7 +12,7 @@ So you have decided to try out Linux in your ASUS laptop... That's great! Howeve
 - [Backup Proprietary eSupport Drivers Folder](#backup-proprietary-esupport-drivers-folder)
 - [Creating a win-to-go installation](#creating-a-win-to-go-installation)
 - [Disable VMD](#disable-vmd)
-- [Disable fastboot](#disable-fastboot)
+- [Disable Secure Boot](#disable-secure-boot)
 - [Use the Laptop Screen](#use-the-laptop-screen)
 - [Disable nouveau](#disable-nouveau)
 - [Switch to Hybrid mode on Windows](#switch-to-hybrid-mode-on-windows)
@@ -43,7 +43,7 @@ Intel laptops have a feature called VMD that is not supported by linux and shoul
 
 AMD laptops can have a RAID mode that should also be disabled: use a software RAID instead if you need such feature.
 
-### Disable fastboot
+### Disable Secure Boot
 
 In Linux, whether or not you need to disable Secure Boot depends heavily on the distro. Installing Arch and its derivatives requires temporarily disabling it, while distros like Fedora typically don't require disabling Secure Boot at any point. That said, it's possible to enable it after installation using tools that simplify the process, such as sbctl. For this reason, leaving Secure Boot disabled post-install is not recommended unless you're running into issues with NVIDIA drivers or custom kernels. This is actually one of the reasons why Arch and Arch-based distros are worth considering — sbctl makes signing the kernel and bootloader straightforward.
 
