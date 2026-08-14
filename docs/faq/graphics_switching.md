@@ -51,9 +51,9 @@ Using tools like "nvtop" and "mangohud", you can monitor your CPU and GPU power 
 
 To check if the Dynamic boost works, you need to identify what is the MAX TGP your model support. Usually, it can be found on manufacturers' websites.
 
-Here are some power data collected from Zephyrus G15 (2022), which rated 120 watt MAX TGP.
+Here are some power data collected from Zephyrus G15 (2022), which rated 120-watt maximum TGP.
 
-Quiete Mode: 25 Watt (CPU) + 60 Watt (GPU)
+Quiet mode: 25 Watt (CPU) + 60 Watt (GPU)
 
 Balanced Mode: 30 Watt (CPU) + 80 Watt (GPU)
 
