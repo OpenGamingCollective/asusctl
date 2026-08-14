@@ -153,11 +153,7 @@ pub fn setup_fan_curve_page(ui: &MainWindow, _config: Arc<Mutex<Config>>) {
 
         // TODO: the fan curve stuff was written donkeys ago with the expectation that
         // only 3 profiles existed
-        let profile = if platform_profile_choices.contains(&PlatformProfile::Quiet) {
-            PlatformProfile::Quiet
-        } else {
-            PlatformProfile::LowPower
-        };
+        let profile = PlatformProfile::Quiet.resolve_alias(&platform_profile_choices);
         let quiet = match fans.fan_curve_data(profile).await {
             Ok(data) => data,
             Err(e) => {
@@ -179,12 +175,7 @@ pub fn setup_fan_curve_page(ui: &MainWindow, _config: Arc<Mutex<Config>>) {
                 let handle_next = handle_next1.clone();
                 let choices = choices.clone();
                 tokio::spawn(async move {
-                    let mut target: PlatformProfile = profile.into();
-                    if target == PlatformProfile::Quiet
-                        && !choices.contains(&PlatformProfile::Quiet)
-                    {
-                        target = PlatformProfile::LowPower;
-                    }
+                    let target = PlatformProfile::from(profile).resolve_alias(&choices);
                     if fans.set_curves_to_defaults(target).await.is_err() {
                         return;
                     }
@@ -203,7 +194,7 @@ pub fn setup_fan_curve_page(ui: &MainWindow, _config: Arc<Mutex<Config>>) {
                         return;
                     };
                     let Ok(quiet) = fans
-                        .fan_curve_data(PlatformProfile::Quiet)
+                        .fan_curve_data(PlatformProfile::Quiet.resolve_alias(&choices))
                         .await
                         .map_err(|e| error!("{e:}"))
                     else {
