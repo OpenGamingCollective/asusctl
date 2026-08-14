@@ -40,17 +40,21 @@ Custom fan curves (not speaking of the built-in power profiles) are only support
 See the [supported laptops list](https://github.com/OpenGamingCollective/asusctl#supported-laptops) to check whether your model is included.
 The necessary kernel patches are merged since 5.17.
 
-The format is shown [here](https://github.com/cronosun/atrofac/blob/master/ADVANCED.md#limits).
+The data format is a comma-separated list of points in the form `30c:1%,49c:2%,...`, where each point is a temperature followed by a fan speed. If the `%` is omitted the fan range is 0-255.
 
-There are three fan profiles namely Quiet, Balanced and Performance to choose from. Each profile is linked to power profile and gets applied when the power profile is set. You can enable/disable the fan profiles using the following command:
+There are three fan profiles namely Quiet, Balanced and Performance to choose from. Each profile is linked to power profile and gets applied when the power profile is set. You can enable/disable all fan profiles at once for a profile using the following command:
 
 ```bash
-asusctl fan-curve -m <profile_name> -e true/false
+asusctl fan-curve --mod-profile <profile_name> --enable-fan-curves true/false
 ```
+
+To enable or disable a single fan curve for a profile use `--enable-fan-curve` together with `--fan <cpu/gpu/mid>`.
 
 All three fan profiles can be activated at once. If no profile is activated manually then the fan curve from the BIOS is used.
 To change the fan curve data for a specific profile use the following command:
 
 ```bash
-asusctl fan-curve -m <profile_name> -D <fan_curve_data>
+asusctl fan-curve --mod-profile <profile_name> --data <fan_curve_data>
 ```
+
+An optional `--fan <cpu/gpu/mid>` can be added to select the fan to apply the data to (defaults to `cpu`).
