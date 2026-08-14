@@ -13,7 +13,7 @@ After checking the usual suspects:
 - GPU monitoring widgets: keep the GPU on to monitor it!
 - ollama: if ollama is running nvidia might not be able to sleep!
 
-One possible culprit might also me realtime audio kit being enabled.
+One possible culprit might also be realtime audio kit being enabled.
 
 This service can probe all available audio devices, which includes nvidia hdmi audio!
 
