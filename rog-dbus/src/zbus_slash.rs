@@ -1,4 +1,3 @@
-use rog_slash::SlashMode;
 use zbus::proxy;
 
 #[proxy(
@@ -29,7 +28,7 @@ pub trait Slash {
     #[zbus(property)]
     fn mode(&self) -> zbus::Result<u8>;
     #[zbus(property)]
-    fn set_mode(&self, value: SlashMode) -> zbus::Result<()>;
+    fn set_mode(&self, value: u8) -> zbus::Result<()>;
 
     /// ShowBatteryWarning property
     #[zbus(property)]

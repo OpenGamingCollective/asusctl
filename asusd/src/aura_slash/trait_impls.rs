@@ -145,7 +145,10 @@ impl SlashZbus {
 
     /// Set interval between slash animations (0-255)
     #[zbus(property)]
-    async fn set_mode(&self, mode: SlashMode) -> zbus::Result<()> {
+    async fn set_mode(&self, mode: u8) -> zbus::Result<()> {
+        let mode = SlashMode::try_from(mode).map_err(|err| {
+            zbus::fdo::Error::InvalidArgs(format!("ctrl_slash::set_mode {}", err))
+        })?;
         let mut config = self.0.lock_config().await;
 
         let command_packets = slash_pkt_set_mode(config.slash_type, mode);

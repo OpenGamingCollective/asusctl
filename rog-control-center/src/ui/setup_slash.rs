@@ -113,7 +113,9 @@ pub fn setup_slash_page(ui: &MainWindow, _states: Arc<Mutex<Config>>) {
                                 .into(),
                                 "Setting Slash animation failed".into(),
                                 handle_copy,
-                                slash_copy.set_mode(slash_mode_from_index(index)).await,
+                                slash_copy
+                                    .set_mode(slash_mode_from_index(index) as u8)
+                                    .await,
                             );
                         });
                     });
