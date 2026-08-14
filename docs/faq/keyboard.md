@@ -3,7 +3,7 @@
 ## Contents
 
 - [Can I re-map the arrow keys?](#can-i-re-map-the-arrow-keys)
-- [I have a laptop where the arrow keys are unmarked by emit keycodes, can I use these?](#i-have-a-laptop-where-the-arrow-keys-are-unmarked-by-emit-keycodes-can-i-use-these)
+- [I have a laptop where the arrow keys do not emit keycodes, can I use these?](#i-have-a-laptop-where-the-arrow-keys-do-not-emit-keycodes-can-i-use-these)
 - [My keyboard isn't working properly with the driver](#my-keyboard-isnt-working-properly-with-the-driver)
 - [Can I customise the Fn key?](#can-i-customise-the-fn-key)
 - [My laptop has no SysRq key. Can I remap any key to SysRq?](#my-laptop-has-no-sysrq-key-can-i-remap-any-key-to-sysrq)
@@ -38,7 +38,7 @@ sudo udevadm trigger
 
 You can see a list of keycodes [here](https://github.com/torvalds/linux/blob/b76f733c3ff83089cf1e3f9ae233533649f999b3/include/uapi/linux/input-event-codes.h).
 
-### I have a laptop where the arrow keys are unmarked by emit keycodes, can I use these?
+### I have a laptop where the arrow keys do not emit keycodes, can I use these?
 
 Yes, you can.
 
