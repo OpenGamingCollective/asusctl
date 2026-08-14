@@ -12,6 +12,7 @@ So you have decided to try out Linux in your ASUS laptop... That's great! Howeve
 - [Backup Proprietary eSupport Drivers Folder](#backup-proprietary-esupport-drivers-folder)
 - [Creating a win-to-go installation](#creating-a-win-to-go-installation)
 - [Disable VMD](#disable-vmd)
+- [Disable fastboot](#disable-fastboot)
 - [Disable Secure Boot](#disable-secure-boot)
 - [Use the Laptop Screen](#use-the-laptop-screen)
 - [Disable nouveau](#disable-nouveau)
@@ -27,7 +28,7 @@ When present, the folder can be found in `C:\eSupport` make sure to backup this 
 
 Certain laptops have one or more firmware for internal devices that must be updated using windows: it is very important you keep windows in a bootable state on a (preferably fast SSD or nvme) external disk!
 
-Use your windows installation to run rufus and create a win-to-go installation of windows.
+Use your Windows installation to run [Rufus](https://rufus.ie/) and create a Win-to-Go installation of Windows.
 
 Once done start that windows installation and ensure it says it has a valid license (license should be applied from the ACPI just by booting up the installation) and install the official ASUS Armoury Crate as well as any other driver that is available via the ASUS website for your model.
 
@@ -42,6 +43,10 @@ Once done start that windows installation and ensure it says it has a valid lice
 Intel laptops have a feature called VMD that is not supported by linux and should be disabled (on the UEFI setup screen) to avoid problems.
 
 AMD laptops can have a RAID mode that should also be disabled: use a software RAID instead if you need such feature.
+
+### Disable fastboot
+
+The fastboot feature is known to cause random issues for Linux, especially with Wi-Fi cards. It is strongly recommended to disable it in the UEFI setup screen.
 
 ### Disable Secure Boot
 
@@ -69,7 +74,7 @@ Due to display signal routing on Asus ROG laptops, and the setup process dealing
 
 You might encounter the issue about nouveau crashing the installation: this can be solved by adding a boot parameter `modprobe.blacklist=nouveau` to the kernel cmdline before booting the installation media. To edit the installation media boot entry just press e on it and then put the blacklist parameter at the end off all parameters. Example:
 
-![alt text](assets/nouveau_grub.png)
+![GRUB entry with Nouveau disabled](assets/guides/shared/nouveau-grub.png)
 
 The same parameter can be used to boot the installed system, but it is not needed after installing official nvidia drivers.
 
