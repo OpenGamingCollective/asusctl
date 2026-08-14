@@ -299,6 +299,30 @@ async fn bind_shortcut(
     }
 }
 
+async fn configure_shortcuts(
+    gs: &GlobalShortcuts,
+    session: &ashpd::desktop::Session<GlobalShortcuts>,
+) -> bool {
+    if gs.version() >= 2 {
+        match gs
+            .configure_shortcuts(session, None, ConfigureShortcutsOptions::default())
+            .await
+        {
+            Ok(()) => true,
+            Err(err) => {
+                warn!("ConfigureShortcuts failed: {err}");
+                false
+            }
+        }
+    } else {
+        warn!(
+            "ConfigureShortcuts needs portal version 2 (have {})",
+            gs.version()
+        );
+        false
+    }
+}
+
 async fn apply_enable(
     gs: &GlobalShortcuts,
     session: &ashpd::desktop::Session<GlobalShortcuts>,
@@ -311,14 +335,9 @@ async fn apply_enable(
         *current = bind_shortcut(gs, session).await?;
     }
 
-    if *current != Assignment::Assigned && mode == EnableMode::Interactive && gs.version() >= 2 {
+    if *current != Assignment::Assigned && mode == EnableMode::Interactive {
         // KDE requires configure for an existing empty trigger.
-        if let Err(err) = gs
-            .configure_shortcuts(session, None, ConfigureShortcutsOptions::default())
-            .await
-        {
-            warn!("Could not open shortcut configuration: {err}");
-        }
+        configure_shortcuts(gs, session).await;
     }
 
     Ok(match current {
@@ -429,13 +448,7 @@ async fn run_session_inner(
         }
     };
 
-    let mut current = match query_assignment(gs, session).await {
-        Ok(found) => found,
-        Err(err) => {
-            error!("Could not list shortcuts: {err}");
-            return ShortcutStatus::Unavailable;
-        }
-    };
+    let mut current = Assignment::Missing;
     let mut bind_attempted = false;
 
     let mut current_status =
@@ -458,24 +471,7 @@ async fn run_session_inner(
                 match command {
                     Some(Command::Disable) => break ShortcutStatus::Disabled,
                     Some(Command::Configure { respond }) => {
-                        let ok = if gs.version() >= 2 {
-                            match gs
-                                .configure_shortcuts(session, None, ConfigureShortcutsOptions::default())
-                                .await
-                            {
-                                Ok(()) => true,
-                                Err(err) => {
-                                    warn!("ConfigureShortcuts failed: {err}");
-                                    false
-                                }
-                            }
-                        } else {
-                            warn!(
-                                "ConfigureShortcuts needs portal version 2 (have {})",
-                                gs.version()
-                            );
-                            false
-                        };
+                        let ok = configure_shortcuts(gs, session).await;
                         let _ = respond.send(ok);
                     }
                     Some(Command::Enable { mode, respond }) => {
