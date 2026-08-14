@@ -16,6 +16,24 @@ If you own a ROG Ally or ROG Ally X ChimeraOS might be a good choice.
 
 ## Content
 
+- [Introduction](#introduction)
+- [Installation](#installation)
+  - [Repository](#repository)
+  - [Asusctl](#asusctl)
+  - [ROG Control Center](#rog-control-center)
+  - [Custom kernel - drivers fixes, hardware support](#custom-kernel-drivers-fixes-hardware-support)
+  - [OGC kernel](#ogc-kernel)
+  - [Nvidia](#nvidia)
+    - [Other distributions based on Arch](#other-distributions-based-on-arch)
+      - [EndeavourOS](#endeavouros)
+  - [Secure Boot](#secure-boot)
+    - [Arch](#arch)
+      - [Grub bootloader](#grub-bootloader)
+      - [Systemd-boot bootloader](#systemd-boot-bootloader)
+      - [Limine bootloader](#limine-bootloader)
+      - [Verify signed files](#verify-signed-files)
+    - [CachyOS](#cachyos)
+
 ### Introduction
 
 Read the [Intro](../introduction.md) guide first to avoid bad surprises, especially if you plan to remove windows entirely.
@@ -55,7 +73,6 @@ sudo pacman-key --recv-keys F79100EF8C802DAB81C323BB8EEA5962FE510E19
 sudo pacman-key --finger F79100EF8C802DAB81C323BB8EEA5962FE510E19
 sudo pacman-key --lsign-key F79100EF8C802DAB81C323BB8EEA5962FE510E19
 ```
-
 
 This should show output similar to this:
 
@@ -231,6 +248,12 @@ sudo pacman -S vulkan-radeon nvidia-utils vulkan-icd-loader
 sudo pacman -S vulkan-intel nvidia-utils vulkan-icd-loader
 ```
 
+### Other distributions based on Arch
+
+#### EndeavourOS
+
+When installing EndeavourOS do not use the option with the Nvidia drivers preinstalled. That driver only works with the stock kernel. Use the default install option then install the DKMS package matching your GPU post-install: `nvidia-open-dkms` for Turing and newer GPUs or `nvidia-580xx-dkms` (AUR) for Maxwell, Pascal, and Volta.
+
 ### Secure Boot
 
 #### Arch
@@ -331,9 +354,3 @@ This is a do-and-forget thing: once the initial setup is done no manual interven
 #### CachyOS
 
 To enable Secure Boot on CachyOS, please follow the [CachyOS Secure Boot Setup guide](https://wiki.cachyos.org/configuration/secure_boot_setup/).
-
-### Other distributions based on Arch
-
-#### EndeavourOS
-
-When installing EndeavourOS do not use the option with the Nvidia drivers preinstalled. That driver only works with the stock kernel. Use the default install option then install the DKMS package matching your GPU post-install: `nvidia-open-dkms` for Turing and newer GPUs or `nvidia-580xx-dkms` (AUR) for Maxwell, Pascal, and Volta.
