@@ -16,7 +16,7 @@ This rule applies to almost the entire project, but rogcc runs on Wayland;
 
 ## Improve battery on AMD Laptops
 
-Read docs for more details: [PPD Documentation](https://gitlab.gnome.org/Infrastructure/Mirrors/lorry-mirrors/gitlab_freedesktop_org/hadess/power-profiles-daemon)
+Read docs for more details: [PPD Documentation](https://gitlab.freedesktop.org/upower/power-profiles-daemon)
 
 If you followed any guide, you should have daemon power profiles, which have two functions that are disabled by default: Panel power savings and AMDGPU Dynamic power management. These actions apply only to laptops with integrated Radeon graphics. Check which of them are available on your device:
 
@@ -86,3 +86,11 @@ sudo modprobe -r snd_hda_intel && sudo modprobe snd_hda_intel
 
 > [!NOTE]
 > Reloading `snd_hda_intel` may interrupt audio playback.
+
+### Wi-Fi powersaving
+
+If your wireless card is managed by `iwlwifi`, you can enable Wi-Fi power saving. Create or edit `/etc/modprobe.d/iwlwifi.conf` and add:
+
+```conf
+options iwlwifi power_save=1
+```
