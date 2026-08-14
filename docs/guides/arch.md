@@ -142,7 +142,13 @@ After installing the new kernel you need to regenerate your boot menu or add a n
 **Systemd-boot**
 
 ```bash
-sudo bootctl update
+sudo mkinitcpio -P
+```
+
+Verify the new kernel entry appears in the boot menu before rebooting:
+
+```bash
+sudo bootctl list
 ```
 
 **Limine**
