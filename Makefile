@@ -40,8 +40,7 @@ ifeq ($(X11),1)
 endif
 
 # Always use the versions in Cargo.lock by default
-# EDIT 20260718: commented out as Cargo.lock needs to be updated to build
-#ARGS += --locked
+ARGS += --locked
 
 # Allow optionally freezing the build to avoid any network access and enforce Cargo.lock strictly
 FROZEN ?= 0
