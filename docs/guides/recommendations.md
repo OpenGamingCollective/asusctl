@@ -71,11 +71,18 @@ This option is the most important, because in battery it needs to say low. With 
 
 ### Audio powersaving
 
-You can enable audio powersaving features:
+You can enable audio powersaving features. Create or edit `/etc/modprobe.d/audio.conf` as root (e.g. `sudo nano /etc/modprobe.d/audio.conf`) and add:
 
 ```conf
-/etc/modprobe.d/audio.conf
-
 # enable audio power savings
 options snd_hda_intel power_save=1
 ```
+
+For the setting to take effect, reload the module or reboot:
+
+```bash
+sudo modprobe -r snd_hda_intel && sudo modprobe snd_hda_intel
+```
+
+> [!NOTE]
+> Reloading `snd_hda_intel` may interrupt audio playback.
