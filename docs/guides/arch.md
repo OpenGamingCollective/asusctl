@@ -22,7 +22,7 @@ If you own a ROG Ally or ROG Ally X ChimeraOS might be a good choice.
   - [Asusctl](#asusctl)
   - [ROG Control Center](#rog-control-center)
   - [Graphics Switching](#graphics-switching)
-  - [Custom kernel - drivers fixes, hardware support](#custom-kernel-drivers-fixes-hardware-support)
+  - [Custom kernel - drivers fixes, hardware support](#custom-kernel---drivers-fixes-hardware-support)
   - [OGC kernel](#ogc-kernel)
   - [Nvidia](#nvidia)
     - [Other distributions based on Arch](#other-distributions-based-on-arch)
