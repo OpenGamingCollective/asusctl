@@ -108,10 +108,12 @@ This section covers installing asusctl and its supporting software. This enables
 sudo dnf install asusctl
 ```
 
-Enable and start the systemd service:
+The `asusd` service is started automatically by a udev rule, so it does not need to be enabled. You can check its status or restart it manually:
 
 ```bash
-sudo systemctl enable --now asusd.service
+systemctl status asusd.service
+# or, to restart it:
+sudo systemctl restart asusd.service
 ```
 
 `asusd` manages platform profiles and CPU EPP settings itself. Running an external power management daemon (such as `power-profiles-daemon` or `tuned`) alongside `asusd` can cause race conditions and contention over the platform profile and EPP preferences. You have two options:

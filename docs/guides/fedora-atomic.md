@@ -118,10 +118,10 @@ For installation and usage instructions, refer to the [documentation](https://op
 
 #### After rebooting
 
-Once the asusd service has been restarted, it should be enabled by default. If this is not the case, you can enable it as follows:
+The `asusd` service is triggered by a udev rule after the keyboard driver is ready, so it does not need to be enabled and is not supposed to be. You can check its status with:
 
 ```bash
-systemctl enable --now asusd.service
+systemctl status asusd.service
 ```
 
 > [!NOTE]
