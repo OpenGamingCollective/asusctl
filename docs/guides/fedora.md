@@ -8,6 +8,26 @@ For simple USB stick flashing: [Fedora Media Writer](https://getfedora.org/en/wo
 
 ## Contents
 
+- [About Fedora Versions](#about-fedora-versions)
+- [Installation](#installation)
+- [Setup](#setup)
+  - [Using the Terminal](#using-the-terminal)
+  - [Update Fedora](#update-fedora)
+  - [Enabling the Terra Repository](#enabling-the-terra-repository)
+  - [Asusctl](#asusctl)
+  - [ROG Control Center](#rog-control-center)
+  - [Install Nvidia Graphics Drivers](#install-nvidia-graphics-drivers)
+  - [Graphics Switching](#graphics-switching)
+- [Optional Steps](#optional-steps)
+  - [Installing RPM Fusion](#installing-rpm-fusion)
+  - [Hardware Accelerated codecs](#hardware-accelerated-codecs)
+  - [Cardwire](#cardwire)
+  - [Enabling Secure Boot](#enabling-secure-boot)
+    - [Install the required tools](#install-the-required-tools)
+    - [Initiate the key enrollment](#initiate-the-key-enrollment)
+    - [Reboot to enroll the key](#reboot-to-enroll-the-key)
+    - [Rebuild the kernel module](#rebuild-the-kernel-module)
+
 ### About Fedora Versions
 
 This guide is updated for the current stable release of Fedora.
@@ -166,7 +186,7 @@ Here, a current value of 0 means that your dgpu is not disabled (i.e., enabled).
 You can set whether you want to utilize your dGPU by modifying the setting under the `GPU Configuration` tab in the ROG Control Center. Alternatively, use the command `asusctl armoury set dgpu_disable 1` to disable the dgpu, and 0 to re-enable it.
 
 > [!NOTE]
-> Due to how Linux systems are configured to use the dGPU, you must reboot your system after changing your dGPU configuration. If you wish to power off your dgpu without rebooting, you should use an alternative program such as [Cardwire]().
+> Due to how Linux systems are configured to use the dGPU, you must reboot your system after changing your dGPU configuration. If you wish to power off your dgpu without rebooting, you should use an alternative program such as [Cardwire](#cardwire).
 
 ### Optional Steps
 
