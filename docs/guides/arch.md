@@ -7,7 +7,7 @@ Arch Linux is the preferred distro and the only one that is directly supported b
 Since it can be complicated to install arch, in case you don't want even try archinstall, we also suggest trying:
 
 - EndeavourOS as it feels more like a cohesive distro rather than a collection of software to install and configure.
-- CachyOS since it has a very easy step by step guide, and it has an amazing out-of-the-box experience.
+- CachyOS since it has a very easy step-by-step guide, and it has an amazing out-of-the-box experience.
 - Garuda is also pretty popular and has gained a fair share of users.
 
 Every linux kernel past and including 6.19 has everything needed to provide a smooth experience, but it is advised to install a kernel from OGC.
@@ -101,7 +101,7 @@ systemctl enable --now power-profiles-daemon.service
 ```
 
 > [!CAUTION]
-> Be aware that some functions or asusctl need kernel level drivers support, take a look at the "Custom kernel section"
+> Be aware that some functions or asusctl need kernel-level drivers support, take a look at the "Custom kernel section"
 
 ### ROG Control Center
 
@@ -309,4 +309,4 @@ To enable Secure Boot on CachyOS, please follow the [CachyOS Secure Boot Setup g
 
 #### EndeavourOS
 
-When installing EndeavourOS do not use the option with the Nvidia drivers preinstalled. That driver only works with the stock kernel. Use the default install option then install `nvidia-open-dkms` post install.
+When installing EndeavourOS do not use the option with the Nvidia drivers preinstalled. That driver only works with the stock kernel. Use the default install option then install `nvidia-open-dkms` post-install.
