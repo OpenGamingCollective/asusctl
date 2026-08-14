@@ -70,7 +70,7 @@ See [issue #264](https://github.com/OpenGamingCollective/asusctl/issues/264) for
 ROG Control Center is a GUI tool for configuring few aspects of asusctl. After adding the Terra repository as described above, you can now install the tool:
 
 ```bash
-rpm-ostree install asusctl-rog-gui
+sudo rpm-ostree install asusctl-rog-gui
 ```
 
 ![ROG Control Center](../assets/guides/shared/rog-control-center.png)
@@ -111,7 +111,7 @@ Cardwire is the community's new replacement for the now-deprecated supergfxctl.
 Cardwire is available on the Terra repository. You can install it with:
 
 ```bash
-rpm-ostree install cardwire cardwire-gui
+sudo rpm-ostree install cardwire cardwire-gui
 ```
 
 For installation and usage instructions, refer to the [documentation](https://opengamingcollective.github.io/cardwire/).
@@ -162,7 +162,7 @@ flatpak install org.gnome.Calculator org.gnome.Calendar org.gnome.Characters org
 ##### Replace Firefox RPM with Flathub Flatpak and Force Wayland
 
 ```bash
-rpm-ostree override remove firefox firefox-langpacks
+sudo rpm-ostree override remove firefox firefox-langpacks
 flatpak install flathub org.mozilla.firefox org.freedesktop.Platform.ffmpeg-full
 ```
 
@@ -183,7 +183,7 @@ If you are unable or unwilling to use the method described above, you can follow
 Add RPM-Fusion repos:
 
 ```bash
-rpm-ostree install --apply-live https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
+sudo rpm-ostree install --apply-live https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
 ```
 
 > [!NOTE]
@@ -192,8 +192,8 @@ rpm-ostree install --apply-live https://mirrors.rpmfusion.org/free/fedora/rpmfus
 Install Nvidia drivers:
 
 ```bash
-rpm-ostree install akmod-nvidia xorg-x11-drv-nvidia xorg-x11-drv-nvidia-cuda
-rpm-ostree kargs --append=rd.driver.blacklist=nouveau,nova_core --append=modprobe.blacklist=nouveau,nova_core
+sudo rpm-ostree install akmod-nvidia xorg-x11-drv-nvidia xorg-x11-drv-nvidia-cuda
+sudo rpm-ostree kargs --append=rd.driver.blacklist=nouveau,nova_core --append=modprobe.blacklist=nouveau,nova_core
 ```
 
 Wait for the module to be built, then reboot:
