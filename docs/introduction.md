@@ -9,7 +9,7 @@ So you have decided to try out Linux in your ASUS laptop... That's great! Howeve
 
 ## Content
 
-- [Backup Propietary eSupport Drivers Folder](#backup-propietary-esupport-drivers-folder)
+- [Backup Proprietary eSupport Drivers Folder](#backup-proprietary-esupport-drivers-folder)
 - [Creating a win-to-go installation](#creating-a-win-to-go-installation)
 - [Disable VMD](#disable-vmd)
 - [Disable fastboot](#disable-fastboot)
@@ -17,9 +17,9 @@ So you have decided to try out Linux in your ASUS laptop... That's great! Howeve
 - [Disable nouveau](#disable-nouveau)
 - [Switch to Hybrid mode on Windows](#switch-to-hybrid-mode-on-windows)
 
-### Backup Propietary eSupport Drivers Folder
+### Backup Proprietary eSupport Drivers Folder
 
-Stock installations of Windows on ASUS laptops include propietary drivers that cannot be sourced directly from the ASUS website or the MyASUS utility. Before removing the Windows partition or recovery partition these drivers should be backed up. If you ever decide to dual boot or run Windows in a VM, you will need a copy of the drivers for your specific model.
+Stock installations of Windows on ASUS laptops include proprietary drivers that cannot be sourced directly from the ASUS website or the MyASUS utility. Before removing the Windows partition or recovery partition these drivers should be backed up. If you ever decide to dual boot or run Windows in a VM, you will need a copy of the drivers for your specific model.
 
 When present, the folder can be found in `C:\eSupport:` make sure to backup this folder up before performing any destructive operations on your Windows partition !
 
