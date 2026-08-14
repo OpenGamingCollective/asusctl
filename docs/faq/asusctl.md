@@ -35,7 +35,9 @@ It's also possible that your laptop doesn't support this so if the kernel update
 
 ### How do I set a custom fan curve?
 
-Custom fan curves (not speaking of the built-in power profiles) are currently only supported on Ryzen ROG laptops.
+Custom fan curves (not speaking of the built-in power profiles) are only supported on specific models.
+
+See the [supported laptops list](https://github.com/OpenGamingCollective/asusctl#supported-laptops) to check whether your model is included.
 The necessary kernel patches are merged since 5.17.
 
 The format is shown [here](https://github.com/cronosun/atrofac/blob/master/ADVANCED.md#limits).
