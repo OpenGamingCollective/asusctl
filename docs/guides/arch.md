@@ -76,7 +76,7 @@ sudo pacman-key --lsign-key F79100EF8C802DAB81C323BB8EEA5962FE510E19
 
 This should show output similar to this:
 
-![alt text](../assets/arch_ogc_keys.png)
+![OGC repository signing key](../assets/guides/arch/ogc-signing-key.png)
 
 > [!TIP]
 > Have any problems ? Check if `/etc/pacman.d/gnupg/gpg.conf` doesn't have specified the keyserver or make sure it is `hkp://keyserver.ubuntu.com` If you still have problems check if you are not running some active VPN connection, this does sometimes cause problems when fetching the server.
@@ -136,7 +136,7 @@ ROG Control Center is a GUI tool for configuring few aspects of asusctl.
 sudo pacman -S rog-control-center
 ```
 
-![alt text](../assets/rogcc.png)
+![ROG Control Center](../assets/guides/shared/rog-control-center.png)
 
 ### Custom kernel - drivers fixes, hardware support
 
