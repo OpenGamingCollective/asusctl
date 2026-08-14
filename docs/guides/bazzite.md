@@ -32,7 +32,7 @@ Bazzite ships the Terra repository preconfigured but disabled. If you prefer RPM
 
 ```bash
 sudo sed -i 's/enabled=0/enabled=1/' /etc/yum.repos.d/terra.repo /etc/yum.repos.d/terra-extras.repo
-rpm-ostree install asusctl asusctl-rog-gui
+sudo rpm-ostree install asusctl asusctl-rog-gui
 ```
 
 Reboot after layering. Keep in mind that rpm-ostree layered packages can pause updates and may not survive rebasing to a new image, so the Homebrew method is recommended.

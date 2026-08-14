@@ -111,7 +111,7 @@ sudo dnf install asusctl
 Enable and start the systemd service:
 
 ```bash
-systemctl enable --now asusd.service
+sudo systemctl enable --now asusd.service
 ```
 
 `asusd` manages platform profiles and CPU EPP settings itself. Running an external power management daemon (such as `power-profiles-daemon` or `tuned`) alongside `asusd` can cause race conditions and contention over the platform profile and EPP preferences. You have two options:
