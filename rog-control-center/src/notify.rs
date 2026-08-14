@@ -71,7 +71,7 @@ fn dgpu_status_for_tick(
     }
 }
 
-fn start_dpu_status_mon(config: Arc<Mutex<Config>>, gpu_status_tx: watch::Sender<GfxPower>) {
+fn start_dgpu_status_mon(config: Arc<Mutex<Config>>, gpu_status_tx: watch::Sender<GfxPower>) {
     use rog_platform::gpu_pci::{asus_dgpu_disabled, asus_gpu_mux_discreet, Device};
 
     let find_dgpu = || {
@@ -197,44 +197,7 @@ pub fn start_notifications(
     });
 
     info!("Attempting to start plain dgpu status monitor");
-    start_dpu_status_mon(config.clone(), gpu_status_tx);
-
-    // GPU MUX Mode notif
-    // TODO: need to get armoury attrs and iter to find
-    // let enabled_notifications_copy = config.clone();
-    // tokio::spawn(async move {
-    //     let conn = zbus::Connection::system().await.map_err(|e| {
-    //         error!("zbus signal: receive_notify_gpu_mux_mode: {e}");
-    //         e
-    //     })?;
-    //     let proxy = PlatformProxy::new(&conn).await.map_err(|e| {
-    //         error!("zbus signal: receive_notify_gpu_mux_mode: {e}");
-    //         e
-    //     })?;
-
-    //     let mut actual_mux_mode = GpuMode::Error;
-    //     if let Ok(mode) = proxy.gpu_mux_mode().await {
-    //         actual_mux_mode = GpuMode::from(mode);
-    //     }
-
-    //     info!("Started zbus signal thread: receive_notify_gpu_mux_mode");
-    //     while let Some(e) =
-    // proxy.receive_gpu_mux_mode_changed().await.next().await {         if let
-    // Ok(config) = enabled_notifications_copy.lock() {             if
-    // !config.notifications.enabled || !config.notifications.receive_notify_gfx {
-    //                 continue;
-    //             }
-    //         }
-    //         if let Ok(out) = e.get().await {
-    //             let mode = GpuMode::from(out);
-    //             if mode == actual_mux_mode {
-    //                 continue;
-    //             }
-    //             do_mux_notification("Reboot required. BIOS GPU MUX mode set to",
-    // &mode).ok();         }
-    //     }
-    //     Ok::<(), zbus::Error>(())
-    // });
+    start_dgpu_status_mon(config.clone(), gpu_status_tx);
 
     Ok(vec![blocking])
 }
