@@ -35,7 +35,7 @@ This guide is updated for the current stable release of Fedora.
 However, please be aware:
 
 - You need to keep Fedora up to date. If you are 2 versions behind, your OS is no longer supported by Fedora (updates, security, etc.)
-- E.g. If Fedora 43 is the current stable release, and you are on Fedora 41, your OS is unsupported.
+- E.g. If Fedora 44 is the current stable release, and you are on Fedora 42, your OS is unsupported.
 
 ### Installation
 
@@ -57,7 +57,7 @@ However, please be aware:
 This guide requires typing _terminal commands_. To type them, start the Terminal application, which opens a window that has a command prompt.
 
 To open the Terminal, simply press the Windows/Super key to bring up the Start Menu (KDE) or the Activities view (GNOME), and start typing "term" in the search box. Click on the search result.
-![alt text](../assets/fedora_term.png)
+![Terminal search](../assets/guides/fedora/terminal-search.png)
 
 Commands that have _sudo_ in front are administrator commands, and may require you to type in your password.
 
@@ -80,10 +80,10 @@ Or if you don't want to use terminal:
 2. Navigate to Updates tab
 3. Click the Refresh-button in the top left corner
 4. Download all available updates
-   ![alt text](../assets/fedora_updater.png)
+   ![Software updates](../assets/guides/fedora/software-updates.png)
 5. After the updates have been downloaded, click the "Restart & Update" button
 
-![alt text](../assets/fedora_updater_restart.png)
+![Restart and update](../assets/guides/fedora/software-restart.png)
 
 Wait until the updates are installed.
 
@@ -95,11 +95,11 @@ Wait until the updates are installed.
 ASUS Linux packages and tools are currently packaged on the Terra Repository for Fedora. Add the Terra repo with the following commands:
 
 ```bash
-sudo dnf install --nogpgcheck --repofrompath 'terra,https://repos.fyralabs.com/terra$releasever' terra-release
+sudo dnf install --nogpgcheck --repofrompath 'terra,https://repos.fyralabs.com/terra$releasever' terra-release terra-gpg-keys
 ```
 
 > [!WARNING]
-> For previous users who have enabled the community-maintained COPR repository, this repository is no longer maintained and should not be used. You can migrate to the new Terra repository by using the above command, and by deleting the old copr repository with `sudo dnf copr remove lukenukem/asus-linux`. Don't forget to reinstall all ASUS Linux tools.
+> The older community-maintained COPR repository is no longer recommended and is currently broken due to expired signing keys, so it should not be used. If you previously enabled it, migrate to the Terra repository by using the above command, and by deleting the old copr repository with `sudo dnf copr remove lukenukem/asus-linux`. Don't forget to reinstall all ASUS Linux tools.
 
 #### Asusctl
 
@@ -115,15 +115,25 @@ Enable and start the systemd service:
 systemctl enable --now asusd.service
 ```
 
-To avoid [problems with tuned](https://gitlab.com/asus-linux/asusctl/-/issues/724), you should use ppd.
+`asusd` manages platform profiles and CPU EPP settings itself. Running an external power management daemon (such as `power-profiles-daemon` or `tuned`) alongside `asusd` can cause race conditions and contention over the platform profile and EPP preferences. You have two options:
+
+1. **Let `asusd` manage profiles** and disable the external daemon. Since Fedora 41, `tuned` is the default power profile daemon. Note that KDE Plasma's PowerDevil can respawn `power-profiles-daemon` through DBus activation even after it is disabled, so be sure to mask it instead:
 
 ```bash
-sudo dnf swap tuned-ppd power-profiles-daemon --allowerasing
-systemctl enable --now power-profiles-daemon.service
+sudo systemctl mask --now power-profiles-daemon.service
+# or, if you use tuned:
+sudo systemctl mask --now tuned.service tuned-ppd.service
 ```
 
-> [!WARNING]
-> This part is outdated, it will be updated soon
+2. **Keep the external daemon** and disable `asusd`'s profile management by setting the following to `false` in `/etc/asusd/asusd.ron`:
+
+```conf
+change_platform_profile_on_ac: false,
+change_platform_profile_on_battery: false,
+platform_profile_linked_epp: false,
+```
+
+See [issue #264](https://github.com/OpenGamingCollective/asusctl/issues/264) for details.
 
 #### ROG Control Center
 
@@ -132,6 +142,10 @@ ROG Control Center is a GUI tool that can be used to configure asusctl. After ad
 ```bash
 sudo dnf install asusctl-rog-gui
 ```
+
+![ROG Control Center](../assets/guides/shared/rog-control-center.png)
+
+![ROG Control Center fan curve](../assets/guides/shared/rog-control-center-fan-curve.png)
 
 > [!NOTE]
 > For complete functionality and driver support, it is recommended to use a Kernel version of 6.19 or greater.
@@ -206,7 +220,7 @@ You need [RPM-Fusion](#installing-rpm-fusion) repos and follow [this guide](<htt
 
 #### Cardwire
 
-Cardwire is the community's new replacement for the now-deprecated supergfxd.
+Cardwire is the community's new replacement for the now-deprecated supergfxctl.
 
 > [!CAUTION]
 > Cardwire is currently still considered EXPERIMENTAL. If you choose to install this tool, expect rough edges and quirks. For support, join our Discord server.
