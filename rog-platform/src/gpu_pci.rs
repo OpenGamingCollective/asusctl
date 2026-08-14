@@ -280,11 +280,12 @@ impl Device {
         if let Ok(entries) = fs::read_dir("/sys/class/hwmon") {
             for entry in entries.flatten() {
                 let path = entry.path();
-                let is_match = path.join("device").canonicalize().ok().is_some_and(|p| {
-                    p == self.dev_path
-                        || self.dev_path.starts_with(&p)
-                        || p.starts_with(&self.dev_path)
-                });
+                // This GPU or something under it, never an ancestor bridge
+                let is_match = path
+                    .join("device")
+                    .canonicalize()
+                    .ok()
+                    .is_some_and(|p| p == self.dev_path || p.starts_with(&self.dev_path));
                 if is_match {
                     if let Some(temp) = read_hwmon_temp(&path) {
                         return Some(temp);
@@ -333,11 +334,12 @@ impl Device {
         if let Ok(entries) = fs::read_dir("/sys/class/drm") {
             for entry in entries.flatten() {
                 let path = entry.path();
-                let is_match = path.join("device").canonicalize().ok().is_some_and(|p| {
-                    p == self.dev_path
-                        || self.dev_path.starts_with(&p)
-                        || p.starts_with(&self.dev_path)
-                });
+                // This GPU or something under it, never an ancestor bridge
+                let is_match = path
+                    .join("device")
+                    .canonicalize()
+                    .ok()
+                    .is_some_and(|p| p == self.dev_path || p.starts_with(&self.dev_path));
                 if is_match {
                     if let Some(busy) = read_drm_busy(&path) {
                         return Some(busy);
@@ -382,11 +384,12 @@ impl Device {
         if let Ok(entries) = fs::read_dir("/sys/class/hwmon") {
             for entry in entries.flatten() {
                 let path = entry.path();
-                let is_match = path.join("device").canonicalize().ok().is_some_and(|p| {
-                    p == self.dev_path
-                        || self.dev_path.starts_with(&p)
-                        || p.starts_with(&self.dev_path)
-                });
+                // This GPU or something under it, never an ancestor bridge
+                let is_match = path
+                    .join("device")
+                    .canonicalize()
+                    .ok()
+                    .is_some_and(|p| p == self.dev_path || p.starts_with(&self.dev_path));
                 if is_match {
                     if let Some(freq) = read_hwmon_freq(&path) {
                         return Some(freq);
