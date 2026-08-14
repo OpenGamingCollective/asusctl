@@ -1,6 +1,8 @@
-# Fedora Silverblue Setup Guide
+# Fedora Atomic Setup Guide
 
-> A Quickstart Guide to Fedora Silverblue and Asus-Linux
+> A Quickstart Guide to Fedora Atomic Desktops (Silverblue, Kinoite) and Asus-Linux
+
+This guide covers the Fedora Atomic Desktops (Silverblue, Kinoite, Sway Atomic, Budgie Atomic, COSMIC Atomic), which use rpm-ostree for package layering. If you use a Universal Blue image such as Bazzite, see the [Bazzite guide](bazzite.md) instead.
 
 ## Contents
 
@@ -29,9 +31,9 @@ Read the [Intro guide](../introduction.md) first to avoid bad surprises.
 
 ASUS Linux packages and tools are currently packaged on the Terra Repository for Fedora. Add the Terra repo with the following commands:
 
-```bash
-curl -fsSL https://github.com/terrapkg/subatomic-repos/raw/main/terra.repo | pkexec tee /etc/yum.repos.d/terra.repo
-rpm-ostree install --apply-live terra-release
+````bash
+curl -fsSL https://raw.githubusercontent.com/terrapkg/packages/f$(rpm --eval '%{fedora}')/anda/terra/release/terra.repo | pkexec tee /etc/yum.repos.d/terra.repo
+rpm-ostree install terra-release terra-gpg-keys
 ```
 
 #### Asusctl
@@ -40,16 +42,27 @@ This section covers installing asusctl and its supporting software. This enables
 
 ```bash
 rpm-ostree install asusctl
-```
+````
 
-To avoid [problems with tuned](https://gitlab.com/asus-linux/asusctl/-/issues/724), you should use ppd.
+`asusd` manages platform profiles and CPU EPP settings itself. Running an external power management daemon (such as `power-profiles-daemon` or `tuned`) alongside `asusd` can cause race conditions and contention over the platform profile and EPP preferences. You have two options:
+
+1. **Let `asusd` manage profiles** and disable the external daemon. Since Fedora 41, `tuned` is the default power profile daemon. Note that KDE Plasma's PowerDevil can respawn `power-profiles-daemon` through DBus activation even after it is disabled, so be sure to mask it instead:
 
 ```bash
-rpm-ostree override remove tuned-ppd --install power-profiles-daemon
+sudo systemctl mask --now power-profiles-daemon.service
+# or, if you use tuned:
+sudo systemctl mask --now tuned.service tuned-ppd.service
 ```
 
-> [!WARNING]
-> This ppd section is outdated
+2. **Keep the external daemon** and disable `asusd`'s profile management by setting the following to `false` in `/etc/asusd/asusd.ron`:
+
+```conf
+change_platform_profile_on_ac: false,
+change_platform_profile_on_battery: false,
+platform_profile_linked_epp: false,
+```
+
+See [issue #264](https://github.com/OpenGamingCollective/asusctl/issues/264) for details.
 
 #### ROG Control Center
 
@@ -59,6 +72,10 @@ ROG Control Center is a GUI tool for configuring few aspects of asusctl. After a
 rpm-ostree install asusctl-rog-gui
 ```
 
+![ROG Control Center](../assets/guides/shared/rog-control-center.png)
+
+![ROG Control Center fan curve](../assets/guides/shared/rog-control-center-fan-curve.png)
+
 now reboot your system to apply the changes
 
 #### After rebooting
@@ -66,7 +83,7 @@ now reboot your system to apply the changes
 Once the asusd service has been restarted, it should be enabled by default. If this is not the case, you can enable it as follows:
 
 ```bash
-systemctl enable --now asusd.services
+systemctl enable --now asusd.service
 ```
 
 > [!NOTE]
@@ -117,7 +134,7 @@ Nvidia in Atomic versions requires key enrollment. However, you may need to repe
 
 ##### Recommended approach
 
-The recommended approach is to use or rebase [Bazzite](https://bazzite.gg/), [Bluefin](https://projectbluefin.io/), [Aurora](https://getaurora.dev/en), or a vanilla image of [Universal Blue](https://github.com/orgs/ublue-os/packages?tab=packages&q=silverblue-nvidia) with the Nvidia driver already configured.
+The recommended approach is to use or rebase [Bazzite](https://bazzite.gg/), [Bluefin](https://projectbluefin.io/), [Aurora](https://getaurora.dev/en), or a vanilla image of [Universal Blue](https://github.com/orgs/ublue-os/packages?tab=packages&q=silverblue-nvidia) with the Nvidia driver already configured. If you rebase to Bazzite, see the [Bazzite guide](bazzite.md) for installing asusctl.
 
 If you want rebase follow this [guide](https://docs.getaurora.dev/guides/alternate-install-guide).
 
