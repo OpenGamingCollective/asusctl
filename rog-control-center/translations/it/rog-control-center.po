@@ -488,6 +488,12 @@ msgctxt "PageSystem"
 msgid "N/A"
 msgstr "N/D"
 
+#: rog-control-center/ui/pages/system.slint:373
+#: rog-control-center/ui/pages/system.slint:386
+msgctxt "PageSystem"
+msgid "Suspended"
+msgstr "Sospesa"
+
 #: rog-control-center/ui/pages/system.slint:351
 msgctxt "PageSystem"
 msgid "Fan Speeds"

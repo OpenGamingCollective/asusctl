@@ -574,6 +574,12 @@ msgctxt "PageSystem"
 msgid "dGPU Status"
 msgstr ""
 
+#: rog-control-center/ui/pages/system.slint:373
+#: rog-control-center/ui/pages/system.slint:386
+msgctxt "PageSystem"
+msgid "Suspended"
+msgstr ""
+
 #: rog-control-center/ui/pages/system.slint:394
 msgctxt "PageSystem"
 msgid "Fan Speeds"

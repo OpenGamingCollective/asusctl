@@ -173,6 +173,7 @@ export global SystemPageData {
     in-out property <float> igpu_temp_val: -1.0;
     in-out property <float> igpu_usage_val: -1.0;
     in-out property <bool> has_igpu: false;
+    in-out property <bool> dgpu_suspended: false;
 }
 
 export component PageSystem inherits Rectangle {
@@ -369,9 +370,9 @@ export component PageSystem inherits Rectangle {
                                     color: Palette.control-foreground;
                                 }
                                 Text {
-                                    text: SystemPageData.gpu_temp_val > 0.0 ? (Math.round(SystemPageData.gpu_temp_val) + " °C") : @tr("N/A");
+                                    text: SystemPageData.dgpu_suspended ? @tr("Suspended") : (SystemPageData.gpu_temp_val >= 0.0 ? (Math.round(SystemPageData.gpu_temp_val) + " °C") : @tr("N/A"));
                                     font-weight: 700;
-                                    color: SystemPageData.gpu_temp_val > 80 ? #ef4444 : (SystemPageData.gpu_temp_val > 65 ? #eab308 : (SystemPageData.gpu_temp_val > 0.0 ? #22c55e : Palette.control-foreground));
+                                    color: SystemPageData.dgpu_suspended ? Palette.control-foreground : (SystemPageData.gpu_temp_val > 80 ? #ef4444 : (SystemPageData.gpu_temp_val > 65 ? #eab308 : (SystemPageData.gpu_temp_val >= 0.0 ? #22c55e : Palette.control-foreground)));
                                 }
                             }
                             
@@ -382,7 +383,7 @@ export component PageSystem inherits Rectangle {
                                     color: Palette.control-foreground;
                                 }
                                 Text {
-                                    text: SystemPageData.gpu_usage_val >= 0.0 ? (Math.round(SystemPageData.gpu_usage_val) + "%") : @tr("N/A");
+                                    text: SystemPageData.dgpu_suspended ? @tr("Suspended") : (SystemPageData.gpu_usage_val >= 0.0 ? (Math.round(SystemPageData.gpu_usage_val) + "%") : @tr("N/A"));
                                     font-weight: 700;
                                     color: Palette.control-foreground;
                                 }

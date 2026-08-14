@@ -498,6 +498,12 @@ msgctxt "PageSystem"
 msgid "N/A"
 msgstr "N/A"
 
+#: rog-control-center/ui/pages/system.slint:373
+#: rog-control-center/ui/pages/system.slint:386
+msgctxt "PageSystem"
+msgid "Suspended"
+msgstr "Askıda"
+
 #: rog-control-center/ui/pages/system.slint:351
 #, fuzzy
 msgctxt "PageSystem"

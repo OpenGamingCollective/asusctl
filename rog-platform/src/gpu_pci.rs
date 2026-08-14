@@ -234,16 +234,16 @@ impl Device {
         }
     }
 
-    /// Read the temperature (°C) of this GPU from sysfs hwmon.
+    /// Read the temperature (°C) of this GPU from sysfs hwmon with NVML fallback.
     ///
     /// If this is a discrete GPU and it is not in the `Active` power state,
-    /// this immediately returns `Some(0.0)` without reading sysfs hwmon
-    /// nodes to prevent waking the PCIe device from runtime PM sleep.
+    /// this immediately returns `None` without accessing hwmon or NVML to prevent
+    /// waking the PCIe device from runtime PM sleep.
     pub fn get_temp(&self) -> Option<f32> {
         if self.is_dgpu
             && self.get_runtime_status().unwrap_or(GfxPower::Unknown) != GfxPower::Active
         {
-            return Some(0.0);
+            return None;
         }
 
         // 1. Direct hwmon directory under device path
@@ -282,16 +282,16 @@ impl Device {
         None
     }
 
-    /// Read the GPU utilization percentage (0.0 - 100.0) from sysfs DRM nodes.
+    /// Read the GPU utilization percentage (0.0 - 100.0) from sysfs DRM nodes with NVML fallback.
     ///
     /// If this is a discrete GPU and it is not in the `Active` power state,
-    /// this immediately returns `Some(0.0)` without reading sysfs DRM
-    /// nodes to prevent waking the PCIe device from runtime PM sleep.
+    /// this immediately returns `None` without accessing DRM sysfs or NVML to prevent
+    /// waking the PCIe device from runtime PM sleep.
     pub fn get_usage_pct(&self) -> Option<f32> {
         if self.is_dgpu
             && self.get_runtime_status().unwrap_or(GfxPower::Unknown) != GfxPower::Active
         {
-            return Some(0.0);
+            return None;
         }
 
         // 1. Direct gpu_busy_percent under device path
@@ -617,6 +617,7 @@ pub struct GpuTelemetry {
     pub igpu_usage: f32,
     pub dgpu_temp: f32,
     pub dgpu_usage: f32,
+    pub dgpu_suspended: bool,
 }
 
 impl Default for GpuTelemetry {
@@ -624,8 +625,9 @@ impl Default for GpuTelemetry {
         Self {
             igpu_temp: -1.0,
             igpu_usage: -1.0,
-            dgpu_temp: 0.0,
-            dgpu_usage: 0.0,
+            dgpu_temp: -1.0,
+            dgpu_usage: -1.0,
+            dgpu_suspended: false,
         }
     }
 }
@@ -633,14 +635,16 @@ impl Default for GpuTelemetry {
 /// Retrieve telemetry metrics for all detected GPUs in a single udev scan.
 pub fn get_gpu_telemetry() -> GpuTelemetry {
     let mut telemetry = GpuTelemetry::default();
-    let dgpu_active = get_gpu_power_status() == GfxPower::Active;
+    let power_status = get_gpu_power_status();
+    let dgpu_active = power_status == GfxPower::Active;
+    telemetry.dgpu_suspended = power_status == GfxPower::Suspended;
 
     if let Ok(devices) = Device::find() {
         for device in devices {
             if device.is_dgpu() {
                 if dgpu_active {
-                    telemetry.dgpu_temp = device.get_temp().unwrap_or(0.0);
-                    telemetry.dgpu_usage = device.get_usage_pct().unwrap_or(0.0);
+                    telemetry.dgpu_temp = device.get_temp().unwrap_or(-1.0);
+                    telemetry.dgpu_usage = device.get_usage_pct().unwrap_or(-1.0);
                 }
             } else {
                 telemetry.igpu_temp = device.get_temp().unwrap_or(-1.0);
@@ -788,9 +792,9 @@ mod tests {
         fs::write(dir.join("gpu_busy_percent"), "80\n")?;
 
         let device = fake_device(dir.0.clone());
-        // Discrete GPU in suspended state must return 0.0 without querying hwmon/drm
-        assert_eq!(device.get_temp(), Some(0.0));
-        assert_eq!(device.get_usage_pct(), Some(0.0));
+        // Discrete GPU in suspended state must return None without querying hwmon/drm/nvml
+        assert_eq!(device.get_temp(), None);
+        assert_eq!(device.get_usage_pct(), None);
         Ok(())
     }
 

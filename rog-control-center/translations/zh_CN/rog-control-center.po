@@ -503,6 +503,12 @@ msgctxt "PageSystem"
 msgid "N/A"
 msgstr "无"
 
+#: rog-control-center/ui/pages/system.slint:373
+#: rog-control-center/ui/pages/system.slint:386
+msgctxt "PageSystem"
+msgid "Suspended"
+msgstr "已挂起"
+
 #: rog-control-center/ui/pages/system.slint:351
 #, fuzzy
 msgctxt "PageSystem"

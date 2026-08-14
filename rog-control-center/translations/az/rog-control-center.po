@@ -503,6 +503,12 @@ msgctxt "PageSystem"
 msgid "N/A"
 msgstr "Mövcud deyil"
 
+#: rog-control-center/ui/pages/system.slint:373
+#: rog-control-center/ui/pages/system.slint:386
+msgctxt "PageSystem"
+msgid "Suspended"
+msgstr "Dayandırılıb"
+
 #: rog-control-center/ui/pages/system.slint:351
 #, fuzzy
 msgctxt "PageSystem"
