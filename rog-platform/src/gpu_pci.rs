@@ -9,6 +9,7 @@ use std::fs::{self, OpenOptions};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::sync::OnceLock;
 
 use log::{info, trace, warn};
 use serde::{Deserialize, Serialize};
@@ -172,9 +173,22 @@ fn read_drm_busy(dir: &Path) -> Option<f32> {
         .ok()
 }
 
-fn read_nvml_temp() -> Option<f32> {
+/// The process-wide NVML handle, initialised on first successful use.
+///
+/// `Nvml::init` dlopens libnvidia-ml and costs milliseconds, so it is not
+/// repeated per telemetry read. A failed init is not cached: the driver may
+/// simply not be up yet, so the next call retries.
+fn nvml() -> Option<&'static nvml_wrapper::Nvml> {
+    static NVML: OnceLock<nvml_wrapper::Nvml> = OnceLock::new();
+    if let Some(nvml) = NVML.get() {
+        return Some(nvml);
+    }
     let nvml = nvml_wrapper::Nvml::init().ok()?;
-    let device = nvml.device_by_index(0).ok()?;
+    Some(NVML.get_or_init(|| nvml))
+}
+
+fn read_nvml_temp() -> Option<f32> {
+    let device = nvml()?.device_by_index(0).ok()?;
     let temp = device
         .temperature(nvml_wrapper::enum_wrappers::device::TemperatureSensor::Gpu)
         .ok()?;
@@ -182,8 +196,7 @@ fn read_nvml_temp() -> Option<f32> {
 }
 
 fn read_nvml_usage() -> Option<f32> {
-    let nvml = nvml_wrapper::Nvml::init().ok()?;
-    let device = nvml.device_by_index(0).ok()?;
+    let device = nvml()?.device_by_index(0).ok()?;
     let rates = device.utilization_rates().ok()?;
     Some(rates.gpu as f32)
 }
@@ -201,8 +214,7 @@ fn read_hwmon_freq(dir: &Path) -> Option<f32> {
 }
 
 fn read_nvml_freq() -> Option<f32> {
-    let nvml = nvml_wrapper::Nvml::init().ok()?;
-    let device = nvml.device_by_index(0).ok()?;
+    let device = nvml()?.device_by_index(0).ok()?;
     let clock = device
         .clock_info(nvml_wrapper::enum_wrappers::device::Clock::Graphics)
         .ok()?;
