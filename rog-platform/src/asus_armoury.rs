@@ -265,6 +265,16 @@ pub enum FirmwareAttributeType {
     Norestore,
 }
 
+impl FirmwareAttributeType {
+    pub fn is_read_only(&self) -> bool {
+        matches!(self, Self::ReadOnly)
+    }
+
+    pub fn should_persist_armoury_setting(&self) -> bool {
+        matches!(self, Self::Immediate | Self::Bios)
+    }
+}
+
 macro_rules! define_attribute_getters {
     // Accept a list of attribute idents and an optional `types { .. }` block
     ( $( $attr:ident ),* $(,)? $( ; types { $( $tattr:ident : $ptype:ident ),* $(,)? } )? ) => {

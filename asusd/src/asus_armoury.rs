@@ -181,7 +181,8 @@ impl crate::Reloadable for AsusArmouryAttribute {
         let name = self.attr.name();
 
         let mut config = self.config.lock().await;
-        let apply_value = match attribute.property_type() {
+        let prop_type = attribute.property_type();
+        let apply_value = match prop_type {
             FirmwareAttributeType::Ppt => {
                 let profile: PlatformProfile = self.platform.get_platform_profile()?.into();
                 let power_plugged = self
@@ -205,28 +206,12 @@ impl crate::Reloadable for AsusArmouryAttribute {
 
                 apply_value.map_or(AttrValue::None, AttrValue::Integer)
             }
-            FirmwareAttributeType::Gpu => {
+            _ if !prop_type.should_persist_armoury_setting() => {
                 if config.armoury_settings.remove(&attribute).is_some() {
-                    info!("Removed persisted GPU attribute {name} from config");
+                    info!("Removed stale persisted {prop_type:?} attribute {name} from config");
                     config.write();
                 }
-                info!("Reload called on GPU attribute {name}: doing nothing");
-                AttrValue::None
-            }
-            FirmwareAttributeType::ReadOnly => {
-                if config.armoury_settings.remove(&attribute).is_some() {
-                    info!("Removed stale persisted read-only attribute {name} from config");
-                    config.write();
-                }
-                info!("Reload called on read-only attribute {name}: doing nothing");
-                AttrValue::None
-            }
-            FirmwareAttributeType::Norestore => {
-                if config.armoury_settings.remove(&attribute).is_some() {
-                    info!("Removed stale persisted norestore attribute {name} from config");
-                    config.write();
-                }
-                info!("Reload called on norestore attribute {name}: doing nothing");
+                info!("Reload called on {prop_type:?} attribute {name}: doing nothing");
                 AttrValue::None
             }
             _ => {
@@ -323,34 +308,71 @@ impl AsusArmouryAttribute {
     }
 
     async fn restore_default(&self) -> fdo::Result<()> {
-        self.attr.restore_default()?;
-        if self.name().property_type() == FirmwareAttributeType::Ppt {
-            let profile: PlatformProfile = self.platform.get_platform_profile()?.into();
-            let power_plugged = self
-                .power
-                .get_online()
-                .map_err(|e| {
-                    error!("Could not get power status: {e:?}");
-                    e
-                })
-                .unwrap_or_default();
+        let name = self.attr.name();
+        let prop_type = self.name().property_type();
 
-            let mut config = self.config.lock().await;
-            let tuning = config.select_tunings(power_plugged == 1, profile);
-            if let Some(tune) = tuning.group.get_mut(&self.name()) {
-                if let AttrValue::Integer(i) = self.attr.default_value() {
-                    *tune = *i;
-                }
-            }
-            if tuning.enabled {
-                self.attr
-                    .set_current_value(self.attr.default_value())
+        if prop_type.is_read_only() {
+            warn!(
+                "Attempted to restore default on read-only attribute {name}: operation discarded"
+            );
+            return Err(fdo::Error::NotSupported(format!(
+                "{name} is read-only and cannot be changed"
+            )));
+        }
+
+        match prop_type {
+            FirmwareAttributeType::Ppt => {
+                let profile: PlatformProfile = self.platform.get_platform_profile()?.into();
+                let power_plugged = self
+                    .power
+                    .get_online()
                     .map_err(|e| {
-                        error!("Could not set value: {e:?}");
+                        error!("Could not get power status: {e:?}");
                         e
-                    })?;
+                    })
+                    .unwrap_or_default();
+
+                let default = self.attr.default_value();
+                let mut config = self.config.lock().await;
+                let tuning = config.select_tunings(power_plugged == 1, profile);
+
+                if tuning.enabled {
+                    match self.attr.set_current_value(default) {
+                        Ok(()) => {
+                            if let AttrValue::Integer(i) = default {
+                                if let Some(tune) = tuning.group.get_mut(&self.name()) {
+                                    *tune = *i;
+                                } else {
+                                    tuning.group.insert(self.name(), *i);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            warn!(
+                                "Failed to restore default value {:?} for {name}: {e}. Querying active current_value.",
+                                default
+                            );
+                            if let Ok(AttrValue::Integer(cur)) = self.attr.current_value() {
+                                if let Some(tune) = tuning.group.get_mut(&self.name()) {
+                                    *tune = cur;
+                                } else {
+                                    tuning.group.insert(self.name(), cur);
+                                }
+                            }
+                        }
+                    }
+                } else if let AttrValue::Integer(i) = default {
+                    if let Some(tune) = tuning.group.get_mut(&self.name()) {
+                        *tune = *i;
+                    } else {
+                        tuning.group.insert(self.name(), *i);
+                    }
+                }
+                config.write();
             }
-            config.write();
+            _ => {
+                self.attr.restore_default()?;
+            }
         }
         Ok(())
     }
@@ -677,7 +699,8 @@ pub async fn set_config_or_default(
     let mut changed = false;
     for attr in attrs.attributes().iter() {
         let name: FirmwareAttribute = attr.name().into();
-        match name.property_type() {
+        let prop_type = name.property_type();
+        match prop_type {
             FirmwareAttributeType::Ppt => {
                 let tuning = config.select_tunings(power_plugged, profile);
                 if !tuning.enabled {
@@ -722,36 +745,14 @@ pub async fn set_config_or_default(
                     }
                 }
             }
-            FirmwareAttributeType::Gpu => {
-                // Clean stale persisted queue from older versions. GPU deferred
-                // writes are now in-memory and are applied only on shutdown.
+            _ if !prop_type.should_persist_armoury_setting() => {
                 if config.armoury_settings.remove(&name).is_some() {
                     info!(
-                        "Removed stale persisted GPU attribute {} from config",
+                        "Removed stale persisted {prop_type:?} attribute {} from config",
                         <&str>::from(name)
                     );
                     changed = true;
                 }
-            }
-            FirmwareAttributeType::ReadOnly => {
-                if config.armoury_settings.remove(&name).is_some() {
-                    info!(
-                        "Removed stale persisted read-only attribute {} from config",
-                        <&str>::from(name)
-                    );
-                    changed = true;
-                }
-                // Never restore or apply read-only attributes
-            }
-            FirmwareAttributeType::Norestore => {
-                if config.armoury_settings.remove(&name).is_some() {
-                    info!(
-                        "Removed stale persisted norestore attribute {} from config",
-                        <&str>::from(name)
-                    );
-                    changed = true;
-                }
-                // Never restore or apply norestore attributes
             }
             _ => {
                 if let Some(saved_value) = config.armoury_settings.get(&name) {
