@@ -32,7 +32,7 @@ Read the [Intro guide](../introduction.md) first to avoid bad surprises.
 
 ASUS Linux packages and tools are currently packaged on the Terra Repository for Fedora. Add the Terra repo with the following commands:
 
-````bash
+```bash
 curl -fsSL https://raw.githubusercontent.com/terrapkg/packages/f$(rpm --eval '%{fedora}')/anda/terra/release/terra.repo | pkexec tee /etc/yum.repos.d/terra.repo
 sudo rpm-ostree install terra-release terra-gpg-keys
 ```
@@ -43,7 +43,7 @@ This section covers installing asusctl and its supporting software. This enables
 
 ```bash
 sudo rpm-ostree install asusctl
-````
+```
 
 `asusd` manages platform profiles and CPU EPP settings itself. Running an external power management daemon (such as `power-profiles-daemon` or `tuned`) alongside `asusd` can cause race conditions and contention over the platform profile and EPP preferences. You have two options:
 
