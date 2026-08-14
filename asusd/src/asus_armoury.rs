@@ -641,6 +641,20 @@ pub async fn set_config_or_default(
         let name: FirmwareAttribute = attr.name().into();
         match name.property_type() {
             FirmwareAttributeType::Ppt => {
+                // The firmware swaps the range on AC/DC and an attribute with no
+                // range in the current state rejects every write with EINVAL. Must
+                // be the live range, the cached one predates the last swap.
+                if let (Some(min), Some(max)) = (attr.refresh_min_value(), attr.refresh_max_value())
+                {
+                    if max <= min {
+                        debug!(
+                            "{} has no usable range in this power state, skipping",
+                            <&str>::from(name)
+                        );
+                        continue;
+                    }
+                }
+
                 let tuning = config.select_tunings(power_plugged, profile);
                 if !tuning.enabled {
                     debug!("Tuning group is not enabled, skipping");
