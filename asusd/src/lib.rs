@@ -18,11 +18,13 @@ pub mod aura_types;
 pub mod error;
 
 use std::future::Future;
+use std::sync::Arc;
 
 use dmi_id::DMIID;
 use futures_util::stream::StreamExt;
 use log::{debug, error, info, warn};
 use logind_zbus::manager::ManagerProxy;
+use rog_platform::power::AsusPower;
 use zbus::object_server::{Interface, SignalEmitter};
 use zbus::proxy::CacheProperties;
 use zbus::zvariant::ObjectPath;
@@ -181,6 +183,108 @@ pub trait ZbusRun {
     }
 }
 
+/// Locate the mains (AC adapter) supply and its `online` attribute. Goes
+/// through `AsusPower` so the monitor watches the same supply `get_online()`
+/// reads.
+fn mains_power_supply() -> Option<(String, std::path::PathBuf)> {
+    let power = AsusPower::new()
+        .map_err(|e| error!("Could not enumerate power supplies: {e}"))
+        .ok()?;
+    match (power.mains_sysname(), power.mains_syspath()) {
+        (Some(sysname), Some(syspath)) => Some((sysname, syspath.join("online"))),
+        _ => {
+            error!(
+                "No power supply with type 'Mains' was found, external power changes will not be \
+                 detected"
+            );
+            None
+        }
+    }
+}
+
+fn read_power_supply_online(path: &std::path::Path) -> Option<bool> {
+    std::fs::read_to_string(path)
+        .map_err(|e| error!("Could not read the external power supply state from {path:?}: {e}"))
+        .ok()
+        .map(|online| online.trim() != "0")
+}
+
+/// Watch the mains power supply for udev change events, publishing the new
+/// `online` state. State is published rather than acted on here so a slow
+/// consumer can never stall the poll loop.
+fn spawn_mains_power_monitor(
+    sysname: String,
+    online_path: std::path::PathBuf,
+    power_state: Arc<tokio::sync::watch::Sender<Option<bool>>>,
+) {
+    std::thread::spawn(move || {
+        let mut monitor = match udev::MonitorBuilder::new()
+            .and_then(|monitor| monitor.match_subsystem("power_supply"))
+            .and_then(|monitor| monitor.listen())
+        {
+            Ok(monitor) => monitor,
+            Err(e) => {
+                error!("Could not create a udev power supply monitor: {e}");
+                return;
+            }
+        };
+
+        let mut poll = match mio::Poll::new() {
+            Ok(poll) => poll,
+            Err(e) => {
+                error!("Could not create a mio poll for the power supply monitor: {e}");
+                return;
+            }
+        };
+
+        if let Err(e) =
+            poll.registry()
+                .register(&mut monitor, mio::Token(0), mio::Interest::READABLE)
+        {
+            error!("Could not register the power supply monitor with mio: {e}");
+            return;
+        }
+
+        let mut events = mio::Events::with_capacity(8);
+        loop {
+            match poll.poll(&mut events, None) {
+                Ok(()) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(e) => {
+                    error!(
+                        "Power supply monitor poll error, external power changes will no longer \
+                         be detected: {e}"
+                    );
+                    return;
+                }
+            }
+
+            for event in monitor.iter() {
+                if event.event_type() != udev::EventType::Change {
+                    continue;
+                }
+                let device = event.device();
+                if device.sysname().to_string_lossy() != sysname {
+                    continue;
+                }
+
+                // A change uevent is not guaranteed to carry the full property set
+                let online = match device.property_value("POWER_SUPPLY_ONLINE") {
+                    Some(value) => Some(value != "0"),
+                    None => {
+                        debug!("Power supply uevent had no POWER_SUPPLY_ONLINE, reading sysfs");
+                        read_power_supply_online(&online_path)
+                    }
+                };
+
+                if online.is_some() && power_state.send(online).is_err() {
+                    return;
+                }
+            }
+        }
+    });
+}
+
 /// Set up a task to run on the async executor
 pub trait CtrlTask {
     fn zbus_path() -> &'static str;
@@ -213,6 +317,10 @@ pub trait CtrlTask {
     ///
     /// The closures can potentially block, so execution time should be the
     /// minimal possible such as save a variable.
+    ///
+    /// `on_lid_change` and `on_external_power_change` are also called once with
+    /// the current state so that the hardware is configured at daemon start,
+    /// not only on the next transition.
     fn create_sys_event_tasks<Fut1, Fut2, Fut3, Fut4, F1, F2, F3, F4>(
         &self,
         mut on_prepare_for_sleep: F1,
@@ -231,15 +339,46 @@ pub trait CtrlTask {
         Fut4: Future<Output = ()> + Send,
     {
         async {
-            let connection = Connection::system()
-                .await
-                .expect("Controller could not create dbus connection");
+            // The system bus can still be coming up during early boot
+            let connection = match Connection::system().await {
+                Ok(connection) => connection,
+                Err(e) => {
+                    error!("Controller could not create dbus connection: {e}");
+                    return;
+                }
+            };
 
-            let logind_manager = ManagerProxy::builder(&connection)
+            let logind_manager = match ManagerProxy::builder(&connection)
                 .cache_properties(CacheProperties::Lazily)
                 .build()
                 .await
-                .expect("Controller could not create ManagerProxy");
+            {
+                Ok(manager) => manager,
+                Err(e) => {
+                    error!("Controller could not create ManagerProxy: {e}");
+                    return;
+                }
+            };
+
+            // Caching is required for the change stream to fire, but it also makes
+            // property reads return cache. A resync must bypass it or it reads back
+            // the same stale value a missed signal left behind.
+            let logind_direct = match ManagerProxy::builder(&connection)
+                .cache_properties(CacheProperties::No)
+                .build()
+                .await
+            {
+                Ok(manager) => Some(manager),
+                Err(e) => {
+                    warn!("Could not create an uncached ManagerProxy, lid state will not resync after resume: {e}");
+                    None
+                }
+            };
+
+            // Bumped after every resume. Change detection below is edge triggered,
+            // so both watchers re-read their source when this ticks.
+            let (resumed, _) = tokio::sync::watch::channel(0u64);
+            let resumed = Arc::new(resumed);
 
             tokio::spawn({
                 let logind_manager = logind_manager.clone();
@@ -258,6 +397,7 @@ pub trait CtrlTask {
 
             tokio::spawn({
                 let logind_manager = logind_manager.clone();
+                let resumed = resumed.clone();
                 async move {
                     if let Ok(mut notif) = logind_manager.receive_prepare_for_sleep().await {
                         while let Some(event) = notif.next().await {
@@ -265,6 +405,9 @@ pub trait CtrlTask {
                             if let Ok(args) = event.args() {
                                 debug!("Doing on_prepare_for_sleep({})", args.start);
                                 on_prepare_for_sleep(args.start).await;
+                                if !args.start {
+                                    resumed.send_modify(|tick| *tick += 1);
+                                }
                             }
                         }
                     }
@@ -273,160 +416,87 @@ pub trait CtrlTask {
 
             tokio::spawn({
                 let logind_manager = logind_manager.clone();
+                let mut resumed = resumed.subscribe();
                 async move {
-                    // 1. Initial Lid State Fetch & Apply at Daemon Startup
+                    // Subscribe before the initial read so a startup change is not lost
+                    let mut stream = logind_manager.receive_lid_closed_changed().await;
+                    let resync = logind_direct.as_ref().unwrap_or(&logind_manager);
+
                     let mut last_lid = match logind_manager.lid_closed().await {
                         Ok(closed) => {
-                            debug!("Initial lid state on startup: {}", closed);
+                            debug!("Initial lid state on startup: {closed}");
                             on_lid_change(closed).await;
-                            closed
+                            Some(closed)
                         }
                         Err(e) => {
-                            warn!("Failed to read initial lid state from logind: {}", e);
-                            false
+                            warn!("Failed to read initial lid state from logind: {e}");
+                            None
                         }
                     };
 
-                    // 2. Subscribe to D-Bus Property Change Stream
-                    let mut stream = logind_manager.receive_lid_closed_changed().await;
+                    loop {
+                        let lid_closed = tokio::select! {
+                            Some(change) = stream.next() => change.get().await,
+                            Ok(()) = resumed.changed() => {
+                                debug!("Re-reading lid state after resume");
+                                resync.lid_closed().await
+                            }
+                            else => break,
+                        };
 
-                    // 3. Process Signals with Event Deduplication
-                    while let Some(change) = stream.next().await {
-                        if let Ok(lid_closed) = change.get().await {
-                            if lid_closed != last_lid {
-                                last_lid = lid_closed;
-                                debug!("Lid state changed: {}", lid_closed);
+                        match lid_closed {
+                            Ok(lid_closed) if last_lid != Some(lid_closed) => {
+                                last_lid = Some(lid_closed);
+                                debug!("Lid state changed: {lid_closed}");
                                 on_lid_change(lid_closed).await;
+                            }
+                            Ok(_) => {}
+                            Err(e) => {
+                                // The tracked state is now unknown, let the next read through
+                                last_lid = None;
+                                warn!("Failed to read lid state from logind: {e}");
                             }
                         }
                     }
                 }
             });
 
-            // External power supply monitoring
-            if let Some((external_power_supply_sysname, initial_power_supply_state)) =
-                std::fs::read_dir("/sys/class/power_supply")
-                    .ok()
-                    .and_then(|dir| {
-                        // Look up the external power supply sysname (e.g. "ACAD") by finding one
-                        // with the type "mains"
-                        dir.flatten().find_map(|entry| {
-                            let type_path = entry.path().canonicalize().ok()?.join("type");
-                            let supply_type = std::fs::read_to_string(type_path).ok()?;
-                            supply_type
-                                .trim()
-                                .eq_ignore_ascii_case("mains")
-                                .then(|| entry.file_name().to_string_lossy().to_string())
-                        })
-                    })
-                    .and_then(|sysname| {
-                        // Look up the initial state of the external power supply
-                        let path = std::path::PathBuf::from("/sys/class/power_supply")
-                            .join(&sysname)
-                            .join("online");
-                        let state = std::fs::read_to_string(&path)
-                            .map_err(|e| {
-                                error!(
-                                    "Could not read external power supply state from {path:?}: {e}"
-                                )
-                            })
-                            .ok()
-                            .map(|s| s.trim() != "0")?;
-                        Some((sysname, state))
-                    })
-            {
-                debug!(
-                    "External power supply plugged in on startup: {}",
-                    initial_power_supply_state
-                );
-                on_external_power_change(initial_power_supply_state).await;
+            // logind's OnExternalPower is annotated EmitsChangedSignal=false so it can
+            // only be polled. The kernel emits a udev change event for the mains supply
+            // instead, so watch that. Kept separate from the `aura_manager` monitor,
+            // which belongs to device discovery.
+            if let Some((sysname, online_path)) = mains_power_supply() {
+                // Start the monitor before the initial read so a startup change is not lost
+                let (power_state, mut power_changed) = tokio::sync::watch::channel(None);
+                spawn_mains_power_monitor(sysname, online_path.clone(), Arc::new(power_state));
 
-                let handle = tokio::runtime::Handle::current();
-                std::thread::spawn(move || {
-                    'external_power_monitor_thread: {
-                        let mut power_supply_monitor = match udev::MonitorBuilder::new()
-                            .and_then(|m| m.match_subsystem("power_supply"))
-                            .and_then(|m| m.listen())
-                        {
-                            Ok(m) => m,
-                            Err(e) => {
-                                error!("Could not create udev power supply monitor: {e}");
-                                break 'external_power_monitor_thread;
+                let mut last_power = read_power_supply_online(&online_path);
+                if let Some(online) = last_power {
+                    debug!("External power supply plugged in on startup: {online}");
+                    on_external_power_change(online).await;
+                }
+
+                let mut resumed = resumed.subscribe();
+                tokio::spawn(async move {
+                    loop {
+                        let online = tokio::select! {
+                            Ok(()) = power_changed.changed() => *power_changed.borrow_and_update(),
+                            Ok(()) = resumed.changed() => {
+                                debug!("Re-reading external power state after resume");
+                                read_power_supply_online(&online_path)
                             }
+                            else => break,
                         };
 
-                        let mut poll = match mio::Poll::new() {
-                            Ok(p) => p,
-                            Err(e) => {
-                                error!("Could not create mio Poll: {e}");
-                                break 'external_power_monitor_thread;
-                            }
-                        };
-
-                        if let Err(e) = poll.registry().register(
-                            &mut power_supply_monitor,
-                            mio::Token(0),
-                            mio::Interest::READABLE,
-                        ) {
-                            error!("Could not register power supply monitor with mio: {e}");
-                            break 'external_power_monitor_thread;
-                        }
-
-                        let mut events = mio::Events::with_capacity(8);
-
-                        let mut last_power_supply_state = initial_power_supply_state;
-                        loop {
-                            match poll.poll(&mut events, None) {
-                                Ok(_) => {}
-                                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
-                                Err(e) => {
-                                    error!("Power supply monitor poll error: {e}");
-                                    break 'external_power_monitor_thread;
-                                }
-                            }
-
-                            for event in power_supply_monitor.iter() {
-                                if event.event_type() != udev::EventType::Change {
-                                    continue;
-                                }
-                                if event.device().sysname().to_string_lossy()
-                                    != external_power_supply_sysname
-                                {
-                                    continue;
-                                }
-
-                                let Some(current_power_supply_state) = event
-                                    .device()
-                                    .property_value("POWER_SUPPLY_ONLINE")
-                                    .map(|v| v != "0")
-                                else {
-                                    warn!(
-                                        "Power supply change event for external power supply \
-                                         missing POWER_SUPPLY_ONLINE property, skipping..."
-                                    );
-                                    continue;
-                                };
-
-                                if current_power_supply_state != last_power_supply_state {
-                                    last_power_supply_state = current_power_supply_state;
-                                    debug!(
-                                        "External power supply state changed: {}",
-                                        current_power_supply_state
-                                    );
-                                    handle.block_on(on_external_power_change(
-                                        current_power_supply_state,
-                                    ));
-                                }
+                        if let Some(online) = online {
+                            if last_power != Some(online) {
+                                last_power = Some(online);
+                                debug!("External power supply state changed: {online}");
+                                on_external_power_change(online).await;
                             }
                         }
                     }
-                    error!(
-                        "External power supply monitor exited unexpectedly, changes will no \
-                         longer be detected."
-                    );
                 });
-            } else {
-                warn!("External power supply monitoring unavailable");
             }
         }
     }

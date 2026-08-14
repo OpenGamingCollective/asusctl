@@ -905,7 +905,6 @@ impl crate::Reloadable for CtrlPlatform {
                 self.update_policy_ac_or_bat(power_plugged > 0, change_epp)
                     .await;
             }
-            self.run_ac_or_bat_cmd(power_plugged > 0).await;
         }
 
         Ok(())

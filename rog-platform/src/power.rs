@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use log::{info, warn};
 
@@ -119,6 +119,23 @@ impl AsusPower {
 
     pub fn has_battery(&self) -> bool {
         !self.battery.as_os_str().is_empty()
+    }
+
+    /// Syspath of the mains (AC adapter) supply that `get_online()` reads,
+    /// e.g. `/sys/devices/.../power_supply/ADP0`
+    pub fn mains_syspath(&self) -> Option<&Path> {
+        (!self.mains.as_os_str().is_empty()).then_some(self.mains.as_path())
+    }
+
+    /// Sysname of the mains supply, e.g. `ADP0`. This is the name udev events
+    /// carry, so it is what a monitor must match against.
+    pub fn mains_sysname(&self) -> Option<String> {
+        Some(
+            self.mains_syspath()?
+                .file_name()?
+                .to_string_lossy()
+                .to_string(),
+        )
     }
 
     pub fn get_battery_cycle_count(&self) -> Result<i32> {
