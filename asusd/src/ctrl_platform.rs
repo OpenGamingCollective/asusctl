@@ -786,10 +786,21 @@ impl CtrlPlatform {
                             .get(&name)
                             .map(|v| AttrValue::Integer(*v))
                             .unwrap_or_else(|| attr.default_value().clone());
-                        // restore default
-                        attr.set_current_value(&value)?;
-                        if let AttrValue::Integer(i) = value {
-                            *tune = i
+                        match attr.set_current_value(&value) {
+                            Ok(()) => {
+                                if let AttrValue::Integer(i) = value {
+                                    *tune = i;
+                                }
+                            }
+                            Err(e) => {
+                                warn!(
+                                    "Could not set PPT value {value:?} for {}: {e}. Querying active current_value.",
+                                    <&str>::from(name)
+                                );
+                                if let Ok(AttrValue::Integer(cur)) = attr.current_value() {
+                                    *tune = cur;
+                                }
+                            }
                         }
                     }
                 }

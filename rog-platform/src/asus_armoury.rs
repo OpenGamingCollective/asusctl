@@ -352,7 +352,8 @@ define_attribute_getters!(
 
         apu_mem: Norestore,
 
-        charge_mode: Immediate,
+        // charge_mode is read-only in the asus-armoury driver (0444, no store handler)
+        charge_mode: ReadOnly,
     }
 );
 

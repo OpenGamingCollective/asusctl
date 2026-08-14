@@ -247,13 +247,19 @@ impl crate::Reloadable for AsusArmouryAttribute {
             }
             _ => {
                 info!("Applying value {apply_value:?} to attribute {name}");
-                self.attr.set_current_value(&apply_value).map_err(|e| {
-                    error!("Could not set {name} value: {e:?}");
-                    self.attr.base_path_exists();
-                    e
-                })?;
-
-                info!("Restored asus-armoury setting {name} to {apply_value:?}");
+                if let Err(e) = self.attr.set_current_value(&apply_value) {
+                    if attribute.property_type() == FirmwareAttributeType::Ppt {
+                        warn!(
+                            "Could not restore PPT setting {name} to {apply_value:?}: {e:?}. Hardware may restrict this setting in current power state."
+                        );
+                    } else {
+                        error!("Could not set {name} value: {e:?}");
+                        self.attr.base_path_exists();
+                        return Err(e.into());
+                    }
+                } else {
+                    info!("Restored asus-armoury setting {name} to {apply_value:?}");
+                }
             }
         }
 
@@ -394,6 +400,9 @@ impl AsusArmouryAttribute {
                     return Ok(*tune);
                 }
             }
+            if let Ok(AttrValue::Integer(cur)) = self.attr.current_value() {
+                return Ok(cur);
+            }
             if let AttrValue::Integer(i) = self.attr.default_value() {
                 return Ok(*i);
             }
@@ -448,25 +457,18 @@ impl AsusArmouryAttribute {
                     })
                     .unwrap_or_default();
 
-                let mut config = self.config.lock().await;
-                let tuning = config.select_tunings(power_plugged == 1, profile);
+                let config = self.config.lock().await;
+                let tuning_enabled = config
+                    .select_tunings_ref(power_plugged == 1, profile)
+                    .map(|t| t.enabled)
+                    .unwrap_or(false);
 
-                if let Some(tune) = tuning.group.get_mut(&self.name()) {
-                    *tune = value;
+                if tuning_enabled {
+                    debug!("Tuning is enabled: setting value to PPT property {name} = {value}");
+                    AttrValue::Integer(value)
                 } else {
-                    tuning.group.insert(self.name(), value);
-                    debug!("Store tuning config for {name} = {:?}", value);
-                }
-
-                match tuning.enabled {
-                    true => {
-                        debug!("Tuning is enabled: setting value to PPT property {name} = {value}");
-                        AttrValue::Integer(value)
-                    }
-                    false => {
-                        warn!("Tuning is disabled: skipping setting value to PPT property {name}");
-                        AttrValue::None
-                    }
+                    warn!("Tuning is disabled: skipping setting value to PPT property {name}");
+                    AttrValue::None
                 }
             }
             FirmwareAttributeType::Gpu => {
@@ -484,22 +486,7 @@ impl AsusArmouryAttribute {
                     })?;
                 return Ok(());
             }
-            _ => {
-                let mut settings = self.config.lock().await;
-                settings
-                    .armoury_settings
-                    .entry(self.name())
-                    .and_modify(|setting| {
-                        debug!("Set config for {name} = {value}");
-                        *setting = value;
-                    })
-                    .or_insert_with(|| {
-                        debug!("Adding config for {name} = {value}");
-                        value
-                    });
-
-                AttrValue::Integer(value)
-            }
+            _ => AttrValue::Integer(value),
         };
 
         // Only write to sysfs if we have a real value to apply.
@@ -512,8 +499,46 @@ impl AsusArmouryAttribute {
             })?;
         }
 
-        // write config after setting value
-        self.config.lock().await.write();
+        // Commit to in-memory config and persist to disk ONLY AFTER successful hardware write
+        // (or when tuning is disabled and hardware write was intentionally skipped).
+        {
+            let mut config = self.config.lock().await;
+            match self.name().property_type() {
+                FirmwareAttributeType::Ppt => {
+                    let profile: PlatformProfile = self.platform.get_platform_profile()?.into();
+                    let power_plugged = self
+                        .power
+                        .get_online()
+                        .map_err(|e| {
+                            error!("Could not get power status: {e:?}");
+                            e
+                        })
+                        .unwrap_or_default();
+
+                    let tuning = config.select_tunings(power_plugged == 1, profile);
+                    if let Some(tune) = tuning.group.get_mut(&self.name()) {
+                        *tune = value;
+                    } else {
+                        tuning.group.insert(self.name(), value);
+                        debug!("Store tuning config for {name} = {:?}", value);
+                    }
+                }
+                _ => {
+                    config
+                        .armoury_settings
+                        .entry(self.name())
+                        .and_modify(|setting| {
+                            debug!("Set config for {name} = {value}");
+                            *setting = value;
+                        })
+                        .or_insert_with(|| {
+                            debug!("Adding config for {name} = {value}");
+                            value
+                        });
+                }
+            }
+            config.write();
+        }
 
         // When an nv_* attribute (Nvidia TDP/temp) is written, restart
         // nvidia-powerd so it re-reads the new TDP limits from hardware.
@@ -668,17 +693,30 @@ pub async fn set_config_or_default(
                         .ok();
                 } else {
                     let default = attr.default_value();
-                    attr.set_current_value(default)
-                        .map_err(|e| {
-                            error!("Failed to set {}: {e}", <&str>::from(name));
-                        })
-                        .ok();
-                    if let AttrValue::Integer(i) = default {
-                        tuning.group.insert(name, *i);
+                    let value_to_save = match attr.set_current_value(default) {
+                        Ok(()) => match default {
+                            AttrValue::Integer(i) => Some(*i),
+                            _ => None,
+                        },
+                        Err(e) => {
+                            warn!(
+                                "Default value {:?} for {} rejected on current power state: {e}. Falling back to active current_value.",
+                                default,
+                                <&str>::from(name)
+                            );
+                            match attr.current_value() {
+                                Ok(AttrValue::Integer(cur)) => Some(cur),
+                                _ => None,
+                            }
+                        }
+                    };
+
+                    if let Some(val) = value_to_save {
+                        tuning.group.insert(name, val);
                         info!(
                             "Set default tuning config for {} = {:?}",
                             <&str>::from(name),
-                            i
+                            val
                         );
                         changed = true;
                     }
