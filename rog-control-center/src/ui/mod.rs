@@ -293,7 +293,6 @@ pub fn setup_app_settings_page(
 
         let toggle_handle = handle.clone();
         let config_copy = config.clone();
-        let weak = ui.as_weak();
         global.on_set_enable_global_shortcut(move |enable| {
             if enable {
                 match config_copy.lock() {
@@ -304,31 +303,8 @@ pub fn setup_app_settings_page(
                     Err(err) => error!("Could not save global shortcut setting: {err}"),
                 }
                 let handle = toggle_handle.clone();
-                let config = config_copy.clone();
-                let weak = weak.clone();
                 tokio::spawn(async move {
-                    let status = handle.enable(EnableMode::Interactive).await;
-                    if status == ShortcutStatus::Unassigned {
-                        // The user cancelled the first-time bind dialog, so
-                        // the feature can do nothing: revert the intent.
-                        match config.lock() {
-                            Ok(mut lock) => {
-                                lock.enable_global_shortcut = false;
-                                lock.write();
-                            }
-                            Err(err) => {
-                                error!("Could not revert global shortcut setting: {err}")
-                            }
-                        }
-                        handle.disable().await;
-                        weak.upgrade_in_event_loop(|ui| {
-                            ui.global::<AppSettingsPageData>()
-                                .set_enable_global_shortcut(false);
-                        })
-                        .ok();
-                    }
-                    // `Unavailable` keeps the config: the failure may be
-                    // temporary and the next startup will retry the restore.
+                    handle.enable(EnableMode::Interactive).await;
                 });
             } else {
                 match config_copy.lock() {

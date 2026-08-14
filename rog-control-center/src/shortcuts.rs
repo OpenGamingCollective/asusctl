@@ -306,25 +306,21 @@ async fn apply_enable(
     bind_attempted: &mut bool,
     mode: EnableMode,
 ) -> ashpd::Result<ShortcutStatus> {
-    if *current != Assignment::Assigned && mode == EnableMode::Interactive {
-        match *current {
-            Assignment::Missing if !*bind_attempted => {
-                // A failed or cancelled bind may still persist state.
-                *bind_attempted = true;
-                *current = bind_shortcut(gs, session).await?;
-            }
-            Assignment::Unassigned if gs.version() >= 2 => {
-                // KDE requires Configure for an existing empty trigger.
-                if let Err(err) = gs
-                    .configure_shortcuts(session, None, ConfigureShortcutsOptions::default())
-                    .await
-                {
-                    warn!("Could not open shortcut configuration: {err}");
-                }
-            }
-            _ => {}
+    if !*bind_attempted {
+        *bind_attempted = true;
+        *current = bind_shortcut(gs, session).await?;
+    }
+
+    if *current != Assignment::Assigned && mode == EnableMode::Interactive && gs.version() >= 2 {
+        // KDE requires configure for an existing empty trigger.
+        if let Err(err) = gs
+            .configure_shortcuts(session, None, ConfigureShortcutsOptions::default())
+            .await
+        {
+            warn!("Could not open shortcut configuration: {err}");
         }
     }
+
     Ok(match current {
         Assignment::Assigned => ShortcutStatus::Listening,
         _ => ShortcutStatus::Unassigned,
