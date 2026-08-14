@@ -20,8 +20,8 @@ For a technical analysis, see [Adding PPT values from Armoury Crate](https://you
 
 ## Missing LED control
 
-The process is similar for missing LED control, except the table is in the `asusd` software: [`aura_support.ron`](https://gitlab.com/asus-linux/asusctl/-/blob/main/rog-aura/data/aura_support.ron?ref_type=heads).
+The process is similar for missing LED control, except the table is in the `asusd` software: [`aura_support.ron`](https://github.com/OpenGamingCollective/asusctl/blob/main/rog-aura/data/aura_support.ron).
 
-Add your model to this file locally and test the changes, rebooting your laptop afterward. If it works, fork the repository, add the model, and send a merge request to the original repository. The change will then be available to other users.
+Add your model to this file locally and test the changes, rebooting your laptop afterward. If it works, fork the repository, add the model, and submit a pull request to the original repository. The change will then be available to other users.
 
 The capabilities of your model can be found in the official ASUS Armoury Crate software.
