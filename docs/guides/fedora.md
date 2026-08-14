@@ -265,3 +265,15 @@ sudo akmods --force --rebuild
 
 sudo dracut --force
 ```
+
+Then reboot the system:
+
+```bash
+sudo systemctl reboot
+```
+
+After booting, verify that the rebuilt NVIDIA module is loaded:
+
+```bash
+nvidia-smi
+```
