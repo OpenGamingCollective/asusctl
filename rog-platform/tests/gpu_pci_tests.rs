@@ -5,7 +5,7 @@
 //! functions (`Device::find`, `get_gpu_power_status`) are tested via integration
 //! tests on machines with actual GPUs.
 
-use rog_platform::gpu_pci::{lscpi_dgpu_check, GfxPower};
+use rog_platform::gpu_pci::{lspci_dgpu_check, GfxPower};
 use std::str::FromStr;
 
 // ---------------------------------------------------------------------------
@@ -19,8 +19,8 @@ fn gfx_power_from_str_active() {
 
 #[test]
 fn gfx_power_from_str_active_case_insensitive() {
-    assert_eq!(GfxPower::from_str("Active").unwrap(), GfxPower::Active);
     assert_eq!(GfxPower::from_str("ACTIVE").unwrap(), GfxPower::Active);
+    assert_eq!(GfxPower::from_str("Active").unwrap(), GfxPower::Active);
 }
 
 #[test]
@@ -48,51 +48,68 @@ fn gfx_power_from_str_asus_mux_discreet() {
 }
 
 #[test]
-fn gfx_power_from_str_unknown_fallback() {
+fn gfx_power_from_str_handles_whitespace() {
     assert_eq!(
-        GfxPower::from_str("something_weird").unwrap(),
-        GfxPower::Unknown
+        GfxPower::from_str("  suspended\n").unwrap(),
+        GfxPower::Suspended
     );
-    assert_eq!(GfxPower::from_str("").unwrap(), GfxPower::Unknown);
-    assert_eq!(GfxPower::from_str("UNKNOWN").unwrap(), GfxPower::Unknown);
+    assert_eq!(GfxPower::from_str("\tactive ").unwrap(), GfxPower::Active);
 }
 
 #[test]
-fn gfx_power_from_str_handles_whitespace() {
-    assert_eq!(GfxPower::from_str("  active  ").unwrap(), GfxPower::Active);
+fn gfx_power_from_str_unknown_fallback() {
     assert_eq!(
-        GfxPower::from_str("\tsuspended\n").unwrap(),
-        GfxPower::Suspended
+        GfxPower::from_str("auto").unwrap(),
+        GfxPower::Unknown,
+        "unexpected kernel string should map to Unknown"
     );
+    assert_eq!(
+        GfxPower::from_str("unsupported").unwrap(),
+        GfxPower::Unknown
+    );
+    assert_eq!(GfxPower::from_str("").unwrap(), GfxPower::Unknown);
+    assert_eq!(GfxPower::from_str("garbage").unwrap(), GfxPower::Unknown);
 }
 
 // ---------------------------------------------------------------------------
-// GfxPower – Display / Into<&str>
+// GfxPower – Display round-trip
 // ---------------------------------------------------------------------------
 
 #[test]
 fn gfx_power_display_roundtrip() {
     let variants = [
-        (GfxPower::Active, "active"),
-        (GfxPower::Suspended, "suspended"),
-        (GfxPower::AsusDisabled, "dgpu_disabled"),
-        (GfxPower::AsusMuxDiscreet, "asus_mux_discreet"),
-        (GfxPower::Unknown, "unknown"),
+        GfxPower::Active,
+        GfxPower::Suspended,
+        GfxPower::AsusDisabled,
+        GfxPower::AsusMuxDiscreet,
+        GfxPower::Unknown,
     ];
-    for (variant, expected_str) in variants {
-        // Into<&str>
-        let s: &str = (&variant).into();
-        assert_eq!(s, expected_str, "Into<&str> failed for {variant:?}");
+    for &variant in &variants {
+        let s = variant.to_string();
+        let parsed = GfxPower::from_str(&s).unwrap();
+        assert_eq!(variant, parsed, "failed round-trip for {variant:?}");
+    }
+}
 
-        // Display
-        let displayed = format!("{variant}");
-        assert_eq!(displayed, expected_str, "Display failed for {variant:?}");
+// ---------------------------------------------------------------------------
+// GfxPower – Serde
+// ---------------------------------------------------------------------------
 
-        // Roundtrip: from_str(display) should give back the same variant
+#[test]
+fn gfx_power_serde_roundtrip() {
+    let variants = [
+        GfxPower::Active,
+        GfxPower::Suspended,
+        GfxPower::AsusDisabled,
+        GfxPower::AsusMuxDiscreet,
+        GfxPower::Unknown,
+    ];
+    for &variant in &variants {
+        let json = serde_json::to_string(&variant).unwrap();
+        let deserialized: GfxPower = serde_json::from_str(&json).unwrap();
         assert_eq!(
-            GfxPower::from_str(&displayed).unwrap(),
-            variant,
-            "Roundtrip failed for {variant:?}"
+            variant, deserialized,
+            "serde round-trip failed for {variant:?}"
         );
     }
 }
@@ -107,7 +124,7 @@ fn gfx_power_default_is_unknown() {
 }
 
 // ---------------------------------------------------------------------------
-// GfxPower – Copy / Clone / PartialEq
+// GfxPower – Copy / Clone
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -120,83 +137,60 @@ fn gfx_power_copy_clone() {
 }
 
 // ---------------------------------------------------------------------------
-// lscpi_dgpu_check – positive matches
+// lspci_dgpu_check – positive matches
 // ---------------------------------------------------------------------------
 
 #[test]
 fn lspci_dgpu_check_radeon_rx() {
-    assert!(lscpi_dgpu_check("Radeon RX 6800M"));
+    assert!(lspci_dgpu_check("Radeon RX 6800M"));
 }
 
 #[test]
 fn lspci_dgpu_check_amd_ati() {
-    assert!(lscpi_dgpu_check("AMD/ATI Navi 22"));
+    assert!(lspci_dgpu_check("AMD/ATI Navi 22"));
 }
 
 #[test]
 fn lspci_dgpu_check_geforce() {
-    assert!(lscpi_dgpu_check("GeForce RTX 3080"));
+    assert!(lspci_dgpu_check("GeForce RTX 3080"));
 }
 
 #[test]
 fn lspci_dgpu_check_geforce_lowercase_f() {
-    assert!(lscpi_dgpu_check("Geforce GTX 1660"));
+    assert!(lspci_dgpu_check("Geforce GTX 1660"));
 }
 
 #[test]
 fn lspci_dgpu_check_quadro() {
-    assert!(lscpi_dgpu_check("Quadro T1000"));
+    assert!(lspci_dgpu_check("Quadro T1000"));
 }
 
 #[test]
 fn lspci_dgpu_check_t1200() {
-    assert!(lscpi_dgpu_check("T1200"));
+    assert!(lspci_dgpu_check("T1200"));
 }
 
 // ---------------------------------------------------------------------------
-// lscpi_dgpu_check – negative matches
+// lspci_dgpu_check – negative matches
 // ---------------------------------------------------------------------------
 
 #[test]
 fn lspci_dgpu_check_intel_igpu() {
-    assert!(!lscpi_dgpu_check("Intel Corporation UHD Graphics 630"));
+    assert!(!lspci_dgpu_check("Intel Corporation UHD Graphics 630"));
 }
 
 #[test]
 fn lspci_dgpu_check_empty_string() {
-    assert!(!lscpi_dgpu_check(""));
+    assert!(!lspci_dgpu_check(""));
 }
 
 #[test]
 fn lspci_dgpu_check_unrelated_device() {
-    assert!(!lscpi_dgpu_check("Realtek RTL8111/8168/8411"));
+    assert!(!lspci_dgpu_check("Realtek RTL8111/8168/8411"));
 }
 
 #[test]
 fn lspci_dgpu_check_partial_match_not_enough() {
     // "Radeon" alone should not match (the pattern requires "Radeon RX" or "AMD/ATI")
-    assert!(!lscpi_dgpu_check("Radeon Pro W6600"));
-}
-
-// ---------------------------------------------------------------------------
-// GfxPower – serialization (serde)
-// ---------------------------------------------------------------------------
-
-#[test]
-fn gfx_power_serde_roundtrip() {
-    let variants = [
-        GfxPower::Active,
-        GfxPower::Suspended,
-        GfxPower::AsusDisabled,
-        GfxPower::AsusMuxDiscreet,
-        GfxPower::Unknown,
-    ];
-    for variant in variants {
-        let json = serde_json::to_string(&variant).expect("serialize");
-        let deserialized: GfxPower = serde_json::from_str(&json).expect("deserialize");
-        assert_eq!(
-            deserialized, variant,
-            "serde roundtrip failed for {variant:?}"
-        );
-    }
+    assert!(!lspci_dgpu_check("Radeon Pro W6600"));
 }

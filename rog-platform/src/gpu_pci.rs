@@ -8,7 +8,6 @@ use std::fmt::Display;
 use std::fs::{self, OpenOptions};
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::str::FromStr;
 
 use log::{info, trace, warn};
@@ -417,13 +416,11 @@ impl Device {
                                     "Found ID_MODEL_FROM_DATABASE property {id} at {:?} : {label:?}",
                                     device.sysname()
                                 );
-                                dgpu = lscpi_dgpu_check(&label.to_string_lossy());
-                            } else {
-                                trace!(
-                                    "Didn't find dGPU with standard methods, using last resort for id:{id} at {:?}",
-                                    device.sysname()
-                                );
-                                dgpu = lscpi_dgpu_check(&lscpi(&id).unwrap_or_default());
+                                dgpu = lspci_dgpu_check(&label.to_string_lossy());
+                            } else if let Some(model) = device.property_value("ID_MODEL") {
+                                dgpu = lspci_dgpu_check(&model.to_string_lossy());
+                            } else if id.starts_with(NVIDIA_PCI_VENDOR) {
+                                dgpu = is_display_class(&class);
                             }
                         }
 
@@ -454,8 +451,8 @@ impl Device {
 
 // --- Utility functions ---
 
-/// Check an lspci label string for dGPU patterns.
-pub fn lscpi_dgpu_check(label: &str) -> bool {
+/// Check a device model or lspci label string for dGPU patterns.
+pub fn lspci_dgpu_check(label: &str) -> bool {
     for pat in [
         "Radeon RX", "AMD/ATI", "GeForce", "Geforce", "Quadro", "T1200",
     ] {
@@ -464,15 +461,6 @@ pub fn lscpi_dgpu_check(label: &str) -> bool {
         }
     }
     false
-}
-
-fn lscpi(vendor_device: &str) -> Result<String> {
-    let mut cmd = Command::new("lspci");
-    cmd.args([
-        "-d", vendor_device,
-    ]);
-    let output = cmd.output().map_err(PlatformError::Io)?;
-    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
 /// Find connected displays for a GPU by scanning its DRM card directory.
