@@ -29,7 +29,10 @@ The suggested bootloader is systemd-boot. Avoid using GRUB.
 Also remember to install these:
 
 ```bash
-pacman -S linux-firmware amd-ucode intel-ucode
+# AMD systems
+pacman -S linux-firmware amd-ucode
+# Intel systems
+pacman -S linux-firmware intel-ucode
 ```
 
 choose either amd-ucode or intel-ucode depending on your CPU.
