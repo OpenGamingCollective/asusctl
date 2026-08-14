@@ -195,3 +195,15 @@ Install Nvidia drivers:
 rpm-ostree install akmod-nvidia xorg-x11-drv-nvidia xorg-x11-drv-nvidia-cuda
 rpm-ostree kargs --append=rd.driver.blacklist=nouveau,nova_core --append=modprobe.blacklist=nouveau,nova_core
 ```
+
+Wait for the module to be built, then reboot:
+
+```bash
+sudo systemctl reboot
+```
+
+After booting, verify that the NVIDIA driver is loaded:
+
+```bash
+nvidia-smi
+```
