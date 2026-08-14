@@ -114,6 +114,14 @@ fn is_any_external_power_online(supplies: &[(String, std::path::PathBuf)]) -> bo
         .any(|(_, path)| read_power_supply_online(path).unwrap_or(false))
 }
 
+static POWER_MONITOR: tokio::sync::OnceCell<Option<tokio::sync::watch::Receiver<bool>>> =
+    tokio::sync::OnceCell::const_new();
+
+/// Start the power monitor on first use, shared by every `create_sys_event_tasks` caller.
+async fn power_state_receiver() -> Option<tokio::sync::watch::Receiver<bool>> {
+    POWER_MONITOR.get_or_init(start_power_monitor).await.clone()
+}
+
 /// Watch external power supplies for udev change events, reporting whether ANY
 /// external supply is online over a coalescing watch channel.
 ///
@@ -164,8 +172,7 @@ async fn start_power_monitor() -> Option<tokio::sync::watch::Receiver<bool>> {
         let mut events = mio::Events::with_capacity(8);
 
         loop {
-            // Periodic timeout so thread cleanly exits if receiver is dropped on daemon shutdown
-            match poll.poll(&mut events, Some(std::time::Duration::from_secs(5))) {
+            match poll.poll(&mut events, None) {
                 Ok(()) => {}
                 Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
                 Err(e) => {
@@ -175,11 +182,6 @@ async fn start_power_monitor() -> Option<tokio::sync::watch::Receiver<bool>> {
                     );
                     return;
                 }
-            }
-
-            if power_state_tx.is_closed() {
-                // Tokio receiver was dropped (daemon shutting down)
-                return;
             }
 
             let mut has_changes = false;
@@ -484,7 +486,7 @@ pub trait CtrlTask {
             // logind's OnExternalPower is annotated EmitsChangedSignal=false so it can
             // only be polled. The kernel emits a udev change event for power supplies
             // instead, so watch all external supplies (Mains and USB/USB_PD).
-            if let Some(mut power_state_rx) = start_power_monitor().await {
+            if let Some(mut power_state_rx) = power_state_receiver().await {
                 tokio::spawn(async move {
                     let mut last_power = *power_state_rx.borrow_and_update();
                     while power_state_rx.changed().await.is_ok() {
