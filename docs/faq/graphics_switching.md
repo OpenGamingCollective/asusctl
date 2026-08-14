@@ -9,7 +9,7 @@
 
 After checking the usual suspects:
 
-- Missing configuration: you need to configure the system as written in the arch guide.
+- Missing configuration: you need to configure the system for your distribution; see the guide for [Arch Linux](../guides/arch.md), [Fedora Workstation](../guides/fedora.md), [Fedora Atomic](../guides/fedora-atomic.md), [Bazzite](../guides/bazzite.md), [openSUSE Tumbleweed](../guides/opensuse.md), [Ultramarine](../guides/ultramarine.md), or [NixOS](../guides/nixos.md).
 - GPU monitoring widgets: keep the GPU on to monitor it!
 - ollama: if ollama is running nvidia might not be able to sleep!
 
