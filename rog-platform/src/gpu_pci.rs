@@ -188,33 +188,16 @@ fn read_nvml_usage() -> Option<f32> {
     Some(rates.gpu as f32)
 }
 
-/// Graphics clock in MHz from the interfaces that actually exist on Linux:
-/// i915 exposes gt_act_freq_mhz / gt_cur_freq_mhz on the DRM card, amdgpu
-/// exposes hwmon freq1_input in Hz. The proprietary NVIDIA driver exposes
-/// neither, which is what the NVML fallback in get_freq_mhz is for.
-fn read_drm_freq(dir: &Path) -> Option<f32> {
-    // i915: already MHz
-    for node in ["gt_act_freq_mhz", "gt_cur_freq_mhz"] {
-        if let Ok(s) = fs::read_to_string(dir.join(node)) {
-            if let Ok(v) = s.trim().parse::<f32>() {
-                return Some(v);
-            }
-        }
-    }
-    // amdgpu hwmon: freq1_input in Hz
-    if let Ok(entries) = fs::read_dir(dir.join("hwmon")) {
-        for entry in entries.flatten() {
-            let path = entry.path().join("freq1_input");
-            if let Ok(s) = fs::read_to_string(&path) {
-                if let Ok(v) = s.trim().parse::<f32>() {
-                    if v > 0.0 {
-                        return Some(v / 1_000_000.0);
-                    }
-                }
-            }
-        }
-    }
-    None
+/// Graphics clock in MHz from an amdgpu hwmon directory, which reports the
+/// shader clock as `freq1_input` in Hz.
+fn read_hwmon_freq(dir: &Path) -> Option<f32> {
+    let hz = fs::read_to_string(dir.join("freq1_input"))
+        .ok()?
+        .trim()
+        .parse::<f32>()
+        .ok()?;
+    // 0 means the node exists but has no reading, not an idle clock
+    (hz > 0.0).then(|| hz / 1_000_000.0)
 }
 
 fn read_nvml_freq() -> Option<f32> {
@@ -373,13 +356,12 @@ impl Device {
         None
     }
 
-    /// Read the current graphics clock in MHz with NVML fallback.
+    /// Read the current graphics clock (MHz) of this GPU from sysfs hwmon with
+    /// NVML fallback.
     ///
-    /// Reads are device-bound (i915 gt_act_freq_mhz/gt_cur_freq_mhz on this
-    /// device's DRM nodes, then its own hwmon freq1_input), so a hybrid
-    /// laptop's integrated GPU is never mistaken for the dGPU. If this is a
-    /// discrete GPU and it is not in the `Active` power state, this immediately
-    /// returns `None` without touching sysfs or NVML to avoid waking the device.
+    /// If this is a discrete GPU and it is not in the `Active` power state,
+    /// this immediately returns `None` without accessing hwmon or NVML to
+    /// prevent waking the PCIe device from runtime PM sleep.
     pub fn get_freq_mhz(&self) -> Option<f32> {
         if self.is_dgpu
             && self.get_runtime_status().unwrap_or(GfxPower::Unknown) != GfxPower::Active
@@ -387,40 +369,33 @@ impl Device {
             return None;
         }
 
-        // 1. Direct gpu_current_freq under device path
-        if let Some(freq) = read_drm_freq(&self.dev_path) {
-            return Some(freq);
-        }
-
-        // 2. DRM card directories under device path
-        if let Ok(entries) = fs::read_dir(self.dev_path.join("drm")) {
+        // 1. Direct hwmon directory under device path
+        if let Ok(entries) = fs::read_dir(self.dev_path.join("hwmon")) {
             for entry in entries.flatten() {
-                if let Some(freq) = read_drm_freq(&entry.path()) {
+                if let Some(freq) = read_hwmon_freq(&entry.path()) {
                     return Some(freq);
                 }
             }
         }
 
-        // 3. Global /sys/class/drm matching this device's sysfs path
-        if let Ok(entries) = fs::read_dir("/sys/class/drm") {
+        // 2. Global /sys/class/hwmon matching this device's sysfs path
+        if let Ok(entries) = fs::read_dir("/sys/class/hwmon") {
             for entry in entries.flatten() {
                 let path = entry.path();
-                // Exact match or the sensor lives under this GPU only. A
-                // sensor whose device link resolves to an ancestor (PCIe root
-                // port or bridge) must NOT match, or another device's reading
-                // would be reported as this GPU's.
                 let is_match = path.join("device").canonicalize().ok().is_some_and(|p| {
-                    p == self.dev_path || p.starts_with(&self.dev_path)
+                    p == self.dev_path
+                        || self.dev_path.starts_with(&p)
+                        || p.starts_with(&self.dev_path)
                 });
                 if is_match {
-                    if let Some(freq) = read_drm_freq(&path) {
+                    if let Some(freq) = read_hwmon_freq(&path) {
                         return Some(freq);
                     }
                 }
             }
         }
 
-        // 4. Fallback to NVML if this is an NVIDIA device and DRM freq is not available
+        // 3. Fallback to NVML if this is an NVIDIA device and hwmon is not available
         if self.pci_id.to_uppercase().starts_with(NVIDIA_PCI_VENDOR) {
             if let Some(freq) = read_nvml_freq() {
                 return Some(freq);
@@ -754,7 +729,6 @@ pub fn get_gpu_telemetry() -> GpuTelemetry {
     telemetry
 }
 
-
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -791,56 +765,42 @@ mod tests {
         }
     }
 
-    fn fake_active_device(dev_path: PathBuf) -> std::result::Result<Device, Box<dyn std::error::Error>> {
-        fs::create_dir_all(dev_path.join("power"))?;
-        fs::write(dev_path.join("power/runtime_status"), "active\n")?;
-        Ok(Device {
+    /// A dGPU that reads `active`, so the suspend guard does not short-circuit.
+    fn fake_active_device(dev_path: PathBuf, pci_id: &str) -> Device {
+        fs::create_dir_all(dev_path.join("power")).expect("failed to create power dir");
+        fs::write(dev_path.join("power/runtime_status"), "active\n").expect("write");
+        Device {
             dev_path,
             is_dgpu: true,
-            pci_id: "10DE:2820".to_string(),
-        })
+            pci_id: pci_id.to_string(),
+        }
     }
 
     #[test]
-    fn freq_reads_i915_mhz_directly() -> std::result::Result<(), Box<dyn std::error::Error>> {
-        let dir = TestDir::new("freq_i915");
-        fs::write(dir.join("gt_act_freq_mhz"), "2100\n").expect("write");
-        let dev = fake_active_device(dir.0.clone())?;
-        assert_eq!(dev.get_freq_mhz(), Some(2100.0));
-        Ok(())
-    }
-
-    #[test]
-    fn freq_reads_amdgpu_hwmon_hz() -> std::result::Result<(), Box<dyn std::error::Error>> {
+    fn freq_reads_amdgpu_hwmon_hz() {
         let dir = TestDir::new("freq_amdgpu");
         fs::create_dir_all(dir.join("hwmon/hwmon1")).expect("mkdir");
         fs::write(dir.join("hwmon/hwmon1/freq1_input"), "2100000000\n").expect("write");
-        let dev = fake_active_device(dir.0.clone())?;
+        let dev = fake_active_device(dir.0.clone(), "1002:1638");
         assert_eq!(dev.get_freq_mhz(), Some(2100.0));
-        Ok(())
     }
 
     #[test]
-    fn freq_falls_through_to_drm_children() -> std::result::Result<(), Box<dyn std::error::Error>> {
-        // nothing on the device path itself, but a DRM child carries the node
-        let dir = TestDir::new("freq_drm_child");
-        fs::create_dir_all(dir.join("drm/card2")).expect("mkdir");
-        fs::write(dir.join("drm/card2/gt_cur_freq_mhz"), "1500\n").expect("write");
-        let dev = fake_active_device(dir.0.clone())?;
-        assert_eq!(dev.get_freq_mhz(), Some(1500.0));
-        Ok(())
+    fn freq_ignores_zero_hwmon_reading() {
+        let dir = TestDir::new("freq_zero");
+        fs::create_dir_all(dir.join("hwmon/hwmon1")).expect("mkdir");
+        fs::write(dir.join("hwmon/hwmon1/freq1_input"), "0\n").expect("write");
+        let dev = fake_active_device(dir.0.clone(), "1002:1638");
+        assert_eq!(dev.get_freq_mhz(), None);
     }
 
     #[test]
     fn freq_none_when_no_nodes() {
+        // AMD, so the NVML fallback is skipped and the result does not depend
+        // on whether the test box has a live NVIDIA driver
         let dir = TestDir::new("freq_empty");
-        let dev = fake_device(dir.0.clone());
-        // No sysfs nodes and this test env has no usable NVML either; on a box
-        // with a live NVIDIA driver NVML may still answer, so only assert that
-        // it does not panic and never returns 0 for "no node".
-        if let Some(v) = dev.get_freq_mhz() {
-            assert!(v > 0.0);
-        }
+        let dev = fake_active_device(dir.0.clone(), "1002:1638");
+        assert_eq!(dev.get_freq_mhz(), None);
     }
 
     #[test]
