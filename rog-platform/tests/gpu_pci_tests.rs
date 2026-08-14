@@ -19,6 +19,7 @@ fn gpu_telemetry_default_values() {
     assert_eq!(telemetry.igpu_usage, -1.0);
     assert_eq!(telemetry.dgpu_temp, -1.0);
     assert_eq!(telemetry.dgpu_usage, -1.0);
+    assert_eq!(telemetry.dgpu_freq_mhz, -1.0);
     assert!(!telemetry.dgpu_suspended);
 }
 
