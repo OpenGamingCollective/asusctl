@@ -17,7 +17,7 @@ Please note that NixOS in not officially supported by this project, and any issu
 
 ## Requirement
 
-Linux 6.10 or newer is recommended. To install latest Linux, put this in your configuration file:
+Linux 6.19 or newer is recommended. To install the latest Linux, put this in your configuration file:
 
 ```nix
 boot.kernelPackages = pkgs.linuxPackages_latest;
