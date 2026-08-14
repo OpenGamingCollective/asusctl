@@ -135,7 +135,7 @@ sudo pacman -Syu linux-ogc linux-ogc-headers
 ```
 
 > [!CAUTION]
-> If you are using a custom kernel use the nvidia-open-dkms package for nvidia drivers, the regular nvidia package works only with stock Arch kernel
+> If you are using a custom kernel use a DKMS package for nvidia drivers: `nvidia-open-dkms` for Turing and newer GPUs or `nvidia-580xx-dkms` (AUR) for Maxwell, Pascal, and Volta. The regular nvidia package works only with stock Arch kernel
 
 After installing the new kernel you need to regenerate your boot menu or add a new boot entry depending on what boot manager you are using.
 
@@ -169,6 +169,16 @@ You can check currently booted kernel with command uname -r. It should give you 
 ### Nvidia
 
 If your laptop has an NVIDIA GPU, consider using the latest NVIDIA driver.
+
+The driver package depends on your GPU generation:
+
+- Turing and newer (GTX 16 series, RTX 20 series onward): `nvidia-open-dkms`
+- Maxwell, Pascal, and Volta: `nvidia-580xx-dkms` (AUR, the proprietary legacy driver is the only supported option for these generations)
+
+> [!NOTE]
+> Some Ampere-equipped laptops may crash with the open driver due to GSP firmware issues, in that case use the proprietary driver instead.
+
+Both are DKMS packages and work with custom kernels, while the regular `nvidia` package works only with the stock Arch kernel.
 
 You should also install nvidia-laptop-power-cfg
 
@@ -317,4 +327,4 @@ To enable Secure Boot on CachyOS, please follow the [CachyOS Secure Boot Setup g
 
 #### EndeavourOS
 
-When installing EndeavourOS do not use the option with the Nvidia drivers preinstalled. That driver only works with the stock kernel. Use the default install option then install `nvidia-open-dkms` post-install.
+When installing EndeavourOS do not use the option with the Nvidia drivers preinstalled. That driver only works with the stock kernel. Use the default install option then install the DKMS package matching your GPU post-install: `nvidia-open-dkms` for Turing and newer GPUs or `nvidia-580xx-dkms` (AUR) for Maxwell, Pascal, and Volta.
