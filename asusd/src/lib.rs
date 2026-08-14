@@ -42,7 +42,7 @@ const POWER_SUPPLY_PATH: &str = "/sys/class/power_supply";
 /// Check if a power supply type string represents an external power source.
 fn is_external_power_type(supply_type: &str) -> bool {
     let t = supply_type.trim();
-    t.eq_ignore_ascii_case("mains") || (t.len() >= 3 && t[..3].eq_ignore_ascii_case("usb"))
+    t.eq_ignore_ascii_case("mains") || t.get(..3).is_some_and(|p| p.eq_ignore_ascii_case("usb"))
 }
 
 /// Find all external power supplies (Mains AC or USB-C PD, e.g. `ADP0`, `AC0`, `ucsi-source-psy-*`).
