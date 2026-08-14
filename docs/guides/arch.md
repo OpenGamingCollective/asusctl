@@ -225,7 +225,10 @@ If S0ix platform support is supported you want to ensure it is enabled: this is 
 Make sure you also install the vulkan adapter for mesa as well:
 
 ```bash
-sudo pacman -S nvidia-utils vulkan-icd-loader
+# AMD iGPU
+sudo pacman -S vulkan-radeon nvidia-utils vulkan-icd-loader
+# Intel iGPU
+sudo pacman -S vulkan-intel nvidia-utils vulkan-icd-loader
 ```
 
 ### Secure Boot
