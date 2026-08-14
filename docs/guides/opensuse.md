@@ -60,11 +60,11 @@ Users coming from other distributions may run into issues when using Tumbleweed 
 
 ### Preparations
 
-Prior to installation of openSUSE Tumbleweed, follow the instructions in the **Preparations** section of the [Fedora Guide](fedora.md). The list below gives a summary of the important subsections to review.
+Prior to installation of openSUSE Tumbleweed, follow the [preparations in the Introduction guide](../introduction.md). The list below gives a summary of the important subsections to review.
 
-1. **Proprietary eSupport Drivers Folder** - Backing up the proprietary ASUS drivers.
-2. **Disable Secure Boot** - Disabling secure boot for compatibility with the proprietary Nvidia drivers.
-3. **Use the Laptop Screen** - Background on installation problems that may arise due to external screens.
+1. [Backup Proprietary eSupport Drivers Folder](../introduction.md#backup-proprietary-esupport-drivers-folder) - Backing up the proprietary ASUS drivers.
+2. [Disable Secure Boot](../introduction.md#disable-secure-boot) - Disabling secure boot for compatibility with the proprietary Nvidia drivers.
+3. [Use the Laptop Screen](../introduction.md#use-the-laptop-screen) - Background on installation problems that may arise due to external screens.
 
 ### Installation
 
