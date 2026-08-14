@@ -32,6 +32,7 @@ tokio.workspace = true
 # cli and logging
 log.workspace = true
 env_logger.workspace = true
+human-panic.workspace = true
 
 futures-util.workspace = true
 zbus.workspace = true

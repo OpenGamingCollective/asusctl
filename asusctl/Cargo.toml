@@ -24,6 +24,7 @@ env_logger.workspace = true
 ron.workspace = true
 zbus.workspace = true
 argh.workspace = true
+human-panic.workspace = true
 
 [dev-dependencies]
 rog_dbus = { path = "../rog-dbus" }

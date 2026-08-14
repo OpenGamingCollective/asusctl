@@ -43,6 +43,14 @@ mod slash_cli;
 mod xgm_led_cli;
 
 fn main() {
+    human_panic::setup_panic!(human_panic::Metadata::new(
+        env!("CARGO_PKG_NAME"),
+        env!("CARGO_PKG_VERSION")
+    )
+    .authors(env!("CARGO_PKG_AUTHORS"))
+    .homepage(env!("CARGO_PKG_HOMEPAGE"))
+    .support("Open an issue at https://github.com/OpenGamingCollective/asusctl/issues and attach the crash report."));
+
     // Ensure tracing spans are quiet by default unless user overrides
     if std::env::var_os("RUST_LOG").is_none() {
         std::env::set_var("RUST_LOG", "warn,tracing=error,zbus=error");

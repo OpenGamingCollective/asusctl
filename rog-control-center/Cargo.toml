@@ -33,6 +33,7 @@ rog_slash = { path = "../rog-slash" }
 dmi_id = { path = "../dmi-id" }
 
 argh.workspace = true
+human-panic.workspace = true
 log.workspace = true
 env_logger.workspace = true
 

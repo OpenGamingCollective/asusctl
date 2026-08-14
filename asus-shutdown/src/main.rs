@@ -58,6 +58,14 @@ struct DiscreteGpu {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    human_panic::setup_panic!(human_panic::Metadata::new(
+        env!("CARGO_PKG_NAME"),
+        env!("CARGO_PKG_VERSION")
+    )
+    .authors(env!("CARGO_PKG_AUTHORS"))
+    .homepage(env!("CARGO_PKG_HOMEPAGE"))
+    .support("Open an issue at https://github.com/OpenGamingCollective/asusctl/issues and attach the crash report."));
+
     let mut logger = env_logger::Builder::new();
     logger
         .parse_default_env()
