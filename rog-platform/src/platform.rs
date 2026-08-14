@@ -167,6 +167,26 @@ impl PlatformProfile {
             Self::Quiet | Self::LowPower | Self::Custom => Self::Balanced,
         }
     }
+
+    /// `Quiet` and `LowPower` are the same semantic profile; which name the
+    /// kernel exposes depends on the registered platform_profile handlers.
+    /// Substitute the equivalent name when the requested one is unavailable.
+    pub fn resolve_alias(self, choices: &[Self]) -> Self {
+        if choices.contains(&self) {
+            return self;
+        }
+        let alias = match self {
+            Self::Quiet => Self::LowPower,
+            Self::LowPower => Self::Quiet,
+            _ => return self,
+        };
+        if choices.contains(&alias) {
+            info!("Profile {self} is not exposed by the kernel, using {alias} instead");
+            alias
+        } else {
+            self
+        }
+    }
 }
 
 impl From<i32> for PlatformProfile {
@@ -301,4 +321,74 @@ pub fn get_fan_rpms() -> (i32, i32, i32) {
         }
     }
     (cpu, gpu, mid)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::platform::PlatformProfile;
+
+    // asus-wmi only ever exposes these
+    const ASUS_WMI: &[PlatformProfile] = &[
+        PlatformProfile::Quiet,
+        PlatformProfile::Balanced,
+        PlatformProfile::Performance,
+    ];
+    // amd-pmf exposes low-power instead, with quiet as a hidden choice
+    const AMD_PMF: &[PlatformProfile] = &[
+        PlatformProfile::LowPower,
+        PlatformProfile::Balanced,
+        PlatformProfile::Performance,
+    ];
+
+    #[test]
+    fn alias_substitutes_when_name_is_absent() {
+        assert_eq!(
+            PlatformProfile::LowPower.resolve_alias(ASUS_WMI),
+            PlatformProfile::Quiet
+        );
+        assert_eq!(
+            PlatformProfile::Quiet.resolve_alias(AMD_PMF),
+            PlatformProfile::LowPower
+        );
+    }
+
+    #[test]
+    fn alias_is_a_no_op_when_name_is_available() {
+        assert_eq!(
+            PlatformProfile::Quiet.resolve_alias(ASUS_WMI),
+            PlatformProfile::Quiet
+        );
+        assert_eq!(
+            PlatformProfile::LowPower.resolve_alias(AMD_PMF),
+            PlatformProfile::LowPower
+        );
+        for profile in [
+            PlatformProfile::Balanced,
+            PlatformProfile::Performance,
+        ] {
+            assert_eq!(profile.resolve_alias(ASUS_WMI), profile);
+            assert_eq!(profile.resolve_alias(AMD_PMF), profile);
+        }
+    }
+
+    #[test]
+    fn alias_does_not_invent_an_unavailable_profile() {
+        // Custom has no equivalent, and neither variant is available here
+        assert_eq!(
+            PlatformProfile::Custom.resolve_alias(ASUS_WMI),
+            PlatformProfile::Custom
+        );
+        let no_quiet = [
+            PlatformProfile::Balanced,
+            PlatformProfile::Performance,
+        ];
+        assert_eq!(
+            PlatformProfile::Quiet.resolve_alias(&no_quiet),
+            PlatformProfile::Quiet
+        );
+        assert_eq!(
+            PlatformProfile::LowPower.resolve_alias(&no_quiet),
+            PlatformProfile::LowPower
+        );
+    }
 }

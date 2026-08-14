@@ -280,33 +280,22 @@ impl CtrlPlatform {
             self.config.lock().await.platform_profile_on_battery
         };
 
-        // Configs may contain a profile name (Quiet or LowPower) that this
-        // platform does not expose via the kernel ACPI sysfs — different ASUS
-        // platforms expose one or the other for the same semantic profile.
         // Normalize at apply-time so AC/BAT transitions still work correctly.
-        let alias = match configured {
-            PlatformProfile::Quiet => Some(PlatformProfile::LowPower),
-            PlatformProfile::LowPower => Some(PlatformProfile::Quiet),
-            _ => None,
-        };
-        if let Some(target) = alias {
-            if let Ok(choices) = self.platform.get_platform_profile_choices() {
-                if !choices.contains(&configured) && choices.contains(&target) {
-                    let mut cfg = self.config.lock().await;
-                    if power_plugged {
-                        cfg.platform_profile_on_ac = target;
-                    } else {
-                        cfg.platform_profile_on_battery = target;
-                    }
-                    cfg.write();
-                    warn!(
-                        "Configured profile {:?} is unavailable, falling back to {:?} for {}",
-                        configured,
-                        target,
-                        if power_plugged { "AC" } else { "battery" }
-                    );
-                    return target;
+        if let Ok(choices) = self.platform.get_platform_profile_choices() {
+            let target = configured.resolve_alias(&choices);
+            if target != configured {
+                let mut cfg = self.config.lock().await;
+                if power_plugged {
+                    cfg.platform_profile_on_ac = target;
+                } else {
+                    cfg.platform_profile_on_battery = target;
                 }
+                cfg.write();
+                warn!(
+                    "Rewrote stored {} profile {configured:?} as {target:?}",
+                    if power_plugged { "AC" } else { "battery" }
+                );
+                return target;
             }
         }
 
@@ -542,36 +531,13 @@ impl CtrlPlatform {
             self.config.lock().await.write();
 
             let choices = self.platform.get_platform_profile_choices()?;
-            // Different ASUS platforms expose only one of Quiet / LowPower
-            // via the kernel ACPI platform_profile sysfs for the same
-            // semantic profile. Map the requested variant to the available
-            // one so user-facing setters succeed regardless of which name
-            // the kernel reports on this machine. Same bidirectional
-            // fallback is applied in set_platform_profile_on_battery /
-            // set_platform_profile_on_ac and at apply-time in
-            // select_power_profile_for_source.
-            let policy = if !choices.contains(&policy) {
-                match policy {
-                    PlatformProfile::Quiet
-                        if choices.contains(&PlatformProfile::LowPower) =>
-                    {
-                        PlatformProfile::LowPower
-                    }
-                    PlatformProfile::LowPower
-                        if choices.contains(&PlatformProfile::Quiet) =>
-                    {
-                        PlatformProfile::Quiet
-                    }
-                    _ => {
-                        return Err(FdoErr::NotSupported(format!(
-                            "RogPlatform: platform_profile: {} not supported",
-                            policy
-                        )));
-                    }
-                }
-            } else {
-                policy
-            };
+            let policy = policy.resolve_alias(&choices);
+            if !choices.contains(&policy) {
+                return Err(FdoErr::NotSupported(format!(
+                    "RogPlatform: platform_profile: {} not supported",
+                    policy
+                )));
+            }
 
             self.platform
                 .set_platform_profile(policy.into())
@@ -611,23 +577,10 @@ impl CtrlPlatform {
         #[zbus(signal_context)] ctxt: SignalEmitter<'_>,
         policy: PlatformProfile,
     ) -> Result<(), FdoErr> {
-        // If the requested profile isn't available on this platform, fall
-        // back to the semantic equivalent (Quiet <-> LowPower) so we don't
-        // write an unavailable profile into the config file. Different ASUS
-        // platforms expose one or the other for the same semantic profile.
+        // Store the name the kernel actually exposes, not the one asked for.
         let mut chosen = policy;
         if let Ok(choices) = self.platform.get_platform_profile_choices() {
-            if !choices.contains(&chosen) {
-                if chosen == PlatformProfile::Quiet
-                    && choices.contains(&PlatformProfile::LowPower)
-                {
-                    chosen = PlatformProfile::LowPower;
-                } else if chosen == PlatformProfile::LowPower
-                    && choices.contains(&PlatformProfile::Quiet)
-                {
-                    chosen = PlatformProfile::Quiet;
-                }
-            }
+            chosen = chosen.resolve_alias(&choices);
         }
 
         self.config.lock().await.platform_profile_on_battery = chosen;
@@ -659,20 +612,10 @@ impl CtrlPlatform {
         #[zbus(signal_context)] ctxt: SignalEmitter<'_>,
         policy: PlatformProfile,
     ) -> Result<(), FdoErr> {
-        // Mirror the same bidirectional Quiet <-> LowPower fallback for AC.
+        // Mirror the same alias resolution for AC.
         let mut chosen = policy;
         if let Ok(choices) = self.platform.get_platform_profile_choices() {
-            if !choices.contains(&chosen) {
-                if chosen == PlatformProfile::Quiet
-                    && choices.contains(&PlatformProfile::LowPower)
-                {
-                    chosen = PlatformProfile::LowPower;
-                } else if chosen == PlatformProfile::LowPower
-                    && choices.contains(&PlatformProfile::Quiet)
-                {
-                    chosen = PlatformProfile::Quiet;
-                }
-            }
+            chosen = chosen.resolve_alias(&choices);
         }
 
         self.config.lock().await.platform_profile_on_ac = chosen;
