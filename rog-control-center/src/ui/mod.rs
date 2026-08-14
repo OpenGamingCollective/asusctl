@@ -294,31 +294,21 @@ pub fn setup_app_settings_page(
         let toggle_handle = handle.clone();
         let config_copy = config.clone();
         global.on_set_enable_global_shortcut(move |enable| {
-            if enable {
-                match config_copy.lock() {
-                    Ok(mut lock) => {
-                        lock.enable_global_shortcut = true;
-                        lock.write();
-                    }
-                    Err(err) => error!("Could not save global shortcut setting: {err}"),
+            match config_copy.lock() {
+                Ok(mut lock) => {
+                    lock.enable_global_shortcut = enable;
+                    lock.write();
                 }
-                let handle = toggle_handle.clone();
-                tokio::spawn(async move {
-                    handle.enable(EnableMode::Interactive).await;
-                });
-            } else {
-                match config_copy.lock() {
-                    Ok(mut lock) => {
-                        lock.enable_global_shortcut = false;
-                        lock.write();
-                    }
-                    Err(err) => error!("Could not save global shortcut setting: {err}"),
-                }
-                let handle = toggle_handle.clone();
-                tokio::spawn(async move {
-                    handle.disable().await;
-                });
+                Err(err) => error!("Could not save global shortcut setting: {err}"),
             }
+            let handle = toggle_handle.clone();
+            tokio::spawn(async move {
+                if enable {
+                    handle.enable(EnableMode::Interactive).await;
+                } else {
+                    handle.disable().await;
+                }
+            });
         });
 
         global.on_manage_global_shortcut(move || {
