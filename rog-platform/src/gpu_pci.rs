@@ -211,6 +211,140 @@ impl Device {
         }
     }
 
+    /// Read the temperature (°C) of this GPU from sysfs hwmon.
+    ///
+    /// If this is a discrete GPU and it is not in the `Active` power state,
+    /// this immediately returns `Some(0.0)` without reading sysfs hwmon
+    /// nodes to prevent waking the PCIe device from runtime PM sleep.
+    pub fn get_temp(&self) -> Option<f32> {
+        if self.is_dgpu
+            && self.get_runtime_status().unwrap_or(GfxPower::Unknown) != GfxPower::Active
+        {
+            return Some(0.0);
+        }
+
+        // 1. Direct hwmon directory under device path
+        let hwmon_dir = self.dev_path.join("hwmon");
+        if let Ok(entries) = fs::read_dir(&hwmon_dir) {
+            for entry in entries.flatten() {
+                let temp_path = entry.path().join("temp1_input");
+                if let Ok(temp_str) = fs::read_to_string(temp_path) {
+                    if let Ok(temp_val) = temp_str.trim().parse::<f32>() {
+                        return Some(temp_val / 1000.0);
+                    }
+                }
+            }
+        }
+
+        // 2. Global /sys/class/hwmon matching this device's sysfs path
+        if let Ok(entries) = fs::read_dir("/sys/class/hwmon") {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let is_match = path.join("device").canonicalize().ok().is_some_and(|p| {
+                    p == self.dev_path
+                        || self.dev_path.starts_with(&p)
+                        || p.starts_with(&self.dev_path)
+                });
+                if is_match {
+                    let temp_path = path.join("temp1_input");
+                    if let Ok(temp_str) = fs::read_to_string(temp_path) {
+                        if let Ok(temp_val) = temp_str.trim().parse::<f32>() {
+                            return Some(temp_val / 1000.0);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Fallback to NVML if this is an NVIDIA device and hwmon is not available
+        if self.pci_id.to_uppercase().starts_with(NVIDIA_PCI_VENDOR) {
+            if let Ok(nvml) = nvml_wrapper::Nvml::init() {
+                if let Ok(device) = nvml.device_by_index(0) {
+                    if let Ok(temp) = device
+                        .temperature(nvml_wrapper::enum_wrappers::device::TemperatureSensor::Gpu)
+                    {
+                        return Some(temp as f32);
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Read the GPU utilization percentage (0.0 - 100.0) from sysfs DRM nodes.
+    ///
+    /// If this is a discrete GPU and it is not in the `Active` power state,
+    /// this immediately returns `Some(0.0)` without reading sysfs DRM
+    /// nodes to prevent waking the PCIe device from runtime PM sleep.
+    pub fn get_usage_pct(&self) -> Option<f32> {
+        if self.is_dgpu
+            && self.get_runtime_status().unwrap_or(GfxPower::Unknown) != GfxPower::Active
+        {
+            return Some(0.0);
+        }
+
+        // 1. Direct gpu_busy_percent under device path
+        let direct_busy = self.dev_path.join("gpu_busy_percent");
+        if direct_busy.exists() {
+            if let Ok(val_str) = fs::read_to_string(direct_busy) {
+                if let Ok(val) = val_str.trim().parse::<f32>() {
+                    return Some(val);
+                }
+            }
+        }
+
+        // 2. DRM card directories under device path
+        let drm_dir = self.dev_path.join("drm");
+        if let Ok(entries) = fs::read_dir(&drm_dir) {
+            for entry in entries.flatten() {
+                let busy_path = entry.path().join("device/gpu_busy_percent");
+                if busy_path.exists() {
+                    if let Ok(val_str) = fs::read_to_string(busy_path) {
+                        if let Ok(val) = val_str.trim().parse::<f32>() {
+                            return Some(val);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Global /sys/class/drm matching this device's sysfs path
+        if let Ok(entries) = fs::read_dir("/sys/class/drm") {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let is_match = path.join("device").canonicalize().ok().is_some_and(|p| {
+                    p == self.dev_path
+                        || self.dev_path.starts_with(&p)
+                        || p.starts_with(&self.dev_path)
+                });
+                if is_match {
+                    let busy_path = path.join("device/gpu_busy_percent");
+                    if busy_path.exists() {
+                        if let Ok(val_str) = fs::read_to_string(busy_path) {
+                            if let Ok(val) = val_str.trim().parse::<f32>() {
+                                return Some(val);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 4. Fallback to NVML if this is an NVIDIA device and DRM busy is not available
+        if self.pci_id.to_uppercase().starts_with(NVIDIA_PCI_VENDOR) {
+            if let Ok(nvml) = nvml_wrapper::Nvml::init() {
+                if let Ok(device) = nvml.device_by_index(0) {
+                    if let Ok(rates) = device.utilization_rates() {
+                        return Some(rates.gpu as f32);
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
     /// Enumerate PCI GPU devices via udev and identify the dGPU.
     pub fn find() -> Result<Vec<Self>> {
         let mut devices = Vec::new();
@@ -523,12 +657,23 @@ pub fn get_gpu_names() -> (String, String) {
 }
 
 pub fn get_igpu_temp() -> f32 {
+    let devices = Device::find().unwrap_or_default();
+    if let Some(igpu) = devices.iter().find(|d| !d.is_dgpu()) {
+        if let Some(temp) = igpu.get_temp() {
+            return temp;
+        }
+    }
     if let Ok(entries) = std::fs::read_dir("/sys/class/hwmon") {
         for entry in entries.flatten() {
             let path = entry.path();
             if let Ok(name) = std::fs::read_to_string(path.join("name")) {
                 let name = name.trim();
-                if name == "amdgpu" {
+                if name == "amdgpu"
+                    || name == "i915"
+                    || name == "xe"
+                    || name == "k10temp"
+                    || name == "coretemp"
+                {
                     if let Ok(temp_str) = std::fs::read_to_string(path.join("temp1_input")) {
                         if let Ok(temp_val) = temp_str.trim().parse::<f32>() {
                             return temp_val / 1000.0;
@@ -542,6 +687,12 @@ pub fn get_igpu_temp() -> f32 {
 }
 
 pub fn get_igpu_usage_pct() -> f32 {
+    let devices = Device::find().unwrap_or_default();
+    if let Some(igpu) = devices.iter().find(|d| !d.is_dgpu()) {
+        if let Some(usage) = igpu.get_usage_pct() {
+            return usage;
+        }
+    }
     if let Ok(entries) = std::fs::read_dir("/sys/class/drm") {
         for entry in entries.flatten() {
             let path = entry.path();
@@ -554,7 +705,7 @@ pub fn get_igpu_usage_pct() -> f32 {
                 if busy_path.exists() {
                     if let Ok(vendor_str) = std::fs::read_to_string(path.join("device/vendor")) {
                         let vendor = vendor_str.trim();
-                        if vendor == "0x1002" {
+                        if vendor == "0x1002" || vendor == "0x8086" {
                             if let Ok(val_str) = std::fs::read_to_string(busy_path) {
                                 if let Ok(val) = val_str.trim().parse::<f32>() {
                                     return val;
@@ -570,13 +721,13 @@ pub fn get_igpu_usage_pct() -> f32 {
 }
 
 pub fn get_gpu_temp() -> f32 {
-    if let Ok(nvml) = nvml_wrapper::Nvml::init() {
-        if let Ok(device) = nvml.device_by_index(0) {
-            if let Ok(temp) =
-                device.temperature(nvml_wrapper::enum_wrappers::device::TemperatureSensor::Gpu)
-            {
-                return temp as f32;
-            }
+    if get_gpu_power_status() != GfxPower::Active {
+        return 0.0;
+    }
+    let devices = Device::find().unwrap_or_default();
+    if let Some(dgpu) = devices.iter().find(|d| d.is_dgpu()) {
+        if let Some(temp) = dgpu.get_temp() {
+            return temp;
         }
     }
     if let Ok(entries) = std::fs::read_dir("/sys/class/hwmon") {
@@ -584,7 +735,11 @@ pub fn get_gpu_temp() -> f32 {
             let path = entry.path();
             if let Ok(name) = std::fs::read_to_string(path.join("name")) {
                 let name = name.trim();
-                if name == "amdgpu" || name == "nouveau" {
+                if name == "amdgpu"
+                    || name == "nouveau"
+                    || name == "nvidia"
+                    || name == "nvidia_hwmon"
+                {
                     if let Ok(temp_str) = std::fs::read_to_string(path.join("temp1_input")) {
                         if let Ok(temp_val) = temp_str.trim().parse::<f32>() {
                             return temp_val / 1000.0;
@@ -598,11 +753,13 @@ pub fn get_gpu_temp() -> f32 {
 }
 
 pub fn get_gpu_usage_pct() -> f32 {
-    if let Ok(nvml) = nvml_wrapper::Nvml::init() {
-        if let Ok(device) = nvml.device_by_index(0) {
-            if let Ok(rates) = device.utilization_rates() {
-                return rates.gpu as f32;
-            }
+    if get_gpu_power_status() != GfxPower::Active {
+        return 0.0;
+    }
+    let devices = Device::find().unwrap_or_default();
+    if let Some(dgpu) = devices.iter().find(|d| d.is_dgpu()) {
+        if let Some(usage) = dgpu.get_usage_pct() {
+            return usage;
         }
     }
     if let Ok(entries) = std::fs::read_dir("/sys/class/drm") {
@@ -740,6 +897,43 @@ mod tests {
 
         fs::write(dir.join("power/runtime_status"), "unsupported\n")?;
         assert_eq!(device.get_runtime_status()?, GfxPower::Unknown);
+        Ok(())
+    }
+
+    #[test]
+    fn device_get_temp_and_usage_when_suspended(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let dir = TestDir::new("asusctl_test_temp_suspended");
+        fs::create_dir_all(dir.join("power"))?;
+        fs::write(dir.join("power/runtime_status"), "suspended\n")?;
+
+        let hwmon_dir = dir.join("hwmon/hwmon0");
+        fs::create_dir_all(&hwmon_dir)?;
+        fs::write(hwmon_dir.join("temp1_input"), "55000\n")?;
+        fs::write(dir.join("gpu_busy_percent"), "80\n")?;
+
+        let device = fake_device(dir.0.clone());
+        // Discrete GPU in suspended state must return 0.0 without querying hwmon/drm
+        assert_eq!(device.get_temp(), Some(0.0));
+        assert_eq!(device.get_usage_pct(), Some(0.0));
+        Ok(())
+    }
+
+    #[test]
+    fn device_get_temp_and_usage_when_active() -> std::result::Result<(), Box<dyn std::error::Error>>
+    {
+        let dir = TestDir::new("asusctl_test_temp_active");
+        fs::create_dir_all(dir.join("power"))?;
+        fs::write(dir.join("power/runtime_status"), "active\n")?;
+
+        let hwmon_dir = dir.join("hwmon/hwmon0");
+        fs::create_dir_all(&hwmon_dir)?;
+        fs::write(hwmon_dir.join("temp1_input"), "62500\n")?;
+        fs::write(dir.join("gpu_busy_percent"), "45\n")?;
+
+        let device = fake_device(dir.0.clone());
+        assert_eq!(device.get_temp(), Some(62.5));
+        assert_eq!(device.get_usage_pct(), Some(45.0));
         Ok(())
     }
 

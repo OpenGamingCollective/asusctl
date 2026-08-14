@@ -46,7 +46,6 @@ futures-util.workspace = true
 thiserror.workspace = true
 udev.workspace = true
 serde_json.workspace = true
-nvml-wrapper.workspace = true
 
 [dependencies.slint]
 git = "https://github.com/slint-ui/slint.git"
