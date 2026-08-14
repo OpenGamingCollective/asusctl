@@ -18,13 +18,11 @@ pub mod aura_types;
 pub mod error;
 
 use std::future::Future;
-use std::time::Duration;
 
 use dmi_id::DMIID;
 use futures_util::stream::StreamExt;
-use log::{debug, info, warn};
+use log::{debug, error, info, warn};
 use logind_zbus::manager::ManagerProxy;
-use tokio::time::sleep;
 use zbus::object_server::{Interface, SignalEmitter};
 use zbus::proxy::CacheProperties;
 use zbus::zvariant::ObjectPath;
@@ -38,6 +36,182 @@ pub const ASUS_ZBUS_PATH: &str = "/xyz/ljones";
 pub static DBUS_NAME: &str = "xyz.ljones.Asusd";
 pub static DBUS_PATH: &str = "/xyz/ljones/Daemon";
 pub static DBUS_IFACE: &str = "xyz.ljones.Asusd";
+
+const POWER_SUPPLY_PATH: &str = "/sys/class/power_supply";
+
+/// Check if a power supply type string represents an external power source.
+fn is_external_power_type(supply_type: &str) -> bool {
+    let t = supply_type.trim();
+    t.eq_ignore_ascii_case("mains") || (t.len() >= 3 && t[..3].eq_ignore_ascii_case("usb"))
+}
+
+/// Find all external power supplies (Mains AC or USB-C PD, e.g. `ADP0`, `AC0`, `ucsi-source-psy-*`).
+fn find_external_power_supplies() -> Vec<(String, std::path::PathBuf)> {
+    let mut enumerator = match udev::Enumerator::new() {
+        Ok(e) => e,
+        Err(e) => {
+            warn!("Could not create a udev enumerator for power supplies: {e}");
+            return Vec::new();
+        }
+    };
+    if let Err(e) = enumerator.match_subsystem("power_supply") {
+        warn!("Could not filter the udev enumerator to power supplies: {e}");
+        return Vec::new();
+    }
+    let devices = match enumerator.scan_devices() {
+        Ok(d) => d,
+        Err(e) => {
+            warn!("Could not scan for power supplies: {e}");
+            return Vec::new();
+        }
+    };
+
+    let supplies: Vec<_> = devices
+        .filter_map(|device| {
+            let supply_type = device.attribute_value("type")?;
+            if is_external_power_type(&supply_type.to_string_lossy()) {
+                let sysname = device.sysname().to_string_lossy().into_owned();
+                let online_path = std::path::Path::new(POWER_SUPPLY_PATH)
+                    .join(&sysname)
+                    .join("online");
+                Some((sysname, online_path))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    if supplies.is_empty() {
+        warn!(
+            "No power supplies with type 'Mains' or 'USB' found in {POWER_SUPPLY_PATH}, \
+             external power changes will not be detected"
+        );
+    } else {
+        debug!(
+            "Power monitor: tracking external power supplies: {:?}",
+            supplies
+                .iter()
+                .map(|(name, _)| name.as_str())
+                .collect::<Vec<_>>()
+        );
+    }
+
+    supplies
+}
+
+fn read_power_supply_online(path: &std::path::Path) -> Option<bool> {
+    std::fs::read_to_string(path)
+        .map_err(|e| debug!("Could not read power supply state from {path:?}: {e}"))
+        .ok()
+        .and_then(|online| online.trim().parse::<u8>().ok())
+        .map(|v| v != 0)
+}
+
+/// Returns `true` if any of the given external power supplies is currently online.
+fn is_any_external_power_online(supplies: &[(String, std::path::PathBuf)]) -> bool {
+    supplies
+        .iter()
+        .any(|(_, path)| read_power_supply_online(path).unwrap_or(false))
+}
+
+/// Watch external power supplies for udev change events, reporting whether ANY
+/// external supply is online over a coalescing watch channel.
+///
+/// The udev socket listener is bound inside the worker thread before taking the initial
+/// power state snapshot so that any hardware transitions occurring during startup are
+/// buffered and never lost.
+async fn start_power_monitor() -> Option<tokio::sync::watch::Receiver<bool>> {
+    let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
+
+    std::thread::spawn(move || {
+        let mut monitor = match udev::MonitorBuilder::new()
+            .and_then(|monitor| monitor.match_subsystem("power_supply"))
+            .and_then(|monitor| monitor.listen())
+        {
+            Ok(monitor) => monitor,
+            Err(e) => {
+                warn!("Could not create a udev power supply monitor: {e}");
+                let _ = ready_tx.send(None);
+                return;
+            }
+        };
+
+        let mut poll = match mio::Poll::new() {
+            Ok(poll) => poll,
+            Err(e) => {
+                warn!("Could not create a mio poll for the power supply monitor: {e}");
+                let _ = ready_tx.send(None);
+                return;
+            }
+        };
+
+        if let Err(e) =
+            poll.registry()
+                .register(&mut monitor, mio::Token(0), mio::Interest::READABLE)
+        {
+            warn!("Could not register the power supply monitor with mio: {e}");
+            let _ = ready_tx.send(None);
+            return;
+        }
+
+        // Establish initial snapshot after the udev listener is bound
+        let mut supplies = find_external_power_supplies();
+        let initial_online = is_any_external_power_online(&supplies);
+        let (power_state_tx, power_state_rx) = tokio::sync::watch::channel(initial_online);
+
+        let _ = ready_tx.send(Some(power_state_rx));
+
+        let mut events = mio::Events::with_capacity(8);
+
+        loop {
+            // Periodic timeout so thread cleanly exits if receiver is dropped on daemon shutdown
+            match poll.poll(&mut events, Some(std::time::Duration::from_secs(5))) {
+                Ok(()) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(e) => {
+                    warn!(
+                        "Power supply monitor poll error, external power changes will no longer \
+                         be detected: {e}"
+                    );
+                    return;
+                }
+            }
+
+            if power_state_tx.is_closed() {
+                // Tokio receiver was dropped (daemon shutting down)
+                return;
+            }
+
+            let mut has_changes = false;
+            for event in monitor.iter() {
+                let dev = event.device();
+                let sysname = dev.sysname().to_string_lossy();
+                let is_relevant = supplies.iter().any(|(name, _)| name == sysname.as_ref())
+                    || dev
+                        .property_value("POWER_SUPPLY_TYPE")
+                        .or_else(|| dev.attribute_value("type"))
+                        .is_some_and(|t| is_external_power_type(&t.to_string_lossy()));
+
+                if is_relevant {
+                    match event.event_type() {
+                        udev::EventType::Add | udev::EventType::Remove => {
+                            supplies = find_external_power_supplies();
+                        }
+                        _ => {}
+                    }
+                    has_changes = true;
+                }
+            }
+
+            if has_changes {
+                let online = is_any_external_power_online(&supplies);
+                power_state_tx.send_replace(online);
+            }
+        }
+    });
+
+    ready_rx.await.ok().flatten()
+}
 
 /// This macro adds a function which spawns an `inotify` task on the passed in
 /// `Executor`.
@@ -199,19 +373,7 @@ pub trait CtrlTask {
         signal: SignalEmitter<'static>,
     ) -> impl Future<Output = Result<(), RogError>> + Send;
 
-    // /// Create a timed repeating task
-    // async fn repeating_task(&self, millis: u64, mut task: impl FnMut() + Send +
-    // 'static) {     use std::time::Duration;
-    //     use tokio::time;
-    //     let mut timer = time::interval(Duration::from_millis(millis));
-    //     tokio::spawn(async move {
-    //         timer.tick().await;
-    //         task();
-    //     });
-    // }
-
-    /// Free helper method to create tasks to run on: sleep, wake, shutdown,
-    /// boot
+    /// Free helper method to create tasks to run on: sleep, wake, shutdown, boot
     ///
     /// The closures can potentially block, so execution time should be the
     /// minimal possible such as save a variable.
@@ -233,70 +395,108 @@ pub trait CtrlTask {
         Fut4: Future<Output = ()> + Send,
     {
         async {
-            let connection = Connection::system()
-                .await
-                .expect("Controller could not create dbus connection");
+            let connection = match Connection::system().await {
+                Ok(conn) => conn,
+                Err(err) => {
+                    error!("Controller could not create dbus connection: {err}");
+                    return;
+                }
+            };
 
-            let manager = ManagerProxy::builder(&connection)
-                .cache_properties(CacheProperties::No)
+            let logind_manager = match ManagerProxy::builder(&connection)
+                .cache_properties(CacheProperties::Lazily)
                 .build()
                 .await
-                .expect("Controller could not create ManagerProxy");
+            {
+                Ok(manager) => manager,
+                Err(err) => {
+                    warn!("Controller could not create logind ManagerProxy: {err}");
+                    return;
+                }
+            };
 
-            let manager1 = manager.clone();
-            tokio::spawn(async move {
-                if let Ok(mut notif) = manager1.receive_prepare_for_shutdown().await {
-                    while let Some(event) = notif.next().await {
-                        // blocks thread :|
-                        if let Ok(args) = event.args() {
-                            debug!("Doing on_prepare_for_shutdown({})", args.start);
-                            on_prepare_for_shutdown(args.start).await;
+            tokio::spawn({
+                let logind_manager = logind_manager.clone();
+                async move {
+                    if let Ok(mut notif) = logind_manager.receive_prepare_for_shutdown().await {
+                        while let Some(event) = notif.next().await {
+                            // blocks thread :|
+                            if let Ok(args) = event.args() {
+                                debug!("Doing on_prepare_for_shutdown({})", args.start);
+                                on_prepare_for_shutdown(args.start).await;
+                            }
                         }
                     }
                 }
             });
 
-            let manager2 = manager.clone();
-            tokio::spawn(async move {
-                if let Ok(mut notif) = manager2.receive_prepare_for_sleep().await {
-                    while let Some(event) = notif.next().await {
-                        // blocks thread :|
-                        if let Ok(args) = event.args() {
-                            debug!("Doing on_prepare_for_sleep({})", args.start);
-                            on_prepare_for_sleep(args.start).await;
+            tokio::spawn({
+                let logind_manager = logind_manager.clone();
+                async move {
+                    if let Ok(mut notif) = logind_manager.receive_prepare_for_sleep().await {
+                        while let Some(event) = notif.next().await {
+                            // blocks thread :|
+                            if let Ok(args) = event.args() {
+                                debug!("Doing on_prepare_for_sleep({})", args.start);
+                                on_prepare_for_sleep(args.start).await;
+                            }
                         }
                     }
                 }
             });
 
-            let manager3 = manager.clone();
-            tokio::spawn(async move {
-                let mut last_power = manager3.on_external_power().await.unwrap_or_default();
+            tokio::spawn({
+                let logind_manager = logind_manager.clone();
+                async move {
+                    // Subscribe before the initial read so a change during startup is
+                    // queued rather than lost
+                    let mut stream = logind_manager.receive_lid_closed_changed().await;
 
-                loop {
-                    if let Ok(next) = manager3.on_external_power().await {
-                        if next != last_power {
-                            last_power = next;
-                            on_external_power_change(next).await;
+                    let mut last_lid = match logind_manager.lid_closed().await {
+                        Ok(closed) => {
+                            debug!("Initial lid state on startup: {closed}");
+                            Some(closed)
+                        }
+                        Err(e) => {
+                            debug!("Failed to read initial lid state from logind: {e}");
+                            None
+                        }
+                    };
+
+                    while let Some(change) = stream.next().await {
+                        match change.get().await {
+                            Ok(lid_closed) if last_lid != Some(lid_closed) => {
+                                last_lid = Some(lid_closed);
+                                debug!("Lid state changed: {lid_closed}");
+                                on_lid_change(lid_closed).await;
+                            }
+                            Ok(_) => {}
+                            Err(e) => {
+                                // The tracked state is now unknown, let the next signal through
+                                last_lid = None;
+                                debug!("Failed to read lid state after a logind change: {e}");
+                            }
                         }
                     }
-                    sleep(Duration::from_secs(2)).await;
                 }
             });
 
-            tokio::spawn(async move {
-                let mut last_lid = manager.lid_closed().await.unwrap_or_default();
-                // need to loop on these as they don't emit signals
-                loop {
-                    if let Ok(next) = manager.lid_closed().await {
-                        if next != last_lid {
-                            last_lid = next;
-                            on_lid_change(next).await;
+            // logind's OnExternalPower is annotated EmitsChangedSignal=false so it can
+            // only be polled. The kernel emits a udev change event for power supplies
+            // instead, so watch all external supplies (Mains and USB/USB_PD).
+            if let Some(mut power_state_rx) = start_power_monitor().await {
+                tokio::spawn(async move {
+                    let mut last_power = *power_state_rx.borrow_and_update();
+                    while power_state_rx.changed().await.is_ok() {
+                        let online = *power_state_rx.borrow_and_update();
+                        if online != last_power {
+                            last_power = online;
+                            debug!("External power supply state changed: {online}");
+                            on_external_power_change(online).await;
                         }
                     }
-                    sleep(Duration::from_secs(2)).await;
-                }
-            });
+                });
+            }
         }
     }
 }
