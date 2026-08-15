@@ -192,7 +192,7 @@ sudo grub-mkconfig -o /boot/grub/grub.cfg
 You can check currently booted kernel with command uname -r. It should give you for example:
 
 ```bash
-7.2.rc7.ogc3-1
+7.2.0-rc7-1-ogc
 ```
 
 ### Nvidia
