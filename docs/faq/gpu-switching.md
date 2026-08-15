@@ -1,0 +1,49 @@
+# GPU Switching
+
+> Managing the dGPU and MUX on hybrid ASUS laptops
+
+## Does my laptop support it?
+
+You can check if your device supports graphics switching by running:
+
+```bash
+asusctl armoury list
+```
+
+If your device supports disabling of the dGPU, you should see an entry that looks like the following:
+
+```bash
+dgpu_disable:
+  current: [(0),1]
+```
+
+Here, a current value of `0` means that your dGPU is not disabled (i.e., enabled).
+
+## Switching the dGPU
+
+You can set whether you want to utilize your dGPU by modifying the setting under the `GPU Configuration` tab in the ROG Control Center. Alternatively, use the command line:
+
+```bash
+asusctl armoury set dgpu_disable 1   # disable the dGPU
+asusctl armoury set dgpu_disable 0   # re-enable the dGPU
+```
+
+> [!NOTE]
+> Due to how Linux systems are configured to use the dGPU, you must reboot your system after changing your dGPU configuration. If you wish to power off your dGPU without rebooting, you should use an alternative program such as Cardwire (see below).
+
+## Cardwire
+
+Cardwire is the community's new replacement for the now-deprecated supergfxctl. It manages the GPU with an eBPF/LSM approach, allowing the dGPU to power down at runtime - no reboot required.
+
+> [!CAUTION]
+> Cardwire is currently still considered EXPERIMENTAL. If you choose to install this tool, expect rough edges and quirks. For support, join our Discord server.
+
+See the [Cardwire documentation](https://opengamingcollective.github.io/cardwire/) for installation and usage instructions. On some distributions it is packaged: on Arch via the [OGC repository](../distributions/arch.md) (`pacman -S cardwire`), on Fedora-based systems via Terra (`dnf install cardwire`), and on NixOS via `services.cardwired.enable`.
+
+## supergfxctl
+
+`supergfxctl` is deprecated in favor of Cardwire. If you still require VFIO for virtual machines, supergfxctl remains available from some distribution repositories - check your distribution's package manager.
+
+## Dynamic Boost
+
+For NVIDIA laptops, `nvidia-powerd` enables Dynamic Boost; see the [Graphics FAQ](../faq/graphics.md#nvidia-dynamic-boost-isnt-working).
