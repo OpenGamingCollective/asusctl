@@ -21,6 +21,10 @@
 - [Ubuntu](distributions/ubuntu.md)
 - [PikaOS](distributions/pikaos.md)
 
+# Usage
+
+- [asusctl](usage/asusctl.md)
+
 # FAQ
 
 - [General](faq/general.md)
