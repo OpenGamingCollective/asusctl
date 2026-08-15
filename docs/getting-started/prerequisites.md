@@ -82,4 +82,4 @@ If you have a 2022 or newer model, please put it into Hybrid mode in advance on 
 
 ## Installing Linux
 
-You are now ready to install Linux! Please look at the [Supported Distributions](../getting-started/supported-distributions.md)
+You are now ready to install Linux! Head over to the [Supported Distributions](../getting-started/supported-distributions.md) and choose a distribution !

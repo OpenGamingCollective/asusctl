@@ -2,18 +2,24 @@
 
 > Which distributions officially support asusctl, and what to expect elsewhere
 
-Distributions with a guide and packaged asusctl:
+Here are the distributions with a written guide:
 
-- Fedora Workstation
 - Arch Linux
-- Ultramarine
+- Bazzite
+- Fedora Workstation
+- Fedora Atomic
 - NixOS
 - Bazzite
 - openSUSE Tumbleweed
+- PikaOS
 - Ubuntu 26.04
-- AerynOS
+- Ultramarine
 
 You can find the full guides in the [Distribution Guides](../distributions/index.md) section.
+
+Other distributions that packages asusctl:
+- AerynOS
+
 
 Distributions that are very popular but are not supported:
 
