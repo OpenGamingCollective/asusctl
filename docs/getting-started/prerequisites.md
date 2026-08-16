@@ -39,6 +39,9 @@ Once done start that Windows installation and ensure it says it has a valid lice
 
 Intel laptops have a feature called VMD that is not supported by Linux and should be disabled (on the UEFI setup screen) to avoid problems.
 
+> [!IMPORTANT]
+> Disabling this will cause issues with booting windows. The easiest fix is to uninstall the raid drivers inWindows, turn off raid/vmd and thne boot windows in safe mode.
+
 AMD laptops can have a RAID mode that should also be disabled: use a software RAID instead if you need such feature.
 
 ## Disable fastboot
