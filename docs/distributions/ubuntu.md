@@ -29,6 +29,9 @@ The casks install the `asusd` systemd units, udev rules, and D-Bus configuration
 sudo systemctl enable --now asusd.service asus-shutdown.service
 systemctl --user daemon-reload
 systemctl --user enable --now asusd-user.service
+sudo udevadm control --reload
+sudo udevadm trigger
+systemctl status asusd.service
 ```
 
 For everything else (platform profiles, fan curves, GPU switching), refer to the [Usage](../usage/asusctl.md) section.
