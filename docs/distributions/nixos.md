@@ -34,34 +34,24 @@ services.asusd.enable = true;
 
 Then rebuild your NixOS
 
+> [!IMPORTANT]
+> **Power profiles**: `asusd` manages platform profiles and CPU EPP settings itself via the ACPI `platform_profile` interface. Running an external power profiles daemon (such as `power-profiles-daemon` or `tuned`) alongside `asusd` can cause race conditions over `/sys/firmware/acpi/platform_profile` and CPU EPP preferences. You have two options:
+>
+> 1. **Let `asusd` manage profiles** and do not enable an external daemon (e.g. do not enable `services.power-profiles-daemon`).
+> 2. **Keep the external daemon** and disable `asusd`'s profile management by setting the following to `false` in `/etc/asusd/asusd.ron`:
+>
+> ```ron
+> change_platform_profile_on_ac: false,
+> change_platform_profile_on_battery: false,
+> platform_profile_linked_epp: false,
+> ```
+>
+> A common way to switch profiles is binding the `Fn+F5` key to `asusctl profile next`
+> Available profiles vary by system, see `asusctl profile list`.
+
 ## Graphics Switching
 
-It is now possible to manage your graphics card using `asusctl` or the ROG Control Center. You can check if your device supports graphics switching by running the following command:
-
-```bash
-asusctl armoury list
-```
-
-If your device supports disabling of the dGPU, you should see an entry that looks like the following:
-
-```bash
-dgpu_disable:
-  current: [(0),1]
-```
-
-Here, a current value of 0 means that your dgpu is not disabled (i.e., enabled).
-
-You can set whether you want to utilize your dGPU by modifying the setting under the `GPU Configuration` tab in the ROG Control Center. Alternatively, use the command `asusctl armoury set dgpu_disable 1` to disable the dgpu, and 0 to re-enable it.
-
-> [!NOTE]
-> Due to how Linux systems are configured to use the dGPU, you must reboot your system after changing your dGPU configuration. If you wish to power off your dgpu without rebooting, you should use an alternative program such as Cardwire (see below).
-
-### Cardwire
-
-Cardwire is the community's new replacement for the now-deprecated supergfxctl.
-
-> [!CAUTION]
-> Cardwire is currently still considered EXPERIMENTAL. If you choose to install this tool, expect rough edges and quirks. For support, join our Discord server.
+See [GPU Switching](../faq/gpu-switching.md) for how to manage the dGPU and MUX.
 
 Cardwire is also packaged in nixpkgs. Enable it with:
 

@@ -24,7 +24,7 @@ Newcomers should start by reading the [Intro](../introduction.md) guide.
   - [Install Nvidia Graphics Drivers](#install-nvidia-graphics-drivers)
   - [Update System Boot Configuration for Nvidia](#update-system-boot-configuration-for-nvidia)
 - [Asus-Linux Software](#asus-linux-software)
-  - [Adding the Repository Copr Repo](#adding-the-repository-copr-repo)
+  - [Adding the Tuatara Repository](#adding-the-tuatara-repository)
   - [Asusctl](#asusctl)
   - [ROG Control Center](#rog-control-center)
   - [Graphics Switching](#graphics-switching)
@@ -56,15 +56,15 @@ Users coming from other distributions may run into issues when using Tumbleweed 
 8. OpenSUSE community websites may provide "one-click installers", which can cause more trouble than they're worth. Avoid using these.
 9. OpenSUSE provides excellent support for the btrfs file system, and supports automatic bootable btrfs snapshots out of the box.
 10. OpenSUSE provides the YaST GUI tool for system management. YaST is polarizing, but may be helpful for new users to get a better idea of the system configuration. Many operations should still be performed via the terminal instead.
-11. The Asus-Linux core team currently has no members with experience in openSUSE or Fedora, so if the COPR repository stops generating new packages (or its signing keys expire, as they currently have), the best thing you can do is report the issue; or, if you can fix it, it would be best if you became a package maintainer.
+11. asusctl is packaged for openSUSE Tumbleweed in the [Tuatara repository](https://docs.terrapkg.com/tuatara/installing/), the openSUSE counterpart of the Terra repository. If the repository stops generating new packages, the best thing you can do is report the issue; or, if you can fix it, it would be best if you became a package maintainer.
 
 ### Preparations
 
-Prior to installation of openSUSE Tumbleweed, follow the [preparations in the Introduction guide](../introduction.md). The list below gives a summary of the important subsections to review.
+Prior to installation of openSUSE Tumbleweed, follow the [preparations in the Prerequisites guide](../getting-started/prerequisites.md). The list below gives a summary of the important subsections to review.
 
-1. [Backup Proprietary eSupport Drivers Folder](../introduction.md#backup-proprietary-esupport-drivers-folder) - Backing up the proprietary ASUS drivers.
-2. [Disable Secure Boot](../introduction.md#disable-secure-boot) - Disabling secure boot for compatibility with the proprietary Nvidia drivers.
-3. [Use the Laptop Screen](../introduction.md#use-the-laptop-screen) - Background on installation problems that may arise due to external screens.
+1. [Backup Proprietary eSupport Drivers Folder](../getting-started/prerequisites.md#backup-proprietary-esupport-drivers-folder) - Backing up the proprietary ASUS drivers.
+2. [Disable Secure Boot](../getting-started/prerequisites.md#disable-secure-boot) - Disabling secure boot for compatibility with the proprietary Nvidia drivers.
+3. [Use the Laptop Screen](../getting-started/prerequisites.md#use-the-laptop-screen) - Background on installation problems that may arise due to external screens.
 
 ### Installation
 
@@ -180,7 +180,7 @@ groupadd wheel
 usermod -aG wheel USERNAME
 ```
 
-5. *Optionally*, verify the user was added to the wheel group, replacing USERNAME with the desired user:
+5. _Optionally_, verify the user was added to the wheel group, replacing USERNAME with the desired user:
 
 ```bash
 id USERNAME
@@ -254,17 +254,16 @@ sudo grub2-mkconfig -o /boot/grub2/grub.cfg
 
 ### Asus-Linux Software
 
-#### Adding the Repository Copr Repo
+#### Adding the Tuatara Repository
 
-As mentioned in consideration 11, the only community repository at this time is Copr.
+Tuatara is the openSUSE counterpart of the Terra repository, providing packages for ASUS laptops including asusctl and the ROG Control Center.
 
-> [!WARNING]
-> The COPR repository is currently broken: its GPG signing keys have expired, so package installation fails with signature verification errors. The instructions below will not work until the keys are renewed. If installation fails, build asusctl from source following the instructions in the [asusctl README](https://github.com/OpenGamingCollective/asusctl).
+> [!NOTE]
+> Tuatara currently supports openSUSE Tumbleweed only. If your system releasever is not `tumbleweed` (but compatible with it), replace `$releasever` in the following command with `tumbleweed` manually.
 
 ```bash
 # add the repository and install asusctl
-sudo curl -Lo /etc/zypp/repos.d/lukenukem-asus-linux.repo \
-  https://copr.fedorainfracloud.org/coprs/lukenukem/asus-linux/repo/opensuse-tumbleweed/lukenukem-asus-linux-opensuse-tumbleweed.repo
+sudo zypper install --plus-repo 'https://repos.fyralabs.com/tuatara-$releasever' tuatara-release
 
 # refresh the repositories and install asusctl
 sudo zypper refresh
@@ -285,13 +284,27 @@ sudo zypper rm tlp
 sudo zypper in asusctl
 ```
 
-3. Ensure that **power-profiles-daemon** is enabled and running:
+> [!IMPORTANT]
+> **Power profiles**: `asusd` manages platform profiles and CPU EPP settings itself via the ACPI `platform_profile` interface. Running an external power profiles daemon (such as `power-profiles-daemon` or `tuned`) alongside `asusd` can cause race conditions over `/sys/firmware/acpi/platform_profile` and CPU EPP preferences. You have two options:
+>
+> 1. **Let `asusd` manage profiles** and disable the external daemon:
+>
+> ```bash
+> sudo systemctl disable --now power-profiles-daemon.service
+> ```
+>
+> 2. **Keep the external daemon** and disable `asusd`'s profile management by setting the following to `false` in `/etc/asusd/asusd.ron`:
+>
+> ```ron
+> change_platform_profile_on_ac: false,
+> change_platform_profile_on_battery: false,
+> platform_profile_linked_epp: false,
+> ```
+>
+> A common way to switch profiles is binding the `Fn+F5` key to `asusctl profile next`
+> Available profiles vary by system, see `asusctl profile list`.
 
-```bash
-sudo systemctl enable --now power-profiles-daemon.service
-```
-
-4. Either restart the system, or run the following command to immediately begin using asusctl:
+3. Either restart the system, or run the following command to immediately begin using asusctl:
 
 ```bash
 sudo systemctl start asusd
@@ -307,38 +320,13 @@ The optional ROG Control Center GUI tool can be installed to assist with control
 sudo zypper in asusctl-rog-gui
 ```
 
-![ROG Control Center](../assets/guides/shared/rog-control-center.png)
+![ROG Control Center](../assets/shared/rog-control-center.png)
 
-![ROG Control Center fan curve](../assets/guides/shared/rog-control-center-fan-curve.png)
+![ROG Control Center fan curve](../assets/shared/rog-control-center-fan-curve.png)
 
 #### Graphics Switching
 
-It is now possible to manage your graphics card using the ASUS GPU with `asusctl` or the ROG Control Center. You can check if your device supports graphics switching by running the following command:
-
-```bash
-asusctl armoury list
-```
-
-If your device supports disabling of the dGPU, you should see an entry that looks like the following:
-
-```bash
-dgpu_disable:
-  current: [(0),1]
-```
-
-Here, a current value of 0 means that your dgpu is not disabled (i.e., enabled).
-
-You can set whether you want to utilize your dGPU by modifying the setting under the `GPU Configuration` tab in the ROG Control Center. Alternatively, use the command `asusctl armoury set dgpu_disable 1` to disable the dgpu, and 0 to re-enable it.
-
-> [!NOTE]
-> Due to how Linux systems are configured to use the dGPU, you must reboot your system after changing your dGPU configuration. If you wish to power off your dgpu without rebooting, you should use an alternative program such as Cardwire (see below).
-
-##### Cardwire
-
-Cardwire is the community's new replacement for the now-deprecated supergfxctl.
-
-> [!CAUTION]
-> Cardwire is currently still considered EXPERIMENTAL. If you choose to install this tool, expect rough edges and quirks. For support, join our Discord server.
+See [GPU Switching](../faq/gpu-switching.md) for how to manage the dGPU and MUX on ASUS laptops, including Cardwire.
 
 Cardwire is not yet packaged for openSUSE, so it must be built from source; see its [documentation](https://opengamingcollective.github.io/cardwire/).
 
@@ -353,7 +341,7 @@ sudo systemctl enable --now supergfxd
 
 #### Enabling ZRAM
 
-Unlike Fedora, zram is not enabled by default. The `zram-generator` package can be installed to set up and use zram instead of traditional swap. The Arch wiki's [guide on zram](https://wiki.archlinux.org/title/Zram) can be used as a reference. The steps below set up zram using the Fedora 37 default configuration and one additional option:
+Unlike Fedora, zram is not enabled by default. The `zram-generator` package can be installed to set up and use zram instead of traditional swap. The Arch wiki's [guide on zram](https://wiki.archlinux.org/title/Zram) can be used as a reference. The steps below set up zram with a common default configuration and one additional option:
 
 1. Ensure zswap is disabled to avoid conflicts with zram. The process can be found on the [Arch wiki](https://wiki.archlinux.org/title/zswap#Toggling_zswap).
 
@@ -367,7 +355,7 @@ sudo zypper in zram-generator
 
 4. Edit the newly created configuration file.
 
-5. **Fedora 37 Default:** add the following to the configuration file:
+5. **Default configuration:** add the following to the configuration file:
 
 ```conf
 [zram0]
@@ -386,9 +374,9 @@ compression-algorithm = zstd
 
 #### Open Build Service
 
-The [Open Build Service](https://build.opensuse.org/) (OBS) is a service that supports community-maintained packages, such as asusctl. The [openSUSE wiki](https://en.opensuse.org/Additional_package_repositories) has instructions on how to add some popular repos from the build service, such as the latest Wine (based on Wine-HQ), games, and more.
+The [Open Build Service](https://build.opensuse.org/) (OBS) is a service that supports community-maintained packages. The [openSUSE wiki](https://en.opensuse.org/Additional_package_repositories) has instructions on how to add some popular repos from the build service, such as the latest Wine (based on Wine-HQ), games, and more.
 
-With the exception of **home:luke_nukem**, a common [recommendation](https://opensuse.github.io/openSUSE-docs-revamped-temp/safety_usability/) is to avoid home repos in the OBS. These repos can cause issues unless you know or trust the maintainer.
+A common [recommendation](https://opensuse.github.io/openSUSE-docs-revamped-temp/safety_usability/) is to avoid home repos in the OBS, as these repos can cause issues unless you know or trust the maintainer. Prefer the [Tuatara repository](https://docs.terrapkg.com/tuatara/installing/) for asusctl and related ASUS packages.
 
 The [OBS Package Installer](https://github.com/openSUSE/opi) (opi) is a helpful tool that allows users to search the OBS and other vendors (e.g., Packman) for specific packages. It can be used to identify what packages are available on the OBS or elsewhere, along with getting links to review them. Opi prompts the user based on matching package names and build locations it finds (there are usually multiple). The chosen repo will be automatically added by opi when installing packages.
 

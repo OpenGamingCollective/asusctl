@@ -44,12 +44,27 @@ This section covers installing `asusctl` and its supporting software. It enables
 sudo dnf install asusctl
 ```
 
-To avoid [problems with tuned](https://gitlab.com/asus-linux/asusctl/-/issues/724), use `power-profiles-daemon`:
-
-```bash
-sudo dnf install power-profiles-daemon --allowerasing
-sudo systemctl enable --now power-profiles-daemon.service
-```
+> [!IMPORTANT]
+> **Power profiles**: `asusd` manages platform profiles and CPU EPP settings itself via the ACPI `platform_profile` interface. Running an external power profiles daemon (such as `power-profiles-daemon` or `tuned`) alongside `asusd` can cause race conditions over `/sys/firmware/acpi/platform_profile` and CPU EPP preferences. You have two options:
+>
+> 1. **Let `asusd` manage profiles** and disable the external daemon. Since Ultramarine is Fedora-based, `tuned` is the default power profile daemon. Note that KDE Plasma's PowerDevil can respawn `power-profiles-daemon` through DBus activation even after it is disabled, so be sure to mask it instead:
+>
+> ```bash
+> sudo systemctl mask --now power-profiles-daemon.service
+> # or, if you use tuned:
+> sudo systemctl mask --now tuned.service tuned-ppd.service
+> ```
+>
+> 2. **Keep the external daemon** and disable `asusd`'s profile management by setting the following to `false` in `/etc/asusd/asusd.ron`:
+>
+> ```ron
+> change_platform_profile_on_ac: false,
+> change_platform_profile_on_battery: false,
+> platform_profile_linked_epp: false,
+> ```
+>
+> A common way to switch profiles is binding the `Fn+F5` key to `asusctl profile next`
+> Available profiles vary by system, see `asusctl profile list`.
 
 ### ROG Control Center
 
@@ -59,9 +74,9 @@ ROG Control Center is a GUI tool for configuring some aspects of `asusctl`. It i
 sudo dnf install asusctl-rog-gui
 ```
 
-![ROG Control Center](../assets/guides/shared/rog-control-center.png)
+![ROG Control Center](../assets/shared/rog-control-center.png)
 
-![ROG Control Center fan curve](../assets/guides/shared/rog-control-center-fan-curve.png)
+![ROG Control Center fan curve](../assets/shared/rog-control-center-fan-curve.png)
 
 Reboot after installing `asusctl`:
 
@@ -74,40 +89,7 @@ sudo systemctl reboot
 
 ### Graphics Switching
 
-It is now possible to manage your graphics card using `asusctl` or the ROG Control Center. You can check if your device supports graphics switching by running the following command:
-
-```bash
-asusctl armoury list
-```
-
-If your device supports disabling of the dGPU, you should see an entry that looks like the following:
-
-```bash
-dgpu_disable:
-  current: [(0),1]
-```
-
-Here, a current value of 0 means that your dgpu is not disabled (i.e., enabled).
-
-You can set whether you want to utilize your dGPU by modifying the setting under the `GPU Configuration` tab in the ROG Control Center. Alternatively, use the command `asusctl armoury set dgpu_disable 1` to disable the dgpu, and 0 to re-enable it.
-
-> [!NOTE]
-> Due to how Linux systems are configured to use the dGPU, you must reboot your system after changing your dGPU configuration. If you wish to power off your dgpu without rebooting, you should use an alternative program such as Cardwire (see below).
-
-#### Cardwire
-
-Cardwire is the community's new replacement for the now-deprecated supergfxctl.
-
-> [!CAUTION]
-> Cardwire is currently still considered EXPERIMENTAL. If you choose to install this tool, expect rough edges and quirks. For support, join our Discord server.
-
-Cardwire is available for install on the Terra repository. You can install it with:
-
-```bash
-sudo dnf install cardwire
-```
-
-For installation and usage instructions, refer to the [documentation](https://opengamingcollective.github.io/cardwire/).
+See [GPU Switching](../faq/gpu-switching.md) for how to manage the dGPU and MUX.
 
 ## Optional Steps
 

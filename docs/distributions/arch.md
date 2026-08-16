@@ -77,7 +77,7 @@ sudo pacman-key --lsign-key F79100EF8C802DAB81C323BB8EEA5962FE510E19
 
 This should show output similar to this:
 
-![OGC repository signing key](../assets/guides/arch/ogc-signing-key.png)
+![OGC repository signing key](../assets/distributions/arch/ogc-signing-key.png)
 
 > [!TIP]
 > Have any problems ? Check if `/etc/pacman.d/gnupg/gpg.conf` doesn't have specified the keyserver or make sure it is `hkp://keyserver.ubuntu.com` If you still have problems check if you are not running some active VPN connection, this does sometimes cause problems when fetching the server.
@@ -118,13 +118,28 @@ sudo pacman -S asusctl
 
 asusd service is triggered by a udev rule after the keyboard driver is ready, the service doesn't need to be enabled and is not supposed to be.
 
-> [!NOTE]
-> Note: Asusctl is designed to work primarily with power-profiles-daemon; other power management tools can create conflicts with asusctl; if you're using an Arch-based distro, you may already have ppd installed, so you might not need to follow this step, as in CachyOS.
-
-```bash
-sudo pacman -S power-profiles-daemon
-systemctl enable --now power-profiles-daemon.service
-```
+> [!IMPORTANT]
+> **Power profiles**: `asusd` manages platform profiles and CPU EPP settings itself via the ACPI `platform_profile` interface. Running an external power profiles daemon (such as `power-profiles-daemon` or `tuned`) alongside `asusd` can cause race conditions over `/sys/firmware/acpi/platform_profile` and CPU EPP preferences. You have two options:
+>
+> 1. **Let `asusd` manage profiles** and disable the external daemon:
+>
+>    ```bash
+>    sudo systemctl disable --now power-profiles-daemon.service
+>    sudo systemctl mask power-profiles-daemon.service
+>    ```
+>
+> 2. **Keep the external daemon** and disable `asusd`'s profile management by setting the following to `false` in `/etc/asusd/asusd.ron`:
+>
+>    ```ron
+>    change_platform_profile_on_ac: false,
+>    change_platform_profile_on_battery: false,
+>    platform_profile_linked_epp: false,
+>    ```
+>
+> If you're using an Arch-based distro you may already have power-profiles-daemon installed, as in CachyOS.
+>
+> A common way to switch profiles is binding the `Fn+F5` key to `asusctl profile next`
+> Available profiles vary by system, see `asusctl profile list`.
 
 > [!CAUTION]
 > Be aware that some functions or asusctl need kernel-level drivers support, take a look at the "Custom kernel section"
@@ -137,44 +152,11 @@ ROG Control Center is a GUI tool for configuring few aspects of asusctl.
 sudo pacman -S rog-control-center
 ```
 
-![ROG Control Center](../assets/guides/shared/rog-control-center.png)
+![ROG Control Center](../assets/shared/rog-control-center.png)
 
 ### Graphics Switching
 
-It is possible to manage your graphics card using `asusctl` or the ROG Control Center. You can check if your device supports graphics switching by running the following command:
-
-```bash
-asusctl armoury list
-```
-
-If your device supports disabling of the dGPU, you should see an entry that looks like the following:
-
-```bash
-dgpu_disable:
-  current: [(0),1]
-```
-
-Here, a current value of '0' means that your dgpu is not disabled (i.e., enabled).
-
-You can set whether you want to utilize your dGPU by modifying the setting under the `GPU Configuration` tab in the ROG Control Center. Alternatively, use the command `asusctl armoury set dgpu_disable 1` to disable the dgpu, and 'asusctl armoury set dgpu_disable 0' to re-enable it.
-
-> [!NOTE]
-> Due to how Linux systems are configured to use the dGPU, you must reboot your system after changing your dGPU configuration. If you wish to power off your dgpu without rebooting, you should use an alternative program such as Cardwire (see below).
-
-#### Cardwire
-
-Cardwire is the new replacement for the now-deprecated supergfxctl.
-
-> [!CAUTION]
-> Cardwire is currently still considered EXPERIMENTAL. If you choose to install this tool, expect rough edges and quirks. For support, join our Discord server.
-
-Cardwire is available on the OGC repository. You can install it with:
-
-```bash
-sudo pacman -S cardwire
-```
-
-For installation and usage instructions, refer to the [documentation](https://opengamingcollective.github.io/cardwire/).
+See [GPU Switching](../faq/gpu-switching.md) for how to manage the dGPU and MUX.
 
 ### Custom kernel - drivers fixes, hardware support
 
@@ -224,7 +206,7 @@ sudo grub-mkconfig -o /boot/grub/grub.cfg
 You can check currently booted kernel with command uname -r. It should give you for example:
 
 ```bash
-6.18.1-arch1-g14-1
+7.2.0-rc7-1-ogc
 ```
 
 ### Nvidia

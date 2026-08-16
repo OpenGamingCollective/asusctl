@@ -13,11 +13,11 @@
 
 This function is now integrated into the ROG Control Center, so long as you run it in the background you will get the notifications.
 
-You can find all notify settings in the "System Settings" in the ROG Control Center.
+You can find all notify settings in the "App Settings" in the ROG Control Center.
 
 ### How can I enable S3 (legacy) suspend?
 
-Depending on your kernel version, you may occasioinally experience issues with the 2021/2022 versions of the Zephyrus G14/G15 which affects the proper use or newer suspend methods, like s0ix.
+Depending on your kernel version, you may occasionally experience issues with the 2021/2022 versions of the Zephyrus G14/G15 which affect the proper use of newer suspend methods, like s0ix.
 
 A potential fix is to patch your DSDT tables so your machine uses the older suspend method, called S3. In our tests this works great on the 2021 / 2022 G14 and G15. Those patches are not part of the main repo and can't be. It will always be a manual matter and cannot be integrated into the kernel.
 
@@ -28,7 +28,7 @@ You can find the script here: https://gitlab.com/marcaux/g14-2021-s3-dsdt
 
 ### Note for ROG Zephyrus G15 (2022)
 
-After BIOS version 313, ASUS fix ACPI support for Linux, which is crucial if you want Performance mode to work properly.
+After BIOS version 313, ASUS fixed ACPI support for Linux, which is crucial if you want Performance mode to work properly.
 
 And ASUS optimized power distribution between CPU and GPU, which before caused stuttering/frame drops in performance mode that confuse many users for a long time.
 
@@ -46,8 +46,8 @@ These steps are not needed if you are running Linux exclusively.
 
 ### Note for ROG Flow X13 (2021)
 
-BIOS versions 408 & 409 cannot boot a Linux kernel newer than 5.15.x so you will need to upgrade to the 410 bios [here](https://rog.asus.com/laptops/rog-flow/2021-rog-flow-x13-series/helpdesk_bios).
+BIOS versions 408 & 409 cannot boot a Linux kernel newer than 5.15.x so you will need to upgrade to the 410 BIOS from the [official ROG Flow X13 (2021) BIOS support page](https://rog.asus.com/bt/laptops/rog-flow/2021-rog-flow-x13-series/helpdesk_bios/).
 
 ### Is `<distro>` supported by asusctl?
 
-TODO: List of supported distros
+See the [Supported Distributions](../getting-started/supported-distributions.md) page for the officially supported distributions and what to expect on others. In short: The kernel must be >=6.19.

@@ -9,7 +9,7 @@
 
 After checking the usual suspects:
 
-- Missing configuration: you need to configure the system for your distribution; see the guide for [Arch Linux](../guides/arch.md), [Fedora Workstation](../guides/fedora.md), [Fedora Atomic](../guides/fedora-atomic.md), [Bazzite](../guides/bazzite.md), [openSUSE Tumbleweed](../guides/opensuse.md), [Ultramarine](../guides/ultramarine.md), or [NixOS](../guides/nixos.md).
+- Missing configuration: follow the setup steps in the [distribution guides](../distributions/index.md).
 - GPU monitoring widgets: keep the GPU on to monitor it!
 - ollama: if ollama is running nvidia might not be able to sleep!
 
@@ -40,7 +40,7 @@ sudo systemctl enable nvidia-powerd.service
 You can do it in many ways. If you already installed asusctl, you can switch to it using:
 
 ```bash
-asusctl profile -P Performance
+asusctl profile set Performance
 ```
 
 or ROG Control Center (GUI) to set it.

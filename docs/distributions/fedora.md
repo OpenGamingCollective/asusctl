@@ -56,7 +56,7 @@ However, please be aware:
 This guide requires typing _terminal commands_. To type them, start the Terminal application, which opens a window that has a command prompt.
 
 To open the Terminal, simply press the Windows/Super key to bring up the Start Menu (KDE) or the Activities view (GNOME), and start typing "term" in the search box. Click on the search result.
-![Terminal search](../assets/guides/fedora/terminal-search.png)
+![Terminal search](../assets/distributions/fedora/terminal-search.png)
 
 Commands that have _sudo_ in front are administrator commands, and may require you to type in your password.
 
@@ -79,10 +79,10 @@ Or if you don't want to use terminal:
 2. Navigate to Updates tab
 3. Click the Refresh-button in the top left corner
 4. Download all available updates
-   ![Software updates](../assets/guides/fedora/software-updates.png)
+   ![Software updates](../assets/distributions/fedora/software-updates.png)
 5. After the updates have been downloaded, click the "Restart & Update" button
 
-![Restart and update](../assets/guides/fedora/software-restart.png)
+![Restart and update](../assets/distributions/fedora/software-restart.png)
 
 Wait until the updates are installed.
 
@@ -144,9 +144,9 @@ ROG Control Center is a GUI tool that can be used to configure asusctl. After ad
 sudo dnf install asusctl-rog-gui
 ```
 
-![ROG Control Center](../assets/guides/shared/rog-control-center.png)
+![ROG Control Center](../assets/shared/rog-control-center.png)
 
-![ROG Control Center fan curve](../assets/guides/shared/rog-control-center-fan-curve.png)
+![ROG Control Center fan curve](../assets/shared/rog-control-center-fan-curve.png)
 
 > [!NOTE]
 > For complete functionality and driver support, it is recommended to use a Kernel version of 6.19 or greater.
@@ -183,40 +183,7 @@ For more details, see the official documentation for [RPM Fusion](<https://rpmfu
 
 #### Graphics Switching
 
-It is now possible to manage your graphics card using the ASUS GPU with `asusctl` or the ROG Control Center. You can check if your device supports graphics switching by running the following command:
-
-```bash
-asusctl armoury list
-```
-
-If your device supports disabling of the dGPU, you should see an entry that looks like the following:
-
-```bash
-dgpu_disable:
-  current: [(0),1]
-```
-
-Here, a current value of 0 means that your dgpu is not disabled (i.e., enabled).
-
-You can set whether you want to utilize your dGPU by modifying the setting under the `GPU Configuration` tab in the ROG Control Center. Alternatively, use the command `asusctl armoury set dgpu_disable 1` to disable the dgpu, and 0 to re-enable it.
-
-> [!NOTE]
-> Due to how Linux systems are configured to use the dGPU, you must reboot your system after changing your dGPU configuration. If you wish to power off your dgpu without rebooting, you should use an alternative program such as Cardwire (see below).
-
-##### Cardwire
-
-Cardwire is the community's new replacement for the now-deprecated supergfxctl.
-
-> [!CAUTION]
-> Cardwire is currently still considered EXPERIMENTAL. If you choose to install this tool, expect rough edges and quirks. For support, join our Discord server.
-
-Cardwire is available for install on the Terra repo. You can install it with:
-
-```bash
-sudo dnf install cardwire
-```
-
-For installation and usage instructions, refer to the [documentation](https://opengamingcollective.github.io/cardwire/).
+See [GPU Switching](../faq/gpu-switching.md) for how to manage the dGPU and MUX.
 
 ### Optional Steps
 
