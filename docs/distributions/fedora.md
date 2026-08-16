@@ -181,7 +181,7 @@ sudo dnf install akmod-nvidia xorg-x11-drv-nvidia-cuda
 
 For more details, see the official documentation for [RPM Fusion](<https://rpmfusion.org/Howto/NVIDIA?highlight=(%5CbCategoryHowto%5Cb)>).
 
-### Graphics Switching
+#### Graphics Switching
 
 See [GPU Switching](../faq/gpu-switching.md) for how to manage the dGPU and MUX.
 
