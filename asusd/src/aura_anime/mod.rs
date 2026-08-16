@@ -3,15 +3,15 @@ pub mod config;
 pub mod trait_impls;
 
 use std::convert::TryFrom;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::sleep;
 
 use config_traits::StdConfig;
 use log::{debug, error, info, warn};
 use rog_anime::usb::{
-    pkt_flush, pkt_set_brightness, pkt_set_enable_display, pkt_set_enable_powersave_anim,
-    pkts_for_init, Brightness,
+    Brightness, pkt_flush, pkt_set_brightness, pkt_set_enable_display,
+    pkt_set_enable_powersave_anim, pkts_for_init,
 };
 use rog_anime::{ActionData, AnimeDataBuffer, AnimePacketType};
 use rog_platform::hid_raw::HidRaw;

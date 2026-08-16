@@ -49,7 +49,7 @@ impl CPUControl {
                     None => {
                         return Err(PlatformError::CPU(format!(
                             "{ATTR_AVAILABLE_GOVERNORS} not found"
-                        )))
+                        )));
                     }
                 }
                 match device.attribute_value(ATTR_GOVERNOR) {
@@ -399,7 +399,7 @@ pub fn get_ram_usage_pct() -> f32 {
 #[cfg(test)]
 mod tests {
     use super::CPUControl;
-    use crate::cpu::{CPUGovernor, CPUEPP};
+    use crate::cpu::{CPUEPP, CPUGovernor};
 
     #[test]
     #[ignore = "Can't run this in a docker image"]

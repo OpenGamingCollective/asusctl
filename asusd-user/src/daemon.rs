@@ -12,7 +12,7 @@ use rog_aura::aura_detection::LedSupportData;
 use rog_aura::keyboard::KeyLayout;
 use rog_dbus::zbus_anime::AnimeProxyBlocking;
 use rog_dbus::zbus_aura::AuraProxyBlocking;
-use rog_dbus::{list_iface_blocking, DBUS_NAME};
+use rog_dbus::{DBUS_NAME, list_iface_blocking};
 use zbus::Connection;
 
 #[cfg(not(feature = "local_data"))]
@@ -124,12 +124,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 };
                 anime_control.add_to_server(&mut connection).await;
-                if let Err(e) = tokio::task::spawn_blocking(move || loop {
-                    if let Ok(inner) = inner.clone().try_lock() {
-                        inner.run().ok();
-                    }
-                })
-                .await
+                if let Err(e) =
+                    tokio::task::spawn_blocking(move || -> Result<(), std::convert::Infallible> {
+                        loop {
+                            if let Ok(inner) = inner.clone().try_lock() {
+                                inner.run().ok();
+                            }
+                        }
+                    })
+                    .await
                 {
                     error!("AniMe task failed: {e}");
                 }
@@ -151,15 +154,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .unwrap_or_else(|_| KeyLayout::default_layout());
 
         let aura_proxy_blocking = AuraProxyBlocking::new(&conn)?;
-        tokio::task::spawn_blocking(move || loop {
-            aura_config.aura.next_state(&layout);
-            let packets = aura_config.aura.create_packets();
+        tokio::task::spawn_blocking(move || {
+            loop {
+                aura_config.aura.next_state(&layout);
+                let packets = aura_config.aura.create_packets();
 
-            if let Err(e) = aura_proxy_blocking.direct_addressing_raw(packets) {
-                error!("Aura direct addressing error: {e}");
-                break;
+                if let Err(e) = aura_proxy_blocking.direct_addressing_raw(packets) {
+                    error!("Aura direct addressing error: {e}");
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(33));
             }
-            std::thread::sleep(std::time::Duration::from_millis(33));
         });
     }
     // }

@@ -14,16 +14,16 @@ use rog_platform::error::PlatformError;
 use rog_platform::hid_raw::HidRaw;
 use tokio::sync::Mutex;
 use udev::{Device, MonitorBuilder};
-use zbus::zvariant::{ObjectPath, OwnedObjectPath};
 use zbus::Connection;
+use zbus::zvariant::{ObjectPath, OwnedObjectPath};
 
+use crate::ASUS_ZBUS_PATH;
 use crate::aura_anime::trait_impls::AniMeZbus;
 use crate::aura_laptop::trait_impls::AuraZbus;
 use crate::aura_scsi::trait_impls::ScsiZbus;
 use crate::aura_slash::trait_impls::SlashZbus;
 use crate::aura_types::DeviceHandle;
 use crate::error::RogError;
-use crate::ASUS_ZBUS_PATH;
 
 const MOD_NAME: &str = "aura";
 

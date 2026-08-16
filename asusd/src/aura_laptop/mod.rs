@@ -5,7 +5,7 @@ use config_traits::StdConfig;
 use log::info;
 use rog_aura::keyboard::{AuraLaptopUsbPackets, LedUsbPackets};
 use rog_aura::usb::{AURA_LAPTOP_LED_APPLY, AURA_LAPTOP_LED_SET};
-use rog_aura::{AuraDeviceType, AuraEffect, LedBrightness, PowerZones, AURA_LAPTOP_LED_MSG_LEN};
+use rog_aura::{AURA_LAPTOP_LED_MSG_LEN, AuraDeviceType, AuraEffect, LedBrightness, PowerZones};
 use rog_platform::hid_raw::HidRaw;
 use rog_platform::keyboard_led::KeyboardBacklight;
 use tokio::sync::{Mutex, MutexGuard};

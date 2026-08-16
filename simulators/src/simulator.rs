@@ -141,7 +141,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut event_pump = sdl_context.event_pump().map_err(|e| e.to_string())?;
     'running: loop {
         dev.read(); // it's blocking, and damned hard to sync with arc/mutex
-                    // let one = dev.buffer[0..7] != USB_PREFIX2;
         let index = dev.buffer[3];
 
         let w = dev.animatrix.led_shape().horizontal * 6;

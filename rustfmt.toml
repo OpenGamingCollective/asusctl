@@ -1,5 +1,5 @@
 condense_wildcard_suffixes = true
-edition = "2021"
+edition = "2024"
 format_strings = true
 group_imports = "StdExternalCrate"
 hex_literal_case = "Lower"

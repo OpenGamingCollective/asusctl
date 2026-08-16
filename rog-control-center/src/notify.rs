@@ -75,7 +75,7 @@ fn dgpu_status_for_tick(
 // reject the newer lint names while newer ones still honor them.
 #[allow(unknown_lints, clippy::manual_is_multiple_of)]
 fn start_dgpu_status_mon(config: Arc<Mutex<Config>>, gpu_status_tx: watch::Sender<GfxPower>) {
-    use rog_platform::gpu_pci::{asus_dgpu_disabled, asus_gpu_mux_discreet, Device};
+    use rog_platform::gpu_pci::{Device, asus_dgpu_disabled, asus_gpu_mux_discreet};
 
     let find_dgpu = || {
         Device::find()

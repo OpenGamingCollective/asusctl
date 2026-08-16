@@ -1,6 +1,6 @@
 use argh::FromArgs;
-use rog_anime::usb::{AnimAwake, AnimBooting, AnimShutdown, AnimSleeping};
 use rog_anime::AnimeType;
+use rog_anime::usb::{AnimAwake, AnimBooting, AnimShutdown, AnimSleeping};
 
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "anime", description = "anime commands")]

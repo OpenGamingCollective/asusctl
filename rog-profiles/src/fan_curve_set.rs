@@ -4,8 +4,8 @@ use udev::Device;
 #[cfg(feature = "dbus")]
 use zbus::zvariant::Type;
 
-use crate::error::ProfileError;
 use crate::FanCurvePU;
+use crate::error::ProfileError;
 
 pub(crate) fn pwm_str(fan: char, index: usize) -> String {
     format!("pwm{fan}_auto_point{}_pwm", index + 1)
@@ -198,8 +198,18 @@ mod tests {
             CurveData::from_str("30c:1%,49c:2%,59c:3%,69c:4%,79c:31%,89c:49%,99c:56%,109c:58%")?;
         curve.enabled = true;
         assert_eq!(curve.fan, FanCurvePU::CPU);
-        assert_eq!(curve.temp, [30, 49, 59, 69, 79, 89, 99, 109]);
-        assert_eq!(curve.pwm, [3, 5, 8, 10, 79, 125, 143, 148]);
+        assert_eq!(
+            curve.temp,
+            [
+                30, 49, 59, 69, 79, 89, 99, 109
+            ]
+        );
+        assert_eq!(
+            curve.pwm,
+            [
+                3, 5, 8, 10, 79, 125, 143, 148
+            ]
+        );
 
         let string: String = (&curve).into();
         // End result is slightly different due to type conversions and rounding errors
@@ -218,8 +228,18 @@ mod tests {
     fn curve_data_from_str_simple() -> Result<(), Box<dyn std::error::Error>> {
         let curve = CurveData::from_str("30:1,49:2,59:3,69:4,79:31,89:49,99:56,109:58")?;
         assert_eq!(curve.fan, FanCurvePU::CPU);
-        assert_eq!(curve.temp, [30, 49, 59, 69, 79, 89, 99, 109]);
-        assert_eq!(curve.pwm, [1, 2, 3, 4, 31, 49, 56, 58]);
+        assert_eq!(
+            curve.temp,
+            [
+                30, 49, 59, 69, 79, 89, 99, 109
+            ]
+        );
+        assert_eq!(
+            curve.pwm,
+            [
+                1, 2, 3, 4, 31, 49, 56, 58
+            ]
+        );
         Ok(())
     }
 

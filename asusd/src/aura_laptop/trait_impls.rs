@@ -7,7 +7,7 @@ use rog_aura::{AuraDeviceType, AuraEffect, AuraModeNum, AuraZone, LedBrightness,
 use zbus::fdo::Error as ZbErr;
 use zbus::object_server::SignalEmitter;
 use zbus::zvariant::OwnedObjectPath;
-use zbus::{interface, Connection};
+use zbus::{Connection, interface};
 
 use super::Aura;
 use crate::error::RogError;

@@ -1,9 +1,9 @@
 //! Using a combination of key-colour array plus a key layout to generate
 //! outputs.
 
+use rog_aura::Colour;
 use rog_aura::effects::{AdvancedEffects, Effect};
 use rog_aura::keyboard::{KeyLayout, LedCode};
-use rog_aura::Colour;
 use rog_dbus::zbus_aura::AuraProxyBlocking;
 use zbus::blocking::Connection;
 

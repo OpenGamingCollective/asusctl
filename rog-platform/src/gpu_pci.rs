@@ -805,8 +805,8 @@ mod tests {
     }
 
     #[test]
-    fn first_existing_returns_first_present_path(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    fn first_existing_returns_first_present_path()
+    -> std::result::Result<(), Box<dyn std::error::Error>> {
         let dir = TestDir::new("asusctl_test_first_existing");
         let real = dir.join("present");
         fs::write(&real, "1")?;
@@ -849,8 +849,8 @@ mod tests {
     }
 
     #[test]
-    fn unreadable_runtime_status_is_unknown_not_off(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    fn unreadable_runtime_status_is_unknown_not_off()
+    -> std::result::Result<(), Box<dyn std::error::Error>> {
         let dir = TestDir::new("asusctl_test_runtime_status");
         fs::create_dir_all(dir.join("power"))?;
         let device = fake_device(dir.0.clone());
@@ -870,8 +870,8 @@ mod tests {
     }
 
     #[test]
-    fn device_get_temp_and_usage_when_suspended(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    fn device_get_temp_and_usage_when_suspended()
+    -> std::result::Result<(), Box<dyn std::error::Error>> {
         let dir = TestDir::new("asusctl_test_temp_suspended");
         fs::create_dir_all(dir.join("power"))?;
         fs::write(dir.join("power/runtime_status"), "suspended\n")?;

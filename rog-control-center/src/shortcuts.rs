@@ -3,17 +3,17 @@
 //! Host registration must precede portal use and occur once per connection.
 //! KDE may persist denied shortcuts with an empty trigger.
 
-use ashpd::desktop::global_shortcuts::{GlobalShortcuts, NewShortcut, Shortcut};
 use ashpd::AppID;
+use ashpd::desktop::global_shortcuts::{GlobalShortcuts, NewShortcut, Shortcut};
 use futures_util::StreamExt;
 use log::{error, info, warn};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::{mpsc, oneshot, watch};
 use tokio::task::JoinHandle;
 
-use crate::window::{WeakWindowController, WindowCommand, WindowController};
 use crate::APP_ID;
+use crate::window::{WeakWindowController, WindowCommand, WindowController};
 
 const SHORTCUT_ID: &str = "toggle_rog";
 const SHORTCUT_DESCRIPTION: &str = "Open/Close ROG Control Center";
