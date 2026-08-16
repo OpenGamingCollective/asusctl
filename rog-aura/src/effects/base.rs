@@ -1,6 +1,6 @@
 use super::{EffectState, InputForEffect};
-use crate::keyboard::{KeyLayout, LedCode};
 use crate::Colour;
+use crate::keyboard::{KeyLayout, LedCode};
 
 pub struct InputBased {
     led: LedCode,

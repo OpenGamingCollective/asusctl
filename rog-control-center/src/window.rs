@@ -4,11 +4,11 @@ use std::sync::{Arc, Mutex, OnceLock, Weak};
 use log::error;
 use slint::ComponentHandle;
 
+use crate::MainWindow;
 use crate::config::Config;
 use crate::shortcuts::ShortcutHandle;
 use crate::ui::setup_window;
 use crate::zbus_proxies::AppState;
-use crate::MainWindow;
 
 thread_local! {
     static WINDOW: RefCell<WindowState> = const {

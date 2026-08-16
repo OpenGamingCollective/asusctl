@@ -25,7 +25,7 @@ use std::collections::BTreeMap;
 use rog_aura::keyboard::{AuraLaptopUsbPackets, LaptopAuraPower};
 use rog_aura::{AuraDeviceType, AuraEffect, AuraModeNum, AuraZone, LedBrightness, PowerZones};
 use zbus::blocking::Connection;
-use zbus::{proxy, Result};
+use zbus::{Result, proxy};
 
 const BLOCKING_TIME: u64 = 33; // 100ms = 10 FPS, max 50ms = 20 FPS, 40ms = 25 FPS
 

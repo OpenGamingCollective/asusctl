@@ -5,7 +5,7 @@ use log::{debug, info, warn};
 use rog_aura::aura_detection::LedSupportData;
 use rog_aura::keyboard::LaptopAuraPower;
 use rog_aura::{
-    AuraDeviceType, AuraEffect, AuraModeNum, AuraZone, Direction, LedBrightness, Speed, GRADIENT,
+    AuraDeviceType, AuraEffect, AuraModeNum, AuraZone, Direction, GRADIENT, LedBrightness, Speed,
 };
 use serde::{Deserialize, Serialize};
 

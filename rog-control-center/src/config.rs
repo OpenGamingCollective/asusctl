@@ -3,7 +3,7 @@ use std::fs::create_dir_all;
 use config_traits::{StdConfig, StdConfigLoad1};
 use serde::{Deserialize, Serialize};
 
-use crate::{notify::EnabledNotifications, APP_ID};
+use crate::{APP_ID, notify::EnabledNotifications};
 
 const CFG_DIR: &str = "rog";
 const CFG_FILE_NAME: &str = "rog-control-center.cfg";

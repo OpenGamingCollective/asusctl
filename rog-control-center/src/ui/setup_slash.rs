@@ -9,7 +9,7 @@ use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
 use crate::config::Config;
 use crate::ui::show_toast;
-use crate::{set_ui_callbacks, set_ui_props_async, MainWindow, SlashPageData};
+use crate::{MainWindow, SlashPageData, set_ui_callbacks, set_ui_props_async};
 
 fn slash_modes() -> Vec<SharedString> {
     SlashMode::list()

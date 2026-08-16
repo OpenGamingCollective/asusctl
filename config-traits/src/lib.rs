@@ -12,8 +12,8 @@ use std::path::PathBuf;
 use log::{error, warn};
 pub use ron;
 use ron::ser::PrettyConfig;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 /// Config file helper traits. Only `new()` and `file_name()` are required to be
 /// implemented, the rest are intended to be free methods.

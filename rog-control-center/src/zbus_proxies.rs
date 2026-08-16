@@ -2,7 +2,7 @@ use log::info;
 use std::sync::{Arc, Mutex};
 
 use zbus::blocking::proxy::ProxyImpl;
-use zbus::blocking::{fdo, Connection};
+use zbus::blocking::{Connection, fdo};
 use zbus::zvariant::{OwnedValue, Type, Value};
 use zbus::{interface, proxy};
 

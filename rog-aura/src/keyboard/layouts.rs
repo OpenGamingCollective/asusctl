@@ -238,7 +238,7 @@ impl KeyLayout {
         // TODO: locales
         let layout_name = if led_data.layout_name.is_empty() {
             "ga401q".to_owned() // Need some sort of default here due to ROGCC
-                                // expecting it
+        // expecting it
         } else {
             led_data.layout_name
         };

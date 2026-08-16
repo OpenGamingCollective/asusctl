@@ -8,7 +8,7 @@ use aura_cli::{LedPowerCommand1, LedPowerCommand2};
 use dmi_id::DMIID;
 use env_logger::Env;
 use fan_curve_cli::FanCurveCommand;
-use log::{error, info, LevelFilter};
+use log::{LevelFilter, error, info};
 use rog_anime::usb::get_anime_type;
 use rog_anime::{AnimTime, AnimeDataBuffer, AnimeDiagonal, AnimeGif, AnimeImage, AnimeType, Vec2};
 use rog_aura::keyboard::{AuraPowerState, LaptopAuraPower};
@@ -32,7 +32,7 @@ use zbus::blocking::Connection;
 
 use crate::cli_opts::*;
 use crate::slash_cli::{
-    handle_slash_get, handle_slash_list, handle_slash_set, SlashCommand, SlashSubCommand,
+    SlashCommand, SlashSubCommand, handle_slash_get, handle_slash_list, handle_slash_set,
 };
 
 mod anime_cli;
@@ -401,7 +401,9 @@ fn handle_anime(cmd: &AnimeCommand) -> Result<(), Box<dyn std::error::Error>> {
                 }
                 AnimeActions::PixelImage(image) => {
                     if image.path.is_empty() {
-                        println!("Missing arg or command; run 'asusctl anime pixel-image --help' for usage");
+                        println!(
+                            "Missing arg or command; run 'asusctl anime pixel-image --help' for usage"
+                        );
                         return Ok(());
                     }
                     verify_brightness(image.bright);
@@ -446,7 +448,9 @@ fn handle_anime(cmd: &AnimeCommand) -> Result<(), Box<dyn std::error::Error>> {
                 }
                 AnimeActions::PixelGif(gif) => {
                     if gif.path.is_empty() {
-                        println!("Missing arg or command; run 'asusctl anime pixel-gif --help' for usage");
+                        println!(
+                            "Missing arg or command; run 'asusctl anime pixel-gif --help' for usage"
+                        );
                         return Ok(());
                     }
                     verify_brightness(gif.bright);

@@ -6,18 +6,18 @@ use log::info;
 use rog_platform::platform::{PlatformProfile, RogPlatform};
 use rog_profiles::error::ProfileError;
 use rog_profiles::fan_curve_set::CurveData;
-use rog_profiles::{find_fan_curve_node, FanCurvePU, FanCurveProfiles};
+use rog_profiles::{FanCurvePU, FanCurveProfiles, find_fan_curve_node};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
-use zbus::{interface, Connection};
+use zbus::{Connection, interface};
 
 use rog_platform::asus_armoury::FirmwareAttributes;
 use rog_platform::power::AsusPower;
 
+use crate::CONFIG_PATH_BASE;
 use crate::asus_armoury::set_config_or_default;
 use crate::config::Config;
 use crate::error::RogError;
-use crate::CONFIG_PATH_BASE;
 
 pub const FAN_CURVE_ZBUS_NAME: &str = "FanCurves";
 pub const FAN_CURVE_ZBUS_PATH: &str = "/xyz/ljones";

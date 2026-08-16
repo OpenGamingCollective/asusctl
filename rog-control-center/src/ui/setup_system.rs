@@ -11,8 +11,8 @@ use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
 use super::show_toast;
 use crate::config::Config;
-use crate::zbus_proxies::{find_iface_async, AppState};
-use crate::{set_ui_callbacks, AttrMinMax, MainWindow, SystemPageData};
+use crate::zbus_proxies::{AppState, find_iface_async};
+use crate::{AttrMinMax, MainWindow, SystemPageData, set_ui_callbacks};
 
 const MINMAX: AttrMinMax = AttrMinMax {
     min: 0,

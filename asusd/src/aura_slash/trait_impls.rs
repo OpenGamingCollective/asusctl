@@ -7,11 +7,11 @@ use rog_slash::usb::{
 };
 use rog_slash::{DeviceState, SlashMode};
 use zbus::zvariant::OwnedObjectPath;
-use zbus::{interface, Connection};
+use zbus::{Connection, interface};
 
 use super::Slash;
-use crate::error::RogError;
 use crate::Reloadable;
+use crate::error::RogError;
 
 #[derive(Clone)]
 pub struct SlashZbus(Slash);
