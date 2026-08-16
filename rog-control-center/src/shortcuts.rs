@@ -53,6 +53,15 @@ enum Assignment {
     Assigned,
 }
 
+impl Assignment {
+    fn status(self) -> ShortcutStatus {
+        match self {
+            Assignment::Assigned => ShortcutStatus::Listening,
+            _ => ShortcutStatus::Unassigned,
+        }
+    }
+}
+
 fn classify(entry: Option<(&str, &str)>) -> Assignment {
     match entry {
         None => Assignment::Missing,
@@ -61,13 +70,26 @@ fn classify(entry: Option<(&str, &str)>) -> Assignment {
     }
 }
 
+fn classify_bound(entry: Option<(&str, &str)>) -> Assignment {
+    match entry {
+        None => Assignment::Missing,
+        Some(_) => Assignment::Assigned,
+    }
+}
+
+fn shortcut_entry(shortcuts: &[Shortcut]) -> Option<(&str, &str)> {
+    shortcuts
+        .iter()
+        .find(|s| s.id() == SHORTCUT_ID)
+        .map(|s| (s.id(), s.trigger_description()))
+}
+
 fn assignment(shortcuts: &[Shortcut]) -> Assignment {
-    classify(
-        shortcuts
-            .iter()
-            .find(|s| s.id() == SHORTCUT_ID)
-            .map(|s| (s.id(), s.trigger_description())),
-    )
+    classify(shortcut_entry(shortcuts))
+}
+
+fn bound_assignment(shortcuts: &[Shortcut]) -> Assignment {
+    classify_bound(shortcut_entry(shortcuts))
 }
 
 /// Portal proxy with the interface version, read once at init time.
@@ -279,6 +301,29 @@ async fn query_assignment(
     Ok(assignment(request.response()?.shortcuts()))
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum EnableAction {
+    Bind,
+    Configure,
+    Skip,
+}
+
+fn enable_action(
+    current: Assignment,
+    bind_attempted: bool,
+    mode: EnableMode,
+    portal_version: u32,
+) -> EnableAction {
+    match (current, bind_attempted) {
+        (Assignment::Unassigned, _) => match (mode, portal_version >= 2) {
+            (EnableMode::Interactive, true) => EnableAction::Configure,
+            _ => EnableAction::Skip,
+        },
+        (_, false) => EnableAction::Bind,
+        (_, true) => EnableAction::Skip,
+    }
+}
+
 // A session permits one bind attempt; cancellation may persist an empty trigger.
 async fn bind_shortcut(
     portal: &Portal,
@@ -289,7 +334,7 @@ async fn bind_shortcut(
     info!("Requesting shortcut bind via portal");
     let request = portal.gs.bind_shortcuts(session, &[shortcut], None).await?;
     match request.response() {
-        Ok(bound) => Ok(assignment(bound.shortcuts())),
+        Ok(bound) => Ok(bound_assignment(bound.shortcuts())),
         Err(err) => {
             info!("Shortcut bind not completed ({err}), re-reading assignments");
             query_assignment(portal, session).await
@@ -304,30 +349,23 @@ async fn apply_enable(
     bind_attempted: &mut bool,
     mode: EnableMode,
 ) -> ashpd::Result<ShortcutStatus> {
-    if *current != Assignment::Assigned && mode == EnableMode::Interactive {
-        match *current {
-            Assignment::Missing if !*bind_attempted => {
-                // A failed or cancelled bind may still persist state.
-                *bind_attempted = true;
-                *current = bind_shortcut(portal, session).await?;
-            }
-            Assignment::Unassigned if portal.version >= 2 => {
-                // KDE requires Configure for an existing empty trigger.
-                if let Err(err) = portal
-                    .gs
-                    .configure_shortcuts(session, None, None::<ashpd::ActivationToken>)
-                    .await
-                {
-                    warn!("Could not open shortcut configuration: {err}");
-                }
-            }
-            _ => {}
+    match enable_action(*current, *bind_attempted, mode, portal.version) {
+        EnableAction::Bind => {
+            *bind_attempted = true;
+            *current = bind_shortcut(portal, session).await?;
         }
+        EnableAction::Configure => {
+            if let Err(err) = portal
+                .gs
+                .configure_shortcuts(session, None, None::<ashpd::ActivationToken>)
+                .await
+            {
+                warn!("Could not open shortcut configuration: {err}");
+            }
+        }
+        EnableAction::Skip => {}
     }
-    Ok(match current {
-        Assignment::Assigned => ShortcutStatus::Listening,
-        _ => ShortcutStatus::Unassigned,
-    })
+    Ok(current.status())
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -514,10 +552,7 @@ async fn run_session_inner(
                 match event {
                     Some(update) => {
                         current = assignment(update.shortcuts());
-                        let new_status = match current {
-                            Assignment::Assigned => ShortcutStatus::Listening,
-                            _ => ShortcutStatus::Unassigned,
-                        };
+                        let new_status = current.status();
                         if new_status != current_status {
                             info!("Shortcut assignment changed: {new_status:?}");
                             current_status = new_status;
@@ -553,6 +588,84 @@ mod tests {
             classify(Some((SHORTCUT_ID, "XF86Launch3"))),
             Assignment::Assigned
         );
+    }
+
+    #[test]
+    fn bound_shortcut_with_empty_trigger_is_assigned() {
+        assert_eq!(
+            classify_bound(Some((SHORTCUT_ID, ""))),
+            Assignment::Assigned
+        );
+        assert_eq!(
+            classify_bound(Some((SHORTCUT_ID, "   "))),
+            Assignment::Assigned
+        );
+        assert_eq!(
+            classify_bound(Some((SHORTCUT_ID, "XF86Launch3"))),
+            Assignment::Assigned
+        );
+    }
+
+    #[test]
+    fn bound_response_without_id_is_missing() {
+        assert_eq!(classify_bound(None), Assignment::Missing);
+    }
+
+    #[test]
+    fn enable_action_binds_once_per_session() {
+        assert_eq!(
+            enable_action(Assignment::Missing, false, EnableMode::Restore, 1),
+            EnableAction::Bind
+        );
+        assert_eq!(
+            enable_action(Assignment::Assigned, false, EnableMode::Restore, 1),
+            EnableAction::Bind
+        );
+        assert_eq!(
+            enable_action(Assignment::Missing, true, EnableMode::Interactive, 2),
+            EnableAction::Skip
+        );
+        assert_eq!(
+            enable_action(Assignment::Assigned, true, EnableMode::Restore, 2),
+            EnableAction::Skip
+        );
+    }
+
+    #[test]
+    fn enable_action_configures_only_interactive_unassigned_on_v2() {
+        assert_eq!(
+            enable_action(Assignment::Unassigned, false, EnableMode::Interactive, 2),
+            EnableAction::Configure
+        );
+        assert_eq!(
+            enable_action(Assignment::Unassigned, true, EnableMode::Interactive, 2),
+            EnableAction::Configure
+        );
+        assert_eq!(
+            enable_action(Assignment::Unassigned, false, EnableMode::Interactive, 1),
+            EnableAction::Skip
+        );
+        assert_eq!(
+            enable_action(Assignment::Unassigned, false, EnableMode::Restore, 2),
+            EnableAction::Skip
+        );
+    }
+
+    #[test]
+    fn unassigned_never_binds_directly() {
+        for attempted in [
+            false, true,
+        ] {
+            assert_ne!(
+                enable_action(
+                    Assignment::Unassigned,
+                    attempted,
+                    EnableMode::Interactive,
+                    2
+                ),
+                EnableAction::Bind
+            );
+        }
     }
 
     #[test]
