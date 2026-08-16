@@ -25,4 +25,3 @@ It provides safe access to platform profiles, custom fan curves, battery charge 
 - **Picking a distribution?** See [Supported Distributions](getting-started/supported-distributions.md) and the [Distribution Guides](distributions/index.md).
 - **Just installed?** Read the [General Recommendations](getting-started/recommendations.md), then explore the [Usage](usage/asusctl.md) section.
 - **Something not working?** Check the [FAQ](faq/general.md).
-- **Looking for a G-Helper-like experience?** See [G-Helper Comparison](hardware/g-helper.md).
