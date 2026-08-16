@@ -14,7 +14,7 @@ Here are the distributions with a written guide:
 - [Ubuntu 26.04](../distributions/ubuntu.md)
 - [Ultramarine](../distributions/ultramarine.md)
 
-Other distributions that packages asusctl:
+Other distributions that package asusctl:
 
 - AerynOS
 
