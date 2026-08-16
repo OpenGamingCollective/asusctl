@@ -24,6 +24,7 @@ jobs:
           persist-credentials: false
       - name: Install mdBook
         run: |
+          export RUSTUP_TOOLCHAIN=stable
           curl --proto '=https' --tlsv1.2 https://sh.rustup.rs -sSf -y | sh
           rustup update
           cargo install --locked --version ${MDBOOK_VERSION} mdbook
