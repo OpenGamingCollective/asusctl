@@ -49,14 +49,14 @@ fn main() -> Result<()> {
         debug!("Gamescope detected");
         if !gamescope.is_empty() {
             debug!("Setting WAYLAND_DISPLAY to {}", gamescope);
-            env::set_var("WAYLAND_DISPLAY", gamescope);
+            unsafe { env::set_var("WAYLAND_DISPLAY", gamescope) };
         }
         // gamescope-0
         else if let Ok(wayland) = env::var("WAYLAND_DISPLAY") {
             debug!("Wayland display detected");
             if wayland.is_empty() {
                 debug!("Setting WAYLAND_DISPLAY to gamescope-0");
-                env::set_var("WAYLAND_DISPLAY", "gamescope-0");
+                unsafe { env::set_var("WAYLAND_DISPLAY", "gamescope-0") };
             }
         }
     }
