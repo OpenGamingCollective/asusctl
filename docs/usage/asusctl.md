@@ -112,8 +112,8 @@ asusctl battery oneshot 90   # one-shot charge to 90%
 Custom fan curves are only supported on specific models. The data format is a comma-separated list of exactly 8 points in the form `30c:1%,49c:2%,...`, where each point is a temperature in degrees Celsius followed by a fan speed. If the `%` is omitted the fan speed range is 0-255. Temperatures and fan speeds must be non-decreasing along the curve, and temperatures above 100 °C are not recommended.
 
 ```bash
-asusctl fan-curve --mod-profile Balanced --data 30c:1%,49c:2%,59c:3%,69c:4%,79c:31%,89c:49%,99c:56%,109c:58%
-asusctl fan-curve --mod-profile Balanced --fan cpu --data 30c:1%,49c:2%,59c:3%,69c:4%,79c:31%,89c:49%,99c:56%,109c:58%
+asusctl fan-curve --mod-profile Balanced --data 30c:1%,49c:2%,59c:3%,69c:4%,79c:31%,89c:49%,99c:56%,100c:58%
+asusctl fan-curve --mod-profile Balanced --fan cpu --data 30c:1%,49c:2%,59c:3%,69c:4%,79c:31%,89c:49%,99c:56%,100c:58%
 ```
 
 There are three fan profiles (Quiet, Balanced, and Performance), each linked to the platform profile of the same name. Enable or disable them:
