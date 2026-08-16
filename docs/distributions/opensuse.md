@@ -312,7 +312,7 @@ sudo zypper in asusctl-rog-gui
 
 #### Graphics Switching
 
-See [GPU Switching](../hardware/gpu-switching.md) for how to manage the dGPU and MUX on ASUS laptops, including Cardwire.
+See [GPU Switching](../faq/gpu-switching.md) for how to manage the dGPU and MUX on ASUS laptops, including Cardwire.
 
 Cardwire is not yet packaged for openSUSE, so it must be built from source; see its [documentation](https://opengamingcollective.github.io/cardwire/).
 
