@@ -51,6 +51,9 @@ asusctl profile next            # cycle to the next profile
 
 Available profiles:
 
+> [!NOTE]
+> Available profiles vary by laptop and kernel support. The table below lists those that may be present. Run `asusctl profile list` to see the profiles your system actually exposes.
+
 | Profile | Description |
 |---|---|
 | `Balanced` | Default profile |
