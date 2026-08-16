@@ -16,7 +16,8 @@ Bazzite is a gaming-oriented atomic Fedora image based on [Universal Blue](https
 The supported way on Bazzite is the `ujust asus` helper. It installs the Universal Blue Homebrew casks `asusctl-linux` and `rog-control-center-linux` from the `ublue-os/tap` tap, and enables the required services. No reboot is needed and the installation survives rebasing:
 
 ```bash
-ujust asus install
+# <https://github.com/ublue-os/bazzite/blob/b798170d195f8466f687b61be1831c1ec785d942/system_files/desktop/shared/usr/share/ublue-os/just/82-bazzite-apps.just#L265-L405>
+ujust asus
 ```
 
 The services are enabled automatically.
