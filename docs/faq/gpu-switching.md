@@ -2,15 +2,15 @@
 
 > Managing the dGPU and MUX on hybrid ASUS laptops
 
-## Does my laptop support it?
+## What GPU modes does my laptop support?
 
-You can check if your device supports graphics switching by running:
+Support varies between laptops: some have Eco Mode only (`dgpu_disable`), some Ultimate Mode only (`gpu_mux_mode`), and some have both. You can check if your device supports graphics switching by running:
 
 ```bash
 asusctl armoury list
 ```
 
-If your device supports disabling of the dGPU, you should see an entry that looks like the following:
+If your device supports disabling of the dGPU (Eco Mode), you should see an entry that looks like the following:
 
 ```bash
 dgpu_disable:
@@ -19,14 +19,33 @@ dgpu_disable:
 
 Here, a current value of `0` means that your dGPU is not disabled (i.e., enabled).
 
-## Switching the dGPU
+If your device supports routing the screen to the dGPU (Ultimate Mode), you should see an entry that looks like the following:
 
-You can set whether you want to utilize your dGPU by modifying the setting under the `GPU Configuration` tab in the ROG Control Center. Alternatively, use the command line:
+```bash
+gpu_mux_mode:
+  current: [(0),1]
+```
+
+Here, a current value of `0` means that the MUX is disabled, in which case the discrete GPU is your default GPU and will be routed to your screen.
+
+You can set your GPU configuration by modifying the setting under the `GPU Configuration` tab in the ROG Control Center. Tt writes both the `dgpu_disable` and `gpu_mux_mode` attributes. Alternatively, use the command line:
 
 ```bash
 asusctl armoury set dgpu_disable 1   # disable the dGPU
 asusctl armoury set dgpu_disable 0   # re-enable the dGPU
+asusctl armoury set gpu_mux_mode 0   # enable the MUX (route the screen to the dGPU)
+asusctl armoury set gpu_mux_mode 1   # disable the MUX
 ```
+
+On MUX-capable systems the two attributes must be set in pairs; the valid combinations are:
+
+| Mode | `dgpu_disable` | `gpu_mux_mode` |
+|---|---|---|
+| Integrated | 1 | 1 |
+| Hybrid | 0 | 1 |
+| Ultimate | 0 | 0 |
+
+On systems without a MUX, only `dgpu_disable` is available.
 
 > [!NOTE]
 > Due to how Linux systems are configured to use the dGPU, you must reboot your system after changing your dGPU configuration. If you wish to power off your dGPU without rebooting, you should use an alternative program such as Cardwire (see below).
