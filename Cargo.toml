@@ -10,7 +10,7 @@ authors = [
 repository = "https://github.com/OpenGamingCollective/asusctl"
 homepage = "https://github.com/OpenGamingCollective/asusctl"
 description = "Laptop feature control for ASUS ROG laptops and others"
-edition = "2021"
+edition = "2024"
 
 [workspace]
 resolver = "2"
