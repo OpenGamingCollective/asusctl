@@ -17,7 +17,7 @@ It provides safe access to platform profiles, custom fan curves, battery charge 
 ## Kernel requirement
 
 > [!WARNING]
-> Many features are developed alongside Linux kernel updates. The minimum suggested kernel version is **Linux 6.19 or newer**. Support for Thermal Design Power (TDP) and other features is tied to the `asus-armoury` driver, which is only available mainline since 6.19.
+> Many features are developed alongside Linux kernel updates. The minimum supported kernel version is **Linux 6.19 or newer**. Support for Thermal Design Power (TDP) and other features is tied to the `asus-armoury` driver, which is only available mainline since 6.19.
 
 ## Where to start
 
