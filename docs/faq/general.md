@@ -46,7 +46,7 @@ These steps are not needed if you are running Linux exclusively.
 
 ### Note for ROG Flow X13 (2021)
 
-BIOS versions 408 & 409 cannot boot a Linux kernel newer than 5.15.x so you will need to upgrade to the 410 BIOS [here](https://rog.asus.com/bt/laptops/rog-flow/2021-rog-flow-x13-series/helpdesk_bios/).
+BIOS versions 408 & 409 cannot boot a Linux kernel newer than 5.15.x so you will need to upgrade to the 410 BIOS from the [official ROG Flow X13 (2021) BIOS support page](https://rog.asus.com/bt/laptops/rog-flow/2021-rog-flow-x13-series/helpdesk_bios/).
 
 ### Is `<distro>` supported by asusctl?
 
