@@ -32,7 +32,6 @@ Once done start that Windows installation and ensure it says it has a valid lice
 
 > [!WARNING]
 > You are supposed to use this Windows installation to fully update your laptop before installing Linux and regularly after!
-
 > [!WARNING]
 > The Windows installation might be required if you ask for help to troubleshoot certain issues, so be sure to keep it safe and update it as well as Armoury Crate from time to time!
 
