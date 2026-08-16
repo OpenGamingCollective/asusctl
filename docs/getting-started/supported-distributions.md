@@ -17,6 +17,7 @@ Here are the distributions with a written guide:
 Other distributions that package asusctl:
 
 - AerynOS
+- Solus
 
 Distributions that are very popular but are not supported:
 
