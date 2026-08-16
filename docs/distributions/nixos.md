@@ -34,6 +34,21 @@ services.asusd.enable = true;
 
 Then rebuild your NixOS
 
+> [!IMPORTANT]
+> **Power profiles**: `asusd` manages platform profiles and CPU EPP settings itself via the ACPI `platform_profile` interface. Running an external power profiles daemon (such as `power-profiles-daemon` or `tuned`) alongside `asusd` can cause race conditions over `/sys/firmware/acpi/platform_profile` and CPU EPP preferences. You have two options:
+>
+> 1. **Let `asusd` manage profiles** and do not enable an external daemon (e.g. do not enable `services.power-profiles-daemon`).
+> 2. **Keep the external daemon** and disable `asusd`'s profile management by setting the following to `false` in `/etc/asusd/asusd.ron`:
+>
+> ```ron
+> change_platform_profile_on_ac: false,
+> change_platform_profile_on_battery: false,
+> platform_profile_linked_epp: false,
+> ```
+>
+> A common way to switch profiles is binding the `Fn+F5` key to `asusctl profile next`
+> Available profiles vary by system, see `asusctl profile list`.
+
 ## Graphics Switching
 
 See [GPU Switching](../faq/gpu-switching.md) for how to manage the dGPU and MUX.

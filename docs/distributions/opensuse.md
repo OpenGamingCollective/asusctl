@@ -180,7 +180,7 @@ groupadd wheel
 usermod -aG wheel USERNAME
 ```
 
-5. *Optionally*, verify the user was added to the wheel group, replacing USERNAME with the desired user:
+5. _Optionally_, verify the user was added to the wheel group, replacing USERNAME with the desired user:
 
 ```bash
 id USERNAME
@@ -284,13 +284,27 @@ sudo zypper rm tlp
 sudo zypper in asusctl
 ```
 
-3. Ensure that **power-profiles-daemon** is enabled and running:
+> [!IMPORTANT]
+> **Power profiles**: `asusd` manages platform profiles and CPU EPP settings itself via the ACPI `platform_profile` interface. Running an external power profiles daemon (such as `power-profiles-daemon` or `tuned`) alongside `asusd` can cause race conditions over `/sys/firmware/acpi/platform_profile` and CPU EPP preferences. You have two options:
+>
+> 1. **Let `asusd` manage profiles** and disable the external daemon:
+>
+> ```bash
+> sudo systemctl disable --now power-profiles-daemon.service
+> ```
+>
+> 2. **Keep the external daemon** and disable `asusd`'s profile management by setting the following to `false` in `/etc/asusd/asusd.ron`:
+>
+> ```ron
+> change_platform_profile_on_ac: false,
+> change_platform_profile_on_battery: false,
+> platform_profile_linked_epp: false,
+> ```
+>
+> A common way to switch profiles is binding the `Fn+F5` key to `asusctl profile next`
+> Available profiles vary by system, see `asusctl profile list`.
 
-```bash
-sudo systemctl enable --now power-profiles-daemon.service
-```
-
-4. Either restart the system, or run the following command to immediately begin using asusctl:
+3. Either restart the system, or run the following command to immediately begin using asusctl:
 
 ```bash
 sudo systemctl start asusd

@@ -118,13 +118,28 @@ sudo pacman -S asusctl
 
 asusd service is triggered by a udev rule after the keyboard driver is ready, the service doesn't need to be enabled and is not supposed to be.
 
-> [!NOTE]
-> Note: Asusctl is designed to work primarily with power-profiles-daemon; other power management tools can create conflicts with asusctl; if you're using an Arch-based distro, you may already have ppd installed, so you might not need to follow this step, as in CachyOS.
-
-```bash
-sudo pacman -S power-profiles-daemon
-systemctl enable --now power-profiles-daemon.service
-```
+> [!IMPORTANT]
+> **Power profiles**: `asusd` manages platform profiles and CPU EPP settings itself via the ACPI `platform_profile` interface. Running an external power profiles daemon (such as `power-profiles-daemon` or `tuned`) alongside `asusd` can cause race conditions over `/sys/firmware/acpi/platform_profile` and CPU EPP preferences. You have two options:
+>
+> 1. **Let `asusd` manage profiles** and disable the external daemon:
+>
+>    ```bash
+>    sudo systemctl disable --now power-profiles-daemon.service
+>    sudo systemctl mask power-profile-daemon.service
+>    ```
+>
+> 2. **Keep the external daemon** and disable `asusd`'s profile management by setting the following to `false` in `/etc/asusd/asusd.ron`:
+>
+>    ```ron
+>    change_platform_profile_on_ac: false,
+>    change_platform_profile_on_battery: false,
+>    platform_profile_linked_epp: false,
+>    ```
+>
+> If you're using an Arch-based distro you may already have power-profiles-daemon installed, as in CachyOS.
+>
+> A common way to switch profiles is binding the `Fn+F5` key to `asusctl profile next`
+> Available profiles vary by system, see `asusctl profile list`.
 
 > [!CAUTION]
 > Be aware that some functions or asusctl need kernel-level drivers support, take a look at the "Custom kernel section"
@@ -142,7 +157,6 @@ sudo pacman -S rog-control-center
 ### Graphics Switching
 
 See [GPU Switching](../faq/gpu-switching.md) for how to manage the dGPU and MUX.
-
 
 ### Custom kernel - drivers fixes, hardware support
 

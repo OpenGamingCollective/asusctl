@@ -22,6 +22,30 @@ ujust asus
 
 The services are enabled automatically.
 
+### Power profiles
+
+> [!IMPORTANT]
+> **Power profiles**: `asusd` manages platform profiles and CPU EPP settings itself via the ACPI `platform_profile` interface. Running an external power profiles daemon (such as `power-profiles-daemon` or `tuned`) alongside `asusd` can cause race conditions over `/sys/firmware/acpi/platform_profile` and CPU EPP preferences. You have two options:
+>
+> 1. **Let `asusd` manage profiles** and disable the external daemon. Note that KDE Plasma's PowerDevil can respawn `power-profiles-daemon` through DBus activation even after it is disabled, so be sure to mask it instead:
+>
+> ```bash
+> sudo systemctl mask --now power-profiles-daemon.service
+> # or, if you use tuned:
+> sudo systemctl mask --now tuned.service tuned-ppd.service
+> ```
+>
+> 2. **Keep the external daemon** and disable `asusd`'s profile management by setting the following to `false` in `/etc/asusd/asusd.ron`:
+>
+> ```ron
+> change_platform_profile_on_ac: false,
+> change_platform_profile_on_battery: false,
+> platform_profile_linked_epp: false,
+> ```
+>
+> A common way to switch profiles is binding the `Fn+F5` key to `asusctl profile next`
+> Available profiles vary by system, see `asusctl profile list`.
+
 ### Graphics Switching
 
 See [GPU Switching](../faq/gpu-switching.md) for how to manage the dGPU and MUX.
