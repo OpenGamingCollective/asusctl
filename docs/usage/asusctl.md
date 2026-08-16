@@ -112,8 +112,8 @@ asusctl battery oneshot 90   # one-shot charge to 90%
 Custom fan curves are only supported on specific models. The data format is a comma-separated list of exactly 8 points in the form `30c:1%,49c:2%,...`, where each point is a temperature in degrees Celsius followed by a fan speed. If the `%` is omitted the fan speed range is 0-255. Temperatures and fan speeds must be non-decreasing along the curve, and temperatures above 100 °C are not recommended.
 
 ```bash
-asusctl fan-curve --mod-profile Balanced --data 30c:1%,49c:2%,70c:50%,80c:100%
-asusctl fan-curve --mod-profile Balanced --fan cpu --data 30c:1%,49c:2%,70c:50%,80c:100%
+asusctl fan-curve --mod-profile Balanced --data 30c:1%,49c:2%,59c:3%,69c:4%,79c:31%,89c:49%,99c:56%,109c:58%
+asusctl fan-curve --mod-profile Balanced --fan cpu --data 30c:1%,49c:2%,59c:3%,69c:4%,79c:31%,89c:49%,99c:56%,109c:58%
 ```
 
 There are three fan profiles (Quiet, Balanced, and Performance), each linked to the platform profile of the same name. Enable or disable them:
@@ -131,7 +131,7 @@ If no profile is activated manually, the fan curve from the BIOS is used.
 |---|---|
 | `--mod-profile <profile>` | The profile to modify. When given without any other option, prints the current curve data for that profile |
 | `--data <points>` | Set the fan curve data; requires `--mod-profile` |
-| `--fan <cpu\|gpu\|mid>` | Select the fan to modify; defaults to `cpu`. Required by `--data` and `--enable-fan-curve` |
+| `--fan <cpu\|gpu\|mid>` | Select the fan to modify; defaults to `cpu`. Required by `--enable-fan-curve` |
 | `--enable-fan-curves <true\|false>` | Enable or disable all fan curves of a profile; requires `--mod-profile` |
 | `--enable-fan-curve <true\|false>` | Enable or disable a single fan curve; requires `--mod-profile` and `--fan` |
 | `--default` | Set the active profile's fan curves back to the defaults |
