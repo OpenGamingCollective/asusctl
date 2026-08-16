@@ -124,12 +124,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 };
                 anime_control.add_to_server(&mut connection).await;
-                if let Err(e) = tokio::task::spawn_blocking(move || loop {
-                    if let Ok(inner) = inner.clone().try_lock() {
-                        inner.run().ok();
+                let Err(e) = tokio::task::spawn_blocking(move || {
+                    loop {
+                        if let Ok(inner) = inner.clone().try_lock() {
+                            inner.run().ok();
+                        }
                     }
                 })
-                .await
+                .await;
                 {
                     error!("AniMe task failed: {e}");
                 }
