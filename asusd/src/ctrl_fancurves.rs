@@ -82,8 +82,7 @@ impl CtrlFanCurveZbus {
     /// Re-apply PPT values after fan curve writes. Fan curve changes reset
     /// the EC fan mode, and PPT values must be re-sent afterwards.
     async fn reapply_ppt(&self, profile: PlatformProfile) {
-        let (Some(ref platform_config), Some(ref power)) = (&self.platform_config, &self.power)
-        else {
+        let (Some(platform_config), Some(power)) = (&self.platform_config, &self.power) else {
             return;
         };
         let power_plugged = power.get_online().unwrap_or_default();
