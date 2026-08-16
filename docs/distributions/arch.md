@@ -125,7 +125,7 @@ asusd service is triggered by a udev rule after the keyboard driver is ready, th
 >
 >    ```bash
 >    sudo systemctl disable --now power-profiles-daemon.service
->    sudo systemctl mask power-profile-daemon.service
+>    sudo systemctl mask power-profiles-daemon.service
 >    ```
 >
 > 2. **Keep the external daemon** and disable `asusd`'s profile management by setting the following to `false` in `/etc/asusd/asusd.ron`:
