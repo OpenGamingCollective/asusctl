@@ -4,7 +4,11 @@
 
 ## What GPU modes does my laptop support?
 
-Support varies between laptops: some have Eco Mode only (`dgpu_disable`), some Ultimate Mode only (`gpu_mux_mode`), and some have both. You can check if your device supports graphics switching by running:
+Support varies between laptops: some have Eco Mode only (`dgpu_disable`) and some have Ultimate Mode as well (`gpu_mux_mode`).
+
+You can set your GPU configuration by modifying the setting under the `GPU Configuration` tab in the ROG Control Center. It writes both the `dgpu_disable` and `gpu_mux_mode` attributes. Alternatively, use the command line:
+
+You can check if your device supports graphics switching by running:
 
 ```bash
 asusctl armoury list
@@ -27,8 +31,6 @@ gpu_mux_mode:
 ```
 
 Here, a current value of `0` means that the MUX is disabled, in which case the discrete GPU is your default GPU and will be routed to your screen.
-
-You can set your GPU configuration by modifying the setting under the `GPU Configuration` tab in the ROG Control Center. Tt writes both the `dgpu_disable` and `gpu_mux_mode` attributes. Alternatively, use the command line:
 
 ```bash
 asusctl armoury set dgpu_disable 1   # disable the dGPU
