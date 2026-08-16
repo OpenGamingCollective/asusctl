@@ -7,7 +7,7 @@ use std::time::Duration;
 use config_traits::{StdConfig, StdConfigLoad1};
 use dmi_id::DMIID;
 use env_logger::Env;
-use log::{LevelFilter, debug, error, info, warn};
+use log::{debug, error, info, warn};
 use rog_control_center::cli_options::CliStart;
 use rog_control_center::config::Config;
 use rog_control_center::error::Result;
@@ -25,16 +25,11 @@ use tokio::runtime::Runtime;
 
 fn main() -> Result<()> {
     // Ensure tracing spans are quiet by default unless user overrides
-    let mut logger = env_logger::Builder::from_env(
+    env_logger::Builder::from_env(
         Env::default().default_filter_or("warn,tracing=error,zbus=error"),
-    );
-    logger
-        .parse_default_env()
-        .filter_level(LevelFilter::Info)
-        .parse_default_env()
-        .target(env_logger::Target::Stderr)
-        .format_timestamp(None)
-        .init();
+    )
+    .format_timestamp(None)
+    .init();
 
     let cli_parsed: CliStart = argh::from_env();
 
