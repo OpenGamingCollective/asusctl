@@ -21,7 +21,7 @@ dgpu_disable:
   current: [(0),1]
 ```
 
-Here, a current value of `0` means that your dGPU is not disabled (i.e., enabled).
+When this attribute is `1`, the dGPU is disabled and only the iGPU will be used (Integrated mode). A value of `0` leaves the dGPU enabled. `dgpu_disable` is independent of the MUX, so whether the dGPU drives the display is then up to `gpu_mux_mode`.
 
 If your device supports routing the screen to the dGPU (Ultimate Mode), you should see an entry that looks like the following:
 
