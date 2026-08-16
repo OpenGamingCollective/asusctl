@@ -4,18 +4,15 @@
 
 Here are the distributions with a written guide:
 
-- Arch Linux
-- Bazzite
-- Fedora Workstation
-- Fedora Atomic
-- NixOS
-- Bazzite
-- openSUSE Tumbleweed
-- PikaOS
-- Ubuntu 26.04
-- Ultramarine
-
-You can find the full guides in the [Distribution Guides](../distributions/index.md) section.
+- [Arch Linux](../distributions/arch.md)
+- [Bazzite](../distributions/bazzite.md)
+- [Fedora Workstation](../distributions/fedora.md)
+- [Fedora Atomic](../distributions/fedora-atomic.md)
+- [NixOS](../distributions/nixos.md)
+- [openSUSE Tumbleweed](../distributions/opensuse.md)
+- [PikaOS](../distributions/pikaos.md)
+- [Ubuntu 26.04](../distributions/ubuntu.md)
+- [Ultramarine](../distributions/ultramarine.md)
 
 Other distributions that packages asusctl:
 - AerynOS
