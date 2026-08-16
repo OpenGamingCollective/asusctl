@@ -62,7 +62,3 @@ See the [Cardwire documentation](https://opengamingcollective.github.io/cardwire
 ## supergfxctl
 
 `supergfxctl` is deprecated in favor of Cardwire. If you still require VFIO for virtual machines, supergfxctl remains available from some distribution repositories - check your distribution's package manager.
-
-## Dynamic Boost
-
-For NVIDIA laptops, `nvidia-powerd` enables Dynamic Boost; see the [Graphics FAQ](../faq/graphics.md#nvidia-dynamic-boost-isnt-working).
