@@ -4,3 +4,6 @@
 # >= 1.86/1.87/1.9x and fail to build.
 [resolver]
 incompatible-rust-versions = "fallback"
+
+[target.'cfg(all())']
+rustflags = ["-A", "clippy::collapsible_if"]

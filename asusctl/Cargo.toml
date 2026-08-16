@@ -25,10 +25,6 @@ ron.workspace = true
 zbus.workspace = true
 argh.workspace = true
 
-[dev-dependencies]
-rog_dbus = { path = "../rog-dbus" }
-png.workspace = true
-
 [package.metadata.deb]
 license-file = ["../LICENSE", "4"]
 extended-description = """\

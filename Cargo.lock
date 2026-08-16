@@ -276,7 +276,6 @@ dependencies = [
  "dmi_id",
  "env_logger",
  "log",
- "png 0.18.1",
  "rog_anime",
  "rog_aura",
  "rog_dbus",
