@@ -25,7 +25,7 @@ Distributions that are very popular but are not supported:
 
 **But why?**
 
-Old kernel: many patches that drastically improve Linux experience on an ASUS/ROG laptop are only available in the latest kernel. The minimum kernel version we recommend now is >= 6.19 (newer is better), which is why you should never run CentOS/RockyOS/Debian on newer devices, especially a laptop.
+Old kernel: many patches that drastically improve Linux experience on an ASUS/ROG laptop are only available in the latest kernel. The minimum kernel version we recommend now is >= 6.19 (newer is better), which is why CentOS/RockyOS/Debian are listed as unsupported. Their default kernels often fall below this, especially on newer devices.
 
 However, if you REALLY REALLY need that very specific distro to get your job done, we strongly recommend using [DistroBox](https://github.com/89luca89/distrobox) to provide the environment that the software needs. You can find many youtube videos show you how to use it (Don't install asusctl on distrobox, asusd needs root access).
 
