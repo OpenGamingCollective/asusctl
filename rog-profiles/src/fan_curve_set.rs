@@ -121,6 +121,25 @@ impl CurveData {
         self.fan = fan;
     }
 
+    /// Check that both temperature and fan power ascend across the eight
+    /// points. Equal adjacent values are allowed so that flat sections of a
+    /// curve remain valid.
+    pub fn validate(&self) -> Result<(), ProfileError> {
+        for (label, points) in [
+            ("temperature", &self.temp),
+            ("percentage", &self.pwm),
+        ] {
+            for pair in points.windows(2) {
+                if pair[0] > pair[1] {
+                    return Err(ProfileError::ParseFanCurvePrevHigher(
+                        label, pair[0], pair[1],
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
     fn set_val_from_attr(tmp: &str, device: &Device, buf: &mut [u8; 8]) {
         if let Some(n) = tmp.chars().nth(15) {
             if let Some(digit) = n.to_digit(10) {
