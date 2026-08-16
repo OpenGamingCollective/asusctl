@@ -39,11 +39,11 @@ asusctl armoury set gpu_mux_mode 1   # disable the MUX
 
 On MUX-capable systems the two attributes must be set in pairs; the valid combinations are:
 
-| Mode | `dgpu_disable` | `gpu_mux_mode` |
-|---|---|---|
-| Integrated | 1 | 1 |
-| Hybrid | 0 | 1 |
-| Ultimate | 0 | 0 |
+| Mode       | `dgpu_disable` | `gpu_mux_mode` |
+| ---------- | -------------- | -------------- |
+| Integrated | 1              | 1              |
+| Hybrid     | 0              | 1              |
+| Ultimate   | 0              | 0              |
 
 On systems without a MUX, only `dgpu_disable` is available.
 
@@ -58,7 +58,3 @@ Cardwire is the community's new replacement for the now-deprecated supergfxctl. 
 > Cardwire is currently still considered EXPERIMENTAL. If you choose to install this tool, expect rough edges and quirks. For support, join our Discord server.
 
 See the [Cardwire documentation](https://opengamingcollective.github.io/cardwire/) for installation and usage instructions. On some distributions it is packaged: on Arch via the [OGC repository](../distributions/arch.md) (`pacman -S cardwire`), on Fedora-based systems via Terra (`dnf install cardwire`), and on NixOS via `services.cardwired.enable`.
-
-## supergfxctl
-
-`supergfxctl` is deprecated in favor of Cardwire. If you still require VFIO for virtual machines, supergfxctl remains available from some distribution repositories - check your distribution's package manager.
