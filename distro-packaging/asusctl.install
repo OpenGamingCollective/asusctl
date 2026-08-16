@@ -14,4 +14,16 @@ cleanup_asusd_leftovers() {
         echo "-> Renaming old asusd graphics mode file, this file can be safely removed"
         mv -vf /etc/modprobe.d/asusd.conf /etc/modprobe.d/asusd.old
     fi
+    if [[ -e /usr/lib/systemd/user/asusd-user.service ]]; then
+        echo "-> Disabling obsolete asusd-user systemd service"
+        systemctl --global disable asusd-user.service 2>/dev/null || true
+        pkill -x asusd-user 2>/dev/null || true
+        echo "-> Removing obsolete asusd-user systemd service"
+        rm -f /usr/lib/systemd/user/asusd-user.service
+    fi
+    if [[ -e /usr/bin/asusd-user ]]; then
+        pkill -x asusd-user 2>/dev/null || true
+        echo "-> Removing obsolete asusd-user binary"
+        rm -f /usr/bin/asusd-user
+    fi
 }

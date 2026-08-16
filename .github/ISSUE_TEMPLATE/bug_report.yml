@@ -20,7 +20,6 @@ body:
       description: Select the main component where the issue occurs.
       options:
         - "asusd (System Daemon / D-Bus)"
-        - "asusd-user (User Session Daemon)"
         - "asusctl (CLI Tool)"
         - "rog-control-center (GUI / Slint / System Tray)"
         - "rog-aura (Keyboard / Aura RGB)"

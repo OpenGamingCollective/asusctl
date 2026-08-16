@@ -18,8 +18,6 @@ Enable and start the services:
 
 ```bash
 sudo systemctl enable --now asusd.service asus-shutdown.service
-systemctl --user daemon-reload
-systemctl --user enable --now asusd-user.service
 sudo udevadm control --reload
 sudo udevadm trigger
 systemctl status asusd.service

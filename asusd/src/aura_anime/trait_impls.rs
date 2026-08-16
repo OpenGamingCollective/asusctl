@@ -290,8 +290,8 @@ impl AniMeZbus {
         config.write();
     }
 
-    /// The main loop is the base system set action if the user isn't running
-    /// the user daemon
+    /// The main loop runs the continuous system animation sequence
+    /// configured in `/etc/asusd/anime.ron`
     async fn run_main_loop(&self, start: bool) {
         if start {
             self.0.thread_exit.store(true, Ordering::SeqCst);

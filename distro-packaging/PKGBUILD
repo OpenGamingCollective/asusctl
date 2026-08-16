@@ -61,7 +61,6 @@ _package-rog-control-center() {
 	make DESTDIR="$pkgdir" install
 	rm -rf "$pkgdir"/usr/bin/asusctl
 	rm -rf "$pkgdir"/usr/bin/asusd
-	rm -rf "$pkgdir"/usr/bin/asusd-user
 	rm -rf "$pkgdir"/usr/bin/asus-shutdown
 	rm -rf "$pkgdir"/usr/lib
 	rm -rf "$pkgdir"/usr/share/dbus-1

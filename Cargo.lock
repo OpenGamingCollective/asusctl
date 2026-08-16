@@ -317,25 +317,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "asusd-user"
-version = "6.4.0"
-dependencies = [
- "config-traits",
- "dirs",
- "env_logger",
- "log",
- "rog_anime",
- "rog_aura",
- "rog_dbus",
- "rog_platform",
- "ron",
- "serde",
- "thiserror 2.0.20",
- "tokio",
- "zbus",
-]
-
-[[package]]
 name = "async-broadcast"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
