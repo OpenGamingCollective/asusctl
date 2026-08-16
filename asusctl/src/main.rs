@@ -6,6 +6,7 @@ use std::thread::sleep;
 use anime_cli::{AnimeActions, AnimeCommand};
 use aura_cli::{LedPowerCommand1, LedPowerCommand2};
 use dmi_id::DMIID;
+use env_logger::Env;
 use fan_curve_cli::FanCurveCommand;
 use log::{error, info, LevelFilter};
 use rog_anime::usb::get_anime_type;
@@ -44,10 +45,9 @@ mod xgm_led_cli;
 
 fn main() {
     // Ensure tracing spans are quiet by default unless user overrides
-    if std::env::var_os("RUST_LOG").is_none() {
-        std::env::set_var("RUST_LOG", "warn,tracing=error,zbus=error");
-    }
-    let mut logger = env_logger::Builder::new();
+    let mut logger = env_logger::Builder::from_env(
+        Env::default().default_filter_or("warn,tracing=error,zbus=error"),
+    );
     logger
         .parse_default_env()
         .filter_level(LevelFilter::Info)
