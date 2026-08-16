@@ -17,7 +17,7 @@ You can find all notify settings in the "App Settings" in the ROG Control Center
 
 ### How can I enable S3 (legacy) suspend?
 
-Depending on your kernel version, you may occasionally experience issues with the 2021/2022 versions of the Zephyrus G14/G15 which affects the proper use or newer suspend methods, like s0ix.
+Depending on your kernel version, you may occasionally experience issues with the 2021/2022 versions of the Zephyrus G14/G15 which affect the proper use of newer suspend methods, like s0ix.
 
 A potential fix is to patch your DSDT tables so your machine uses the older suspend method, called S3. In our tests this works great on the 2021 / 2022 G14 and G15. Those patches are not part of the main repo and can't be. It will always be a manual matter and cannot be integrated into the kernel.
 
