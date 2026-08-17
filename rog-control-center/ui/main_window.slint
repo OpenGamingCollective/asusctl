@@ -74,18 +74,19 @@ export component MainWindow inherits Window {
         }
 
         Rectangle {
+            property <length> max-content-width: 1100px;
             background: Theme.bg-base;
             // Home dashboard fills the area right of the sidebar.
             if side-bar.current-item == 0: PageHome {
-                // Responsive width: fill small windows, cap at 1100px and center on large ones.
-                width: root.width - side-bar.width > 1100px ? 1100px : root.width - side-bar.width;
-                height: root.height;
-                x: root.width - side-bar.width > 1100px ? ((root.width - side-bar.width) - 1100px) / 2 : 0px;
+                // Responsive width: fill small windows, cap at max-content-width and center on large ones.
+                width: parent.width > parent.max-content-width ? parent.max-content-width : parent.width;
+                height: parent.height;
+                x: parent.width > parent.max-content-width ? (parent.width - parent.max-content-width) / 2 : 0px;
             }
             // Every not-yet-ported page: empty placeholder (background only).
             if side-bar.current-item > 0: Rectangle {
-                width: root.width - side-bar.width;
-                height: root.height;
+                width: parent.width;
+                height: parent.height;
                 background: Theme.bg-base;
             }
         }
