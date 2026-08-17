@@ -1,3 +1,4 @@
+//! Used to init the GUI
 use log::warn;
 use rog_dbus::list_iface_blocking;
 use slint::ComponentHandle;
@@ -17,20 +18,27 @@ pub fn setup_window(_config: Arc<Mutex<Config>>) -> MainWindow {
         warn!("Couldn't show main window: {e:?}");
     }
 
-    let available = list_iface_blocking().unwrap_or_default();
+    let _available = list_iface_blocking().unwrap_or_default();
 
+    // OLD CODE, PLEASE KEEP FOR NOW, MIGHT BE USED LATER
+    //ui.set_sidebar_items_avilable(
+    //    [
+    //        true,
+    //        available.contains(&"xyz.ljones.Platform".to_string()),
+    //        available.contains(&"xyz.ljones.Aura".to_string()),
+    //        available.contains(&"xyz.ljones.Anime".to_string()),
+    //        available.contains(&"xyz.ljones.Slash".to_string()),
+    //        available.contains(&"xyz.ljones.FanCurves".to_string()),
+    //        true,
+    //        available.contains(&"xyz.ljones.Platform".to_string()),
+    //        true,
+    //        true,
+    //    ]
+    //    .into(),
+    //);
     ui.set_sidebar_items_avilable(
         [
-            true,
-            available.contains(&"xyz.ljones.Platform".to_string()),
-            available.contains(&"xyz.ljones.Aura".to_string()),
-            available.contains(&"xyz.ljones.Anime".to_string()),
-            available.contains(&"xyz.ljones.Slash".to_string()),
-            available.contains(&"xyz.ljones.FanCurves".to_string()),
-            true,
-            available.contains(&"xyz.ljones.Platform".to_string()),
-            true,
-            true,
+            true, true, true, true, true, true, true, true, true, true,
         ]
         .into(),
     );
