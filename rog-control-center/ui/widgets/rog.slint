@@ -102,6 +102,96 @@ export component RogModeSelector inherits Rectangle {
     }
 }
 
+// — Performance mode grid (large icons + labels) —
+export component RogModeGrid inherits Rectangle {
+    in property <[int]> profile-indexes;
+    in property <[string]> profile-choices;
+    in property <int> current-profile;
+    callback selected(int);
+
+    height: 104px;
+    width: 100%;
+
+    HorizontalLayout {
+        spacing: 0px;
+        for ev[p] in root.profile-indexes: Rectangle {
+            horizontal-stretch: 1;
+            height: 100%;
+
+            accessible-role: button;
+            accessible-label: root.profile-choices[p];
+            accessible-action-default => { root.selected(ev); }
+
+            if root.current-profile == p: Rectangle {
+                width: 100%; height: 100%;
+                background: Theme.mode-selected;
+                border-radius: 4px;
+                drop-shadow-blur: 16px;
+                drop-shadow-color: Theme.rog-red-glow;
+            }
+
+            VerticalLayout {
+                alignment: center;
+                spacing: 10px;
+                Image {
+                    source: ev == 0 ? @image-url("../images/mode-performance.svg") :
+                            ev == 1 ? @image-url("../images/mode-turbo.svg") :
+                            ev == 2 ? @image-url("../images/mode-silent.svg") :
+                            ev == 3 ? @image-url("../images/mode-silent.svg") :
+                            ev == 4 ? @image-url("../images/mode-manual.svg") :
+                            @image-url("../images/mode-performance.svg");
+                    colorize: root.current-profile == p ? Theme.text-primary : Theme.text-secondary;
+                    height: 32px;
+                    image-fit: contain;
+                    horizontal-alignment: center;
+                }
+
+                Text {
+                    text: root.profile-choices[p];
+                    color: root.current-profile == p ? Theme.text-primary : Theme.text-secondary;
+                    font-size: 14px;
+                    horizontal-alignment: center;
+                }
+            }
+
+            if root.current-profile == p: Rectangle {
+                y: parent.height - 6px;
+                width: 40px; height: 3px;
+                x: (parent.width - 40px) / 2;
+                background: Theme.rog-red;
+                drop-shadow-blur: 10px;
+                drop-shadow-offset-y: -4px;
+                drop-shadow-color: Theme.rog-red-glow;
+            }
+
+            ta := TouchArea {
+                width: 100%; height: 100%;
+                mouse-cursor: pointer;
+                clicked => { root.selected(ev); }
+            }
+
+            FocusScope {
+                enabled: true;
+                key-pressed(event) => {
+                    if (event.text == Key.Return || event.text == Key.Space) {
+                        root.selected(ev);
+                        return accept;
+                    }
+                    reject
+                }
+                if self.has-focus: Rectangle {
+                    width: parent.width;
+                    height: parent.height;
+                    border-radius: 4px;
+                    border-width: 2px;
+                    border-color: Theme.rog-red;
+                    background: transparent;
+                }
+            }
+        }
+    }
+}
+
 // — Hand-drawn AC slider (grey track + red fill + white round red-bordered handle) —
 export component RogSlider inherits Rectangle {
     in property <string> label;
