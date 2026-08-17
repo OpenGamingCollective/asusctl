@@ -12,6 +12,7 @@ use rog_control_center::config::Config;
 use rog_control_center::error::Result;
 use rog_control_center::print_versions;
 
+use rog_control_center::state::Event;
 use slint::ComponentHandle;
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
@@ -100,6 +101,9 @@ fn main() -> Result<()> {
 
     // Create the Central Event Channel
     let (event_tx, mut event_rx) = mpsc::unbounded_channel::<rog_control_center::state::Event>();
+
+    // Send the dmi product name to the UI
+    let _ = event_tx.send(Event::DmiLoaded(dmi.product_name.clone()));
 
     // Start System Tray
     rog_control_center::tray::init_tray(vec![], config.clone(), event_tx.clone());
