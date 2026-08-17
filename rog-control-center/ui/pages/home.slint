@@ -2,7 +2,7 @@
 // Layout: HorizontalLayout 2-col (left 360px fixed + right flexible), no ScrollView (avoids binding loops)
 // Font: Inter Display for product name
 // Data: all from SystemPageData, no hardcoded values
-import { RogProductCard, RogSlashMark, RogMetric, RogReading, RogStatRow, RogPage } from "../widgets/rog.slint";
+import { RogProductCard, RogSlashMark, RogMetric, RogReading, RogStatRow, RogPage, RogModeGrid } from "../widgets/rog.slint";
 import { Theme } from "../globals.slint";
 import { SystemPageData } from "system.slint";
 
@@ -216,66 +216,12 @@ export component PageHome inherits RogPage {
                             }
                         }
 
-                        if SystemPageData.platform_profile_indexes.length > 0: Rectangle {
-                            height: 104px;
-                            width: 100%;
-                            for ev[p] in SystemPageData.platform_profile_indexes: Rectangle {
-                                x: p * (parent.width / SystemPageData.platform_profile_indexes.length);
-                                y: 0px;
-                                width: parent.width / SystemPageData.platform_profile_indexes.length;
-                                height: 100%;
-
-                                if SystemPageData.platform_profile == p: Rectangle {
-                                    x: 0px; y: 0px;
-                                    width: 100%; height: 100%;
-                                    background: Theme.mode-selected;
-                                    border-radius: 4px;
-                                    drop-shadow-blur: 16px;
-                                    drop-shadow-color: Theme.rog-red-glow;
-                                }
-
-                                Image {
-                                    // Icon by power intensity: Quiet/LowPower → silent,
-                                    // Balanced → performance, Performance → turbo, Custom → manual.
-                                    source: ev == 0 ? @image-url("../images/mode-performance.svg") :
-                                            ev == 1 ? @image-url("../images/mode-turbo.svg") :
-                                            ev == 2 ? @image-url("../images/mode-silent.svg") :
-                                            ev == 3 ? @image-url("../images/mode-silent.svg") :
-                                            ev == 4 ? @image-url("../images/mode-manual.svg") :
-                                            @image-url("../images/mode-performance.svg");
-                                    colorize: SystemPageData.platform_profile == p ? Theme.text-primary : Theme.text-secondary;
-                                    width: 32px; height: 32px;
-                                    image-fit: contain;
-                                    x: (parent.width - self.width) / 2;
-                                    y: 12px;
-                                }
-
-                                Text {
-                                    text: SystemPageData.platform_profile_choices[p];
-                                    color: SystemPageData.platform_profile == p ? Theme.text-primary : Theme.text-secondary;
-                                    font-size: 14px;
-                                    width: parent.width;
-                                    horizontal-alignment: center;
-                                    y: 54px;
-                                }
-
-                                if SystemPageData.platform_profile == p: Rectangle {
-                                    x: (parent.width - 40px) / 2;
-                                    y: parent.height - 6px;
-                                    width: 40px; height: 3px;
-                                    background: Theme.rog-red;
-                                    drop-shadow-blur: 10px;
-                                    drop-shadow-offset-y: -4px;
-                                    drop-shadow-color: Theme.rog-red-glow;
-                                }
-
-                                TouchArea {
-                                    width: 100%; height: 100%;
-                                    mouse-cursor: pointer;
-                                    clicked => {
-                                        SystemPageData.cb_platform_profile(ev);
-                                    }
-                                }
+                        if SystemPageData.platform_profile_indexes.length > 0: RogModeGrid {
+                            profile-indexes: SystemPageData.platform_profile_indexes;
+                            profile-choices: SystemPageData.platform_profile_choices;
+                            current-profile: SystemPageData.platform_profile;
+                            selected(ev) => {
+                                SystemPageData.cb_platform_profile(ev);
                             }
                         }
                     }
