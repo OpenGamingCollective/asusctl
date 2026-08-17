@@ -4499,6 +4499,7 @@ dependencies = [
 name = "rog-control-center"
 version = "6.4.0"
 dependencies = [
+ "anyhow",
  "argh",
  "ashpd",
  "asusd",

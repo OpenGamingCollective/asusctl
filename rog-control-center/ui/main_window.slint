@@ -1,33 +1,24 @@
-import { Palette, Button, VerticalBox } from "std-widgets.slint";
-import { AppSize } from "globals.slint";
-import { PageSystem, SystemPageData, AttrMinMax } from "pages/system.slint";
+// rog-control-center — dashboard shell (AC-style base design)
+// Sidebar + Home dashboard. Pages that are not ported yet render an empty
+// (background-only) placeholder so every nav entry remains reachable while
+// the redesign is built out page by page.
+import { Palette } from "std-widgets.slint";
+import { AppSize, Theme } from "globals.slint";
+import { SystemPageData, AttrMinMax } from "pages/system.slint";
+import { PageHome } from "pages/home.slint";
 import { SideBar } from "widgets/sidebar.slint";
-import { PageAbout } from "pages/about.slint";
-import { PageFans } from "pages/fans.slint";
-import { PageAnime, AnimePageData } from "pages/anime.slint";
-import { PageSlash, SlashPageData } from "pages/slash.slint";
-import { RogItem } from "widgets/common.slint";
-import { PageAura } from "pages/aura.slint";
-import { PageGPU, GPUPageData } from "pages/gpu.slint";
-import { PageBattery } from "pages/battery.slint";
-import { Node } from "widgets/graph.slint";
-export { Node }
-import { FanPageData, FanType, Profile } from "types/fan_types.slint";
-export { FanPageData, FanType, Profile }
-import { AuraPageData, AuraDevType, LaptopAuraPower, AuraPowerState, PowerZones, AuraEffect } from "types/aura_types.slint";
-export { AuraPageData, AuraDevType, LaptopAuraPower, AuraPowerState, PowerZones, AuraEffect }
-import { PageAppSettings, AppSettingsPageData, GlobalShortcutStatus } from "pages/app_settings.slint";
 
-export { AppSize, AttrMinMax, SystemPageData, AnimePageData, SlashPageData, AppSettingsPageData, GlobalShortcutStatus, GPUPageData }
+export { AppSize, AttrMinMax, SystemPageData }
 
 export component MainWindow inherits Window {
-    title: "ROG Control";
+    title: "ROG Control Center";
     always-on-top: true;
     default-font-family: "Noto Sans";
     default-font-size: 14px;
     default-font-weight: 400;
     icon: @image-url("../data/rog-control-center.png");
     in property <[bool]> sidebar_items_avilable: [
+        true, // System Control (Home)
         true,
         true,
         true,
@@ -38,10 +29,6 @@ export component MainWindow inherits Window {
         true, // App Settings
         true, // About
     ];
-    private property <bool> show_notif;
-    // TODO: change if TUF on the logo in the menu on the main page
-    in property <bool> is_tuf: false;
-    private property <bool> fade_cover;
     private property <bool> toast: false;
     private property <string> toast_text: "I show when something is waiting";
     callback show_toast(string);
@@ -56,179 +43,87 @@ export component MainWindow inherits Window {
             toast_text = "";
         }
     }
-    callback exit-app();
-    callback show_notification(bool);
-    show_notification(yes) => {
-        show_notif = yes;
-        fade_cover = yes;
-    }
-    callback external_colour_change();
-    external_colour_change() => {
-        aura.external_colour_change();
-        aura.external_colour_change();
-    }
     min-height: AppSize.height;
     min-width: AppSize.width;
-    background: Palette.alternate-background;
+    // Default open size — taller than the handheld-friendly min so the dashboard
+    // has room on normal laptops. Resizable between min and max.
+    preferred-width: 1000px;
+    preferred-height: 700px;
+    max-width: 2560px;
+    max-height: 2000px;
+    background: Theme.bg-base;
 
     HorizontalLayout {
         padding: 0px;
-        VerticalLayout {
-            padding: 0px;
-            side-bar := SideBar {
-                model: [
-                    @tr("Menu1" => "System Control"),
-                    @tr("Menu2" => "Keyboard Aura"),
-                    @tr("Menu3" => "AniMe Matrix"),
-                    @tr("Menu4" => "Slash Lighting"),
-                    @tr("Menu5" => "Fan Curves"),
-                    @tr("Menu6" => "GPU Configuration"),
-                    @tr("Menu9" => "Battery Info"),
-                    @tr("Menu7" => "App Settings"),
-                    @tr("Menu8" => "About"),
-                ];
-                available: root.sidebar_items_avilable;
-                is_tuf: root.is_tuf;
-            }
-
-            Button {
-                height: 40px;
-                width: side-bar.width;
-                text: @tr("Quit App");
-                clicked() => {
-                    root.exit-app();
-                }
-            }
+        side-bar := SideBar {
+            // Title + icon travel together as one model — no separate icon array
+            // to keep in sync when entries are added or reordered.
+            model: [
+                { title: @tr("Menu1" => "System Control"), icon: @image-url("images/nav-home.svg") },
+                { title: @tr("Menu_system" => "System Tuning"), icon: @image-url("images/ic-cpu.svg") },
+                { title: @tr("Menu2" => "Keyboard Aura"), icon: @image-url("images/nav-keyboard.svg") },
+                { title: @tr("Menu3" => "AniMe Matrix"), icon: @image-url("images/nav-matrix.svg") },
+                { title: @tr("Menu4" => "Slash Lighting"), icon: @image-url("images/nav-slash.svg") },
+                { title: @tr("Menu5" => "Fan Curves"), icon: @image-url("images/nav-fan.svg") },
+                { title: @tr("Menu6" => "GPU Configuration"), icon: @image-url("images/nav-gpu.svg") },
+                { title: @tr("Menu9" => "Battery Info"), icon: @image-url("images/nav-battery.svg") },
+                { title: @tr("Menu7" => "App Settings"), icon: @image-url("images/nav-apps.svg") },
+                { title: @tr("Menu8" => "About"), icon: @image-url("images/nav-about.svg") },
+            ];
+            available: root.sidebar_items_avilable;
         }
 
         Rectangle {
-            background: Palette.background;
-            if(side-bar.current-item == 0): page := PageSystem {
-                width: root.width - side-bar.width;
-                height: root.height + 12px;
+            background: Theme.bg-base;
+            // Home dashboard fills the area right of the sidebar.
+            if side-bar.current-item == 0: PageHome {
+                // Responsive width: fill small windows, cap at 1100px and center on large ones.
+                width: root.width - side-bar.width > 1100px ? 1100px : root.width - side-bar.width;
+                height: root.height;
+                x: root.width - side-bar.width > 1100px ? ((root.width - side-bar.width) - 1100px) / 2 : 0px;
             }
-
-            /*if(side-bar.current-item == 1):*/ aura := PageAura {
+            // Every not-yet-ported page: empty placeholder (background only).
+            if side-bar.current-item > 0: Rectangle {
                 width: root.width - side-bar.width;
-                height: root.height + 12px;
-                visible: side-bar.current-item == 1;
-            }
-
-            if(side-bar.current-item == 2): PageAnime {
-                width: root.width - side-bar.width;
-                height: root.height + 12px;
-                visible: side-bar.current-item == 2;
-            }
-
-            if(side-bar.current-item == 3): PageSlash {
-                width: root.width - side-bar.width;
-                height: root.height + 12px;
-                visible: side-bar.current-item == 3;
-            }
-
-            if(side-bar.current-item == 4): fans := PageFans {
-                width: root.width - side-bar.width;
-                height: root.height + 12px;
-                visible: side-bar.current-item == 4;
-            }
-
-            if(side-bar.current-item == 5): PageGPU {
-                width: root.width - side-bar.width;
-                height: root.height + 12px;
-                visible: side-bar.current-item == 5;
-            }
-
-            if(side-bar.current-item == 6): PageBattery {
-                width: root.width - side-bar.width;
-                height: root.height + 12px;
-                visible: side-bar.current-item == 6;
-            }
-
-            if(side-bar.current-item == 7): PageAppSettings {
-                width: root.width - side-bar.width;
-                height: root.height + 12px;
-                visible: side-bar.current-item == 7;
-            }
-
-            if(side-bar.current-item == 8): PageAbout {
-                width: root.width - side-bar.width;
-                height: root.height + 12px;
-                visible: side-bar.current-item == 8;
-            }
-
-            if toast: Rectangle {
-                x: 0px;
-                y: root.height - self.height;
-                width: root.width - side-bar.width;
-                height: 40px;
-                opacity: 1.0;
-                background: Palette.selection-background;
-                clip: true;
-                TouchArea {
-                    height: 100%;
-                    width: 100%;
-                    clicked => {
-                        toast = false;
-                    }
-                }
-
-                Rectangle {
-                    height: 100%;
-                    width: 100%;
-                    background: Palette.control-background;
-                    Text {
-                        color: Palette.control-foreground;
-                        text: root.toast_text;
-                    }
-                }
+                height: root.height;
+                background: Theme.bg-base;
             }
         }
     }
 
-    if fade_cover: Rectangle {
-        x: 0px;
-        y: 0px;
-        width: root.width;
-        height: root.height;
-        background: Colors.rgba(25,33,23,20);
-        opacity: 0.7;
+    // Toast: pill that fades + slides in from the bottom, centred on
+    // the WHOLE window (independent of the sidebar width). Tap to
+    // dismiss. Always mounted so the enter/exit animations can play.
+    Rectangle {
+        property <length> pill-w: toast-lbl.preferred-width + 48px;
+        x: (root.width - self.width) / 2;
+        y: root.height - 24px - (toast ? 0px : 16px) - self.height;
+        width: pill-w;
+        height: 40px;
+        border-radius: 20px;
+        background: Theme.bg-elevated;
+        border-width: 1px;
+        border-color: Theme.line;
+        drop-shadow-blur: 18px;
+        drop-shadow-color: #00000060;
+        opacity: toast ? 1.0 : 0.0;
+        visible: self.opacity > 0.01;
+        animate opacity { duration: 220ms; easing: ease-out; }
+        animate y { duration: 220ms; easing: cubic-bezier(0.22, 0.61, 0.36, 1); }
         TouchArea {
             height: 100%;
             width: 100%;
+            mouse-cursor: pointer;
             clicked => {
-                // toolbar-dropdown.close();
-                if (show_notif) {
-                    show_notif = false;
-                }
-                fade_cover = false;
+                toast = false;
             }
         }
-    }
-
-
-    // // TODO: or use Dialogue
-    if show_notif: Rectangle {
-        x: root.width / 8;
-        y: root.height / 8;
-        height: (root.height / 8) * 6;
-        width: (root.width / 8) * 6;
-        TouchArea {
-            height: 100%;
-            width: 100%;
-            clicked => {
-                show_notif = false;
-                exit-app();
-            }
-        }
-
-        // TODO: add properties to display
-        Rectangle {
-            height: 100%;
-            width: 100%;
-            background: Palette.background;
-            Text {
-                text: "Click here to exit";
-            }
+        toast-lbl := Text {
+            color: Theme.text-primary;
+            font-size: Theme.font-sm;
+            text: root.toast_text;
+            horizontal-alignment: center;
+            vertical-alignment: center;
         }
     }
 
@@ -242,20 +137,20 @@ export component MainWindow inherits Window {
         border-width: 3px;
         border-radius: 10px;
 
-        VerticalBox {
-            RogItem {
-                min-height: 50px;
-                max-height: 100px;
-                Text {
-                    text <=> SomeError.error_message;
-                    font-size: 18px;
-                }
+        VerticalLayout {
+            padding: 20px;
+            spacing: 12px;
+            alignment: center;
+            Text {
+                text <=> SomeError.error_message;
+                font-size: 18px;
+                color: Palette.control-foreground;
+                horizontal-alignment: center;
             }
-
             Text {
                 text <=> SomeError.error_help;
-                horizontal-alignment: TextHorizontalAlignment.center;
-                vertical-alignment: TextVerticalAlignment.center;
+                color: Palette.control-foreground;
+                horizontal-alignment: center;
             }
         }
     }
