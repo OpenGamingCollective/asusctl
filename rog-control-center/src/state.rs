@@ -94,7 +94,7 @@ impl AppState {
             Event::ShowWindow => ui_updates.push(UiUpdate::ShowWindow),
             Event::HideWindow => ui_updates.push(UiUpdate::HideWindow),
             Event::Quit => {
-                let _ = std::process::exit(0);
+                std::process::exit(0);
             }
         }
 
