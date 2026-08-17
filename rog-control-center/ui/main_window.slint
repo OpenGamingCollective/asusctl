@@ -96,7 +96,7 @@ export component MainWindow inherits Window {
     // the WHOLE window (independent of the sidebar width). Tap to
     // dismiss. Always mounted so the enter/exit animations can play.
     Rectangle {
-        property <length> pill-w: toast-lbl.preferred-width + 48px;
+        property <length> pill-w: (toast-lbl.preferred-width + 48px) > (root.width - 32px) ? (root.width - 32px) : (toast-lbl.preferred-width + 48px);
         x: (root.width - self.width) / 2;
         y: root.height - 24px - (toast ? 0px : 16px) - self.height;
         width: pill-w;
@@ -120,11 +120,13 @@ export component MainWindow inherits Window {
             }
         }
         toast-lbl := Text {
+            width: parent.width - 48px;
             color: Theme.text-primary;
             font-size: Theme.font-sm;
             text: root.toast_text;
             horizontal-alignment: center;
             vertical-alignment: center;
+            overflow: elide;
         }
     }
 
