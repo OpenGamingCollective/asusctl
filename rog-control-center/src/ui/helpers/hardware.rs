@@ -5,7 +5,7 @@ use anyhow::Result;
 
 pub fn get_dmi_product_name() -> io::Result<String> {
     let path = Path::new("/sys/class/dmi/id/product_name");
-    fs::read_to_string(path)
+    Ok(fs::read_to_string(path)?.trim().to_owned())
 }
 
 /// Get the battery informations from rog_platform
