@@ -16,6 +16,9 @@ pub enum Event {
     UserRequestedProfile(i32),
     UserRequestedBatteryLimit(u8),
 
+    // Settings
+    UserToggledTray(bool),
+
     // Window Management
     ToggleWindow,
     ShowWindow,
@@ -27,6 +30,9 @@ pub enum Event {
 pub enum Action {
     SetPlatformProfile(i32),
     SetBatteryLimit(u8),
+
+    // Settings
+    SetTray(bool),
 }
 
 #[derive(Debug, Clone)]
@@ -92,6 +98,11 @@ impl AppState {
             Event::UserRequestedBatteryLimit(requested_limit) => {
                 actions.push(Action::SetBatteryLimit(requested_limit));
             }
+            // Config
+            Event::UserToggledTray(b) => {
+                actions.push(Action::SetTray(b));
+            }
+            // Window Management
             Event::ToggleWindow => ui_updates.push(UiUpdate::ToggleWindow),
             Event::ShowWindow => ui_updates.push(UiUpdate::ShowWindow),
             Event::HideWindow => ui_updates.push(UiUpdate::HideWindow),
