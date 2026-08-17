@@ -42,7 +42,7 @@ pub fn apply_ui_update(ui: &MainWindow, update: UiUpdate) {
             let _ = ui.window().hide();
         }
         UiUpdate::Quit => {
-            std::process::exit(0);
+            let _ = slint::quit_event_loop();
         }
     }
 }
