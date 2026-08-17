@@ -1,12 +1,20 @@
-//! XDG GlobalShortcuts portal integration for toggling the main window.
+//! XDG `GlobalShortcuts` portal integration for toggling the main window.
 //!
-//! Host registration must precede portal use and occur once per connection.
-//! KDE may persist denied shortcuts with an empty trigger.
+//! Invariants:
+//! - Host registration must precede portal use and occur once per connection.
+//! - Signal streams are subscribed before List/Bind so early signals are not
+//!   missed.
+//! - A session permits one bind attempt; cancellation may persist an empty
+//!   trigger. KDE may persist denied shortcuts with an empty trigger.
+//! - All session signals are drained by a single select loop; a zbus
+//!   subscription buffers at most 64 undelivered messages.
+//! - The portal session is closed on the bus before the actor task returns,
+//!   and the runtime is stopped only after the actor finishes (main.rs).
 
 use ashpd::AppID;
 use ashpd::desktop::global_shortcuts::{GlobalShortcuts, NewShortcut, Shortcut};
 use futures_util::StreamExt;
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::{mpsc, oneshot, watch};
@@ -37,6 +45,7 @@ pub enum EnableMode {
 
 impl ShortcutStatus {
     /// Whether the app should stay alive while its window is hidden.
+    #[must_use]
     pub fn keeps_alive(self, enabled_in_config: bool) -> bool {
         match self {
             ShortcutStatus::Starting | ShortcutStatus::Listening => true,
@@ -92,6 +101,33 @@ fn bound_assignment(shortcuts: &[Shortcut]) -> Assignment {
     classify_bound(shortcut_entry(shortcuts))
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum EnableAction {
+    Bind,
+    Configure,
+    Skip,
+}
+
+fn enable_action(
+    current: Assignment,
+    bind_attempted: bool,
+    mode: EnableMode,
+    portal_version: u32,
+) -> EnableAction {
+    match (current, bind_attempted) {
+        (Assignment::Unassigned, _) => match (mode, portal_version >= 2) {
+            (EnableMode::Interactive, true) => EnableAction::Configure,
+            _ => EnableAction::Skip,
+        },
+        (_, false) => EnableAction::Bind,
+        (_, true) => EnableAction::Skip,
+    }
+}
+
+// ashpd 0.13 migration point: this alias and the Portal impl below are the
+// only ashpd-dependent shapes in this module.
+type PortalSession = ashpd::desktop::Session<'static, GlobalShortcuts<'static>>;
+
 /// Portal proxy with the interface version, read once at init time.
 struct Portal {
     gs: GlobalShortcuts<'static>,
@@ -100,7 +136,7 @@ struct Portal {
 
 impl Portal {
     // Host registration must be the first portal call.
-    async fn new() -> Option<Self> {
+    async fn connect() -> Option<Self> {
         let app_id = match AppID::try_from(APP_ID) {
             Ok(id) => id,
             Err(err) => {
@@ -124,6 +160,36 @@ impl Portal {
             }
         }
     }
+
+    async fn create_session(&self) -> ashpd::Result<PortalSession> {
+        self.gs.create_session().await
+    }
+
+    async fn list_assignment(&self, session: &PortalSession) -> ashpd::Result<Assignment> {
+        let request = self.gs.list_shortcuts(session).await?;
+        Ok(assignment(request.response()?.shortcuts()))
+    }
+
+    // A session permits one bind attempt; cancellation may persist an empty trigger.
+    async fn bind_shortcut(&self, session: &PortalSession) -> ashpd::Result<Assignment> {
+        let shortcut = NewShortcut::new(SHORTCUT_ID, SHORTCUT_DESCRIPTION)
+            .preferred_trigger(PREFERRED_TRIGGER);
+        info!("Requesting shortcut bind via portal");
+        let request = self.gs.bind_shortcuts(session, &[shortcut], None).await?;
+        match request.response() {
+            Ok(bound) => Ok(bound_assignment(bound.shortcuts())),
+            Err(err) => {
+                info!("Shortcut bind not completed ({err}), re-reading assignments");
+                self.list_assignment(session).await
+            }
+        }
+    }
+
+    async fn configure(&self, session: &PortalSession) -> ashpd::Result<()> {
+        self.gs
+            .configure_shortcuts(session, None, None::<ashpd::ActivationToken>)
+            .await
+    }
 }
 
 enum Command {
@@ -137,7 +203,7 @@ enum Command {
     },
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ShortcutHandle {
     commands: mpsc::Sender<Command>,
     status: watch::Receiver<ShortcutStatus>,
@@ -145,6 +211,7 @@ pub struct ShortcutHandle {
 }
 
 /// Owns the actor task and its shutdown signal.
+#[derive(Debug)]
 pub struct ShortcutService {
     handle: ShortcutHandle,
     shutdown: watch::Sender<bool>,
@@ -152,6 +219,7 @@ pub struct ShortcutService {
 }
 
 impl ShortcutService {
+    #[must_use]
     pub fn handle(&self) -> ShortcutHandle {
         self.handle.clone()
     }
@@ -165,10 +233,12 @@ impl ShortcutService {
 }
 
 impl ShortcutHandle {
+    #[must_use]
     pub fn status(&self) -> ShortcutStatus {
         *self.status.borrow()
     }
 
+    #[must_use]
     pub fn status_receiver(&self) -> watch::Receiver<ShortcutStatus> {
         self.status.clone()
     }
@@ -190,7 +260,8 @@ impl ShortcutHandle {
         let _ = self.commands.send(Command::Disable).await;
     }
 
-    /// Whether the portal supports ConfigureShortcuts.
+    /// Whether the portal supports `ConfigureShortcuts`.
+    #[must_use]
     pub fn can_configure(&self) -> bool {
         self.configurable.load(Ordering::Acquire)
     }
@@ -209,7 +280,9 @@ impl ShortcutHandle {
     }
 }
 
-pub fn start(rt: &tokio::runtime::Handle, window: WindowController) -> ShortcutService {
+#[must_use]
+pub fn start(rt: &tokio::runtime::Handle, window: &WindowController) -> ShortcutService {
+    // Capacity 1: callers wait while the actor is busy with a portal dialog.
     let (commands, rx) = mpsc::channel(1);
     let (status, status_rx) = watch::channel(ShortcutStatus::Disabled);
     let (shutdown, shutdown_rx) = watch::channel(false);
@@ -242,6 +315,11 @@ async fn run(
 ) {
     // Reuse the portal proxy; recreate sessions per enable cycle.
     let mut portal: Option<Portal> = None;
+    let actor = Actor {
+        window: &window,
+        status: &status,
+        configurable: &configurable,
+    };
     loop {
         let command = tokio::select! {
             _ = shutdown_requested(&mut shutdown) => break,
@@ -252,11 +330,9 @@ async fn run(
         };
         match command {
             Command::Enable { mode, respond } => {
-                enable(
-                    &window, &mut portal, &status, &configurable, &mut commands, &mut shutdown,
-                    mode, respond,
-                )
-                .await;
+                actor
+                    .enable_session(&mut portal, &mut commands, &mut shutdown, mode, respond)
+                    .await;
             }
             Command::Disable => {}
             Command::Configure { respond } => {
@@ -279,7 +355,9 @@ async fn shutdown_requested(shutdown: &mut watch::Receiver<bool>) {
 }
 
 fn set_status(status: &watch::Sender<ShortcutStatus>, new: ShortcutStatus) {
-    if *status.borrow() != new {
+    let old = *status.borrow();
+    if old != new {
+        debug!("Status {old:?} -> {new:?}");
         let _ = status.send(new);
     }
 }
@@ -293,277 +371,255 @@ fn finish(
     let _ = respond.send(result);
 }
 
-async fn query_assignment(
-    portal: &Portal,
-    session: &ashpd::desktop::Session<'_, GlobalShortcuts<'_>>,
-) -> ashpd::Result<Assignment> {
-    let request = portal.gs.list_shortcuts(session).await?;
-    Ok(assignment(request.response()?.shortcuts()))
+struct Actor<'a> {
+    window: &'a WeakWindowController,
+    status: &'a watch::Sender<ShortcutStatus>,
+    configurable: &'a AtomicBool,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum EnableAction {
-    Bind,
-    Configure,
-    Skip,
-}
+impl Actor<'_> {
+    async fn enable_session(
+        &self,
+        portal_slot: &mut Option<Portal>,
+        commands: &mut mpsc::Receiver<Command>,
+        shutdown: &mut watch::Receiver<bool>,
+        mode: EnableMode,
+        respond: oneshot::Sender<ShortcutStatus>,
+    ) {
+        set_status(self.status, ShortcutStatus::Starting);
 
-fn enable_action(
-    current: Assignment,
-    bind_attempted: bool,
-    mode: EnableMode,
-    portal_version: u32,
-) -> EnableAction {
-    match (current, bind_attempted) {
-        (Assignment::Unassigned, _) => match (mode, portal_version >= 2) {
-            (EnableMode::Interactive, true) => EnableAction::Configure,
-            _ => EnableAction::Skip,
-        },
-        (_, false) => EnableAction::Bind,
-        (_, true) => EnableAction::Skip,
-    }
-}
-
-// A session permits one bind attempt; cancellation may persist an empty trigger.
-async fn bind_shortcut(
-    portal: &Portal,
-    session: &ashpd::desktop::Session<'_, GlobalShortcuts<'_>>,
-) -> ashpd::Result<Assignment> {
-    let shortcut =
-        NewShortcut::new(SHORTCUT_ID, SHORTCUT_DESCRIPTION).preferred_trigger(PREFERRED_TRIGGER);
-    info!("Requesting shortcut bind via portal");
-    let request = portal.gs.bind_shortcuts(session, &[shortcut], None).await?;
-    match request.response() {
-        Ok(bound) => Ok(bound_assignment(bound.shortcuts())),
-        Err(err) => {
-            info!("Shortcut bind not completed ({err}), re-reading assignments");
-            query_assignment(portal, session).await
-        }
-    }
-}
-
-async fn apply_enable(
-    portal: &Portal,
-    session: &ashpd::desktop::Session<'_, GlobalShortcuts<'_>>,
-    current: &mut Assignment,
-    bind_attempted: &mut bool,
-    mode: EnableMode,
-) -> ashpd::Result<ShortcutStatus> {
-    match enable_action(*current, *bind_attempted, mode, portal.version) {
-        EnableAction::Bind => {
-            *bind_attempted = true;
-            *current = bind_shortcut(portal, session).await?;
-        }
-        EnableAction::Configure => {
-            if let Err(err) = portal
-                .gs
-                .configure_shortcuts(session, None, None::<ashpd::ActivationToken>)
-                .await
-            {
-                warn!("Could not open shortcut configuration: {err}");
+        if portal_slot.is_none() {
+            match Portal::connect().await {
+                Some(proxy) => *portal_slot = Some(proxy),
+                None => {
+                    finish(self.status, respond, ShortcutStatus::Unavailable);
+                    return;
+                }
             }
         }
-        EnableAction::Skip => {}
-    }
-    Ok(current.status())
-}
+        let portal = portal_slot.as_ref().expect("portal proxy just initialized");
+        self.configurable
+            .store(portal.version >= 2, Ordering::Release);
 
-#[allow(clippy::too_many_arguments)]
-async fn enable(
-    window: &WeakWindowController,
-    portal: &mut Option<Portal>,
-    status: &watch::Sender<ShortcutStatus>,
-    configurable: &Arc<AtomicBool>,
-    commands: &mut mpsc::Receiver<Command>,
-    shutdown: &mut watch::Receiver<bool>,
-    mode: EnableMode,
-    respond: oneshot::Sender<ShortcutStatus>,
-) {
-    set_status(status, ShortcutStatus::Starting);
-
-    if portal.is_none() {
-        match Portal::new().await {
-            Some(proxy) => *portal = Some(proxy),
-            None => {
-                finish(status, respond, ShortcutStatus::Unavailable);
+        let session = match portal.create_session().await {
+            Ok(session) => session,
+            Err(err) => {
+                error!("Could not create global shortcuts session: {err}");
+                finish(self.status, respond, ShortcutStatus::Unavailable);
                 return;
             }
-        }
+        };
+        info!("Global shortcuts session created");
+
+        let mut session_loop = SessionLoop {
+            portal,
+            session,
+            window: self.window,
+            status_tx: self.status,
+            mode,
+            respond: Some(respond),
+            current: Assignment::Missing,
+            bind_attempted: false,
+            status: ShortcutStatus::Starting,
+            closed_observed: false,
+        };
+        session_loop.run(commands, shutdown).await;
     }
-    let portal = portal.as_ref().expect("portal proxy just initialized");
-    configurable.store(portal.version >= 2, Ordering::Release);
-
-    let session = match portal.gs.create_session().await {
-        Ok(session) => session,
-        Err(err) => {
-            error!("Could not create global shortcuts session: {err}");
-            finish(status, respond, ShortcutStatus::Unavailable);
-            return;
-        }
-    };
-    info!("Global shortcuts session created");
-
-    run_session(
-        portal, session, window, status, commands, shutdown, mode, respond,
-    )
-    .await;
 }
 
-#[allow(clippy::too_many_arguments)]
-async fn run_session(
-    portal: &Portal,
-    session: ashpd::desktop::Session<'static, GlobalShortcuts<'static>>,
-    window: &WeakWindowController,
-    status: &watch::Sender<ShortcutStatus>,
-    commands: &mut mpsc::Receiver<Command>,
-    shutdown: &mut watch::Receiver<bool>,
+/// Owns the portal session and all per-session state.
+struct SessionLoop<'a> {
+    portal: &'a Portal,
+    session: PortalSession,
+    window: &'a WeakWindowController,
+    status_tx: &'a watch::Sender<ShortcutStatus>,
     mode: EnableMode,
-    respond: oneshot::Sender<ShortcutStatus>,
-) {
-    let mut respond = Some(respond);
-    let final_status = tokio::select! {
-        _ = shutdown_requested(shutdown) => ShortcutStatus::Disabled,
-        result = run_session_inner(portal, &session, window, status, commands, mode, &mut respond) => result,
-    };
-
-    if let Some(respond) = respond.take() {
-        let _ = respond.send(final_status);
-    }
-    if let Err(err) = session.close().await {
-        warn!("Could not close global shortcuts session: {err}");
-    }
-    set_status(status, final_status);
-    info!("Global shortcuts session ended ({final_status:?})");
+    respond: Option<oneshot::Sender<ShortcutStatus>>,
+    current: Assignment,
+    bind_attempted: bool,
+    status: ShortcutStatus,
+    closed_observed: bool,
 }
 
-#[allow(clippy::too_many_arguments)]
-async fn run_session_inner(
-    portal: &Portal,
-    session: &ashpd::desktop::Session<'static, GlobalShortcuts<'static>>,
-    window: &WeakWindowController,
-    status: &watch::Sender<ShortcutStatus>,
-    commands: &mut mpsc::Receiver<Command>,
-    mode: EnableMode,
-    respond: &mut Option<oneshot::Sender<ShortcutStatus>>,
-) -> ShortcutStatus {
-    // Subscribe before List/Bind to avoid missing early signals.
-    let mut activated = match portal.gs.receive_activated().await {
-        Ok(stream) => stream,
-        Err(err) => {
-            error!("Could not subscribe to Activated: {err}");
-            return ShortcutStatus::Unavailable;
-        }
-    };
-    let mut changed = match portal.gs.receive_shortcuts_changed().await {
-        Ok(stream) => stream,
-        Err(err) => {
-            error!("Could not subscribe to ShortcutsChanged: {err}");
-            return ShortcutStatus::Unavailable;
-        }
-    };
-    let mut closed = match session.receive_closed().await {
-        Ok(stream) => stream,
-        Err(err) => {
-            error!("Could not subscribe to session Closed: {err}");
-            return ShortcutStatus::Unavailable;
-        }
-    };
+impl SessionLoop<'_> {
+    async fn run(
+        &mut self,
+        commands: &mut mpsc::Receiver<Command>,
+        shutdown: &mut watch::Receiver<bool>,
+    ) -> ShortcutStatus {
+        debug!("Session loop starting (mode={:?})", self.mode);
+        let final_status = tokio::select! {
+            _ = shutdown_requested(shutdown) => ShortcutStatus::Disabled,
+            result = self.run_inner(commands) => result,
+        };
 
-    let mut current = match query_assignment(portal, session).await {
-        Ok(found) => found,
-        Err(err) => {
-            error!("Could not list shortcuts: {err}");
-            return ShortcutStatus::Unavailable;
+        if let Some(respond) = self.respond.take() {
+            let _ = respond.send(final_status);
         }
-    };
-    let mut bind_attempted = false;
+        // Invariant: the session is closed on the bus before this task returns.
+        if let Err(err) = self.session.close().await {
+            // The portal already tore the session down; a failing Close is expected.
+            if self.closed_observed {
+                debug!("Session close after Closed signal: {err}");
+            } else {
+                warn!("Could not close global shortcuts session: {err}");
+            }
+        }
+        set_status(self.status_tx, final_status);
+        info!("Global shortcuts session ended ({final_status:?})");
+        final_status
+    }
 
-    let mut current_status =
-        match apply_enable(portal, session, &mut current, &mut bind_attempted, mode).await {
+    async fn run_inner(&mut self, commands: &mut mpsc::Receiver<Command>) -> ShortcutStatus {
+        // Subscribe before List/Bind to avoid missing early signals.
+        let mut activated = match self.portal.gs.receive_activated().await {
+            Ok(stream) => stream,
+            Err(err) => {
+                error!("Could not subscribe to Activated: {err}");
+                return ShortcutStatus::Unavailable;
+            }
+        };
+        let mut changed = match self.portal.gs.receive_shortcuts_changed().await {
+            Ok(stream) => stream,
+            Err(err) => {
+                error!("Could not subscribe to ShortcutsChanged: {err}");
+                return ShortcutStatus::Unavailable;
+            }
+        };
+        let mut closed = match self.session.receive_closed().await {
+            Ok(stream) => stream,
+            Err(err) => {
+                error!("Could not subscribe to session Closed: {err}");
+                return ShortcutStatus::Unavailable;
+            }
+        };
+        debug!("Portal signal subscriptions ready");
+
+        self.current = match self.portal.list_assignment(&self.session).await {
+            Ok(found) => found,
+            Err(err) => {
+                error!("Could not list shortcuts: {err}");
+                return ShortcutStatus::Unavailable;
+            }
+        };
+        self.bind_attempted = false;
+        debug!("Assignment after list: {:?}", self.current);
+
+        self.status = match self.apply_enable().await {
             Ok(result) => result,
             Err(err) => {
                 error!("Enable failed: {err}");
                 return ShortcutStatus::Unavailable;
             }
         };
-    set_status(status, current_status);
-    if let Some(respond) = respond.take() {
-        let _ = respond.send(current_status);
-    }
-    info!("Global shortcuts status: {current_status:?}");
+        set_status(self.status_tx, self.status);
+        if let Some(respond) = self.respond.take() {
+            let _ = respond.send(self.status);
+        }
+        info!("Global shortcuts status: {:?}", self.status);
 
-    loop {
-        tokio::select! {
-            command = commands.recv() => {
-                match command {
-                    Some(Command::Disable) => break ShortcutStatus::Disabled,
-                    Some(Command::Configure { respond }) => {
-                        let ok = if portal.version >= 2 {
-                            match portal
-                                .gs
-                                .configure_shortcuts(session, None, None::<ashpd::ActivationToken>)
-                                .await
-                            {
-                                Ok(()) => true,
+        loop {
+            tokio::select! {
+                command = commands.recv() => {
+                    match command {
+                        Some(Command::Disable) => {
+                            debug!("Command: Disable");
+                            break ShortcutStatus::Disabled;
+                        }
+                        Some(Command::Configure { respond }) => {
+                            debug!("Command: Configure");
+                            let ok = if self.portal.version >= 2 {
+                                match self.portal.configure(&self.session).await {
+                                    Ok(()) => true,
+                                    Err(err) => {
+                                        warn!("ConfigureShortcuts failed: {err}");
+                                        false
+                                    }
+                                }
+                            } else {
+                                warn!(
+                                    "ConfigureShortcuts needs portal version 2 (have {})",
+                                    self.portal.version
+                                );
+                                false
+                            };
+                            let _ = respond.send(ok);
+                        }
+                        Some(Command::Enable { mode, respond }) => {
+                            debug!("Command: Enable({mode:?})");
+                            set_status(self.status_tx, ShortcutStatus::Starting);
+                            self.mode = mode;
+                            match self.apply_enable().await {
+                                Ok(result) => {
+                                    self.status = result;
+                                    finish(self.status_tx, respond, result);
+                                }
                                 Err(err) => {
-                                    warn!("ConfigureShortcuts failed: {err}");
-                                    false
+                                    error!("Enable failed: {err}");
+                                    finish(self.status_tx, respond, ShortcutStatus::Unavailable);
+                                    break ShortcutStatus::Unavailable;
                                 }
                             }
-                        } else {
-                            warn!(
-                                "ConfigureShortcuts needs portal version 2 (have {})",
-                                portal.version
-                            );
-                            false
-                        };
-                        let _ = respond.send(ok);
+                        }
+                        None => break ShortcutStatus::Disabled,
                     }
-                    Some(Command::Enable { mode, respond }) => {
-                        set_status(status, ShortcutStatus::Starting);
-                        match apply_enable(portal, session, &mut current, &mut bind_attempted, mode).await {
-                            Ok(result) => {
-                                current_status = result;
-                                finish(status, respond, result);
-                            }
-                            Err(err) => {
-                                error!("Enable failed: {err}");
-                                finish(status, respond, ShortcutStatus::Unavailable);
-                                break ShortcutStatus::Unavailable;
+                }
+                event = activated.next() => {
+                    match event {
+                        Some(active) if active.shortcut_id() == SHORTCUT_ID => {
+                            info!("Shortcut activated, toggling window");
+                            if let Some(window) = self.window.upgrade() {
+                                window.request(WindowCommand::Toggle);
                             }
                         }
+                        Some(_) => {}
+                        None => break ShortcutStatus::Unavailable,
                     }
-                    None => break ShortcutStatus::Disabled,
                 }
-            }
-            event = activated.next() => {
-                match event {
-                    Some(active) if active.shortcut_id() == SHORTCUT_ID => {
-                        info!("Shortcut activated, toggling window");
-                        if let Some(window) = window.upgrade() {
-                            window.request(WindowCommand::Toggle);
+                event = changed.next() => {
+                    match event {
+                        Some(update) => {
+                            self.current = assignment(update.shortcuts());
+                            let new_status = self.current.status();
+                            if new_status != self.status {
+                                info!("Shortcut assignment changed: {new_status:?}");
+                                self.status = new_status;
+                                set_status(self.status_tx, new_status);
+                            }
                         }
+                        None => break ShortcutStatus::Unavailable,
                     }
-                    Some(_) => {}
-                    None => break ShortcutStatus::Unavailable,
+                }
+                _ = closed.next() => {
+                    self.closed_observed = true;
+                    debug!("Session Closed signal observed");
+                    break ShortcutStatus::Unavailable;
                 }
             }
-            event = changed.next() => {
-                match event {
-                    Some(update) => {
-                        current = assignment(update.shortcuts());
-                        let new_status = current.status();
-                        if new_status != current_status {
-                            info!("Shortcut assignment changed: {new_status:?}");
-                            current_status = new_status;
-                            set_status(status, new_status);
-                        }
-                    }
-                    None => break ShortcutStatus::Unavailable,
-                }
-            }
-            _ = closed.next() => break ShortcutStatus::Unavailable,
         }
+    }
+
+    async fn apply_enable(&mut self) -> ashpd::Result<ShortcutStatus> {
+        let action = enable_action(
+            self.current, self.bind_attempted, self.mode, self.portal.version,
+        );
+        debug!(
+            "Enable action {action:?} (current {:?}, bind_attempted {}, mode {:?}, portal v{})",
+            self.current, self.bind_attempted, self.mode, self.portal.version
+        );
+        match action {
+            EnableAction::Bind => {
+                self.bind_attempted = true;
+                self.current = self.portal.bind_shortcut(&self.session).await?;
+            }
+            EnableAction::Configure => {
+                if let Err(err) = self.portal.configure(&self.session).await {
+                    warn!("Could not open shortcut configuration: {err}");
+                }
+            }
+            EnableAction::Skip => {}
+        }
+        Ok(self.current.status())
     }
 }
 

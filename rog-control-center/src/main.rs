@@ -207,7 +207,7 @@ fn main() -> Result<()> {
     let shortcut_service = if is_rog_ally {
         None
     } else {
-        let service = rog_control_center::shortcuts::start(rt.handle(), window.clone());
+        let service = rog_control_center::shortcuts::start(rt.handle(), &window);
         let handle = service.handle();
         window.set_shortcuts(handle.clone());
         if config.lock().is_ok_and(|c| c.enable_global_shortcut) {
