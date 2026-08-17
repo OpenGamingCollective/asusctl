@@ -916,15 +916,33 @@ export component RogTabBar inherits Rectangle {
                 root.tab-changed(root.active);
                 return accept;
             }
-            if (event.text == Key.LeftArrow && root.focused-index > 0) {
-                if (root.focused-index - 1 >= root.tab-enabled.length || root.tab-enabled[root.focused-index - 1]) {
+            if (event.text == Key.LeftArrow) {
+                // NOTE: Slint does not yet support imperative `while` or `for` loops in callbacks.
+                // We manually unroll the search to skip over consecutive disabled tabs (max 5 skips).
+                if (root.focused-index >= 1 && (root.focused-index - 1 >= root.tab-enabled.length || root.tab-enabled[root.focused-index - 1])) {
                     root.focused-index -= 1;
+                } else if (root.focused-index >= 2 && (root.focused-index - 2 >= root.tab-enabled.length || root.tab-enabled[root.focused-index - 2])) {
+                    root.focused-index -= 2;
+                } else if (root.focused-index >= 3 && (root.focused-index - 3 >= root.tab-enabled.length || root.tab-enabled[root.focused-index - 3])) {
+                    root.focused-index -= 3;
+                } else if (root.focused-index >= 4 && (root.focused-index - 4 >= root.tab-enabled.length || root.tab-enabled[root.focused-index - 4])) {
+                    root.focused-index -= 4;
+                } else if (root.focused-index >= 5 && (root.focused-index - 5 >= root.tab-enabled.length || root.tab-enabled[root.focused-index - 5])) {
+                    root.focused-index -= 5;
                 }
                 return accept;
             }
-            if (event.text == Key.RightArrow && root.focused-index < root.tabs.length - 1) {
-                if (root.focused-index + 1 >= root.tab-enabled.length || root.tab-enabled[root.focused-index + 1]) {
+            if (event.text == Key.RightArrow) {
+                if (root.focused-index + 1 < root.tabs.length && (root.focused-index + 1 >= root.tab-enabled.length || root.tab-enabled[root.focused-index + 1])) {
                     root.focused-index += 1;
+                } else if (root.focused-index + 2 < root.tabs.length && (root.focused-index + 2 >= root.tab-enabled.length || root.tab-enabled[root.focused-index + 2])) {
+                    root.focused-index += 2;
+                } else if (root.focused-index + 3 < root.tabs.length && (root.focused-index + 3 >= root.tab-enabled.length || root.tab-enabled[root.focused-index + 3])) {
+                    root.focused-index += 3;
+                } else if (root.focused-index + 4 < root.tabs.length && (root.focused-index + 4 >= root.tab-enabled.length || root.tab-enabled[root.focused-index + 4])) {
+                    root.focused-index += 4;
+                } else if (root.focused-index + 5 < root.tabs.length && (root.focused-index + 5 >= root.tab-enabled.length || root.tab-enabled[root.focused-index + 5])) {
+                    root.focused-index += 5;
                 }
                 return accept;
             }
