@@ -324,13 +324,18 @@ export component RogSlider inherits Rectangle {
             accessible-value: root.value;
             accessible-value-minimum: root.minimum;
             accessible-value-maximum: root.maximum;
+            accessible-enabled: root.enabled && root.available;
             accessible-action-increment => {
-                root.value = Math.min(root.maximum, root.value + root.range / 20.0);
-                root.released(root.value);
+                if (root.enabled && root.available) {
+                    root.value = Math.min(root.maximum, root.value + root.range / 20.0);
+                    root.released(root.value);
+                }
             }
             accessible-action-decrement => {
-                root.value = Math.max(root.minimum, root.value - root.range / 20.0);
-                root.released(root.value);
+                if (root.enabled && root.available) {
+                    root.value = Math.max(root.minimum, root.value - root.range / 20.0);
+                    root.released(root.value);
+                }
             }
             FocusScope {
                 enabled: root.enabled && root.available;
