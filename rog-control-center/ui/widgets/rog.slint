@@ -472,6 +472,31 @@ export component RogPowerSlider inherits RogSlider {
                 mouse-cursor: root.enabled ? pointer : default;
                 clicked => { reset-popup.show(); }
             }
+            accessible-role: button;
+            accessible-label: @tr("Reset {}", root.label);
+            accessible-enabled: root.enabled;
+            accessible-action-default => {
+                if (root.enabled) {
+                    reset-popup.show();
+                }
+            }
+            FocusScope {
+                width: 100%; height: 100%;
+                enabled: root.enabled;
+                key-pressed(e) => {
+                    if (e.text == Key.Return || e.text == Key.Space) {
+                        reset-popup.show();
+                        return accept;
+                    }
+                    reject
+                }
+                if self.has-focus: Rectangle {
+                    border-radius: Theme.radius-item;
+                    border-width: 2px;
+                    border-color: Theme.rog-red;
+                    background: transparent;
+                }
+            }
             Text {
                 text: "↺";
                 color: root.enabled ? Theme.text-secondary : Theme.fg-disabled;
@@ -487,6 +512,28 @@ export component RogPowerSlider inherits RogSlider {
             background: help-ta.has-hover ? Theme.bg-elevated : transparent;
             help-ta := TouchArea {
                 clicked => { help-popup.show(); }
+            }
+            accessible-role: button;
+            accessible-label: @tr("Help for {}", root.label);
+            accessible-action-default => {
+                help-popup.show();
+            }
+            FocusScope {
+                width: 100%; height: 100%;
+                enabled: true;
+                key-pressed(e) => {
+                    if (e.text == Key.Return || e.text == Key.Space) {
+                        help-popup.show();
+                        return accept;
+                    }
+                    reject
+                }
+                if self.has-focus: Rectangle {
+                    border-radius: Theme.radius-item;
+                    border-width: 2px;
+                    border-color: Theme.rog-red;
+                    background: transparent;
+                }
             }
             Text {
                 text: "?";
