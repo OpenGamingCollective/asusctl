@@ -12,7 +12,9 @@ pub async fn subscribe_battery(tx: UnboundedSender<Event>) {
             health: charge,
             ..Default::default()
         };
-        let _ = tx.send(Event::BatteryUpdated(info));
+        if tx.send(Event::BatteryUpdated(info)).is_err() {
+            return;
+        };
 
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
