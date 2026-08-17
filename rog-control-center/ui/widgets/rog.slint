@@ -917,8 +917,12 @@ export component RogTabBar inherits Rectangle {
         width: 100%; height: 100%;
         key-pressed(event) => {
             if (event.text == Key.Return || event.text == Key.Space) {
-                root.active = root.focused-index;
-                root.tab-changed(root.active);
+                if (root.focused-index < root.tabs.length
+                    && (root.focused-index >= root.tab-enabled.length
+                        || root.tab-enabled[root.focused-index])) {
+                    root.active = root.focused-index;
+                    root.tab-changed(root.active);
+                }
                 return accept;
             }
             if (event.text == Key.LeftArrow) {
