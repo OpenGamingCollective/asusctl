@@ -1,5 +1,4 @@
 use std::env;
-use std::process::exit;
 use std::sync::{Arc, Mutex};
 
 use config_traits::{StdConfig, StdConfigLoad1};
@@ -146,8 +145,18 @@ fn main() -> Result<()> {
     });
 
     // Run the Slint GUI Loop (this blocks until the window is closed)
+    let close_config = config.clone();
     ui.window().on_close_requested(move || {
-        exit(0);
+        let background = close_config
+            .try_lock()
+            .map(|c| c.run_in_background && c.enable_tray_icon)
+            .unwrap_or(false);
+        if background {
+            slint::CloseRequestResponse::HideWindow
+        } else {
+            let _ = slint::quit_event_loop();
+            slint::CloseRequestResponse::HideWindow
+        }
     });
 
     if let Err(e) = slint::run_event_loop_until_quit() {
