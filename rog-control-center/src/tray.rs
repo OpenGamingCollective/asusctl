@@ -60,6 +60,7 @@ struct AsusTray {
     current_title: String,
     current_icon: Icon,
     tx: UnboundedSender<Event>,
+    pub status: ksni::Status,
 }
 
 impl ksni::Tray for AsusTray {
@@ -76,7 +77,7 @@ impl ksni::Tray for AsusTray {
     }
 
     fn status(&self) -> ksni::Status {
-        ksni::Status::Active
+        self.status
     }
 
     fn menu(&self) -> Vec<ksni::MenuItem<Self>> {
@@ -112,9 +113,14 @@ pub fn init_tray(mut enable_tray_rx: watch::Receiver<bool>, tx: UnboundedSender<
             current_title: TRAY_LABEL.to_string(),
             current_icon: read_icon(Path::new("rog-sidebar-logo.png")),
             tx,
+            status: if *enable_tray_rx.borrow() {
+                ksni::Status::Active
+            } else {
+                ksni::Status::Passive
+            },
         };
 
-        let _tray = match tray_init.disable_dbus_name(true).spawn().await {
+        let tray = match tray_init.disable_dbus_name(true).spawn().await {
             Ok(t) => t,
             Err(e) => {
                 log::error!(
@@ -130,9 +136,16 @@ pub fn init_tray(mut enable_tray_rx: watch::Receiver<bool>, tx: UnboundedSender<
             if enable_tray_rx.changed().await.is_err() {
                 break; // sender dropped
             }
-            if !*enable_tray_rx.borrow_and_update() {
-                return;
-            }
+            let enabled = *enable_tray_rx.borrow_and_update();
+            let _ = tray
+                .update(move |t: &mut AsusTray| {
+                    t.status = if enabled {
+                        ksni::Status::Active
+                    } else {
+                        ksni::Status::Passive
+                    };
+                })
+                .await;
         }
     });
 }
