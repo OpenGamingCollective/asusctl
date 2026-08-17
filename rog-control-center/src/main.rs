@@ -123,6 +123,7 @@ fn main() -> Result<()> {
 
     let mut action_handler = ActionHandler {
         tray_tx: tray_tx.clone(),
+        config: config.clone(),
     };
 
     // Start Event Loop
