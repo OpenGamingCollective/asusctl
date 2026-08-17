@@ -316,7 +316,7 @@ export component RogSlider inherits Rectangle {
                     if e.kind == PointerEventKind.down || (e.kind == PointerEventKind.move && self.pressed) {
                         root.set-from-x(self.mouse-x);
                     }
-                    if e.kind == PointerEventKind.up {
+                    if e.kind == PointerEventKind.up || e.kind == PointerEventKind.cancel {
                         root.released(root.value);
                     }
                 }
