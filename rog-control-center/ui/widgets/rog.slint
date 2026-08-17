@@ -337,11 +337,16 @@ export component RogSlider inherits Rectangle {
                 key-pressed(e) => {
                     if (e.text == Key.RightArrow || e.text == Key.UpArrow) {
                         root.value = Math.min(root.maximum, root.value + root.range / 20.0);
-                        root.released(root.value);
                         return accept;
                     }
                     if (e.text == Key.LeftArrow || e.text == Key.DownArrow) {
                         root.value = Math.max(root.minimum, root.value - root.range / 20.0);
+                        return accept;
+                    }
+                    reject
+                }
+                key-released(e) => {
+                    if (e.text == Key.RightArrow || e.text == Key.UpArrow || e.text == Key.LeftArrow || e.text == Key.DownArrow) {
                         root.released(root.value);
                         return accept;
                     }
