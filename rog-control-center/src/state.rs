@@ -23,11 +23,13 @@ pub enum Event {
     Quit,
 }
 
+#[derive(Debug, Clone)]
 pub enum Action {
     SetPlatformProfile(i32),
     SetBatteryLimit(u8),
 }
 
+#[derive(Debug, Clone)]
 pub enum UiUpdate {
     Telemetry(SystemTelemetry),
     Battery(BatteryInfo),
