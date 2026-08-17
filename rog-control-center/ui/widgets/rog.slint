@@ -90,6 +90,39 @@ export component RogModeSelector inherits Rectangle {
                     root.selected(i);
                 }
             }
+            accessible-role: button;
+            accessible-label: m;
+            accessible-action-default => {
+                root.current = i;
+                root.selected(i);
+            }
+            FocusScope {
+                enabled: true;
+                key-pressed(event) => {
+                    if (event.text == Key.Return || event.text == Key.Space) {
+                        root.current = i;
+                        root.selected(i);
+                        return accept;
+                    }
+                    if (event.text == Key.LeftArrow && i > 0) {
+                        root.current = i - 1;
+                        root.selected(i - 1);
+                        return accept;
+                    }
+                    if (event.text == Key.RightArrow && i < root.modes.length - 1) {
+                        root.current = i + 1;
+                        root.selected(i + 1);
+                        return accept;
+                    }
+                    reject
+                }
+                if self.has-focus: Rectangle {
+                    border-radius: Theme.radius-item;
+                    border-width: 2px;
+                    border-color: Theme.rog-red;
+                    background: transparent;
+                }
+            }
             Text {
                 text: m;
                 color: i == root.current ? #FFFFFF : Theme.text-secondary;
@@ -286,6 +319,45 @@ export component RogSlider inherits Rectangle {
                     if e.kind == PointerEventKind.up {
                         root.released(root.value);
                     }
+                }
+            }
+            accessible-role: slider;
+            accessible-label: root.label;
+            accessible-value: root.value;
+            accessible-value-minimum: root.minimum;
+            accessible-value-maximum: root.maximum;
+            accessible-action-increment => {
+                root.value = Math.min(root.maximum, root.value + root.range / 20.0);
+                root.released(root.value);
+            }
+            accessible-action-decrement => {
+                root.value = Math.max(root.minimum, root.value - root.range / 20.0);
+                root.released(root.value);
+            }
+            FocusScope {
+                enabled: root.enabled && root.available;
+                key-pressed(e) => {
+                    if (e.text == Key.RightArrow || e.text == Key.UpArrow) {
+                        root.value = Math.min(root.maximum, root.value + root.range / 20.0);
+                        root.released(root.value);
+                        return accept;
+                    }
+                    if (e.text == Key.LeftArrow || e.text == Key.DownArrow) {
+                        root.value = Math.max(root.minimum, root.value - root.range / 20.0);
+                        root.released(root.value);
+                        return accept;
+                    }
+                    reject
+                }
+                if self.has-focus: Rectangle {
+                    x: root.pct * (parent.width - 16px) - 3px;
+                    y: (parent.height - 16px) / 2 - 3px;
+                    width: 22px;
+                    height: 22px;
+                    border-radius: 11px;
+                    border-width: 2px;
+                    border-color: Theme.rog-red;
+                    background: transparent;
                 }
             }
         }
@@ -518,6 +590,16 @@ export component RogToggleInt inherits Rectangle {
     callback toggled(int);
     background: transparent;
     horizontal-stretch: root.compact ? 0 : 1;
+    accessible-role: checkbox;
+    accessible-label: root.label;
+    accessible-checkable: true;
+    accessible-checked: root.checked-int != 0;
+    accessible-action-default => {
+        if (root.enabled && root.available) {
+            root.checked-int = root.checked-int != 0 ? 0 : 1;
+            root.toggled(root.checked-int);
+        }
+    }
     // Center the switch row vertically (see RogToggle).
     VerticalLayout {
         alignment: center;
@@ -542,6 +624,26 @@ export component RogToggleInt inherits Rectangle {
                     clicked => {
                         root.checked-int = root.checked-int != 0 ? 0 : 1;
                         root.toggled(root.checked-int);
+                    }
+                }
+                FocusScope {
+                    enabled: root.enabled && root.available;
+                    key-pressed(event) => {
+                        if (event.text == Key.Return || event.text == Key.Space) {
+                            root.checked-int = root.checked-int != 0 ? 0 : 1;
+                            root.toggled(root.checked-int);
+                            return accept;
+                        }
+                        reject
+                    }
+                    if self.has-focus: Rectangle {
+                        x: -3px; y: -3px;
+                        width: parent.width + 6px;
+                        height: parent.height + 6px;
+                        border-radius: 15px;
+                        border-width: 2px;
+                        border-color: Theme.rog-red;
+                        background: transparent;
                     }
                 }
                 Rectangle {
@@ -838,6 +940,48 @@ export component RogTabBar inherits Rectangle {
                     root.tab-changed(i);
                 }
             }
+            accessible-role: tab;
+            accessible-label: t;
+            accessible-checked: i == root.active;
+            accessible-action-default => {
+                if (i >= root.tab-enabled.length || root.tab-enabled[i]) {
+                    root.active = i;
+                    root.tab-changed(i);
+                }
+            }
+            FocusScope {
+                enabled: i >= root.tab-enabled.length || root.tab-enabled[i];
+                key-pressed(event) => {
+                    if (event.text == Key.Return || event.text == Key.Space) {
+                        root.active = i;
+                        root.tab-changed(i);
+                        return accept;
+                    }
+                    if (event.text == Key.LeftArrow && i > 0) {
+                        if (i - 1 >= root.tab-enabled.length || root.tab-enabled[i - 1]) {
+                            root.active = i - 1;
+                            root.tab-changed(i - 1);
+                        }
+                        return accept;
+                    }
+                    if (event.text == Key.RightArrow && i < root.tabs.length - 1) {
+                        if (i + 1 >= root.tab-enabled.length || root.tab-enabled[i + 1]) {
+                            root.active = i + 1;
+                            root.tab-changed(i + 1);
+                        }
+                        return accept;
+                    }
+                    reject
+                }
+                if self.has-focus: Rectangle {
+                    x: 2px; y: 2px;
+                    width: parent.width - 4px; height: parent.height - 4px;
+                    border-radius: 4px;
+                    border-width: 2px;
+                    border-color: Theme.rog-red;
+                    background: transparent;
+                }
+            }
 
             // Hover effect
             if ta.has-hover && i != root.active: Rectangle {
@@ -906,6 +1050,29 @@ export component RogEffectButton inherits Rectangle {
         enabled: root.enabled;
         clicked => { root.clicked(); }
     }
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-action-default => {
+        if (root.enabled) { root.clicked(); }
+    }
+    FocusScope {
+        enabled: root.enabled;
+        key-pressed(event) => {
+            if (event.text == Key.Return || event.text == Key.Space) {
+                root.clicked();
+                return accept;
+            }
+            reject
+        }
+        if self.has-focus: Rectangle {
+            x: 2px; y: 2px;
+            width: parent.width - 4px; height: parent.height - 4px;
+            border-radius: 4px;
+            border-width: 2px;
+            border-color: Theme.rog-red;
+            background: transparent;
+        }
+    }
 }
 
 // —— Display mode card for GPU page (icon + title + description) ——
@@ -960,6 +1127,27 @@ export component RogDisplayModeCard inherits Rectangle {
     ta := TouchArea {
         enabled: root.enabled;
         clicked => { root.clicked(); }
+    }
+    accessible-role: button;
+    accessible-label: root.title;
+    accessible-action-default => {
+        if (root.enabled) { root.clicked(); }
+    }
+    FocusScope {
+        enabled: root.enabled;
+        key-pressed(event) => {
+            if (event.text == Key.Return || event.text == Key.Space) {
+                root.clicked();
+                return accept;
+            }
+            reject
+        }
+        if self.has-focus: Rectangle {
+            border-radius: 4px;
+            border-width: 2px;
+            border-color: Theme.rog-red;
+            background: transparent;
+        }
     }
 }
 
