@@ -1,7 +1,7 @@
+use crate::{MainWindow, SystemPageData, state::Event};
+use log::warn;
 use slint::ComponentHandle;
 use tokio::sync::mpsc::UnboundedSender;
-
-use crate::{MainWindow, SystemPageData, state::Event};
 
 /// A simple macro used to bind an user action to an event, also handle the copy of tx
 macro_rules! bind {
@@ -17,7 +17,20 @@ macro_rules! bind {
     ($ui:ident, $tx:ident, $slint_callback:ident, $event_variant:expr, $cast_type:ty) => {
         let tx_clone = $tx.clone();
         $ui.global::<SystemPageData>().$slint_callback(move |val| {
-            let _ = tx_clone.send($event_variant(val as $cast_type));
+            match <$cast_type>::try_from(val) {
+                Ok(v) => {
+                    let _ = tx_clone.send($event_variant(v));
+                }
+                Err(_) => {
+                    warn!(
+                        concat!(
+                            stringify!($slint_callback),
+                            "received out-of-range value: {}"
+                        ),
+                        val
+                    );
+                }
+            }
         });
     };
     // Binding with no value, can be used for "Restore to Default"
