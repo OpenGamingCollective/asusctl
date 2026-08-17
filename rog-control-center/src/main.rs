@@ -12,6 +12,7 @@ use rog_control_center::error::Result;
 use rog_control_center::print_versions;
 
 use rog_control_center::state::Event;
+use rog_control_center::ui::actions::ActionHandler;
 use slint::ComponentHandle;
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
@@ -104,7 +105,8 @@ fn main() -> Result<()> {
     let _ = event_tx.send(Event::DmiLoaded(dmi.product_name.clone()));
 
     // Start System Tray
-    rog_control_center::tray::init_tray(vec![], config.clone(), event_tx.clone());
+    let (tray_tx, tray_rx) = tokio::sync::watch::channel(config.lock().unwrap().enable_tray_icon);
+    rog_control_center::tray::init_tray(tray_rx, event_tx.clone());
 
     // Start Global Shortcuts
     #[cfg(not(feature = "rog_ally"))]
@@ -119,14 +121,22 @@ fn main() -> Result<()> {
     ));
     // subscribe_telemetry(event_tx.clone(), true);
 
+    let mut action_handler = ActionHandler {
+        tray_tx: tray_tx.clone(),
+    };
+
     // Start Event Loop
     let ui_weak = ui.as_weak();
     rt.spawn(async move {
         let mut state = rog_control_center::state::AppState::new();
         while let Some(event) = event_rx.recv().await {
-            let (_effects, ui_updates) = state.update(event);
+            let (actions, ui_updates) = state.update(event);
 
-            // TODO: Effects
+            if !actions.is_empty() {
+                for action in actions {
+                    action_handler.handle_action(action).await;
+                }
+            }
 
             // Apply UI updates
             if !ui_updates.is_empty() {

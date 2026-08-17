@@ -5,14 +5,12 @@
 //! "dGPU status changed" notifications).
 
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
 
-use crate::config::Config;
 use crate::state::Event;
 use ksni::{Icon, TrayMethods};
 use log::info;
-use rog_platform::platform::Properties;
 use tokio::sync::mpsc::UnboundedSender;
+use tokio::sync::watch;
 
 const TRAY_LABEL: &str = "ROG Control Center";
 //const TRAY_ICON_PATH: &str = "/usr/share/icons/hicolor/512x512/apps/";
@@ -108,11 +106,7 @@ impl ksni::Tray for AsusTray {
 }
 
 /// Start the tray and route its window actions through `WindowController`.
-pub fn init_tray(
-    _supported_properties: Vec<Properties>,
-    config: Arc<Mutex<Config>>,
-    tx: UnboundedSender<Event>,
-) {
+pub fn init_tray(mut enable_tray_rx: watch::Receiver<bool>, tx: UnboundedSender<Event>) {
     tokio::spawn(async move {
         let tray_init = AsusTray {
             current_title: TRAY_LABEL.to_string(),
@@ -132,15 +126,12 @@ pub fn init_tray(
 
         info!("Tray started");
 
-        let mut config_check = tokio::time::interval(std::time::Duration::from_secs(2));
-        config_check.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-
         loop {
-            config_check.tick().await;
-            if let Ok(lock) = config.try_lock() {
-                if !lock.enable_tray_icon {
-                    return;
-                }
+            if enable_tray_rx.changed().await.is_err() {
+                break; // sender dropped
+            }
+            if !*enable_tray_rx.borrow_and_update() {
+                return;
             }
         }
     });
