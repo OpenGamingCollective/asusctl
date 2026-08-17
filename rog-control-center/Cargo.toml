@@ -50,6 +50,7 @@ serde_json.workspace = true
 slint.workspace = true
 fontdue.workspace = true
 anyhow = "1.0.104"
+rand = "0.10.2"
 
 [build-dependencies]
 slint-build.workspace = true
