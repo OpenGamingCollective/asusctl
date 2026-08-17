@@ -15,7 +15,7 @@ impl ActionHandler {
             Action::SetBatteryLimit(_) => {}
             Action::SetPlatformProfile(_) => {}
             Action::SetTray(b) => {
-                match self.config.try_lock() {
+                match self.config.lock() {
                     Ok(mut c) => {
                         // We got the lock, update the config and update the tray
                         c.enable_tray_icon = b;
