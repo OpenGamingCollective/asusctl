@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 use config_traits::{StdConfig, StdConfigLoad1};
 use dmi_id::DMIID;
 use env_logger::Env;
-use log::{error, info};
+use log::{error, info, warn};
 
 use rog_control_center::cli_options::CliStart;
 use rog_control_center::config::Config;
@@ -132,14 +132,15 @@ fn main() -> Result<()> {
             // Apply UI updates
             if !ui_updates.is_empty() {
                 let ui_weak_clone = ui_weak.clone();
-                slint::invoke_from_event_loop(move || {
+                if let Err(err) = slint::invoke_from_event_loop(move || {
                     if let Some(ui) = ui_weak_clone.upgrade() {
                         for update in ui_updates {
                             rog_control_center::ui::update::apply_ui_update(&ui, update);
                         }
                     }
-                })
-                .unwrap();
+                }) {
+                    warn!("Could not dispatch UI update: {:?}", err);
+                };
             }
         }
     });
