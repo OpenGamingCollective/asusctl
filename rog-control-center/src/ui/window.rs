@@ -7,15 +7,22 @@ use std::sync::{Arc, Mutex};
 use crate::MainWindow;
 use crate::config::Config;
 
-pub fn setup_window(_config: Arc<Mutex<Config>>) -> MainWindow {
+pub fn setup_window(config: Arc<Mutex<Config>>) -> MainWindow {
     slint::set_xdg_app_id(crate::APP_ID)
         .map_err(|e| warn!("Couldn't set application ID: {e:?}"))
         .ok();
 
     let ui = MainWindow::new().expect("Couldn't create main window");
 
-    if let Err(e) = ui.window().show() {
-        warn!("Couldn't show main window: {e:?}");
+    let background_startup = match config.try_lock() {
+        Ok(c) => c.startup_in_background,
+        Err(_) => false,
+    };
+
+    if !background_startup {
+        if let Err(e) = ui.window().show() {
+            warn!("Couldn't show main window: {e:?}");
+        }
     }
 
     let _available = list_iface_blocking().unwrap_or_default();
