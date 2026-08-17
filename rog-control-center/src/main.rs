@@ -111,8 +111,10 @@ fn main() -> Result<()> {
     // Bind UI Inputs to the Channel
     rog_control_center::ui::callbacks::bind_ui_events(&ui, event_tx.clone());
 
-    // TODO: Start Hardware Subscriptions
-    // subscribe_battery(event_tx.clone());
+    // Start Hardware Subscriptions
+    rt.spawn(rog_control_center::ui::subscriptions::subscribe_battery(
+        event_tx.clone(),
+    ));
     // subscribe_telemetry(event_tx.clone(), true);
 
     // Start Event Loop
