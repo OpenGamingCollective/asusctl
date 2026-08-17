@@ -122,7 +122,7 @@ export component RogModeGrid inherits Rectangle {
             accessible-label: root.profile-choices[p];
             accessible-action-default => { root.selected(ev); }
 
-            if root.current-profile == p: Rectangle {
+            if root.current-profile == ev: Rectangle {
                 width: 100%; height: 100%;
                 background: Theme.mode-selected;
                 border-radius: 4px;
@@ -140,7 +140,7 @@ export component RogModeGrid inherits Rectangle {
                             ev == 3 ? @image-url("../images/mode-silent.svg") :
                             ev == 4 ? @image-url("../images/mode-manual.svg") :
                             @image-url("../images/mode-performance.svg");
-                    colorize: root.current-profile == p ? Theme.text-primary : Theme.text-secondary;
+                    colorize: root.current-profile == ev ? Theme.text-primary : Theme.text-secondary;
                     height: 32px;
                     image-fit: contain;
                     horizontal-alignment: center;
@@ -148,13 +148,13 @@ export component RogModeGrid inherits Rectangle {
 
                 Text {
                     text: root.profile-choices[p];
-                    color: root.current-profile == p ? Theme.text-primary : Theme.text-secondary;
+                    color: root.current-profile == ev ? Theme.text-primary : Theme.text-secondary;
                     font-size: 14px;
                     horizontal-alignment: center;
                 }
             }
 
-            if root.current-profile == p: Rectangle {
+            if root.current-profile == ev: Rectangle {
                 y: parent.height - 6px;
                 width: 40px; height: 3px;
                 x: (parent.width - 40px) / 2;
