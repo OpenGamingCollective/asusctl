@@ -13,7 +13,8 @@ use tokio::sync::{mpsc, oneshot, watch};
 use tokio::task::JoinHandle;
 
 use crate::APP_ID;
-use crate::window::{WeakWindowController, WindowCommand, WindowController};
+use crate::state::Event;
+use tokio::sync::mpsc::UnboundedSender;
 
 const SHORTCUT_ID: &str = "toggle_rog";
 const SHORTCUT_DESCRIPTION: &str = "Open/Close ROG Control Center";
@@ -187,18 +188,12 @@ impl ShortcutHandle {
     }
 }
 
-pub fn start(rt: &tokio::runtime::Handle, window: WindowController) -> ShortcutService {
+pub fn start(rt: &tokio::runtime::Handle, tx: UnboundedSender<Event>) -> ShortcutService {
     let (commands, rx) = mpsc::channel(1);
     let (status, status_rx) = watch::channel(ShortcutStatus::Disabled);
     let (shutdown, shutdown_rx) = watch::channel(false);
     let configurable = Arc::new(AtomicBool::new(false));
-    let task = rt.spawn(run(
-        window.downgrade(),
-        rx,
-        status,
-        configurable.clone(),
-        shutdown_rx,
-    ));
+    let task = rt.spawn(run(tx, rx, status, configurable.clone(), shutdown_rx));
     let handle = ShortcutHandle {
         commands,
         status: status_rx,
@@ -212,7 +207,7 @@ pub fn start(rt: &tokio::runtime::Handle, window: WindowController) -> ShortcutS
 }
 
 async fn run(
-    window: WeakWindowController,
+    tx: UnboundedSender<Event>,
     mut commands: mpsc::Receiver<Command>,
     status: watch::Sender<ShortcutStatus>,
     configurable: Arc<AtomicBool>,
@@ -231,8 +226,8 @@ async fn run(
         match command {
             Command::Enable { mode, respond } => {
                 enable(
-                    &window, &mut portal, &status, &configurable, &mut commands, &mut shutdown,
-                    mode, respond,
+                    &tx, &mut portal, &status, &configurable, &mut commands, &mut shutdown, mode,
+                    respond,
                 )
                 .await;
             }
@@ -332,7 +327,7 @@ async fn apply_enable(
 
 #[allow(clippy::too_many_arguments)]
 async fn enable(
-    window: &WeakWindowController,
+    tx: &UnboundedSender<Event>,
     portal: &mut Option<Portal>,
     status: &watch::Sender<ShortcutStatus>,
     configurable: &Arc<AtomicBool>,
@@ -366,7 +361,7 @@ async fn enable(
     info!("Global shortcuts session created");
 
     run_session(
-        portal, session, window, status, commands, shutdown, mode, respond,
+        portal, session, tx, status, commands, shutdown, mode, respond,
     )
     .await;
 }
@@ -375,7 +370,7 @@ async fn enable(
 async fn run_session(
     portal: &Portal,
     session: ashpd::desktop::Session<'static, GlobalShortcuts<'static>>,
-    window: &WeakWindowController,
+    tx: &UnboundedSender<Event>,
     status: &watch::Sender<ShortcutStatus>,
     commands: &mut mpsc::Receiver<Command>,
     shutdown: &mut watch::Receiver<bool>,
@@ -385,7 +380,7 @@ async fn run_session(
     let mut respond = Some(respond);
     let final_status = tokio::select! {
         _ = shutdown_requested(shutdown) => ShortcutStatus::Disabled,
-        result = run_session_inner(portal, &session, window, status, commands, mode, &mut respond) => result,
+        result = run_session_inner(portal, &session, tx, status, commands, mode, &mut respond) => result,
     };
 
     if let Some(respond) = respond.take() {
@@ -402,7 +397,7 @@ async fn run_session(
 async fn run_session_inner(
     portal: &Portal,
     session: &ashpd::desktop::Session<'static, GlobalShortcuts<'static>>,
-    window: &WeakWindowController,
+    tx: &UnboundedSender<Event>,
     status: &watch::Sender<ShortcutStatus>,
     commands: &mut mpsc::Receiver<Command>,
     mode: EnableMode,
@@ -502,9 +497,7 @@ async fn run_session_inner(
                 match event {
                     Some(active) if active.shortcut_id() == SHORTCUT_ID => {
                         info!("Shortcut activated, toggling window");
-                        if let Some(window) = window.upgrade() {
-                            window.request(WindowCommand::Toggle);
-                        }
+                        let _ = tx.send(Event::ToggleWindow);
                     }
                     Some(_) => {}
                     None => break ShortcutStatus::Unavailable,

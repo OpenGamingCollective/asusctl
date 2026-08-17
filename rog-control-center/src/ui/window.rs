@@ -1,0 +1,39 @@
+use log::warn;
+use rog_dbus::list_iface_blocking;
+use slint::ComponentHandle;
+use std::sync::{Arc, Mutex};
+
+use crate::MainWindow;
+use crate::config::Config;
+
+pub fn setup_window(_config: Arc<Mutex<Config>>) -> MainWindow {
+    slint::set_xdg_app_id(crate::APP_ID)
+        .map_err(|e| warn!("Couldn't set application ID: {e:?}"))
+        .ok();
+
+    let ui = MainWindow::new().expect("Couldn't create main window");
+
+    if let Err(e) = ui.window().show() {
+        warn!("Couldn't show main window: {e:?}");
+    }
+
+    let available = list_iface_blocking().unwrap_or_default();
+
+    ui.set_sidebar_items_avilable(
+        [
+            true,
+            available.contains(&"xyz.ljones.Platform".to_string()),
+            available.contains(&"xyz.ljones.Aura".to_string()),
+            available.contains(&"xyz.ljones.Anime".to_string()),
+            available.contains(&"xyz.ljones.Slash".to_string()),
+            available.contains(&"xyz.ljones.FanCurves".to_string()),
+            true,
+            available.contains(&"xyz.ljones.Platform".to_string()),
+            true,
+            true,
+        ]
+        .into(),
+    );
+
+    ui
+}

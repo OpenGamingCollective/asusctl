@@ -3,7 +3,18 @@ use std::fs::create_dir_all;
 use config_traits::{StdConfig, StdConfigLoad1};
 use serde::{Deserialize, Serialize};
 
-use crate::{APP_ID, notify::EnabledNotifications};
+use crate::APP_ID;
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+pub struct EnabledNotifications {
+    pub enabled: bool,
+}
+
+impl Default for EnabledNotifications {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
+}
 
 const CFG_DIR: &str = "rog";
 const CFG_FILE_NAME: &str = "rog-control-center.cfg";

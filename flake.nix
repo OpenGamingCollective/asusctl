@@ -43,6 +43,7 @@
             (pkgs system).clang
             (pkgs system).SDL2
             (pkgs system).cargo-cranky
+            (pkgs system).eslint
           ];
           LD_LIBRARY_PATH = (pkgs system).lib.makeLibraryPath [
             (pkgs system).wayland

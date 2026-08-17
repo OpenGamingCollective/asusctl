@@ -9,12 +9,10 @@ pub use slint;
 pub mod cli_options;
 pub mod config;
 pub mod error;
-pub mod notify;
 pub mod shortcuts;
+pub mod state;
 pub mod tray;
-pub mod types;
 pub mod ui;
-pub mod window;
 pub mod zbus_proxies;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
