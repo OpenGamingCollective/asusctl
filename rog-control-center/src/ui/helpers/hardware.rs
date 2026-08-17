@@ -36,7 +36,7 @@ pub fn battery_infos() -> Result<BatteryInfo> {
 }
 
 /// Helper to calculate the CPU usage given the previous and current ticks
-pub fn calculate_cpu_sage(
+pub fn calculate_cpu_usage(
     prev: Option<&rog_platform::cpu::CpuTicks>,
     curr: Option<&rog_platform::cpu::CpuTicks>,
 ) -> f32 {
