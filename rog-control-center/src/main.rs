@@ -86,7 +86,6 @@ fn main() -> Result<()> {
         config.start_fullscreen = false;
     }
 
-    config.write();
     let config = Arc::new(Mutex::new(config));
 
     // Load Translations
