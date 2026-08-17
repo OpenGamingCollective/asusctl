@@ -3,4 +3,3 @@ set -e
 
 echo '+cargo fmt --all -- --check'
 cargo fmt --all -- --check
-git add -u
