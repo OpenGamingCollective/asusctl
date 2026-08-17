@@ -3,9 +3,10 @@ use std::{
     time::Duration,
 };
 
-use slint::{SharedString, Weak};
-
 use crate::MainWindow;
+use log::error;
+use slint::{SharedString, Weak};
+use tokio::runtime::Handle;
 
 // A counter of toast that appears
 static TOAST_SEQ: AtomicU64 = AtomicU64::new(0);
@@ -26,8 +27,16 @@ pub fn show_toast(message: SharedString, handle: Weak<MainWindow>) {
         }
     });
 
+    let handle = match Handle::try_current() {
+        Ok(h) => h,
+        Err(err) => {
+            error!("Cannot obtain handle: {}", err);
+            return;
+        }
+    };
+
     // Spawn a simple timer to remove the toast after 5 sec
-    tokio::spawn(async move {
+    handle.spawn(async move {
         tokio::time::sleep(Duration::from_secs(5)).await;
 
         if TOAST_SEQ.load(Ordering::SeqCst) == current_seq {
