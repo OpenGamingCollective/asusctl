@@ -16,6 +16,29 @@ pub struct Pixel {
     pub alpha: f32,
 }
 
+impl Pixel {
+    #[inline]
+    pub const fn from_rgba(r: u8, g: u8, b: u8, a: u8) -> Self {
+        let color = (r as u32 + g as u32 + b as u32) / 3;
+        let alpha = a as f32 / 255.0;
+        Pixel { color, alpha }
+    }
+}
+
+impl From<image::Rgba<u8>> for Pixel {
+    #[inline]
+    fn from(px: image::Rgba<u8>) -> Self {
+        Self::from_rgba(px[0], px[1], px[2], px[3])
+    }
+}
+
+impl From<&image::Rgba<u8>> for Pixel {
+    #[inline]
+    fn from(px: &image::Rgba<u8>) -> Self {
+        Self::from_rgba(px[0], px[1], px[2], px[3])
+    }
+}
+
 impl Default for Pixel {
     #[inline]
     fn default() -> Self {
@@ -92,6 +115,10 @@ impl AnimeImage {
     ) -> Result<Self> {
         if !(0.0..=1.0).contains(&bright) {
             return Err(AnimeError::InvalidBrightness(bright));
+        }
+
+        if width == 0 {
+            return Err(AnimeError::ZeroWidth);
         }
 
         Ok(Self {
@@ -303,6 +330,7 @@ impl AnimeImage {
         }
     }
 
+    #[inline]
     pub(crate) fn get_mut(&mut self) -> &mut [Pixel] {
         &mut self.img_pixels
     }
@@ -474,50 +502,13 @@ impl AnimeImage {
         bright: f32,
         anime_type: AnimeType,
     ) -> Result<Self> {
-        let data = std::fs::read(path).map_err(|e| {
+        let img = image::open(path).inspect_err(|e| {
             error!("Could not open {path:?}: {e:?}");
-            e
         })?;
-        let data = std::io::Cursor::new(data);
-        let decoder = png_pong::Decoder::new(data)?.into_steps();
-        let png_pong::Step { raster, delay: _ } = decoder.last().ok_or(AnimeError::NoFrames)??;
+        let rgba = img.to_rgba8();
+        let width = rgba.width();
 
-        let width;
-        let pixels = match &raster {
-            png_pong::PngRaster::Gray8(ras) => {
-                width = ras.width();
-                Self::pixels_from_8bit(ras, true)
-            }
-            png_pong::PngRaster::Graya8(ras) => {
-                width = ras.width();
-                Self::pixels_from_8bit(ras, true)
-            }
-            png_pong::PngRaster::Rgb8(ras) => {
-                width = ras.width();
-                Self::pixels_from_8bit(ras, false)
-            }
-            png_pong::PngRaster::Rgba8(ras) => {
-                width = ras.width();
-                Self::pixels_from_8bit(ras, false)
-            }
-            png_pong::PngRaster::Gray16(ras) => {
-                width = ras.width();
-                Self::pixels_from_16bit(ras, true)
-            }
-            png_pong::PngRaster::Rgb16(ras) => {
-                width = ras.width();
-                Self::pixels_from_16bit(ras, false)
-            }
-            png_pong::PngRaster::Graya16(ras) => {
-                width = ras.width();
-                Self::pixels_from_16bit(ras, true)
-            }
-            png_pong::PngRaster::Rgba16(ras) => {
-                width = ras.width();
-                Self::pixels_from_16bit(ras, false)
-            }
-            png_pong::PngRaster::Palette(..) => return Err(AnimeError::Format),
-        };
+        let pixels = rgba.pixels().map(Pixel::from).collect();
 
         let mut matrix = AnimeImage::new(
             Vec2::new(scale, scale),
@@ -532,44 +523,6 @@ impl AnimeImage {
         matrix.update();
         Ok(matrix)
     }
-
-    fn pixels_from_8bit<P>(ras: &pix::Raster<P>, grey: bool) -> Vec<Pixel>
-    where
-        P: pix::el::Pixel<Chan = pix::chan::Ch8>,
-    {
-        ras.pixels()
-            .iter()
-            .map(|px| crate::image::Pixel {
-                color: if grey {
-                    <u8>::from(px.one()) as u32
-                } else {
-                    (<u8>::from(px.one()) / 3) as u32
-                        + (<u8>::from(px.two()) / 3) as u32
-                        + (<u8>::from(px.three()) / 3) as u32
-                },
-                alpha: <f32>::from(px.alpha()),
-            })
-            .collect()
-    }
-
-    fn pixels_from_16bit<P>(ras: &pix::Raster<P>, grey: bool) -> Vec<Pixel>
-    where
-        P: pix::el::Pixel<Chan = pix::chan::Ch16>,
-    {
-        ras.pixels()
-            .iter()
-            .map(|px| crate::image::Pixel {
-                color: if grey {
-                    (<u16>::from(px.one()) >> 8) as u32
-                } else {
-                    ((<u16>::from(px.one()) / 3) >> 8) as u32
-                        + ((<u16>::from(px.two()) / 3) >> 8) as u32
-                        + ((<u16>::from(px.three()) / 3) >> 8) as u32
-                },
-                alpha: <f32>::from(px.alpha()),
-            })
-            .collect()
-    }
 }
 
 impl TryFrom<&AnimeImage> for AnimeDataBuffer {
@@ -578,17 +531,13 @@ impl TryFrom<&AnimeImage> for AnimeDataBuffer {
     /// Do conversion from the nested Vec in `AnimeDataBuffer` to the two
     /// required packets suitable for sending over USB
     fn try_from(leds: &AnimeImage) -> Result<Self> {
-        let mut l: Vec<u8> = leds
-            .led_pos
-            .iter()
-            .map(|l| if let Some(l) = l { l.bright() } else { 0 })
-            .collect();
-        let mut v = Vec::with_capacity(leds.anime_type.data_length());
+        let data_len = leds.anime_type.data_length();
+        let mut v = Vec::with_capacity(data_len);
         if leds.anime_type == AnimeType::GA401 {
             v.push(0);
         }
-        v.append(&mut l);
-        v.append(&mut vec![0u8; leds.anime_type.data_length() - v.len()]);
+        v.extend(leds.led_pos.iter().map(|l| l.map_or(0, |led| led.bright())));
+        v.resize(data_len, 0);
         AnimeDataBuffer::from_vec(leds.anime_type, v)
     }
 }
@@ -688,6 +637,44 @@ mod tests {
         assert_eq!(AnimeImage::pitch(a, 12), 30);
         assert_eq!(AnimeImage::pitch(a, 13), 30);
         assert_eq!(AnimeImage::pitch(a, 14), 29);
+    }
+
+    #[test]
+    fn test_anime_image_new_validation() {
+        let err = AnimeImage::new(
+            Vec2::splat(1.0),
+            0.0,
+            Vec2::default(),
+            1.0,
+            vec![],
+            0,
+            AnimeType::GA402,
+        );
+        assert!(matches!(err, Err(AnimeError::ZeroWidth)));
+
+        let err = AnimeImage::new(
+            Vec2::splat(1.0),
+            0.0,
+            Vec2::default(),
+            1.5,
+            vec![],
+            10,
+            AnimeType::GA402,
+        );
+        assert!(matches!(err, Err(AnimeError::InvalidBrightness(_))));
+    }
+
+    #[test]
+    fn test_pixel_from_rgba() {
+        let rgba = image::Rgba([
+            120, 60, 180, 255,
+        ]);
+        let px1 = Pixel::from(rgba);
+        let px2 = Pixel::from(&rgba);
+        assert_eq!(px1.color, (120 + 60 + 180) / 3);
+        assert_eq!(px1.alpha, 1.0);
+        assert_eq!(px2.color, px1.color);
+        assert_eq!(px2.alpha, px1.alpha);
     }
 
     #[test]

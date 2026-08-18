@@ -22,9 +22,7 @@ name = "rog_anime"
 path = "src/lib.rs"
 
 [dependencies]
-png_pong.workspace = true
-pix.workspace = true
-gif.workspace = true
+image.workspace = true
 log.workspace = true
 
 serde.workspace = true

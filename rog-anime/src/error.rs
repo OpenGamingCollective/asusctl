@@ -1,23 +1,19 @@
-use gif::DecodingError;
-use png_pong::decode::Error as PngError;
+use image::ImageError;
 
 pub type Result<T> = std::result::Result<T, AnimeError>;
 
 #[derive(thiserror::Error, Debug)]
 pub enum AnimeError {
-    #[error("No frames in PNG")]
+    #[error("No frames in image")]
     NoFrames,
 
     #[error("Could not open: {0}")]
-    Io(#[source] std::io::Error),
+    Io(#[from] std::io::Error),
 
-    #[error("PNG error: {0}")]
-    Png(#[source] PngError),
+    #[error("Image error: {0}")]
+    Image(#[from] ImageError),
 
-    #[error("GIF error: {0}")]
-    Gif(#[source] DecodingError),
-
-    #[error("PNG file is not 8bit greyscale")]
+    #[error("Image file format error")]
     Format,
 
     #[error("The input image size is incorrect, expected {0}x{1}")]
@@ -38,6 +34,9 @@ pub enum AnimeError {
     #[error("Image brightness must be between 0.0 and 1.0 (inclusive), was {0}")]
     InvalidBrightness(f32),
 
+    #[error("Image width cannot be zero")]
+    ZeroWidth,
+
     #[error("The data buffer was incorrect length for generating USB packets")]
     DataBufferLength,
 
@@ -49,24 +48,6 @@ pub enum AnimeError {
 
     #[error("Could not parse {0}")]
     ParseError(String),
-}
-
-impl From<std::io::Error> for AnimeError {
-    fn from(err: std::io::Error) -> Self {
-        AnimeError::Io(err)
-    }
-}
-
-impl From<PngError> for AnimeError {
-    fn from(err: PngError) -> Self {
-        AnimeError::Png(err)
-    }
-}
-
-impl From<DecodingError> for AnimeError {
-    fn from(err: DecodingError) -> Self {
-        AnimeError::Gif(err)
-    }
 }
 
 impl From<AnimeError> for zbus::fdo::Error {

@@ -7,18 +7,19 @@ use log::error;
 use crate::AnimeType;
 use crate::data::AnimeDataBuffer;
 use crate::error::{AnimeError, Result};
+use crate::image::Pixel;
 
 /// Mostly intended to be used with ASUS gifs, but can be used for other
 /// purposes (like images)
+#[derive(Clone, Debug)]
 pub struct AnimeDiagonal(AnimeType, Vec<Vec<u8>>);
 
 impl AnimeDiagonal {
+    /// Initialise a new matrix with 0's
     #[inline]
     pub fn new(anime_type: AnimeType) -> Self {
-        Self(
-            anime_type,
-            vec![vec![0; anime_type.width()]; anime_type.height()],
-        )
+        let matrix = vec![vec![0; anime_type.width()]; anime_type.height()];
+        Self(anime_type, matrix)
     }
 
     #[inline]
@@ -38,98 +39,33 @@ impl AnimeDiagonal {
         buf
     }
 
-    /// Generate the base image from inputs. The result can be displayed as is
-    /// or updated via scale, position, or angle then displayed again after
-    /// `update()`.
-    #[inline]
+    /// Make a diagonal matrix from a PNG file.
+    ///
+    /// Accepts PNGs of dimensions up to the max for the laptop model.
+    /// For the G14, the max dimensions are 74x36. Returns [`AnimeError::IncorrectSize`]
+    /// if the image width or height exceeds the supported bounds.
     pub fn from_png(path: &Path, bright: f32, anime_type: AnimeType) -> Result<Self> {
-        let data = std::fs::read(path).map_err(|e| {
+        let img = image::open(path).inspect_err(|e| {
             error!("Could not open {path:?}: {e:?}");
-            e
         })?;
-        let data = std::io::Cursor::new(data);
-        let decoder = png_pong::Decoder::new(data)?.into_steps();
-        let png_pong::Step { raster, delay: _ } = decoder.last().ok_or(AnimeError::NoFrames)??;
+        let rgba = img.to_rgba8();
+
+        let max_w = anime_type.width() as u32;
+        let max_h = anime_type.height() as u32;
+        if rgba.width() > max_w || rgba.height() > max_h {
+            return Err(AnimeError::IncorrectSize(max_w, max_h));
+        }
 
         let mut matrix = AnimeDiagonal::new(anime_type);
 
-        match &raster {
-            png_pong::PngRaster::Gray8(ras) => {
-                Self::pixels_from_8bit(ras, &mut matrix, bright, true);
-            }
-            png_pong::PngRaster::Graya8(ras) => {
-                Self::pixels_from_8bit(ras, &mut matrix, bright, true);
-            }
-            png_pong::PngRaster::Rgb8(ras) => {
-                Self::pixels_from_8bit(ras, &mut matrix, bright, false);
-            }
-            png_pong::PngRaster::Rgba8(ras) => {
-                Self::pixels_from_8bit(ras, &mut matrix, bright, false);
-            }
-            png_pong::PngRaster::Gray16(ras) => {
-                Self::pixels_from_16bit(ras, &mut matrix, bright, true);
-            }
-            png_pong::PngRaster::Rgb16(ras) => {
-                Self::pixels_from_16bit(ras, &mut matrix, bright, false);
-            }
-            png_pong::PngRaster::Graya16(ras) => {
-                Self::pixels_from_16bit(ras, &mut matrix, bright, true);
-            }
-            png_pong::PngRaster::Rgba16(ras) => {
-                Self::pixels_from_16bit(ras, &mut matrix, bright, false);
-            }
-            png_pong::PngRaster::Palette(..) => return Err(AnimeError::Format),
-        };
+        for (x, y, px) in rgba.enumerate_pixels() {
+            let x = x as usize;
+            let y = y as usize;
+            let v = Pixel::from(px).color as f32;
+            matrix.1[y][x] = (v * bright) as u8;
+        }
 
         Ok(matrix)
-    }
-
-    fn pixels_from_8bit<P>(
-        ras: &pix::Raster<P>,
-        matrix: &mut AnimeDiagonal,
-        bright: f32,
-        grey: bool,
-    ) where
-        P: pix::el::Pixel<Chan = pix::chan::Ch8>,
-    {
-        let width = ras.width();
-        for (y, row) in ras.pixels().chunks(width as usize).enumerate() {
-            for (x, px) in row.iter().enumerate() {
-                let v = if grey {
-                    <u8>::from(px.one()) as f32
-                } else {
-                    (<u8>::from(px.one()) / 3) as f32
-                        + (<u8>::from(px.two()) / 3) as f32
-                        + (<u8>::from(px.three()) / 3) as f32
-                };
-                if y < matrix.1.len() && x < matrix.1[y].len() {
-                    matrix.1[y][x] = (v * bright) as u8;
-                }
-            }
-        }
-    }
-
-    fn pixels_from_16bit<P>(
-        ras: &pix::Raster<P>,
-        matrix: &mut AnimeDiagonal,
-        bright: f32,
-        grey: bool,
-    ) where
-        P: pix::el::Pixel<Chan = pix::chan::Ch16>,
-    {
-        let width = ras.width();
-        for (y, row) in ras.pixels().chunks(width as usize).enumerate() {
-            for (x, px) in row.iter().enumerate() {
-                let v = if grey {
-                    (<u16>::from(px.one()) >> 8) as f32
-                } else {
-                    ((<u16>::from(px.one()) / 3) >> 8) as f32
-                        + ((<u16>::from(px.two()) / 3) >> 8) as f32
-                        + ((<u16>::from(px.three()) / 3) >> 8) as f32
-                };
-                matrix.1[y][x] = (v * bright) as u8;
-            }
-        }
     }
 
     /// Convert to a data buffer that can be sent over dbus
@@ -455,5 +391,30 @@ impl AnimeDiagonal {
         let mut buf = vec![0u8; anime_type.data_length()];
         Self::pack_strix_diagonal_into(&mut buf, &self.1);
         AnimeDataBuffer::from_vec(anime_type, buf)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use super::*;
+
+    #[test]
+    fn test_from_png_oversized_error() {
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("tests/data/ga401-diagonal.png");
+
+        let res = AnimeDiagonal::from_png(&path, 1.0, AnimeType::G835L);
+        assert!(matches!(res, Err(AnimeError::IncorrectSize(68, 34))));
+    }
+
+    #[test]
+    fn test_from_png_valid() {
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("tests/data/ga401-diagonal.png");
+
+        let res = AnimeDiagonal::from_png(&path, 1.0, AnimeType::GA401);
+        assert!(res.is_ok());
     }
 }
