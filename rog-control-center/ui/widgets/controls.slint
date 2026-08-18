@@ -1,63 +1,8 @@
-// rog-control-center — AC-style component library (redone against 2.5K AC footage)
-// RogCard=AC card, RogMetricCard=dashboard quad (icon + big number + red progress),
-// RogSlider=hand-drawn AC slider (grey track + red fill + white/red handle), RogToggle=hand-drawn ON-red/OFF-grey,
-// RogModeSelector=performance segment, RogDropdownRow=dropdown, RogSectionHeader=heading
+// Interactive Form Controls
+// Contains inputs, sliders, toggles, selectors, and tab bars used across the UI.
 import { Theme } from "../globals.slint";
 import { ComboBox, Button } from "std-widgets.slint";
-
-// — Page root: declares the opacity transition. The actual opacity value is
-// driven by main_window per active page (crossfade); this only provides the curve. —
-export component RogPage inherits Rectangle {
-    animate opacity { duration: 180ms; easing: ease-out; }
-}
-
-// — "Reboot required" notice banner —
-//   Shown inline next to controls whose changes only apply after a restart
-//   (GPU mode, MUX, reserved memory, miniLED...). Parent toggles `visible`.
-export component RogRebootBanner inherits Rectangle {
-    height: 40px;
-    border-radius: 8px;
-    background: #66550033;
-    border-width: 1px;
-    border-color: #E0B04033;
-    animate opacity { duration: 200ms; easing: ease-out; }
-    HorizontalLayout {
-        padding-left: 14px;
-        padding-right: 14px;
-        spacing: 10px;
-        // Full-height cell so the icon can be centred inside it: Slint
-        // layouts own direct-child geometry, so an Image child can't set y.
-        Rectangle {
-            height: 100%;
-            Image {
-                source: @image-url("../images/nav-about.svg");
-                colorize: #E0B040;
-                width: 18px;
-                height: 18px;
-                x: (parent.width - self.width) / 2;
-                y: (parent.height - self.height) / 2;
-            }
-        }
-        Text {
-            text: @tr("Changes are staged. They will take effect after restarting.");
-            color: Theme.text-secondary;
-            font-size: Theme.font-sm;
-            vertical-alignment: center;
-            overflow: elide;
-        }
-    }
-}
-
-// — Card: dark fill + radius 8 + deep shadow, no bright border (matches AC cards) —
-export component RogCard inherits Rectangle {
-    in property <length> radius: Theme.radius-card;
-    background: Theme.bg-card;
-    border-radius: root.radius;
-    drop-shadow-blur: 18px;
-    drop-shadow-color: #00000070;
-    drop-shadow-offset-y: 4px;
-    clip: true;
-}
+import { RogCard } from "cards.slint";
 
 
 
@@ -132,6 +77,7 @@ export component RogModeSelector inherits Rectangle {
         }
     }
 }
+
 
 // — Performance mode grid (large icons + labels) —
 export component RogModeGrid inherits Rectangle {
@@ -222,6 +168,7 @@ export component RogModeGrid inherits Rectangle {
         }
     }
 }
+
 
 // — Hand-drawn AC slider (grey track + red fill + white round red-bordered handle) —
 export component RogSlider inherits Rectangle {
@@ -378,6 +325,7 @@ export component RogSlider inherits Rectangle {
         root.value = root.minimum + clamp((x - 8px) / (track.width - 16px), 0.0, 1.0) * root.range;
     }
 }
+
 
 // — Power-limit slider: AC slider with optional help popup and reset-to-default.
 //   `available` / "N/A" handling lives in RogSlider itself. —
@@ -547,6 +495,7 @@ export component RogPowerSlider inherits RogSlider {
     }
 }
 
+
 // — Hand-drawn AC toggle (ON red / OFF grey, rounded pill) —
 export component RogToggle inherits Rectangle {
     in property <string> label;
@@ -632,6 +581,7 @@ export component RogToggle inherits Rectangle {
     }
 }
 
+
 // — int switch (for panel_overdrive / boot_sound etc., int 0/1) —
 export component RogToggleInt inherits Rectangle {
     in property <string> label;
@@ -714,6 +664,7 @@ export component RogToggleInt inherits Rectangle {
     }
 }
 
+
 // — Dropdown row (MiniLED / EPP) —
 export component RogDropdownRow inherits Rectangle {
     in property <string> label;
@@ -751,197 +702,6 @@ export component RogDropdownRow inherits Rectangle {
     }
 }
 
-// ============================================================
-//  AC home (dashboard) components — matched against ac-system-page.html (1:1)
-// ============================================================
-
-// — AC signature slash accent: compact slanted parallelograms. —
-// The source is pre-skewed, so there is no rotated bounding box and the mark
-// remains vertically centred relative to its title at every row height.
-export component RogSlashMark inherits Rectangle {
-    in property <color> bar-color: Theme.rog-red;
-    in property <int> count: 3;
-    in property <length> bar-w: 5px;
-    in property <length> bar-h: 14px;
-    width: root.count * (root.bar-w + 11px) - 2px;
-    height: 100%;
-
-    for i in root.count: Image {
-        source: @image-url("../images/slash-bar.svg");
-        colorize: root.bar-color;
-        x: i * (root.bar-w + 11px);
-        y: (root.height - root.bar-h) / 2;
-        width: root.bar-w + 9px;
-        height: root.bar-h;
-        image-fit: fill;
-    }
-}
-
-// — Dark slashes by metric headings retain their original visual weight. —
-export component RogDarkSlashes inherits RogSlashMark {
-    bar-color: Theme.bg-elevated;
-    count: 3;
-    bar-w: 5px;
-    bar-h: 22px;
-}
-
-// — Purple→red gradient meter (#6437FF→#FF1929; Slint has no native gradient, simulated) —
-export component RogMeter inherits Rectangle {
-    in property <float> value: 0.0;          // 0..1
-    in property <length> thickness: 4px;
-    height: root.thickness;
-    background: Theme.line;
-    border-radius: 1px;
-    clip: true;
-    fill := Rectangle {
-        x: 0;
-        width: root.width * clamp(root.value, 0.0, 1.0);
-        height: 100%;
-        clip: true;
-        // Real smooth meter gradient (purple → red), clipped to the fill
-        // width. Replaces the old 7-band fake gradient.
-        Rectangle {
-            x: 0;
-            width: root.width;
-            height: 100%;
-            background: @linear-gradient(90deg, Theme.meter-start, Theme.meter-end);
-        }
-    }
-}
-
-// — Single stat row: left label, right value (13px secondary; dim uses text-dim) —
-export component RogStatRow inherits Rectangle {
-    in property <string> label;
-    in property <string> value;
-    in property <bool> dim: false;
-    background: transparent;
-    height: 20px;
-    HorizontalLayout {
-        Text {
-            text: root.label;
-            color: root.dim ? Theme.text-dim : Theme.text-secondary;
-            font-size: 13px;
-            vertical-alignment: center;
-        }
-        Rectangle { horizontal-stretch: 1; }
-        Text {
-            text: root.value;
-            color: root.dim ? Theme.text-dim : Theme.text-secondary;
-            font-size: 13px;
-            vertical-alignment: center;
-        }
-    }
-}
-
-// — One reading: label+value row + purple-red meter —
-export component RogReading inherits VerticalLayout {
-    in property <string> label;
-    in property <string> value;
-    in property <float> progress: 0.0;
-    spacing: 3px;
-    HorizontalLayout {
-        Text {
-            text: root.label;
-            color: Theme.text-secondary;
-            font-size: 13px;
-            vertical-alignment: center;
-        }
-        Rectangle { horizontal-stretch: 1; }
-        Text {
-            text: root.value;
-            color: Theme.text-secondary;
-            font-size: 13px;
-            vertical-alignment: center;
-        }
-    }
-    RogMeter { value: root.progress; }
-}
-
-// — Metric block: big heading + shared slash accent + free reading/stat fill. —
-export component RogMetric inherits VerticalLayout {
-    in property <string> title;
-    spacing: 7px;
-    alignment: start;
-    HorizontalLayout {
-        spacing: 10px;
-        padding-bottom: 10px;
-        Text {
-            text: root.title;
-            color: Theme.text-primary;
-            font-size: 30px;
-            font-weight: 400;
-        }
-        Rectangle { horizontal-stretch: 1; }
-        RogDarkSlashes {}
-    }
-    @children
-}
-
-// — Product card: product image/placeholder + model (25px 900) + spec lines —
-export component RogProductCard inherits Rectangle {
-    in property <image> product-image;
-    in property <string> name;
-    in property <[string]> details;
-    background: Theme.bg-card;
-    border-radius: 4px;
-    drop-shadow-blur: 18px;
-    drop-shadow-color: #00000073;
-    drop-shadow-offset-y: 4px;
-    clip: true;
-    VerticalLayout {
-        // Image area: stretches (grows with card height to keep the square ratio)
-        Rectangle {
-            vertical-stretch: 1;
-            min-height: 160px;
-            // Hero panel: dark purple-red in dark mode, soft lavender in light.
-            background: Theme.dark ? #15101e : #ECEAF2;
-
-            if root.product-image.width > 0: Image {
-                source: root.product-image;
-                width: 75%;
-                height: 85%;
-                horizontal-alignment: center;
-                vertical-alignment: center;
-                image-fit: contain;
-            }
-            if root.product-image.width == 0: Image {
-                source: Theme.dark ? @image-url("../images/laptop-placeholder.svg")
-                                   : @image-url("../images/laptop-placeholder-light.svg");
-                width: 94%;
-                height: 94%;
-                horizontal-alignment: center;
-                vertical-alignment: center;
-                image-fit: contain;
-            }
-        }
-        // Text info area
-        VerticalLayout {
-            padding-top: 16px;
-            padding-bottom: 18px;
-            padding-left: 20px;
-            padding-right: 20px;
-            spacing: 4px;
-            Text {
-                text: root.name;
-                color: Theme.text-primary;
-                font-family: "Inter Display";
-                font-size: 22px;
-                font-weight: 900;
-                letter-spacing: 0.5px;
-                horizontal-alignment: center;
-                // Long model names wrap instead of being clipped at the edge.
-                wrap: word-wrap;
-            }
-            for d in root.details: Text {
-                text: d;
-                color: Theme.text-secondary;
-                font-size: 11.5px;
-                horizontal-alignment: center;
-                wrap: word-wrap;
-            }
-        }
-    }
-}
 
 // ============================================================
 //  System Settings Page Components — AC multi-tab layout
@@ -1067,162 +827,3 @@ export component RogTabBar inherits Rectangle {
     }
 }
 
-
-// —— Effect icon button for lighting page (large circular icon, radio-style single-select) ——
-// IMPORTANT: parent manages 'selected' state — this component only signals clicked()
-export component RogEffectButton inherits Rectangle {
-    in property <image> icon;
-    in property <string> label;
-    in property <bool> selected: false;  // read-only from parent, do NOT self-assign
-    in property <bool> enabled: true;
-    callback clicked();
-    width: 92px;
-    height: 104px;
-    opacity: root.enabled ? 1.0 : 0.35;
-
-    // Circle background, horizontally centred in the cell (absolute x, not a
-    // layout child, so a fixed-width circle never drifts to the left).
-    outer := Rectangle {
-        x: (parent.width - self.width) / 2;
-        y: 4px;
-        width: 72px;
-        height: 72px;
-        border-radius: 36px;
-        background: root.selected ? Theme.mode-selected : Theme.bg-app;
-        border-width: root.selected ? 2px : 1px;
-        border-color: root.selected ? Theme.rog-red : Theme.line-soft;
-
-        Image {
-            source: root.icon;
-            colorize: root.selected ? Theme.rog-red : Theme.text-secondary;
-            width: 32px;
-            height: 32px;
-            image-fit: contain;
-            horizontal-alignment: center;
-            vertical-alignment: center;
-        }
-    }
-
-    // Label spans the full cell width so its centre lines up with the circle.
-    Text {
-        text: root.label;
-        color: root.selected ? Theme.text-primary : Theme.text-secondary;
-        font-size: 12px;
-        font-weight: root.selected ? 600 : 400;
-        x: 0;
-        y: 82px;
-        width: 100%;
-        horizontal-alignment: center;
-        overflow: elide;
-    }
-
-    ta := TouchArea {
-        width: 100%;
-        height: 100%;
-        enabled: root.enabled;
-        clicked => { root.clicked(); }
-    }
-    accessible-role: button;
-    accessible-label: root.label;
-    accessible-action-default => {
-        if (root.enabled) { root.clicked(); }
-    }
-    FocusScope {
-        enabled: root.enabled;
-        key-pressed(event) => {
-            if (event.text == Key.Return || event.text == Key.Space) {
-                root.clicked();
-                return accept;
-            }
-            reject
-        }
-        if self.has-focus: Rectangle {
-            x: 2px; y: 2px;
-            width: parent.width - 4px; height: parent.height - 4px;
-            border-radius: 4px;
-            border-width: 2px;
-            border-color: Theme.rog-red;
-            background: transparent;
-        }
-    }
-}
-
-// —— Display mode card for GPU page (icon + title + description) ——
-export component RogDisplayModeCard inherits Rectangle {
-    in property <image> icon;
-    in property <string> title;
-    in property <string> description;
-    in property <bool> selected: false;
-    in property <bool> enabled: true;
-    callback clicked();
-    background: Theme.bg-card;
-    border-radius: 4px;
-    border-width: 1px;
-    border-color: root.selected ? Theme.rog-red : (root.enabled ? transparent : Theme.line);
-    animate border-color { duration: 150ms; }
-    clip: true;
-
-    VerticalLayout {
-        padding: 20px;
-        spacing: 12px;
-        alignment: center;
-
-        Image {
-            source: root.icon;
-            colorize: root.selected ? Theme.rog-red : (root.enabled ? Theme.text-dim : Theme.fg-disabled);
-            // Full-width box with contain: the SVG scales to 56px tall and
-            // centers horizontally, regardless of card width.
-            width: 100%;
-            height: 56px;
-            image-fit: contain;
-            opacity: root.enabled ? 1.0 : 0.4;
-        }
-
-        Text {
-            text: root.title;
-            color: root.selected ? Theme.text-primary : (root.enabled ? Theme.text-secondary : Theme.fg-disabled);
-            font-size: 15px;
-            font-weight: 600;
-            horizontal-alignment: center;
-        }
-
-        Text {
-            text: root.description;
-            color: root.enabled ? Theme.text-dim : Theme.fg-disabled;
-            font-size: 11px;
-            horizontal-alignment: center;
-            wrap: word-wrap;
-            opacity: root.enabled ? 1.0 : 0.5;
-        }
-    }
-
-    ta := TouchArea {
-        enabled: root.enabled;
-        clicked => { root.clicked(); }
-    }
-    accessible-role: button;
-    accessible-label: root.title;
-    accessible-action-default => {
-        if (root.enabled) { root.clicked(); }
-    }
-    FocusScope {
-        enabled: root.enabled;
-        key-pressed(event) => {
-            if (event.text == Key.Return || event.text == Key.Space) {
-                root.clicked();
-                return accept;
-            }
-            reject
-        }
-        if self.has-focus: Rectangle {
-            border-radius: 4px;
-            border-width: 2px;
-            border-color: Theme.rog-red;
-            background: transparent;
-        }
-    }
-}
-
-// —— Collapsible section header (title + chevron) ——
-// (removed: was only used by the GPU process list, which had no backend and
-//  was deleted. Re-add from history if a real collapsible section is needed.)

@@ -1,3 +1,5 @@
+//! Types used to represent data
+
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct BatteryInfo {
     pub health: u8,

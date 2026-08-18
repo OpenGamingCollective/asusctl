@@ -2,24 +2,24 @@
 
 use slint::{ComponentHandle, SharedString};
 
-use crate::{MainWindow, SystemPageData, state::UiUpdate};
+use crate::{DeviceData, MainWindow, PowerData, SystemInfo, TelemetryData, state::UiUpdate};
 
 pub fn apply_ui_update(ui: &MainWindow, update: UiUpdate) {
     match update {
         UiUpdate::Telemetry(t) => {
-            let sys_data = ui.global::<SystemPageData>();
+            let sys_data = ui.global::<TelemetryData>();
             sys_data.set_cpu_temp_val(t.cpu.temp);
         }
         UiUpdate::ProductName(n) => {
-            let sys_data = ui.global::<SystemPageData>();
+            let sys_data = ui.global::<SystemInfo>();
             sys_data.set_product_name(SharedString::from(n));
         }
         UiUpdate::Battery(b) => {
-            let sys_data = ui.global::<SystemPageData>();
+            let sys_data = ui.global::<TelemetryData>();
             sys_data.set_battery_health(b.health as i32);
         }
         UiUpdate::PlatformProfile(p) => {
-            let sys_data = ui.global::<SystemPageData>();
+            let sys_data = ui.global::<PowerData>();
             sys_data.set_platform_profile(p);
         }
         UiUpdate::ShowToast {

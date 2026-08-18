@@ -4,11 +4,12 @@
 // the redesign is built out page by page.
 import { Palette } from "std-widgets.slint";
 import { AppSize, Theme } from "globals.slint";
-import { SystemPageData, AttrMinMax } from "pages/system.slint";
+import { SystemInfo, TelemetryData, PowerData, DeviceData } from "pages/system.slint";
+import { AttrMinMax } from "pages/types.slint";
 import { PageHome } from "pages/home.slint";
 import { SideBar } from "widgets/sidebar.slint";
 
-export { AppSize, AttrMinMax, SystemPageData }
+export { AppSize, AttrMinMax, SystemInfo, TelemetryData, PowerData, DeviceData }
 
 export component MainWindow inherits Window {
     title: "ROG Control Center";

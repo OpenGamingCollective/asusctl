@@ -1,0 +1,100 @@
+// Dashboard Metrics
+// Contains readouts, stat rows, and meters used for displaying hardware telemetry.
+import { Theme } from "../globals.slint";
+import { RogDarkSlashes } from "layout.slint";
+
+// — Single stat row: left label, right value (13px secondary; dim uses text-dim) —
+export component RogMeter inherits Rectangle {
+    in property <float> value: 0.0;          // 0..1
+    in property <length> thickness: 4px;
+    height: root.thickness;
+    background: Theme.line;
+    border-radius: 1px;
+    clip: true;
+    fill := Rectangle {
+        x: 0;
+        width: root.width * clamp(root.value, 0.0, 1.0);
+        height: 100%;
+        clip: true;
+        // Real smooth meter gradient (purple → red), clipped to the fill
+        // width. Replaces the old 7-band fake gradient.
+        Rectangle {
+            x: 0;
+            width: root.width;
+            height: 100%;
+            background: @linear-gradient(90deg, Theme.meter-start, Theme.meter-end);
+        }
+    }
+}
+
+export component RogStatRow inherits Rectangle {
+    in property <string> label;
+    in property <string> value;
+    in property <bool> dim: false;
+    background: transparent;
+    height: 20px;
+    HorizontalLayout {
+        Text {
+            text: root.label;
+            color: root.dim ? Theme.text-dim : Theme.text-secondary;
+            font-size: 13px;
+            vertical-alignment: center;
+        }
+        Rectangle { horizontal-stretch: 1; }
+        Text {
+            text: root.value;
+            color: root.dim ? Theme.text-dim : Theme.text-secondary;
+            font-size: 13px;
+            vertical-alignment: center;
+        }
+    }
+}
+
+
+// — One reading: label+value row + purple-red meter —
+export component RogReading inherits VerticalLayout {
+    in property <string> label;
+    in property <string> value;
+    in property <float> progress: 0.0;
+    spacing: 3px;
+    HorizontalLayout {
+        Text {
+            text: root.label;
+            color: Theme.text-secondary;
+            font-size: 13px;
+            vertical-alignment: center;
+        }
+        Rectangle { horizontal-stretch: 1; }
+        Text {
+            text: root.value;
+            color: Theme.text-secondary;
+            font-size: 13px;
+            vertical-alignment: center;
+        }
+    }
+    RogMeter { value: root.progress; }
+}
+
+
+// — Metric block: big heading + shared slash accent + free reading/stat fill. —
+export component RogMetric inherits VerticalLayout {
+    in property <string> title;
+    spacing: 7px;
+    alignment: start;
+    HorizontalLayout {
+        spacing: 10px;
+        padding-bottom: 10px;
+        Text {
+            text: root.title;
+            color: Theme.text-primary;
+            font-size: 30px;
+            font-weight: 400;
+        }
+        Rectangle { horizontal-stretch: 1; }
+        RogDarkSlashes {}
+    }
+    @children
+}
+
+
+// — Purple→red gradient meter (#6437FF→#FF1929; Slint has no native gradient, simulated) —

@@ -2,9 +2,12 @@
 // Layout: HorizontalLayout 2-col (left 360px fixed + right flexible), no ScrollView (avoids binding loops)
 // Font: Inter Display for product name
 // Data: all from SystemPageData, no hardcoded values
-import { RogProductCard, RogSlashMark, RogMetric, RogReading, RogStatRow, RogPage, RogModeGrid } from "../widgets/rog.slint";
+import { RogProductCard } from "../widgets/cards.slint";
+import { RogSlashMark, RogPage } from "../widgets/layout.slint";
+import { RogMetric, RogReading, RogStatRow } from "../widgets/metrics.slint";
+import { RogModeGrid } from "../widgets/controls.slint";
 import { Theme } from "../globals.slint";
-import { SystemPageData } from "system.slint";
+import { SystemInfo, TelemetryData, PowerData, DeviceData } from "system.slint";
 
 export component PageHome inherits RogPage {
     background: Theme.bg-base;
@@ -54,11 +57,11 @@ export component PageHome inherits RogPage {
                         width: 100%;
                         // Keep the card square: height tracks the column width.
                         height: parent.width;
-                        name: SystemPageData.product_name != "" ? SystemPageData.product_name : "ROG Laptop";
+                        name: SystemInfo.product_name != "" ? SystemInfo.product_name : "ROG Laptop";
                         // CPU + GPU straight off the backend — no hardcoded specs.
                         details: [
-                            SystemPageData.cpu_name,
-                            SystemPageData.has_dgpu ? SystemPageData.dgpu_name : SystemPageData.igpu_name,
+                            SystemInfo.cpu_name,
+                            SystemInfo.has_dgpu ? SystemInfo.dgpu_name : SystemInfo.igpu_name,
                         ];
                     }
                 }
@@ -100,21 +103,21 @@ export component PageHome inherits RogPage {
                             title: "CPU";
                             RogReading {
                                 label: @tr("Frequency");
-                                value: SystemPageData.cpu_freq_mhz > 0.0 ? "\{Math.round(SystemPageData.cpu_freq_mhz)} MHz" : "--";
-                                progress: SystemPageData.cpu_freq_mhz / 5000.0;
+                                value: TelemetryData.cpu_freq_mhz > 0.0 ? "\{Math.round(TelemetryData.cpu_freq_mhz)} MHz" : "--";
+                                progress: TelemetryData.cpu_freq_mhz / 5000.0;
                             }
                             RogReading {
                                 label: @tr("Usage");
-                                value: SystemPageData.cpu_usage_val >= 0.0 ? "\{Math.round(SystemPageData.cpu_usage_val)} %" : "--";
-                                progress: SystemPageData.cpu_usage_val / 100.0;
+                                value: TelemetryData.cpu_usage_val >= 0.0 ? "\{Math.round(TelemetryData.cpu_usage_val)} %" : "--";
+                                progress: TelemetryData.cpu_usage_val / 100.0;
                             }
                             RogStatRow {
                                 label: @tr("Temperature");
-                                value: SystemPageData.cpu_temp_val > 0.0 ? "\{Math.round(SystemPageData.cpu_temp_val)} °C" : "--";
+                                value: TelemetryData.cpu_temp_val > 0.0 ? "\{Math.round(TelemetryData.cpu_temp_val)} °C" : "--";
                             }
                         }
 
-                        if SystemPageData.has_dgpu: RogMetric {
+                        if SystemInfo.has_dgpu: RogMetric {
                             horizontal-stretch: 1;
                             max-width: 340px;
                             title: "dGPU";
@@ -123,21 +126,21 @@ export component PageHome inherits RogPage {
                             // even when another one can't be read right now.
                             RogReading {
                                 label: @tr("Frequency");
-                                value: SystemPageData.dgpu_suspended ? @tr("Suspended") : (SystemPageData.gpu_freq_mhz > 0.0 ? "\{Math.round(SystemPageData.gpu_freq_mhz)} MHz" : "--");
-                                progress: SystemPageData.gpu_freq_mhz / 2500.0;
+                                value: TelemetryData.dgpu_suspended ? @tr("Suspended") : (TelemetryData.gpu_freq_mhz > 0.0 ? "\{Math.round(TelemetryData.gpu_freq_mhz)} MHz" : "--");
+                                progress: TelemetryData.gpu_freq_mhz / 2500.0;
                             }
                             RogReading {
                                 label: @tr("Usage");
-                                value: SystemPageData.dgpu_suspended ? @tr("Suspended") : (SystemPageData.gpu_usage_val >= 0.0 ? "\{Math.round(SystemPageData.gpu_usage_val)} %" : "--");
-                                progress: SystemPageData.gpu_usage_val / 100.0;
+                                value: TelemetryData.dgpu_suspended ? @tr("Suspended") : (TelemetryData.gpu_usage_val >= 0.0 ? "\{Math.round(TelemetryData.gpu_usage_val)} %" : "--");
+                                progress: TelemetryData.gpu_usage_val / 100.0;
                             }
                             RogStatRow {
                                 label: @tr("Temperature");
-                                value: SystemPageData.dgpu_suspended ? @tr("Suspended") : (SystemPageData.gpu_temp_val > 0.0 ? "\{Math.round(SystemPageData.gpu_temp_val)} °C" : "--");
+                                value: TelemetryData.dgpu_suspended ? @tr("Suspended") : (TelemetryData.gpu_temp_val > 0.0 ? "\{Math.round(TelemetryData.gpu_temp_val)} °C" : "--");
                             }
                             RogStatRow {
                                 label: @tr("TGP");
-                                value: SystemPageData.dgpu_suspended ? @tr("Suspended") : (SystemPageData.nv_tgp.current >= 0 ? "\{Math.round(SystemPageData.nv_tgp.current)} W" : "--");
+                                value: TelemetryData.dgpu_suspended ? @tr("Suspended") : (PowerData.nv_tgp.current >= 0 ? "\{Math.round(PowerData.nv_tgp.current)} W" : "--");
                             }
                         }
                     }
@@ -154,24 +157,24 @@ export component PageHome inherits RogPage {
                             horizontal-stretch: 1;
                             max-width: 340px;
                             title: @tr("Fan");
-                            if SystemPageData.cpu_fan_rpm >= 0: RogReading {
+                            if TelemetryData.cpu_fan_rpm >= 0: RogReading {
                                 label: @tr("CPU Fan");
                                 // 0 RPM is a real reading (idle/stopped fan); only the
                                 // -1 sentinel from the backend means "no sensor".
-                                value: "\{SystemPageData.cpu_fan_rpm} RPM";
-                                progress: Math.max(0, SystemPageData.cpu_fan_rpm) / 5000.0;
+                                value: "\{TelemetryData.cpu_fan_rpm} RPM";
+                                progress: Math.max(0, TelemetryData.cpu_fan_rpm) / 5000.0;
                             }
                             // Hide the GPU / mid fan rows entirely when the sensor is
                             // absent (-1 sentinel) instead of leaving a "--" placeholder.
-                            if SystemPageData.gpu_fan_rpm >= 0: RogReading {
+                            if TelemetryData.gpu_fan_rpm >= 0: RogReading {
                                 label: @tr("GPU Fan");
-                                value: "\{SystemPageData.gpu_fan_rpm} RPM";
-                                progress: SystemPageData.gpu_fan_rpm / 5000.0;
+                                value: "\{TelemetryData.gpu_fan_rpm} RPM";
+                                progress: TelemetryData.gpu_fan_rpm / 5000.0;
                             }
-                            if SystemPageData.mid_fan_rpm >= 0: RogReading {
+                            if TelemetryData.mid_fan_rpm >= 0: RogReading {
                                 label: @tr("Mid Fan");
-                                value: "\{SystemPageData.mid_fan_rpm} RPM";
-                                progress: SystemPageData.mid_fan_rpm / 5000.0;
+                                value: "\{TelemetryData.mid_fan_rpm} RPM";
+                                progress: TelemetryData.mid_fan_rpm / 5000.0;
                             }
                         }
 
@@ -181,8 +184,8 @@ export component PageHome inherits RogPage {
                             title: @tr("Memory");
                             RogReading {
                                 label: "RAM";
-                                value: SystemPageData.ram_usage_val >= 0.0 ? "\{Math.round(SystemPageData.ram_usage_val)} %" : "--";
-                                progress: SystemPageData.ram_usage_val / 100.0;
+                                value: TelemetryData.ram_usage_val >= 0.0 ? "\{Math.round(TelemetryData.ram_usage_val)} %" : "--";
+                                progress: TelemetryData.ram_usage_val / 100.0;
                             }
                         }
                     }
@@ -200,7 +203,7 @@ export component PageHome inherits RogPage {
                         vertical-stretch: 0;
                         spacing: 12px;
 
-                        if SystemPageData.platform_profile_indexes.length > 0: Rectangle {
+                        if PowerData.platform_profile_indexes.length > 0: Rectangle {
                             height: 24px;
                             HorizontalLayout {
                                 spacing: 8px;
@@ -216,12 +219,12 @@ export component PageHome inherits RogPage {
                             }
                         }
 
-                        if SystemPageData.platform_profile_indexes.length > 0: RogModeGrid {
-                            profile-indexes: SystemPageData.platform_profile_indexes;
-                            profile-choices: SystemPageData.platform_profile_choices;
-                            current-profile: SystemPageData.platform_profile;
+                        if PowerData.platform_profile_indexes.length > 0: RogModeGrid {
+                            profile-indexes: PowerData.platform_profile_indexes;
+                            profile-choices: PowerData.platform_profile_choices;
+                            current-profile: PowerData.platform_profile;
                             selected(ev) => {
-                                SystemPageData.cb_platform_profile(ev);
+                                PowerData.cb_platform_profile(ev);
                             }
                         }
                     }
