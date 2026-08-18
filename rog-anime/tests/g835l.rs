@@ -539,15 +539,15 @@ mod tests {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("tests/data/g835l-diagonal.gif");
 
-        let gif =
-            AnimeGif::from_diagonal_gif(&path, AnimTime::Count(1), 1.0, AnimeType::G835L).unwrap();
+        let gif = AnimeGif::from_diagonal_gif(&path, AnimTime::Count(1), 1.0, AnimeType::G835L)
+            .expect("valid g835l gif");
         assert_eq!(gif.frame_count(), 48);
 
-        let pkt = AnimePacketType::try_from(gif.frames()[0].frame().clone()).unwrap();
+        let pkt = AnimePacketType::try_from(gif.frames()[0].frame()).expect("valid packet");
         assert_eq!(pkt[0], pkt0_frame0_check);
         assert_eq!(pkt[1], pkt1_frame0_check);
 
-        let pkt = AnimePacketType::try_from(gif.frames()[16].frame().clone()).unwrap();
+        let pkt = AnimePacketType::try_from(gif.frames()[16].frame()).expect("valid packet");
         assert_eq!(pkt[0], pkt0_frame16_check);
         assert_eq!(pkt[1], pkt1_frame16_check);
     }

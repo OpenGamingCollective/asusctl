@@ -705,8 +705,8 @@ mod tests {
             1.0,
             AnimeType::GA402,
         )
-        .unwrap();
-        matrix.frames()[0].frame();
-        let _pkt = AnimePacketType::try_from(matrix.frames()[0].frame().clone()).unwrap();
+        .expect("failed to decode sonic-run.gif");
+        let _pkt =
+            AnimePacketType::try_from(matrix.frames()[0].frame()).expect("failed to build packet");
     }
 }

@@ -4,7 +4,7 @@ use std::thread::sleep;
 use std::time::{Duration, Instant};
 
 use dmi_id::DMIID;
-use log::info;
+use log::{info, warn};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "dbus")]
 use zbus::zvariant::{OwnedValue, Type, Value};
@@ -250,10 +250,10 @@ fn split_into_panes(buffers: &mut [[u8; 640]], data: &[u8], pane1_len: usize) {
     }
 }
 
-impl TryFrom<AnimeDataBuffer> for AnimePacketType {
+impl TryFrom<&AnimeDataBuffer> for AnimePacketType {
     type Error = AnimeError;
 
-    fn try_from(anime: AnimeDataBuffer) -> std::result::Result<Self, Self::Error> {
+    fn try_from(anime: &AnimeDataBuffer) -> std::result::Result<Self, Self::Error> {
         if anime.data.len() != anime.anime.data_length() {
             return Err(AnimeError::DataBufferLength);
         }
@@ -277,6 +277,15 @@ impl TryFrom<AnimeDataBuffer> for AnimePacketType {
             buffers[i][..7].copy_from_slice(prefix);
         }
         Ok(buffers)
+    }
+}
+
+impl TryFrom<AnimeDataBuffer> for AnimePacketType {
+    type Error = AnimeError;
+
+    #[inline]
+    fn try_from(anime: AnimeDataBuffer) -> std::result::Result<Self, Self::Error> {
+        Self::try_from(&anime)
     }
 }
 
@@ -317,7 +326,7 @@ pub fn run_animation(frames: &AnimeGif, callback: &dyn Fn(AnimeDataBuffer) -> Re
         fade_out_step = 1.0 / fade_out.as_secs_f32();
 
         if time.total_fade_time() > run_time {
-            println!("Total fade in/out time larger than gif run time. Setting fades to half");
+            warn!("Total fade in/out time larger than gif run time. Setting fades to half");
             fade_in = run_time / 2;
             fade_in_step = 1.0 / (run_time / 2).as_secs_f32();
 
