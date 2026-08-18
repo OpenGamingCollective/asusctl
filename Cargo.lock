@@ -272,8 +272,8 @@ dependencies = [
  "argh",
  "dmi_id",
  "env_logger",
+ "image",
  "log",
- "png 0.18.1",
  "rog_anime",
  "rog_aura",
  "rog_dbus",
@@ -3937,15 +3937,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f38d5652c16fde515bb1ecef450ab0f6a219d619a7274976324d5e377f7dceba"
 
 [[package]]
-name = "parsenic"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c695d2b8bcf1dd62a5173a9c43e6ebbe9261701c002f9b462fc9690c144bb61"
-dependencies = [
- "traitful",
-]
-
-[[package]]
 name = "paste"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4025,12 +4016,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pix"
-version = "0.13.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6574ffbea793ab0c9a9b09ae99831f1513fdd7732b12aca4c7182c46dc3bc9f"
-
-[[package]]
 name = "pkg-config"
 version = "0.3.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4066,19 +4051,6 @@ dependencies = [
  "fdeflate",
  "flate2",
  "miniz_oxide",
-]
-
-[[package]]
-name = "png_pong"
-version = "0.9.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a767b8b17e388cb7f1e74cf3c2ebce14e6b7ae123fa27150889a353fd9eb981f"
-dependencies = [
- "miniz_oxide",
- "parsenic",
- "pix",
- "simd-adler32",
- "traitful",
 ]
 
 [[package]]
@@ -4555,11 +4527,9 @@ name = "rog_anime"
 version = "6.4.0"
 dependencies = [
  "dmi_id",
- "gif 0.14.2",
  "glam",
+ "image",
  "log",
- "pix",
- "png_pong",
  "serde",
  "thiserror 2.0.20",
  "zbus",
@@ -5786,17 +5756,6 @@ dependencies = [
  "thread_local",
  "tracing",
  "tracing-core",
-]
-
-[[package]]
-name = "traitful"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d856e22ead1fb79b9fc3cec63300086f680924f2f7b0e2701f6835a28b9c4425"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.119",
 ]
 
 [[package]]

@@ -45,9 +45,13 @@ env_logger = { version = "^0.11.11", default-features = false, features = ["auto
 # by slint 1.13.1
 fontdue = "=0.9.3"
 futures-util = "^0.3.33"
-gif = "^0.14.2"
 glam = { version = "^0.33.2", features = ["serde"] }
-image = "=0.25.9"
+image = { version = "=0.25.9", default-features = false, features = [
+  "png",
+  "gif",
+  "jpeg",
+  "webp",
+] }
 inotify = "^0.11.4"
 ksni = { version = "^0.3.6", default-features = false, features = ["async-io"] }
 libc = "^0.2.189"
@@ -57,9 +61,6 @@ mio = "^1.2.2"
 # z = ["zbus", "serde", "async"]
 notify-rust = { version = "=4.17.0", default-features = false, features = ["z"] }
 nvml-wrapper = "^0.12.1"
-pix = "=0.13.4"
-png = "^0.18.1"
-png_pong = "=0.9.3"
 ron = "^0.12.2"
 rusb = "^0.9.4"
 sdl2 = { version = "^0.38.0", default-features = false }
