@@ -11,18 +11,15 @@
 //! Push each pattern to the matrix with:
 //!     asusctl anime pixel-image --path /tmp/g635l-patterns/<pattern>.png
 
-use std::fs::{self, File};
-use std::io::BufWriter;
-use std::path::PathBuf;
-
-use png::{BitDepth, ColorType, Encoder};
+use std::fs;
+use std::path::{Path, PathBuf};
 
 const WIDTH: u32 = 68;
 const HEIGHT: u32 = 34;
 const OUT_DIR: &str = "/tmp/g635l-patterns";
 
 /// Writes an 8-bit grayscale PNG. White = 0xff, black = 0x00.
-fn write_png(path: &PathBuf, pixels: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+fn write_png(path: &Path, pixels: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(
         pixels.len(),
         (WIDTH * HEIGHT) as usize,
@@ -30,12 +27,7 @@ fn write_png(path: &PathBuf, pixels: &[u8]) -> Result<(), Box<dyn std::error::Er
         WIDTH * HEIGHT
     );
 
-    let file = File::create(path)?;
-    let mut encoder = Encoder::new(BufWriter::new(file), WIDTH, HEIGHT);
-    encoder.set_color(ColorType::Grayscale);
-    encoder.set_depth(BitDepth::Eight);
-    let mut writer = encoder.write_header()?;
-    writer.write_image_data(pixels)?;
+    image::save_buffer(path, pixels, WIDTH, HEIGHT, image::ExtendedColorType::L8)?;
     Ok(())
 }
 

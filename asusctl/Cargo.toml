@@ -27,7 +27,7 @@ argh.workspace = true
 
 [dev-dependencies]
 rog_dbus = { path = "../rog-dbus" }
-png.workspace = true
+image.workspace = true
 
 [package.metadata.deb]
 license-file = ["../LICENSE", "4"]
