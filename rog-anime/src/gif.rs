@@ -4,6 +4,7 @@ use std::path::Path;
 use std::time::Duration;
 
 use glam::Vec2;
+use image::ImageDecoder;
 use log::error;
 use serde::{Deserialize, Serialize};
 
@@ -54,6 +55,21 @@ impl Default for AnimTime {
     }
 }
 
+impl AnimTime {
+    /// Calculate the frame count for a static image with 30ms frame delay
+    #[inline]
+    pub fn static_frame_count(&self) -> usize {
+        let mut total = Duration::from_millis(1000);
+        if let AnimTime::Fade(fade) = self {
+            total = fade.total_fade_time();
+            if let Some(middle) = fade.show_for {
+                total += middle;
+            }
+        }
+        (total.as_millis() / 30).max(1) as usize
+    }
+}
+
 /// Fancy brightness control: fade in/out, show at brightness for n time
 #[derive(Debug, Copy, Clone, Deserialize, Serialize)]
 pub struct Fade {
@@ -88,6 +104,16 @@ impl Fade {
     }
 }
 
+fn decode_gif(file_name: &Path) -> Result<(image::Frames<'static>, u32, u32)> {
+    let file = File::open(file_name).inspect_err(|e| {
+        error!("Could not open {file_name:?}: {e:?}");
+    })?;
+    let mut decoder = image::codecs::gif::GifDecoder::new(std::io::BufReader::new(file))?;
+    decoder.set_limits(image::Limits::default())?;
+    let (width, height) = decoder.dimensions();
+    Ok((image::AnimationDecoder::into_frames(decoder), width, height))
+}
+
 /// A gif animation. This is a collection of frames from the gif, and a duration
 /// that the animation should be shown for.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -104,46 +130,41 @@ impl AnimeGif {
     ) -> Result<Self> {
         let mut matrix = AnimeDiagonal::new(anime_type);
 
-        let mut decoder = gif::DecodeOptions::new();
-        // Configure the decoder such that it will expand the image to RGBA.
-        decoder.set_color_output(gif::ColorOutput::RGBA);
-        // Read the file header
-        let file = File::open(file_name).map_err(|e| {
-            error!("Could not open {file_name:?}: {e:?}");
-            e
-        })?;
-        let mut decoder = decoder.read_info(file)?;
-
         let mut frames = Vec::default();
-        while let Some(frame) = decoder.read_next_frame()? {
-            let wait = frame.delay * 10;
-            // if matches!(frame.dispose, gif::DisposalMethod::Background) {
-            //     frames = Vec::new();
-            // }
-            for (y, row) in frame.buffer.chunks(frame.width as usize * 4).enumerate() {
-                for (x, px) in row.chunks(4).enumerate() {
-                    if px[3] != 255 {
-                        // should be t but not in some gifs? What, ASUS, what?
-                        continue;
-                    }
-                    let tmp = matrix.get_mut();
-                    let y = y + frame.top as usize;
-                    if y >= tmp.len() {
-                        return Err(AnimeError::PixelGifHeight(tmp.len()));
-                    }
-                    let x = x + frame.left as usize;
-                    if x >= tmp[y].len() {
-                        return Err(AnimeError::PixelGifWidth(tmp[y].len()));
-                    }
+        let (frames_iter, _, _) = decode_gif(file_name)?;
+        for frame in frames_iter {
+            let frame = frame?;
+            let wait: Duration = frame.delay().into();
+            let left = frame.left() as usize;
+            let top = frame.top() as usize;
+            let buffer = frame.buffer();
 
-                    matrix.get_mut()[y][x] = (px[0] as f32 * brightness) as u8;
+            for (x, y, px) in buffer.enumerate_pixels() {
+                if px.0[3] != 255 {
+                    // should be t but not in some gifs? What, ASUS, what?
+                    continue;
                 }
+                let tmp = matrix.get_mut();
+                let y = y as usize + top;
+                let x = x as usize + left;
+                if y >= tmp.len() {
+                    return Err(AnimeError::PixelGifHeight(tmp.len()));
+                }
+                if x >= tmp[y].len() {
+                    return Err(AnimeError::PixelGifWidth(tmp[y].len()));
+                }
+
+                let v = Pixel::from(px).color as f32;
+                tmp[y][x] = (v * brightness) as u8;
             }
 
             frames.push(AnimeFrame {
                 data: matrix.into_data_buffer(anime_type)?,
-                delay: Duration::from_millis(wait as u64),
+                delay: wait,
             });
+        }
+        if frames.is_empty() {
+            return Err(AnimeError::NoFrames);
         }
         Ok(Self(frames, duration))
     }
@@ -157,22 +178,13 @@ impl AnimeGif {
         brightness: f32,
     ) -> Result<Self> {
         let image = AnimeDiagonal::from_png(file_name, brightness, anime_type)?;
-
-        let mut total = Duration::from_millis(1000);
-        if let AnimTime::Fade(fade) = duration {
-            total = fade.total_fade_time();
-            if let Some(middle) = fade.show_for {
-                total += middle;
-            }
-        }
-        // Make frame delay 30ms, and find frame count
-        let frame_count = total.as_millis() / 30;
+        let frame_count = duration.static_frame_count();
 
         let single = AnimeFrame {
             data: image.into_data_buffer(anime_type)?,
             delay: Duration::from_millis(30),
         };
-        let frames = vec![single; frame_count as usize];
+        let frames = vec![single; frame_count];
 
         Ok(Self(frames, duration))
     }
@@ -189,66 +201,51 @@ impl AnimeGif {
         brightness: f32,
         anime_type: AnimeType,
     ) -> Result<Self> {
-        let mut frames = Vec::new();
-        let mut decoder = gif::DecodeOptions::new();
-        // Configure the decoder such that it will expand the image to RGBA.
-        decoder.set_color_output(gif::ColorOutput::RGBA);
-        // Read the file header
-        let file = File::open(file_name).map_err(|e| {
-            error!("Could not open {file_name:?}: {e:?}");
-            e
-        })?;
-        let mut decoder = decoder.read_info(file)?;
+        let (frames_iter, width_u32, height_u32) = decode_gif(file_name)?;
+        let width = width_u32 as usize;
+        let height = height_u32 as usize;
 
-        let height = decoder.height();
-        let width = decoder.width();
-        let pixels: Vec<Pixel> =
-            vec![Pixel::default(); (decoder.width() as u32 * decoder.height() as u32) as usize];
-        let mut image = AnimeImage::new(
+        let pixels: Vec<Pixel> = vec![Pixel::default(); width * height];
+        let mut anime_image = AnimeImage::new(
             Vec2::new(scale, scale),
             angle,
             translation,
             brightness,
             pixels,
-            decoder.width() as u32,
+            width_u32,
             anime_type,
         )?;
 
-        while let Some(frame) = decoder.read_next_frame()? {
-            let wait = frame.delay * 10;
-            if matches!(frame.dispose, gif::DisposalMethod::Background) {
-                let pixels: Vec<Pixel> =
-                    vec![Pixel::default(); (width as u32 * height as u32) as usize];
-                image = AnimeImage::new(
-                    Vec2::new(scale, scale),
-                    angle,
-                    translation,
-                    brightness,
-                    pixels,
-                    width as u32,
-                    anime_type,
-                )?;
-            }
-            for (y, row) in frame.buffer.chunks(frame.width as usize * 4).enumerate() {
-                for (x, px) in row.chunks(4).enumerate() {
-                    if px[3] != 255 {
-                        // should be t but not in some gifs? What, ASUS, what?
-                        continue;
-                    }
-                    let pos =
-                        (x + frame.left as usize) + ((y + frame.top as usize) * width as usize);
-                    image.get_mut()[pos] = Pixel {
-                        color: ((px[0] as u32 + px[1] as u32 + px[2] as u32) / 3),
-                        alpha: 1.0,
-                    };
+        let mut frames = Vec::new();
+        for frame in frames_iter {
+            let frame = frame?;
+            let wait: Duration = frame.delay().into();
+            let left = frame.left() as usize;
+            let top = frame.top() as usize;
+            let buffer = frame.buffer();
+
+            for (x, y, px) in buffer.enumerate_pixels() {
+                if px.0[3] != 255 {
+                    // should be t but not in some gifs? What, ASUS, what?
+                    continue;
                 }
+                let px_x = x as usize + left;
+                let px_y = y as usize + top;
+                if px_x >= width || px_y >= height {
+                    continue;
+                }
+                let pos = px_x + px_y * width;
+                anime_image.get_mut()[pos] = Pixel::from(px);
             }
-            image.update();
+            anime_image.update();
 
             frames.push(AnimeFrame {
-                data: <AnimeDataBuffer>::try_from(&image)?,
-                delay: Duration::from_millis(wait as u64),
+                data: <AnimeDataBuffer>::try_from(&anime_image)?,
+                delay: wait,
             });
+        }
+        if frames.is_empty() {
+            return Err(AnimeError::NoFrames);
         }
         Ok(Self(frames, duration))
     }
@@ -269,22 +266,13 @@ impl AnimeGif {
     ) -> Result<Self> {
         let image =
             AnimeImage::from_png(file_name, scale, angle, translation, brightness, anime_type)?;
-
-        let mut total = Duration::from_millis(1000);
-        if let AnimTime::Fade(fade) = duration {
-            total = fade.total_fade_time();
-            if let Some(middle) = fade.show_for {
-                total += middle;
-            }
-        }
-        // Make frame delay 30ms, and find frame count
-        let frame_count = total.as_millis() / 30;
+        let frame_count = duration.static_frame_count();
 
         let single = AnimeFrame {
             data: <AnimeDataBuffer>::try_from(&image)?,
             delay: Duration::from_millis(30),
         };
-        let frames = vec![single; frame_count as usize];
+        let frames = vec![single; frame_count];
 
         Ok(Self(frames, duration))
     }
@@ -308,8 +296,67 @@ impl AnimeGif {
 
     /// Get total gif time for one run
     pub fn total_frame_time(&self) -> Duration {
-        let mut time = 0;
-        self.0.iter().for_each(|f| time += f.delay.as_millis());
-        Duration::from_millis(time as u64)
+        self.0.iter().map(|f| f.delay).sum()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use super::*;
+
+    #[test]
+    fn test_from_gif_custom() {
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("data/anime/custom/sonic-run.gif");
+
+        let gif = AnimeGif::from_gif(
+            &path,
+            1.0,
+            0.0,
+            Vec2::default(),
+            AnimTime::Infinite,
+            1.0,
+            AnimeType::GA402,
+        )
+        .expect("Failed to decode sonic-run.gif");
+
+        assert!(gif.frame_count() > 0);
+        assert!(gif.total_frame_time() > Duration::ZERO);
+    }
+
+    #[test]
+    fn test_from_diagonal_gif_ga401() {
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("tests/data/ga401-diagonal.gif");
+
+        let gif = AnimeGif::from_diagonal_gif(&path, AnimTime::Count(1), 1.0, AnimeType::GA401)
+            .expect("Failed to decode ga401-diagonal.gif");
+
+        assert_eq!(gif.frame_count(), 1);
+    }
+
+    #[test]
+    fn test_from_diagonal_gif_ga402() {
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("tests/data/ga402-diagonal.gif");
+
+        let gif = AnimeGif::from_diagonal_gif(&path, AnimTime::Count(1), 1.0, AnimeType::GA402)
+            .expect("Failed to decode ga402-diagonal.gif");
+
+        assert_eq!(gif.frame_count(), 1);
+    }
+
+    #[test]
+    fn test_from_diagonal_gif_g835l() {
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("tests/data/g835l-diagonal.gif");
+
+        let gif = AnimeGif::from_diagonal_gif(&path, AnimTime::Count(1), 1.0, AnimeType::G835L)
+            .expect("Failed to decode g835l-diagonal.gif");
+
+        // 48 is the expected image-frame count for the g835l-diagonal.gif fixture
+        assert_eq!(gif.frame_count(), 48);
     }
 }
