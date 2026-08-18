@@ -263,6 +263,34 @@ impl CtrlPlatform {
         }
     }
 
+    /// Remember the given profile as the one to restore next time we switch
+    /// to the currently active power source (AC or battery).
+    async fn remember_profile_for_current_source(&self, policy: PlatformProfile) {
+        let mut config = self.config.lock().await;
+
+        if !config.remember_platform_profile_per_source {
+            return;
+        }
+
+        if let Ok(is_power_plugged) = self
+            .power
+            .get_online()
+            .map(|power_plugged| power_plugged > 0)
+        {
+            match is_power_plugged {
+                true if config.change_platform_profile_on_ac => {
+                    config.platform_profile_on_ac = policy;
+                }
+                false if config.change_platform_profile_on_battery => {
+                    config.platform_profile_on_battery = policy;
+                }
+                _ => return,
+            }
+
+            config.write();
+        }
+    }
+
     async fn get_config_epp_for_throttle(&self, throttle: PlatformProfile) -> CPUEPP {
         match throttle {
             PlatformProfile::Balanced => self.config.lock().await.profile_balanced_epp,
@@ -496,6 +524,7 @@ impl CtrlPlatform {
                     warn!("platform_profile {}", err);
                     FdoErr::Failed(format!("RogPlatform: platform_profile: {err}"))
                 })?;
+            self.remember_profile_for_current_source(policy).await;
             self.enable_ppt_group_changed(&ctxt).await?;
             Ok(self.platform_profile_changed(&ctxt).await?)
         } else {
@@ -545,6 +574,7 @@ impl CtrlPlatform {
                     warn!("platform_profile {}", err);
                     FdoErr::Failed(format!("RogPlatform: platform_profile: {err}"))
                 })?;
+            self.remember_profile_for_current_source(policy).await;
             self.enable_ppt_group_changed(&ctxt).await?;
             Ok(())
         } else {
@@ -633,6 +663,42 @@ impl CtrlPlatform {
     async fn set_change_platform_profile_on_ac(&mut self, change: bool) -> Result<(), FdoErr> {
         self.config.lock().await.change_platform_profile_on_ac = change;
         self.config.lock().await.write();
+        Ok(())
+    }
+
+    /// If enabled, the last profile manually selected on a power source is
+    /// remembered and reapplied the next time that source becomes active.
+    #[zbus(property)]
+    async fn remember_platform_profile_per_source(&self) -> Result<bool, FdoErr> {
+        Ok(self
+            .config
+            .lock()
+            .await
+            .remember_platform_profile_per_source)
+    }
+
+    #[zbus(property)]
+    async fn set_remember_platform_profile_per_source(
+        &mut self,
+        remember: bool,
+    ) -> Result<(), FdoErr> {
+        self.config
+            .lock()
+            .await
+            .remember_platform_profile_per_source = remember;
+        self.config.lock().await.write();
+
+        if remember {
+            // `if remember && let Ok(...) = ...` would be more concise,
+            // but let expressions in this position are currently unstable.
+            if let Ok(profile) = self
+                .platform
+                .get_platform_profile()
+                .map(PlatformProfile::from)
+            {
+                self.remember_profile_for_current_source(profile).await;
+            }
+        }
         Ok(())
     }
 

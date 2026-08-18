@@ -93,6 +93,17 @@ asusctl supports setting power profiles via ACPI `platform_profile` drivers.
 >    platform_profile_linked_epp: false,
 >    ```
 
+By default, `asusd` always applies the configured
+`platform_profile_on_ac`/`platform_profile_on_battery` values whenever
+you switch power source. To instead have `asusd` remember the last
+profile you manually selected on each power source and reapply it the
+next time that source becomes active again, enable the following in
+`/etc/asusd/asusd.ron`:
+
+```ron
+remember_platform_profile_per_source: true,
+```
+
 A common use of asusctl is to bind the `fn+f5` (fan) key to `asusctl profile -n` to cycle through the 3 profiles:
 
 1. Balanced

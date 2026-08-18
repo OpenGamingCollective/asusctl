@@ -44,6 +44,10 @@ pub struct Config {
     pub platform_profile_on_ac: PlatformProfile,
     /// Should the platform profile be set on bat/ac change?
     pub change_platform_profile_on_ac: bool,
+    /// If true, remember the last profile manually selected on each power
+    /// source and restore it on the next switch to that source, instead of
+    /// always applying `platform_profile_on_ac`/`platform_profile_on_battery`
+    pub remember_platform_profile_per_source: bool,
     /// The energy_performance_preference for this platform profile
     pub profile_quiet_epp: CPUEPP,
     /// The energy_performance_preference for this platform profile
@@ -108,6 +112,7 @@ impl Default for Config {
             change_platform_profile_on_battery: true,
             platform_profile_on_ac: PlatformProfile::Performance,
             change_platform_profile_on_ac: true,
+            remember_platform_profile_per_source: false,
             profile_quiet_epp: CPUEPP::Power,
             profile_balanced_epp: CPUEPP::BalancePower,
             profile_performance_epp: CPUEPP::Performance,
@@ -160,6 +165,7 @@ pub struct Config611 {
     pub change_platform_profile_on_battery: bool,
     pub platform_profile_on_ac: PlatformProfile,
     pub change_platform_profile_on_ac: bool,
+    pub remember_platform_profile_per_source: bool,
     pub profile_quiet_epp: CPUEPP,
     pub profile_balanced_epp: CPUEPP,
     pub profile_custom_epp: CPUEPP,
@@ -185,6 +191,7 @@ impl From<Config611> for Config {
             change_platform_profile_on_battery: c.change_platform_profile_on_battery,
             platform_profile_on_ac: c.platform_profile_on_ac,
             change_platform_profile_on_ac: c.change_platform_profile_on_ac,
+            remember_platform_profile_per_source: c.remember_platform_profile_per_source,
             profile_quiet_epp: c.profile_quiet_epp,
             profile_balanced_epp: c.profile_balanced_epp,
             profile_performance_epp: c.profile_performance_epp,
@@ -221,6 +228,7 @@ pub struct Config601 {
     pub change_platform_profile_on_battery: bool,
     pub platform_profile_on_ac: PlatformProfile,
     pub change_platform_profile_on_ac: bool,
+    pub remember_platform_profile_per_source: bool,
     pub profile_quiet_epp: CPUEPP,
     pub profile_balanced_epp: CPUEPP,
     pub profile_performance_epp: CPUEPP,
@@ -258,6 +266,7 @@ impl From<Config601> for Config {
             change_platform_profile_on_battery: c.change_platform_profile_on_battery,
             platform_profile_on_ac: c.platform_profile_on_ac,
             change_platform_profile_on_ac: c.change_platform_profile_on_ac,
+            remember_platform_profile_per_source: c.remember_platform_profile_per_source,
             profile_quiet_epp: c.profile_quiet_epp,
             profile_balanced_epp: c.profile_balanced_epp,
             profile_performance_epp: c.profile_performance_epp,
