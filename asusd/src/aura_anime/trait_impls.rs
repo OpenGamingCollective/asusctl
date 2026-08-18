@@ -18,16 +18,20 @@ use super::config::AniMeConfig;
 use crate::Reloadable;
 use crate::error::RogError;
 
-async fn get_logind_manager<'a>() -> ManagerProxy<'a> {
-    let connection = Connection::system()
-        .await
-        .expect("Controller could not create dbus connection");
+async fn get_logind_manager<'a>() -> Result<ManagerProxy<'a>, RogError> {
+    let connection = Connection::system().await.map_err(|e| {
+        warn!("Controller could not create dbus connection: {e}");
+        RogError::Zbus(e)
+    })?;
 
     ManagerProxy::builder(&connection)
         .cache_properties(CacheProperties::No)
         .build()
         .await
-        .expect("Controller could not create ManagerProxy")
+        .map_err(|e| {
+            warn!("Controller could not create ManagerProxy: {e}");
+            RogError::Zbus(e)
+        })
 }
 
 #[derive(Clone)]
@@ -60,7 +64,7 @@ impl AniMeZbus {
     }
 }
 
-// None of these calls can be guarnateed to succeed unless we loop until okay
+// None of these calls can be guaranteed to succeed unless we loop until okay
 // If the try_lock *does* succeed then any other thread trying to lock will not
 // grab it until we finish.
 #[interface(name = "xyz.ljones.Anime")]
@@ -79,11 +83,10 @@ impl AniMeZbus {
         }
         drop(config);
         self.0.thread_exit.store(true, Ordering::SeqCst);
-        self.0.write_data_buffer(input).await.map_err(|err| {
-            warn!("ctrl_anime::run_animation:callback {}", err);
-            err
-        })?;
-        Ok(())
+        self.0.write_data_buffer(input).await.map_err(|e| {
+            warn!("ctrl_anime::write packet conversion error: {e}");
+            zbus::fdo::Error::Failed(format!("Packet conversion error: {e}"))
+        })
     }
 
     /// Set base brightness level
@@ -231,14 +234,17 @@ impl AniMeZbus {
     /// Set if to turn the AniMe Matrix off when external power is unplugged
     #[zbus(property)]
     async fn set_off_when_unplugged(&self, enabled: bool) {
-        let manager = get_logind_manager().await;
-        let pow = manager.on_external_power().await.unwrap_or_default();
+        let pow = if let Ok(manager) = get_logind_manager().await {
+            manager.on_external_power().await.unwrap_or(true)
+        } else {
+            true
+        };
 
         self.0
-            .write_bytes(&pkt_set_enable_display(!pow && !enabled))
+            .write_bytes(&pkt_set_enable_display(pow || !enabled))
             .await
             .map_err(|err| {
-                warn!("create_sys_event_tasks::off_when_lid_closed {}", err);
+                warn!("set_off_when_unplugged {}", err);
             })
             .ok();
 
@@ -274,14 +280,17 @@ impl AniMeZbus {
     /// Set if to turn the AniMe Matrix off when the lid is closed
     #[zbus(property)]
     async fn set_off_when_lid_closed(&self, enabled: bool) {
-        let manager = get_logind_manager().await;
-        let lid = manager.lid_closed().await.unwrap_or_default();
+        let lid = if let Ok(manager) = get_logind_manager().await {
+            manager.lid_closed().await.unwrap_or(false)
+        } else {
+            false
+        };
 
         self.0
-            .write_bytes(&pkt_set_enable_display(lid && !enabled))
+            .write_bytes(&pkt_set_enable_display(!lid || !enabled))
             .await
             .map_err(|err| {
-                warn!("create_sys_event_tasks::off_when_lid_closed {}", err);
+                warn!("set_off_when_lid_closed {}", err);
             })
             .ok();
 
@@ -477,9 +486,14 @@ impl crate::Reloadable for AniMeZbus {
             .set_builtins_enabled(builtin_anims_enabled, display_brightness)
             .await?;
 
-        let manager = get_logind_manager().await;
-        let lid_closed = manager.lid_closed().await.unwrap_or_default();
-        let power_plugged = manager.on_external_power().await.unwrap_or_default();
+        let (lid_closed, power_plugged) = if let Ok(manager) = get_logind_manager().await {
+            (
+                manager.lid_closed().await.unwrap_or_default(),
+                manager.on_external_power().await.unwrap_or(true),
+            )
+        } else {
+            (false, true)
+        };
 
         let turn_off =
             (lid_closed && off_when_lid_closed) || (!power_plugged && off_when_unplugged);
