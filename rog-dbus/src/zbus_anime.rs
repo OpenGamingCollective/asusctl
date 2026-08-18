@@ -15,7 +15,7 @@ pub trait Anime {
     fn run_main_loop(&self, start: bool) -> zbus::Result<()>;
 
     /// Write method
-    fn write(&self, input: AnimeDataBuffer) -> zbus::Result<()>;
+    fn write(&self, input: &AnimeDataBuffer) -> zbus::Result<()>;
 
     /// NotifyDeviceState signal
     #[zbus(signal)]

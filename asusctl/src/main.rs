@@ -370,7 +370,7 @@ fn handle_anime(cmd: &AnimeCommand) -> Result<(), Box<dyn std::error::Error>> {
         if cmd.clear {
             let data = vec![255u8; anime_type.data_length()];
             let tmp = AnimeDataBuffer::from_vec(anime_type, data)?;
-            proxy.write(tmp)?;
+            proxy.write(&tmp)?;
         }
 
         if let Some(action) = cmd.command.as_ref() {
@@ -393,7 +393,7 @@ fn handle_anime(cmd: &AnimeCommand) -> Result<(), Box<dyn std::error::Error>> {
                         anime_type,
                     )?;
 
-                    proxy.write(<AnimeDataBuffer>::try_from(&matrix)?)?;
+                    proxy.write(&<AnimeDataBuffer>::try_from(&matrix)?)?;
                 }
                 AnimeActions::PixelImage(image) => {
                     if image.path.is_empty() {
@@ -407,7 +407,7 @@ fn handle_anime(cmd: &AnimeCommand) -> Result<(), Box<dyn std::error::Error>> {
                     let matrix =
                         AnimeDiagonal::from_png(Path::new(&image.path), image.bright, anime_type)?;
 
-                    proxy.write(matrix.into_data_buffer(anime_type)?)?;
+                    proxy.write(&matrix.into_data_buffer(anime_type)?)?;
                 }
                 AnimeActions::Gif(gif) => {
                     if gif.path.is_empty() {
@@ -431,7 +431,7 @@ fn handle_anime(cmd: &AnimeCommand) -> Result<(), Box<dyn std::error::Error>> {
                     let mut loops = gif.loops as i32;
                     loop {
                         for frame in matrix.frames() {
-                            proxy.write(frame.frame().clone())?;
+                            proxy.write(frame.frame())?;
                             sleep(frame.delay());
                         }
                         if loops >= 0 {
@@ -461,7 +461,7 @@ fn handle_anime(cmd: &AnimeCommand) -> Result<(), Box<dyn std::error::Error>> {
                     let mut loops = gif.loops as i32;
                     loop {
                         for frame in matrix.frames() {
-                            proxy.write(frame.frame().clone())?;
+                            proxy.write(frame.frame())?;
                             sleep(frame.delay());
                         }
                         if loops >= 0 {

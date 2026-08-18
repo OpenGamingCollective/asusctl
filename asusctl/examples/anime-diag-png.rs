@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let anime_type = get_anime_type();
 
-    proxy.write(matrix.into_data_buffer(anime_type)?).unwrap();
+    proxy.write(&matrix.into_data_buffer(anime_type)?).unwrap();
 
     Ok(())
 }

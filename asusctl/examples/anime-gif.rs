@@ -35,7 +35,7 @@ fn main() {
         for action in seq.iter() {
             if let ActionData::Animation(frames) = action {
                 for frame in frames.frames() {
-                    proxy.write(frame.frame().clone()).unwrap();
+                    proxy.write(frame.frame()).unwrap();
                     sleep(frame.delay());
                 }
             }

@@ -46,5 +46,5 @@ fn main() {
 
     let matrix = <AnimeDataBuffer>::try_from(matrix).unwrap();
 
-    proxy.write(matrix).unwrap();
+    proxy.write(&matrix).unwrap();
 }

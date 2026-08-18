@@ -96,13 +96,13 @@ impl CtrlAnimeInner<'static> {
                             return Ok(true); // Do safe exit
                         }
                         self.client
-                            .write(output)
+                            .write(&output)
                             .map_err(|e| AnimeError::Dbus(format!("{}", e)))
                             .map(|_| false)
                     });
                 }
                 ActionData::Image(image) => {
-                    self.client.write(image.as_ref().clone()).ok();
+                    self.client.write(image.as_ref()).ok();
                 }
                 ActionData::Pause(duration) => {
                     let start = Instant::now();

@@ -30,9 +30,16 @@ fn main() {
         }
 
         let anime_type = get_anime_type();
-        proxy
-            .write(matrix.into_data_buffer(anime_type).unwrap())
-            .unwrap();
+        match matrix.into_data_buffer(anime_type) {
+            Ok(buf) => {
+                if let Err(e) = proxy.write(&buf) {
+                    eprintln!("Failed to write matrix frame to D-Bus: {e}");
+                }
+            }
+            Err(e) => {
+                eprintln!("Failed to convert matrix into data buffer: {e}");
+            }
+        }
         sleep(Duration::from_millis(300));
     }
 }

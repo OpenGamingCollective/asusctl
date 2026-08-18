@@ -129,5 +129,5 @@ fn main() {
     matrix.data_mut()[1244] = 100; // end
     println!("{:?}", matrix);
 
-    proxy.write(matrix).unwrap();
+    proxy.write(&matrix).unwrap();
 }

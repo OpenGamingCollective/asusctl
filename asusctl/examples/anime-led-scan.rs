@@ -90,14 +90,16 @@ fn write_single_led(
     if index < data.len() {
         data[index] = brightness;
     }
-    if let Err(e) = proxy.write(buffer) {
+    if let Err(e) = proxy.write(&buffer) {
         eprintln!("Error writing to device: {}", e);
     }
 }
 
 fn clear_display(proxy: &AnimeProxyBlocking, anime_type: AnimeType) {
     let buffer = AnimeDataBuffer::new(anime_type);
-    let _ = proxy.write(buffer);
+    if let Err(e) = proxy.write(&buffer) {
+        eprintln!("Error writing to device: {}", e);
+    }
 }
 
 fn fill_display(proxy: &AnimeProxyBlocking, anime_type: AnimeType, brightness: u8) {
@@ -106,7 +108,7 @@ fn fill_display(proxy: &AnimeProxyBlocking, anime_type: AnimeType, brightness: u
     for byte in data.iter_mut() {
         *byte = brightness;
     }
-    if let Err(e) = proxy.write(buffer) {
+    if let Err(e) = proxy.write(&buffer) {
         eprintln!("Error writing to device: {}", e);
     }
 }
@@ -124,7 +126,7 @@ fn fill_range(
     for i in start..=end.min(data.len().saturating_sub(1)) {
         data[i] = brightness;
     }
-    if let Err(e) = proxy.write(buffer) {
+    if let Err(e) = proxy.write(&buffer) {
         eprintln!("Error writing to device: {}", e);
     }
 }

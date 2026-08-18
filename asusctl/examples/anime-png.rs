@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         anime_type,
     )?;
 
-    proxy.write(<AnimeDataBuffer>::try_from(&matrix)?).unwrap();
+    proxy.write(&<AnimeDataBuffer>::try_from(&matrix)?).unwrap();
 
     Ok(())
 }

@@ -43,7 +43,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         matrix.update();
 
-        proxy.write(<AnimeDataBuffer>::try_from(&matrix)?).unwrap();
+        proxy.write(&<AnimeDataBuffer>::try_from(&matrix)?).unwrap();
         sleep(Duration::from_micros(500));
     }
 }
