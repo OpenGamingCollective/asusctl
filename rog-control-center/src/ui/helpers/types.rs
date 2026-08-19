@@ -31,7 +31,15 @@ pub struct SystemTelemetry {
     pub igpu_temp: f32,
     pub igpu_usage: f32,
     pub ram_usage_pct: f32,
-    pub fan_rpms: (i32, i32, i32), // (CPU, GPU, Mid)
+    pub fan_rpms: FanTelemetry,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct FanTelemetry {
+    pub cpu: i32,
+    pub gpu: i32,
+    // Some laptops does not have the mid fan
+    pub mid: Option<i32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]

@@ -1,6 +1,6 @@
 use std::{fs, io, path::Path};
 
-use crate::ui::helpers::types::BatteryInfo;
+use crate::ui::helpers::types::{BatteryInfo, CpuTelemetry, GpuTelemetry};
 use anyhow::Result;
 
 pub fn get_dmi_product_name() -> io::Result<String> {
@@ -48,4 +48,16 @@ pub fn calculate_cpu_usage(
         }
     }
     0.0
+}
+
+pub fn get_current_ram() -> f32 {
+    rog_platform::cpu::get_ram_usage_pct()
+}
+
+pub fn get_cpu_telemetry() -> CpuTelemetry {
+    CpuTelemetry {
+        temp: rog_platform::cpu::get_cpu_temp(),
+        freq_mhz: rog_platform::cpu::get_cpu_frequency_mhz(),
+        usage_pct: 99.99,
+    }
 }

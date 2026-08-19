@@ -2,13 +2,18 @@
 
 use slint::{ComponentHandle, SharedString};
 
-use crate::{DeviceData, MainWindow, PowerData, SystemInfo, TelemetryData, state::UiUpdate};
+use crate::{MainWindow, PowerData, SystemInfo, TelemetryData, state::UiUpdate};
 
 pub fn apply_ui_update(ui: &MainWindow, update: UiUpdate) {
     match update {
         UiUpdate::Telemetry(t) => {
             let sys_data = ui.global::<TelemetryData>();
+            // CPU
             sys_data.set_cpu_temp_val(t.cpu.temp);
+            sys_data.set_cpu_freq_mhz(t.cpu.freq_mhz);
+            sys_data.set_cpu_usage_val(t.cpu.usage_pct);
+            // RAM
+            sys_data.set_ram_usage_val(t.ram_usage_pct);
         }
         UiUpdate::ProductName(n) => {
             let sys_data = ui.global::<SystemInfo>();

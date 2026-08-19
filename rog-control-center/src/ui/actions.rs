@@ -1,4 +1,7 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    println,
+    sync::{Arc, Mutex},
+};
 
 use config_traits::StdConfig;
 use log::error;
@@ -13,7 +16,9 @@ impl ActionHandler {
     pub async fn handle_action(&mut self, action: Action) {
         match action {
             Action::SetBatteryLimit(_) => {}
-            Action::SetPlatformProfile(_) => {}
+            Action::SetPlatformProfile(ppd) => {
+                println!("Hello from PPD");
+            }
             Action::SetTray(b) => {
                 match self.config.lock() {
                     Ok(mut c) => {

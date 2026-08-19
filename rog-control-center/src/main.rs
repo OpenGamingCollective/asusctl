@@ -119,6 +119,9 @@ fn main() -> Result<()> {
     rt.spawn(rog_control_center::ui::subscriptions::subscribe_battery(
         event_tx.clone(),
     ));
+    rt.spawn(rog_control_center::ui::subscriptions::subscribe_telemetry(
+        event_tx.clone(),
+    ));
     // subscribe_telemetry(event_tx.clone(), true);
 
     let mut action_handler = ActionHandler {
