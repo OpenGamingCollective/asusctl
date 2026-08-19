@@ -94,7 +94,6 @@ export component RogDisplayModeCard inherits Rectangle {
             colorize: root.selected ? Theme.rog-red : (root.enabled ? Theme.text-dim : Theme.fg-disabled);
             // Full-width box with contain: the SVG scales to 56px tall and
             // centers horizontally, regardless of card width.
-            width: 100%;
             height: 56px;
             image-fit: contain;
             opacity: root.enabled ? 1.0 : 0.4;

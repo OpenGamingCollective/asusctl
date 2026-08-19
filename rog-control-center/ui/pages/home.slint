@@ -3,11 +3,26 @@ import { RogSlashMark, RogPage } from "../widgets/layout.slint";
 import { RogMetric, RogReading, RogStatRow } from "../widgets/metrics.slint";
 import { RogModeGrid } from "../widgets/controls.slint";
 import { Theme } from "../globals.slint";
-import { SystemInfo, TelemetryData, PowerData, DeviceData } from "system.slint";
+import { SystemInfo, TelemetryData, PowerData } from "system.slint";
 
+// NOTE (slint 1.13.1 engine bug): a VerticalLayout used as the FIRST child of
+// a HorizontalLayout makes every later cell render empty. The product card is
+// therefore a direct Rectangle-based child of the columns row (no VerticalLayout
+// wrapper around it). Keep the left cell a Rectangle-like element, not a layout.
 export component PageHome inherits RogPage {
     background: Theme.bg-base;
     clip: true;
+
+    // ====== Responsive sizing ======
+    // Below ~1000px of page width (narrower laptops) the dashboard tightens:
+    // smaller product card, tighter gaps and capped metric cards. On bigger
+    // windows it expands back up to the 1100px cap set by the page host.
+    property <bool> compact: self.width < 1000px;
+    property <length> card-side: root.compact ? 300px : 360px;
+    property <length> gap-lg: root.compact ? 24px : 36px;
+    property <length> gap-md: root.compact ? 16px : 20px;
+    property <length> metric-max: root.compact ? 300px : 340px;
+    property <length> pad-x: root.compact ? 20px : 24px;
 
     // ====== Titlebar + Dashboard Root Layout ======
     VerticalLayout {
@@ -32,40 +47,36 @@ export component PageHome inherits RogPage {
         // ====== Dashboard — fills remaining height via vertical-stretch: 1 ======
         VerticalLayout {
             vertical-stretch: 1;
-            padding-left: 24px;
-            padding-right: 24px;
+            padding-left: root.pad-x;
+            padding-right: root.pad-x;
             padding-top: 12px;
             padding-bottom: 24px;
             spacing: 0px;
 
             HorizontalLayout {
-                spacing: 36px;
+                spacing: root.gap-lg;
 
-                // Left column: product card (kept square)
-                VerticalLayout {
-                    width: 360px;
-                    alignment: start;
-
-                    product-card := RogProductCard {
-                        width: 100%;
-                        // Keep the card square: height tracks the column width.
-                        height: parent.width;
-                        name: SystemInfo.product_name != "" ? SystemInfo.product_name : "ROG Laptop";
-                        // CPU + GPU straight off the backend — no hardcoded specs.
-                        details: [
-                            SystemInfo.cpu_name,
-                            SystemInfo.has_dgpu ? SystemInfo.dgpu_name : SystemInfo.igpu_name,
-                        ];
-                    }
+                // Left column: the product card, directly as a (Rectangle-based)
+                // child — never wrapped in a VerticalLayout (see note above).
+                // Square via the fixed card-side length; no parent geometry.
+                product-card := RogProductCard {
+                    width: root.card-side;
+                    height: root.card-side;
+                    name: SystemInfo.product_name != "" ? SystemInfo.product_name : "ROG Laptop";
+                    // CPU + GPU straight off the backend — no hardcoded specs.
+                    details: [
+                        SystemInfo.cpu_name,
+                        SystemInfo.has_dgpu ? SystemInfo.dgpu_name : SystemInfo.igpu_name,
+                    ];
                 }
 
                 // Right column: System Usage + Operation Mode.
-                // No `alignment` (default distributes free space by stretch).
-                    // Content blocks have vertical-stretch:0 so they keep their
-                    // natural height; only the flex spacers grow in fullscreen.
+                // Content blocks keep their natural height (vertical-stretch: 0);
+                // the flex spacers grow instead, so big windows just get taller
+                // gaps and nothing overflows on short ones.
                 VerticalLayout {
                     horizontal-stretch: 1;
-                    spacing: 20px;
+                    spacing: root.gap-md;
 
                     // System Usage header
                     Rectangle {
@@ -81,18 +92,18 @@ export component PageHome inherits RogPage {
                                 font-weight: 600;
                                 vertical-alignment: center;
                             }
+                            Rectangle { horizontal-stretch: 1; }
                         }
                     }
 
-                    // Row 1: CPU | GPU — cards capped so they don't over-widen;
-                    // the fixed 36px middle gap stays as it was.
+                    // Row 1: CPU | GPU
                     HorizontalLayout {
                         vertical-stretch: 0;
-                        spacing: 36px;
+                        spacing: root.gap-lg;
 
                         cpu-metric := RogMetric {
                             horizontal-stretch: 1;
-                            max-width: 340px;
+                            max-width: root.metric-max;
                             title: "CPU";
                             RogReading {
                                 label: @tr("Frequency");
@@ -112,7 +123,7 @@ export component PageHome inherits RogPage {
 
                         if SystemInfo.has_dgpu: RogMetric {
                             horizontal-stretch: 1;
-                            max-width: 340px;
+                            max-width: root.metric-max;
                             title: "dGPU";
                             // Each field judges independently: a suspended dGPU shows
                             // "Suspended" everywhere, but a readable field still shows
@@ -144,11 +155,11 @@ export component PageHome inherits RogPage {
                     // Row 2: Fan | Memory
                     HorizontalLayout {
                         vertical-stretch: 0;
-                        spacing: 36px;
+                        spacing: root.gap-lg;
 
                         fan-metric := RogMetric {
                             horizontal-stretch: 1;
-                            max-width: 340px;
+                            max-width: root.metric-max;
                             title: @tr("Fan");
                             if TelemetryData.cpu_fan_rpm >= 0: RogReading {
                                 label: @tr("CPU Fan");
@@ -173,7 +184,7 @@ export component PageHome inherits RogPage {
 
                         mem-metric := RogMetric {
                             horizontal-stretch: 1;
-                            max-width: 340px;
+                            max-width: root.metric-max;
                             title: @tr("Memory");
                             RogReading {
                                 label: "RAM";
@@ -192,11 +203,11 @@ export component PageHome inherits RogPage {
                     // the hardware instead of a hardcoded AC-style set. ev is the
                     // profile enum value (passed to cb_platform_profile); p is the
                     // position (used for layout, label lookup and the active check).
-                    VerticalLayout {
+                    if PowerData.platform_profile_indexes.length > 0: VerticalLayout {
                         vertical-stretch: 0;
                         spacing: 12px;
 
-                        if PowerData.platform_profile_indexes.length > 0: Rectangle {
+                        Rectangle {
                             height: 24px;
                             HorizontalLayout {
                                 spacing: 8px;
@@ -212,7 +223,7 @@ export component PageHome inherits RogPage {
                             }
                         }
 
-                        if PowerData.platform_profile_indexes.length > 0: RogModeGrid {
+                        RogModeGrid {
                             profile-indexes: PowerData.platform_profile_indexes;
                             profile-choices: PowerData.platform_profile_choices;
                             current-profile: PowerData.platform_profile;

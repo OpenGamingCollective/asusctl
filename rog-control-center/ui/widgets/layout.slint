@@ -26,7 +26,6 @@ export component RogRebootBanner inherits Rectangle {
         // Full-height cell so the icon can be centred inside it: Slint
         // layouts own direct-child geometry, so an Image child can't set y.
         Rectangle {
-            height: 100%;
             Image {
                 source: @image-url("../images/nav-about.svg");
                 colorize: #E0B040;
@@ -60,7 +59,6 @@ export component RogSlashMark inherits Rectangle {
     in property <length> bar-w: 5px;
     in property <length> bar-h: 14px;
     width: root.count * (root.bar-w + 11px) - 2px;
-    height: 100%;
 
     for i in root.count: Image {
         source: @image-url("../images/slash-bar.svg");
