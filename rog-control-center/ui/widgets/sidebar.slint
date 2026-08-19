@@ -109,7 +109,6 @@ export component NavItem inherits Rectangle {
 
 component HorizontalDivider inherits Rectangle {
     height: 1px;
-    width: 100%;
     background: Theme.divider;
 }
 
@@ -144,7 +143,6 @@ export component SideBar inherits Rectangle {
         // — Header: ROG logo (collapsed) / logo + wordmark (expanded) —
         Rectangle {
             height: 64px;
-            width: 100%;
             background: transparent;
             Image {
                 source: @image-url("../../data/rog-sidebar-logo.png");
@@ -182,7 +180,6 @@ export component SideBar inherits Rectangle {
                     // Entries whose backend is absent on this device are skipped
                     // entirely (height 0), so they don't leave a blank slot.
                     property <bool> avail: index < root.available.length && root.available[index];
-                    width: 100%;
                     height: avail ? 48px : 0px;
                     visible: avail;
                     if avail: NavItem {
@@ -203,7 +200,6 @@ export component SideBar inherits Rectangle {
         HorizontalDivider { }
         Rectangle {
             height: 44px;
-            width: 100%;
             background: pin-ta.has-hover ? Theme.sidebar-selected : transparent;
             Image {
                 source: @image-url("../images/nav-expand.svg");

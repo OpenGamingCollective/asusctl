@@ -1,7 +1,3 @@
-// PageHome — Dashboard page matching AC system-page.html reference
-// Layout: HorizontalLayout 2-col (left 360px fixed + right flexible), no ScrollView (avoids binding loops)
-// Font: Inter Display for product name
-// Data: all from SystemPageData, no hardcoded values
 import { RogProductCard } from "../widgets/cards.slint";
 import { RogSlashMark, RogPage } from "../widgets/layout.slint";
 import { RogMetric, RogReading, RogStatRow } from "../widgets/metrics.slint";
@@ -13,32 +9,29 @@ export component PageHome inherits RogPage {
     background: Theme.bg-base;
     clip: true;
 
-    // Product name from SystemPageData (backend reads /sys/class/dmi/id/product_name)
+    // ====== Titlebar + Dashboard Root Layout ======
+    VerticalLayout {
+        spacing: 0px;
 
-    // ====== Titlebar ======
-    titlebar := Rectangle {
-        y: 0px;
-        height: 52px;
-        width: 100%;
-        background: Theme.bg-base;
-        Text {
-            text: @tr("Home");
-            color: Theme.text-primary;
-            font-size: 20px;
-            font-weight: 700;
-            x: 32px;
-            y: 13px;
+        // ====== Titlebar ======
+        Rectangle {
+            height: 52px;
+            background: Theme.bg-base;
+            HorizontalLayout {
+                padding-left: 32px;
+                Text {
+                    text: @tr("Home");
+                    color: Theme.text-primary;
+                    font-size: 20px;
+                    font-weight: 700;
+                    vertical-alignment: center;
+                }
+            }
         }
-    }
 
-    // ====== Dashboard — fills remaining window height so the vertical flex
-    // gaps inside the right column can grow in fullscreen. ======
-    dashboard := Rectangle {
-        y: titlebar.height;
-        width: 100%;
-        height: parent.height - titlebar.height;
-
+        // ====== Dashboard — fills remaining height via vertical-stretch: 1 ======
         VerticalLayout {
+            vertical-stretch: 1;
             padding-left: 24px;
             padding-right: 24px;
             padding-top: 12px;
