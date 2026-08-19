@@ -1,0 +1,493 @@
+// Modal "Advanced" per-profile power settings (Home -> Operation Mode ->
+// Advanced). Three configurable profiles: Quiet / Balanced / Performance.
+// LowPower is deliberately not configurable.
+//
+// All rows here are kept Rectangle-based / use layouts in safe positions (this
+// project is pinned to slint 1.13.1, see ui/README.md about layouts).
+import { RogSlashMark } from "../widgets/layout.slint";
+import { RogSlider } from "../widgets/controls.slint";
+import { ScrollView } from "std-widgets.slint";
+import { Theme } from "../globals.slint";
+import { PowerData, ProfileLimits } from "system.slint";
+
+// — AC-style toggle switch —
+component RogToggle inherits Rectangle {
+    in property <bool> checked: false;
+    callback toggled(bool);
+    width: 40px;
+    height: 22px;
+    border-radius: 11px;
+    background: root.checked ? Theme.rog-red : Theme.toggle-off;
+    Rectangle {
+        x: root.checked ? 21px : 3px;
+        y: 3px;
+        width: 16px;
+        height: 16px;
+        border-radius: 8px;
+        background: #FFFFFF;
+        drop-shadow-blur: 3px;
+        drop-shadow-color: #00000040;
+    }
+    ta := TouchArea {
+        width: 100%;
+        height: 100%;
+        mouse-cursor: pointer;
+        clicked => { root.toggled(!root.checked); }
+    }
+    accessible-role: switch;
+    accessible-checked: root.checked;
+}
+
+// — Row of selectable pills (tabs / EPP / AC-battery targets) —
+// NOTE (slint 1.13.1): no explicit `height` on this component — a layout cell
+// that contains a nested layout AND has a fixed height makes every later
+// sibling render empty. Let the inner leaf Rectangles define the height.
+component ChoicePills inherits Rectangle {
+    in property <[string]> choices: [];
+    in property <int> current: -1;
+    callback chosen(int);
+    HorizontalLayout {
+        spacing: 8px;
+        for c[i] in root.choices: Rectangle {
+            horizontal-stretch: 1;
+            height: 30px;
+            border-radius: Theme.radius-item;
+            background: i == root.current ? Theme.mode-selected : Theme.bg-elevated;
+            border-width: 1px;
+            border-color: i == root.current ? Theme.rog-red : transparent;
+            Text {
+                text: c;
+                color: i == root.current ? Theme.text-primary : Theme.text-secondary;
+                font-size: Theme.font-sm;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+            ta := TouchArea {
+                width: 100%;
+                height: 100%;
+                mouse-cursor: pointer;
+                clicked => { root.chosen(i); }
+            }
+            accessible-role: button;
+            accessible-label: c;
+            accessible-action-default => { root.chosen(i); }
+        }
+    }
+}
+
+// — One power-limit row: slider + value + reset chip —
+component LimitRow inherits Rectangle {
+    in property <string> label;
+    in property <float> minimum;
+    in property <float> maximum;
+    in property <float> value;
+    in property <string> unit;
+    in property <bool> enabled: true;
+    callback changed(int);
+    callback reset();
+    HorizontalLayout {
+        spacing: 10px;
+        RogSlider {
+            horizontal-stretch: 1;
+            label: root.label;
+            minimum: root.minimum;
+            maximum: Math.max(root.minimum + 1.0, root.maximum);
+            value: root.value;
+            unit: root.unit;
+            enabled: root.enabled;
+            released(v) => { root.changed(Math.round(v)); }
+        }
+        reset-chip := Rectangle {
+            width: 52px;
+            height: 30px;
+            border-radius: Theme.radius-item;
+            background: ta-reset.has-hover ? Theme.bg-elevated : transparent;
+            border-width: 1px;
+            border-color: Theme.line;
+            Text {
+                text: @tr("Reset");
+                color: Theme.text-secondary;
+                font-size: Theme.font-xs;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+            ta-reset := TouchArea {
+                width: 100%;
+                height: 100%;
+                mouse-cursor: pointer;
+                clicked => { root.reset(); }
+            }
+            accessible-role: button;
+            accessible-label: @tr("Reset");
+            accessible-action-default => { root.reset(); }
+        }
+    }
+}
+
+export component PerProfileSettingsOverlay inherits Rectangle {
+    in property <bool> open: false;
+    callback close();
+    // Tab index 0..2 -> Quiet, Balanced, Performance
+    in-out property <int> selected-profile: 0;
+    property <[int]> profile-enums: [2, 0, 1];
+    property <[string]> profile-labels: [@tr("Quiet"), @tr("Balanced"), @tr("Performance")];
+    property <int> current-env: root.profile-enums[root.selected-profile];
+    property <ProfileLimits> active-limits:
+        root.current-env == 2 ? PowerData.limits_quiet :
+        (root.current-env == 0 ? PowerData.limits_balanced : PowerData.limits_performance);
+    property <bool> active-limits-enabled:
+        root.current-env == 2 ? PowerData.limits_enabled_quiet :
+        (root.current-env == 0 ? PowerData.limits_enabled_balanced : PowerData.limits_enabled_performance);
+    property <int> active-epp:
+        root.current-env == 2 ? PowerData.profile_quiet_epp :
+        (root.current-env == 0 ? PowerData.profile_balanced_epp : PowerData.profile_performance_epp);
+
+    background: transparent;
+    visible: root.open;
+    opacity: root.open ? 1.0 : 0.0;
+    animate opacity { duration: 160ms; }
+
+    // Dimmed backdrop — tap to close
+    Rectangle {
+        width: 100%;
+        height: 100%;
+        background: Theme.dark ? #000000 : #000000;
+        opacity: 0.55;
+        ta-backdrop := TouchArea {
+            width: 100%;
+            height: 100%;
+            clicked => { root.close(); }
+        }
+    }
+
+    // Panel
+    panel := Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: Math.min(880px, parent.width - 64px);
+        height: Math.min(700px, parent.height - 48px);
+        background: Theme.bg-card;
+        border-radius: Theme.radius-card;
+        border-width: 1px;
+        border-color: Theme.line;
+        drop-shadow-blur: 24px;
+        drop-shadow-color: #00000080;
+
+        VerticalLayout {
+            padding: 20px;
+            spacing: 12px;
+
+            // Header
+            Rectangle {
+                height: 34px;
+                HorizontalLayout {
+                    spacing: 8px;
+                    RogSlashMark {}
+                    Text {
+                        text: @tr("Power profiles");
+                        color: Theme.text-primary;
+                        font-size: Theme.font-lg;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                    }
+                    Rectangle { horizontal-stretch: 1; }
+                    close-box := Rectangle {
+                        width: 28px;
+                        height: 28px;
+                        border-radius: 14px;
+                        background: ta-close.has-hover ? Theme.bg-elevated : transparent;
+                        Text {
+                            text: "✕";
+                            color: Theme.text-secondary;
+                            font-size: 14px;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                        ta-close := TouchArea {
+                            width: 100%;
+                            height: 100%;
+                            mouse-cursor: pointer;
+                            clicked => { root.close(); }
+                        }
+                        accessible-role: button;
+                        accessible-label: @tr("Close");
+                        accessible-action-default => { root.close(); }
+                    }
+                }
+            }
+
+            // Profile tabs
+            ChoicePills {
+                choices: root.profile-labels;
+                current: root.selected-profile;
+                chosen(i) => { root.selected-profile = i; }
+            }
+
+            // EPP for the selected profile
+            // (no fixed height on this wrapper either — see the note on ChoicePills)
+            Rectangle {
+                VerticalLayout {
+                    spacing: 6px;
+                    Text {
+                        text: @tr("Energy Performance Preference");
+                        color: Theme.text-secondary;
+                        font-size: Theme.font-sm;
+                    }
+                    ChoicePills {
+                        choices: PowerData.energy_performance_choices;
+                        current: root.active-epp;
+                        chosen(i) => {
+                            if (root.current-env == 2) { PowerData.profile_quiet_epp = i; }
+                            if (root.current-env == 0) { PowerData.profile_balanced_epp = i; }
+                            if (root.current-env == 1) { PowerData.profile_performance_epp = i; }
+                            PowerData.cb_set_epp(root.current-env, i);
+                        }
+                    }
+                }
+            }
+
+            // Throttle policy on AC / battery (global, not per profile)
+            Rectangle {
+                VerticalLayout {
+                    spacing: 6px;
+                    Text {
+                        text: @tr("Throttle policy");
+                        color: Theme.text-secondary;
+                        font-size: Theme.font-sm;
+                    }
+                    HorizontalLayout {
+                        Text {
+                            text: @tr("On AC use");
+                            color: Theme.text-secondary;
+                            font-size: Theme.font-sm;
+                            vertical-alignment: center;
+                        }
+                        Rectangle { horizontal-stretch: 1; }
+                        Text {
+                            text: @tr("Change on AC");
+                            color: Theme.text-secondary;
+                            font-size: Theme.font-sm;
+                            vertical-alignment: center;
+                        }
+                        RogToggle {
+                            checked: PowerData.change_platform_profile_on_ac;
+                            toggled(v) => { PowerData.cb_change_platform_profile_on_ac(v); }
+                        }
+                    }
+                    ChoicePills {
+                        choices: PowerData.platform_profile_choices;
+                        current: PowerData.platform_profile_on_ac;
+                        chosen(i) => {
+                            PowerData.platform_profile_on_ac = i;
+                            PowerData.cb_platform_profile_on_ac(i);
+                        }
+                    }
+                    HorizontalLayout {
+                        Text {
+                            text: @tr("On battery use");
+                            color: Theme.text-secondary;
+                            font-size: Theme.font-sm;
+                            vertical-alignment: center;
+                        }
+                        Rectangle { horizontal-stretch: 1; }
+                        Text {
+                            text: @tr("Change on battery");
+                            color: Theme.text-secondary;
+                            font-size: Theme.font-sm;
+                            vertical-alignment: center;
+                        }
+                        RogToggle {
+                            checked: PowerData.change_platform_profile_on_battery;
+                            toggled(v) => { PowerData.cb_change_platform_profile_on_battery(v); }
+                        }
+                    }
+                    ChoicePills {
+                        choices: PowerData.platform_profile_choices;
+                        current: PowerData.platform_profile_on_battery;
+                        chosen(i) => {
+                            PowerData.platform_profile_on_battery = i;
+                            PowerData.cb_platform_profile_on_battery(i);
+                        }
+                    }
+                }
+            }
+
+            // Per-profile enable gate
+            HorizontalLayout {
+                Text {
+                    text: @tr("Apply these limits when this profile is active");
+                    color: Theme.text-secondary;
+                    font-size: Theme.font-sm;
+                    vertical-alignment: center;
+                }
+                Rectangle { horizontal-stretch: 1; }
+                RogToggle {
+                    checked: root.active-limits-enabled;
+                    toggled(v) => {
+                        if (root.current-env == 2) { PowerData.limits_enabled_quiet = v; }
+                        if (root.current-env == 0) { PowerData.limits_enabled_balanced = v; }
+                        if (root.current-env == 1) { PowerData.limits_enabled_performance = v; }
+                        PowerData.cb_enable_profile_limits(root.current-env, v);
+                    }
+                }
+            }
+
+            // Limits — scrolls if the window is short
+            ScrollView {
+                vertical-stretch: 1;
+                VerticalLayout {
+                    spacing: 8px;
+                    Text {
+                        text: @tr("CPU Power Limits");
+                        color: Theme.text-primary;
+                        font-size: Theme.font-md;
+                        font-weight: 600;
+                    }
+                    LimitRow {
+                        label: @tr("CPU Sustained Power Limit");
+                        minimum: root.active-limits.ppt_pl1_spl.min;
+                        maximum: root.active-limits.ppt_pl1_spl.max;
+                        value: root.active-limits.ppt_pl1_spl.current;
+                        unit: "W";
+                        enabled: root.active-limits-enabled;
+                        changed(v) => {
+                            if (root.current-env == 2) { PowerData.limits_quiet.ppt_pl1_spl.current = v; }
+                            if (root.current-env == 0) { PowerData.limits_balanced.ppt_pl1_spl.current = v; }
+                            if (root.current-env == 1) { PowerData.limits_performance.ppt_pl1_spl.current = v; }
+                            PowerData.cb_set_ppt_pl1_spl(root.current-env, v);
+                        }
+                        reset() => { PowerData.cb_reset_ppt_pl1_spl(root.current-env); }
+                    }
+                    LimitRow {
+                        label: @tr("CPU Turbo Power Limit");
+                        minimum: root.active-limits.ppt_pl2_sppt.min;
+                        maximum: root.active-limits.ppt_pl2_sppt.max;
+                        value: root.active-limits.ppt_pl2_sppt.current;
+                        unit: "W";
+                        enabled: root.active-limits-enabled;
+                        changed(v) => {
+                            if (root.current-env == 2) { PowerData.limits_quiet.ppt_pl2_sppt.current = v; }
+                            if (root.current-env == 0) { PowerData.limits_balanced.ppt_pl2_sppt.current = v; }
+                            if (root.current-env == 1) { PowerData.limits_performance.ppt_pl2_sppt.current = v; }
+                            PowerData.cb_set_ppt_pl2_sppt(root.current-env, v);
+                        }
+                        reset() => { PowerData.cb_reset_ppt_pl2_sppt(root.current-env); }
+                    }
+                    LimitRow {
+                        label: @tr("CPU Fast Burst Power Limit");
+                        minimum: root.active-limits.ppt_pl3_fppt.min;
+                        maximum: root.active-limits.ppt_pl3_fppt.max;
+                        value: root.active-limits.ppt_pl3_fppt.current;
+                        unit: "W";
+                        enabled: root.active-limits-enabled;
+                        changed(v) => {
+                            if (root.current-env == 2) { PowerData.limits_quiet.ppt_pl3_fppt.current = v; }
+                            if (root.current-env == 0) { PowerData.limits_balanced.ppt_pl3_fppt.current = v; }
+                            if (root.current-env == 1) { PowerData.limits_performance.ppt_pl3_fppt.current = v; }
+                            PowerData.cb_set_ppt_pl3_fppt(root.current-env, v);
+                        }
+                        reset() => { PowerData.cb_reset_ppt_pl3_fppt(root.current-env); }
+                    }
+                    LimitRow {
+                        label: @tr("Package Fast Power Limit");
+                        minimum: root.active-limits.ppt_fppt.min;
+                        maximum: root.active-limits.ppt_fppt.max;
+                        value: root.active-limits.ppt_fppt.current;
+                        unit: "W";
+                        enabled: root.active-limits-enabled;
+                        changed(v) => {
+                            if (root.current-env == 2) { PowerData.limits_quiet.ppt_fppt.current = v; }
+                            if (root.current-env == 0) { PowerData.limits_balanced.ppt_fppt.current = v; }
+                            if (root.current-env == 1) { PowerData.limits_performance.ppt_fppt.current = v; }
+                            PowerData.cb_set_ppt_fppt(root.current-env, v);
+                        }
+                        reset() => { PowerData.cb_reset_ppt_fppt(root.current-env); }
+                    }
+                    LimitRow {
+                        label: @tr("APU Sustained Power Limit");
+                        minimum: root.active-limits.ppt_apu_sppt.min;
+                        maximum: root.active-limits.ppt_apu_sppt.max;
+                        value: root.active-limits.ppt_apu_sppt.current;
+                        unit: "W";
+                        enabled: root.active-limits-enabled;
+                        changed(v) => {
+                            if (root.current-env == 2) { PowerData.limits_quiet.ppt_apu_sppt.current = v; }
+                            if (root.current-env == 0) { PowerData.limits_balanced.ppt_apu_sppt.current = v; }
+                            if (root.current-env == 1) { PowerData.limits_performance.ppt_apu_sppt.current = v; }
+                            PowerData.cb_set_ppt_apu_sppt(root.current-env, v);
+                        }
+                        reset() => { PowerData.cb_reset_ppt_apu_sppt(root.current-env); }
+                    }
+                    LimitRow {
+                        label: @tr("Platform Sustained Power Limit");
+                        minimum: root.active-limits.ppt_platform_sppt.min;
+                        maximum: root.active-limits.ppt_platform_sppt.max;
+                        value: root.active-limits.ppt_platform_sppt.current;
+                        unit: "W";
+                        enabled: root.active-limits-enabled;
+                        changed(v) => {
+                            if (root.current-env == 2) { PowerData.limits_quiet.ppt_platform_sppt.current = v; }
+                            if (root.current-env == 0) { PowerData.limits_balanced.ppt_platform_sppt.current = v; }
+                            if (root.current-env == 1) { PowerData.limits_performance.ppt_platform_sppt.current = v; }
+                            PowerData.cb_set_ppt_platform_sppt(root.current-env, v);
+                        }
+                        reset() => { PowerData.cb_reset_ppt_platform_sppt(root.current-env); }
+                    }
+
+                    Text {
+                        text: @tr("GPU (NVIDIA)");
+                        color: Theme.text-primary;
+                        font-size: Theme.font-md;
+                        font-weight: 600;
+                    }
+                    LimitRow {
+                        label: @tr("GPU TGP");
+                        minimum: root.active-limits.nv_tgp.min;
+                        maximum: root.active-limits.nv_tgp.max;
+                        value: root.active-limits.nv_tgp.current;
+                        unit: "W";
+                        enabled: true;
+                        changed(v) => {
+                            if (root.current-env == 2) { PowerData.limits_quiet.nv_tgp.current = v; }
+                            if (root.current-env == 0) { PowerData.limits_balanced.nv_tgp.current = v; }
+                            if (root.current-env == 1) { PowerData.limits_performance.nv_tgp.current = v; }
+                            PowerData.cb_set_nv_tgp(root.current-env, v);
+                        }
+                        reset() => { PowerData.cb_reset_nv_tgp(root.current-env); }
+                    }
+                    LimitRow {
+                        label: @tr("GPU Dynamic Boost");
+                        minimum: root.active-limits.nv_dynamic_boost.min;
+                        maximum: root.active-limits.nv_dynamic_boost.max;
+                        value: root.active-limits.nv_dynamic_boost.current;
+                        unit: "W";
+                        enabled: true;
+                        changed(v) => {
+                            if (root.current-env == 2) { PowerData.limits_quiet.nv_dynamic_boost.current = v; }
+                            if (root.current-env == 0) { PowerData.limits_balanced.nv_dynamic_boost.current = v; }
+                            if (root.current-env == 1) { PowerData.limits_performance.nv_dynamic_boost.current = v; }
+                            PowerData.cb_set_nv_dynamic_boost(root.current-env, v);
+                        }
+                        reset() => { PowerData.cb_reset_nv_dynamic_boost(root.current-env); }
+                    }
+                    LimitRow {
+                        label: @tr("GPU Temperature Limit");
+                        minimum: root.active-limits.nv_temp_target.min;
+                        maximum: root.active-limits.nv_temp_target.max;
+                        value: root.active-limits.nv_temp_target.current;
+                        unit: "°C";
+                        enabled: true;
+                        changed(v) => {
+                            if (root.current-env == 2) { PowerData.limits_quiet.nv_temp_target.current = v; }
+                            if (root.current-env == 0) { PowerData.limits_balanced.nv_temp_target.current = v; }
+                            if (root.current-env == 1) { PowerData.limits_performance.nv_temp_target.current = v; }
+                            PowerData.cb_set_nv_temp_target(root.current-env, v);
+                        }
+                        reset() => { PowerData.cb_reset_nv_temp_target(root.current-env); }
+                    }
+                }
+            }
+        }
+    }
+}

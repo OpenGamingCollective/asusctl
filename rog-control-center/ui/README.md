@@ -13,6 +13,12 @@ you the bug below.
     or a component rooted in `Rectangle` (e.g. `RogProductCard`).
   - If a row starts with a widget-like block, give it a fixed `width`/`height`
     and put it directly in the row (no wrapper `VerticalLayout`).
+- **A layout cell that CONTAINS a nested layout must not set an explicit
+  `width`/`height`.** If a non-first child of a layout both contains a nested
+  layout and has a fixed size, every later sibling renders empty (found while
+  building the per-profile overlay; affects components whose root wraps a
+  layout too). Fixed sizes belong on **leaf** `Rectangle`s; let nested-layout
+  cells be content-sized or stretch (`vertical-stretch`/`horizontal-stretch`).
 - **Never size a layout child from its parent's geometry**
   (`height: parent.width`, `width: parent.height`, `height: parent.height` etc.).
   Slint resolves a layout child's size against geometry that isn't final yet —

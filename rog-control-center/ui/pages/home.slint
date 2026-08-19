@@ -12,6 +12,8 @@ import { SystemInfo, TelemetryData, PowerData } from "system.slint";
 export component PageHome inherits RogPage {
     background: Theme.bg-base;
     clip: true;
+    // Forwarded to the main window host, which owns the Advanced overlay.
+    callback open-per-profile-settings();
 
     // ====== Responsive sizing ======
     // Below ~1000px of page width (narrower laptops) the dashboard tightens:
@@ -234,6 +236,9 @@ export component PageHome inherits RogPage {
                             current-profile: PowerData.platform_profile;
                             selected(ev) => {
                                 PowerData.cb_platform_profile(ev);
+                            }
+                            advanced() => {
+                                root.open-per-profile-settings();
                             }
                         }
                     }

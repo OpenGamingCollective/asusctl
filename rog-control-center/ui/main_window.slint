@@ -3,6 +3,7 @@ import { AppSize, Theme } from "globals.slint";
 import { SystemInfo, TelemetryData, PowerData, DeviceData } from "pages/system.slint";
 import { AttrMinMax } from "pages/types.slint";
 import { PageHome } from "pages/home.slint";
+import { PerProfileSettingsOverlay } from "pages/per_profile_settings.slint";
 import { SideBar } from "widgets/sidebar.slint";
 
 export { AppSize, AttrMinMax, SystemInfo, TelemetryData, PowerData, DeviceData }
@@ -38,6 +39,16 @@ export component MainWindow inherits Window {
             toast = false;
             toast_text = "";
         }
+    }
+    // Advanced (per-profile power settings) overlay control.
+    private property <bool> show_per_profile_overlay: false;
+    callback open_per_profile_settings();
+    callback close_per_profile_settings();
+    open_per_profile_settings() => {
+        root.show_per_profile_overlay = true;
+    }
+    close_per_profile_settings() => {
+        root.show_per_profile_overlay = false;
     }
     background: Theme.bg-base;
 
@@ -77,6 +88,9 @@ export component MainWindow inherits Window {
             if side-bar.current-item == 0: PageHome {
                 width: 100%;
                 height: 100%;
+                open-per-profile-settings => {
+                    root.open_per_profile_settings();
+                }
             }
             // Every not-yet-ported page.
             if side-bar.current-item > 0: Rectangle {
@@ -152,6 +166,17 @@ export component MainWindow inherits Window {
                 color: Palette.control-foreground;
                 horizontal-alignment: center;
             }
+        }
+    }
+
+    // Advanced per-profile power settings overlay — declared last so it sits on
+    // top of every page (including the toast + error overlays).
+    PerProfileSettingsOverlay {
+        width: 100%;
+        height: 100%;
+        open: root.show_per_profile_overlay;
+        close() => {
+            root.close_per_profile_settings();
         }
     }
 }

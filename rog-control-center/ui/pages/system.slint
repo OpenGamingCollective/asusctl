@@ -1,6 +1,21 @@
 
 import { AttrMinMax } from "types.slint";
 
+// Per-profile power limits edited in the Home "Advanced" overlay (G-Helper
+// style). One instance per configurable profile (Quiet / Balanced /
+// Performance); LowPower is deliberately not configurable.
+export struct ProfileLimits {
+    ppt_pl1_spl: AttrMinMax,
+    ppt_pl2_sppt: AttrMinMax,
+    ppt_pl3_fppt: AttrMinMax,
+    ppt_fppt: AttrMinMax,
+    ppt_apu_sppt: AttrMinMax,
+    ppt_platform_sppt: AttrMinMax,
+    nv_tgp: AttrMinMax,
+    nv_dynamic_boost: AttrMinMax,
+    nv_temp_target: AttrMinMax,
+}
+
 export global SystemInfo {
     in-out property <bool> asus_armoury_loaded: false;
     in-out property <bool> has_dgpu: true;
@@ -79,6 +94,75 @@ export global PowerData {
     in-out property <bool> ppt_enabled_available;
     in-out property <bool> ppt_enabled;
     callback cb_ppt_enabled(bool);
+
+    // ===== Per-profile power limits (Advanced overlay on Home) =====
+    // profile_ev arguments below use the PlatformProfile enum (Quiet=2,
+    // Balanced=0, Performance=1); LowPower is not configurable. Values are
+    // stored per profile in the client config and applied when that profile
+    // becomes active (see the Rust ActionHandler).
+    in-out property <ProfileLimits> limits_quiet: {
+        ppt_pl1_spl: { min: 0, max: 100, current: 20 },
+        ppt_pl2_sppt: { min: 0, max: 100, current: 20 },
+        ppt_pl3_fppt: { min: 0, max: 100, current: 20 },
+        ppt_fppt: { min: 0, max: 100, current: 20 },
+        ppt_apu_sppt: { min: 0, max: 100, current: 20 },
+        ppt_platform_sppt: { min: 0, max: 100, current: 20 },
+        nv_tgp: { min: 0, max: 175, current: 80 },
+        nv_dynamic_boost: { min: 0, max: 30, current: 5 },
+        nv_temp_target: { min: 0, max: 80, current: 75 },
+    };
+    in-out property <ProfileLimits> limits_balanced: {
+        ppt_pl1_spl: { min: 0, max: 100, current: 20 },
+        ppt_pl2_sppt: { min: 0, max: 100, current: 20 },
+        ppt_pl3_fppt: { min: 0, max: 100, current: 20 },
+        ppt_fppt: { min: 0, max: 100, current: 20 },
+        ppt_apu_sppt: { min: 0, max: 100, current: 20 },
+        ppt_platform_sppt: { min: 0, max: 100, current: 20 },
+        nv_tgp: { min: 0, max: 175, current: 80 },
+        nv_dynamic_boost: { min: 0, max: 30, current: 5 },
+        nv_temp_target: { min: 0, max: 80, current: 75 },
+    };
+    in-out property <ProfileLimits> limits_performance: {
+        ppt_pl1_spl: { min: 0, max: 100, current: 20 },
+        ppt_pl2_sppt: { min: 0, max: 100, current: 20 },
+        ppt_pl3_fppt: { min: 0, max: 100, current: 20 },
+        ppt_fppt: { min: 0, max: 100, current: 20 },
+        ppt_apu_sppt: { min: 0, max: 100, current: 20 },
+        ppt_platform_sppt: { min: 0, max: 100, current: 20 },
+        nv_tgp: { min: 0, max: 175, current: 80 },
+        nv_dynamic_boost: { min: 0, max: 30, current: 5 },
+        nv_temp_target: { min: 0, max: 80, current: 75 },
+    };
+    // Whether the PPT group for each profile is enabled (mirrors asusd's
+    // per-profile tuning gate; NVIDIA has no such gate and is always stored).
+    in-out property <bool> limits_enabled_quiet: false;
+    in-out property <bool> limits_enabled_balanced: false;
+    in-out property <bool> limits_enabled_performance: false;
+
+    // NOTE: slint 1.13.1 does not allow parameter NAMES on callbacks, only
+    // types — arguments are positional (profile_ev first, value second). Names
+    // use cb_set_/cb_reset_ to avoid clashing with the single-value callbacks
+    // declared above (slint has no callback overloading).
+    callback cb_set_ppt_pl1_spl(int, int);
+    callback cb_reset_ppt_pl1_spl(int);
+    callback cb_set_ppt_pl2_sppt(int, int);
+    callback cb_reset_ppt_pl2_sppt(int);
+    callback cb_set_ppt_pl3_fppt(int, int);
+    callback cb_reset_ppt_pl3_fppt(int);
+    callback cb_set_ppt_fppt(int, int);
+    callback cb_reset_ppt_fppt(int);
+    callback cb_set_ppt_apu_sppt(int, int);
+    callback cb_reset_ppt_apu_sppt(int);
+    callback cb_set_ppt_platform_sppt(int, int);
+    callback cb_reset_ppt_platform_sppt(int);
+    callback cb_set_nv_tgp(int, int);
+    callback cb_reset_nv_tgp(int);
+    callback cb_set_nv_dynamic_boost(int, int);
+    callback cb_reset_nv_dynamic_boost(int);
+    callback cb_set_nv_temp_target(int, int);
+    callback cb_reset_nv_temp_target(int);
+    callback cb_enable_profile_limits(int, bool);
+    callback cb_set_epp(int, int);
 
     in-out property <int> platform_profile: 0;
     in-out property <[string]> platform_profile_choices: [@tr("LowPower"), @tr("Quiet"), @tr("Balanced"), @tr("Performance")];
