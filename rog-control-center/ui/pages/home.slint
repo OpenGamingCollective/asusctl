@@ -111,7 +111,7 @@ export component PageHome inherits RogPage {
                         cpu-metric := RogMetric {
                             horizontal-stretch: 1;
                             max-width: root.metric-max;
-                            title: "CPU";
+                            title: SystemInfo.cpu_name != "" ? SystemInfo.cpu_name : @tr("Unknown");
                             RogReading {
                                 label: @tr("Frequency");
                                 value: TelemetryData.cpu_freq_mhz > 0.0 ? "\{Math.round(TelemetryData.cpu_freq_mhz)} MHz" : "--";
@@ -122,16 +122,18 @@ export component PageHome inherits RogPage {
                                 value: TelemetryData.cpu_usage_val >= 0.0 ? "\{Math.round(TelemetryData.cpu_usage_val)} %" : "--";
                                 progress: TelemetryData.cpu_usage_val / 100.0;
                             }
-                            RogStatRow {
+                            RogReading {
                                 label: @tr("Temperature");
                                 value: TelemetryData.cpu_temp_val > 0.0 ? "\{Math.round(TelemetryData.cpu_temp_val)} °C" : "--";
+                                // Gauge 0..100 °C (RogMeter clamps to 0..1).
+                                progress: TelemetryData.cpu_temp_val / 100.0;
                             }
                         }
 
                         if SystemInfo.has_dgpu: RogMetric {
                             horizontal-stretch: 1;
                             max-width: root.metric-max;
-                            title: "dGPU";
+                            title: SystemInfo.dgpu_name != "" ? SystemInfo.dgpu_name : @tr("Unknown");
                             // Each field judges independently: a suspended dGPU shows
                             // "Suspended" everywhere, but a readable field still shows
                             // even when another one can't be read right now.
@@ -145,9 +147,10 @@ export component PageHome inherits RogPage {
                                 value: TelemetryData.dgpu_suspended ? @tr("Suspended") : (TelemetryData.gpu_usage_val >= 0.0 ? "\{Math.round(TelemetryData.gpu_usage_val)} %" : "--");
                                 progress: TelemetryData.gpu_usage_val / 100.0;
                             }
-                            RogStatRow {
+                            RogReading {
                                 label: @tr("Temperature");
                                 value: TelemetryData.dgpu_suspended ? @tr("Suspended") : (TelemetryData.gpu_temp_val > 0.0 ? "\{Math.round(TelemetryData.gpu_temp_val)} °C" : "--");
+                                progress: TelemetryData.dgpu_suspended ? 0.0 : (TelemetryData.gpu_temp_val / 100.0);
                             }
                             RogStatRow {
                                 label: @tr("TGP");
@@ -159,7 +162,7 @@ export component PageHome inherits RogPage {
                     // Vertical flex gap: grows in fullscreen, keeps the rows apart.
                     Rectangle { vertical-stretch: 1; min-height: 0px; }
 
-                    // Row 2: Fan | Memory
+                    // Row 2: Fan | iGPU
                     HorizontalLayout {
                         vertical-stretch: 0;
                         spacing: root.gap-lg;
@@ -168,35 +171,43 @@ export component PageHome inherits RogPage {
                             horizontal-stretch: 1;
                             max-width: root.metric-max;
                             title: @tr("Fan");
-                            if TelemetryData.cpu_fan_rpm >= 0: RogReading {
+                            // All three fan bars are always shown; -1 rpm (absent
+                            // sensor) renders "--" with an empty meter so the card
+                            // never looks empty. 0 rpm is a real reading.
+                            RogReading {
                                 label: @tr("CPU Fan");
-                                // 0 RPM is a real reading (idle/stopped fan); only the
-                                // -1 sentinel from the backend means "no sensor".
-                                value: "\{TelemetryData.cpu_fan_rpm} RPM";
+                                value: TelemetryData.cpu_fan_rpm >= 0 ? "\{TelemetryData.cpu_fan_rpm} RPM" : "--";
                                 progress: Math.max(0, TelemetryData.cpu_fan_rpm) / 5000.0;
                             }
-                            // Hide the GPU / mid fan rows entirely when the sensor is
-                            // absent (-1 sentinel) instead of leaving a "--" placeholder.
-                            if TelemetryData.gpu_fan_rpm >= 0: RogReading {
+                            RogReading {
                                 label: @tr("GPU Fan");
-                                value: "\{TelemetryData.gpu_fan_rpm} RPM";
-                                progress: TelemetryData.gpu_fan_rpm / 5000.0;
+                                value: TelemetryData.gpu_fan_rpm >= 0 ? "\{TelemetryData.gpu_fan_rpm} RPM" : "--";
+                                progress: Math.max(0, TelemetryData.gpu_fan_rpm) / 5000.0;
                             }
-                            if TelemetryData.mid_fan_rpm >= 0: RogReading {
+                            RogReading {
                                 label: @tr("Mid Fan");
-                                value: "\{TelemetryData.mid_fan_rpm} RPM";
-                                progress: TelemetryData.mid_fan_rpm / 5000.0;
+                                value: TelemetryData.mid_fan_rpm >= 0 ? "\{TelemetryData.mid_fan_rpm} RPM" : "--";
+                                progress: Math.max(0, TelemetryData.mid_fan_rpm) / 5000.0;
                             }
                         }
 
-                        mem-metric := RogMetric {
+                        // iGPU is always shown — a laptop always has one.
+                        // (No bare `if` conditional here: a conditional as a
+                        // Row-2 layout child breaks the column's stretch on
+                        // slint 1.13.1.)
+                        igpu-metric := RogMetric {
                             horizontal-stretch: 1;
                             max-width: root.metric-max;
-                            title: @tr("Memory");
+                            title: SystemInfo.igpu_name != "" ? SystemInfo.igpu_name : @tr("Unknown");
                             RogReading {
-                                label: "RAM";
-                                value: TelemetryData.ram_usage_val >= 0.0 ? "\{Math.round(TelemetryData.ram_usage_val)} %" : "--";
-                                progress: TelemetryData.ram_usage_val / 100.0;
+                                label: @tr("Temperature");
+                                value: TelemetryData.igpu_temp_val > 0.0 ? "\{Math.round(TelemetryData.igpu_temp_val)} °C" : "--";
+                                progress: TelemetryData.igpu_temp_val / 100.0;
+                            }
+                            RogReading {
+                                label: @tr("Usage");
+                                value: TelemetryData.igpu_usage_val >= 0.0 ? "\{Math.round(TelemetryData.igpu_usage_val)} %" : "--";
+                                progress: TelemetryData.igpu_usage_val / 100.0;
                             }
                         }
                     }

@@ -89,6 +89,9 @@ export component RogMetric inherits VerticalLayout {
             color: Theme.text-primary;
             font-size: 30px;
             font-weight: 400;
+            // Long hardware names (e.g. "RTX 4090 Mobile") wrap instead of
+            // overflowing the card width.
+            wrap: word-wrap;
         }
         Rectangle { horizontal-stretch: 1; }
         RogDarkSlashes {}
