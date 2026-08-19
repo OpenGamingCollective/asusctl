@@ -1,0 +1,340 @@
+import { SystemDropdown, RogItem, SystemToggle, SystemToggleVert } from "../widgets/common.slint";
+import { Palette, Button, ComboBox, VerticalBox, GroupBox } from "std-widgets.slint";
+import { StyleMetrics, Slider, HorizontalBox, TextEdit, SpinBox, LineEdit, ScrollView } from "std-widgets.slint";
+import { ColourSlider } from "../widgets/colour_picker.slint";
+import { AuraPageData, AuraDevType, PowerZones, LaptopAuraPower, AuraEffect } from "../types/aura_types.slint";
+import { AuraPowerGroup, AuraPowerGroupOld } from "../widgets/aura_power.slint";
+
+export component PageAura inherits Rectangle {
+    property <bool> show_fade_cover: false;
+    property <bool> show_aura_power: false;
+    callback external_colour_change();
+    external_colour_change() => {
+        c1.colourbox = AuraPageData.led_mode_data.colour1;
+        c1.final_colour = AuraPageData.led_mode_data.colour1;
+        c1.external_colour_change();
+        c2.colourbox = AuraPageData.led_mode_data.colour2;
+        c2.final_colour = AuraPageData.led_mode_data.colour2;
+        c2.external_colour_change();
+    }
+
+    ScrollView {
+        VerticalLayout {
+            padding: 10px;
+            spacing: 10px;
+            alignment: LayoutAlignment.start;
+            HorizontalLayout {
+                spacing: 10px;
+                SystemDropdown {
+                    text: @tr("Brightness");
+                    current_index <=> AuraPageData.brightness;
+                    current_value: AuraPageData.brightness_names[self.current-index];
+                    model <=> AuraPageData.brightness_names;
+                    selected => {
+                        AuraPageData.cb_brightness(AuraPageData.brightness)
+                    }
+                }
+
+                SystemDropdown {
+                    width: root.width * 1px / 2px;
+                    text: @tr("Aura mode");
+                    current_index <=> AuraPageData.current_available_mode;
+                    current_value: AuraPageData.available_mode_names[self.current-index];
+                    model <=> AuraPageData.available_mode_names;
+                    selected => {
+                        AuraPageData.apply_effect({
+                            mode: AuraPageData.supported_basic_modes[self.current-index],
+                            zone: AuraPageData.led_mode_data.zone,
+                            colour1: AuraPageData.led_mode_data.colour1,
+                            colour2: AuraPageData.led_mode_data.colour2,
+                            speed: AuraPageData.led_mode_data.speed,
+                            direction: AuraPageData.led_mode_data.direction,
+                        });
+                    }
+                }
+            }
+
+            RogItem {
+                min-height: 220px;
+                max-height: 400px;
+                HorizontalLayout {
+                    padding-top: 5px;
+                    spacing: 10px;
+                    VerticalBox {
+                        Text {
+                            text: @tr("Colour 1");
+                            vertical-alignment: TextVerticalAlignment.center;
+                            horizontal-alignment: TextHorizontalAlignment.center;
+                        }
+                        HorizontalBox {
+                            c1 := ColourSlider {
+                                enabled: AuraPageData.colour1_enabled;
+                                final_colour <=> AuraPageData.color1;
+                                colourbox <=> AuraPageData.colorbox1;
+                                set_hex_from_colour(c) => { return AuraPageData.cb_hex_from_colour(c); }
+                                hex_to_colour(s) => { return AuraPageData.cb_hex_to_colour(s); }
+                                released => {
+                                    AuraPageData.apply_effect({
+                                        mode: AuraPageData.led_mode_data.mode,
+                                        zone: AuraPageData.led_mode_data.zone,
+                                        colour1: AuraPageData.color1,
+                                        colour2: AuraPageData.led_mode_data.colour2,
+                                        speed: AuraPageData.led_mode_data.speed,
+                                        direction: AuraPageData.led_mode_data.direction,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    VerticalBox {
+                        Text { text: @tr("Colour 2"); vertical-alignment: TextVerticalAlignment.center; horizontal-alignment: TextHorizontalAlignment.center; }
+                        HorizontalBox {
+                            c2 := ColourSlider {
+                                enabled: AuraPageData.colour2_enabled;
+                                final_colour <=> AuraPageData.color2;
+                                colourbox <=> AuraPageData.colorbox2;
+                                set_hex_from_colour(c) => { return AuraPageData.cb_hex_from_colour(c); }
+                                hex_to_colour(s) => { return AuraPageData.cb_hex_to_colour(s); }
+                                released => {
+                                    AuraPageData.apply_effect({
+                                        mode: AuraPageData.led_mode_data.mode,
+                                        zone: AuraPageData.led_mode_data.zone,
+                                        colour1: AuraPageData.led_mode_data.colour1,
+                                        colour2: AuraPageData.color2,
+                                        speed: AuraPageData.led_mode_data.speed,
+                                        direction: AuraPageData.led_mode_data.direction,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 10px;
+                min-height: 80px;
+                max-height: 90px;
+                RogItem {
+                    VerticalBox {
+                        Text { text: @tr("Zone"); vertical-alignment: TextVerticalAlignment.center; horizontal-alignment: TextHorizontalAlignment.center; }
+                        ComboBox {
+                            enabled: false;
+                            current_index <=> AuraPageData.zone;
+                            current_value: AuraPageData.zone_names[self.current-index];
+                            model <=> AuraPageData.zone_names;
+                            selected => {
+                                AuraPageData.apply_effect({
+                                    mode: AuraPageData.led_mode_data.mode,
+                                    zone: self.current-index,
+                                    colour1: AuraPageData.led_mode_data.colour1,
+                                    colour2: AuraPageData.led_mode_data.colour2,
+                                    speed: AuraPageData.led_mode_data.speed,
+                                    direction: AuraPageData.led_mode_data.direction,
+                                });
+                            }
+                        }
+                    }
+                }
+                RogItem {
+                    VerticalBox {
+                        Text { text: @tr("Direction"); vertical-alignment: TextVerticalAlignment.center; horizontal-alignment: TextHorizontalAlignment.center; }
+                        ComboBox {
+                            enabled: AuraPageData.direction_enabled;
+                            current_index <=> AuraPageData.direction;
+                            current_value: AuraPageData.direction_names[self.current-index];
+                            model <=> AuraPageData.direction_names;
+                            selected => {
+                                AuraPageData.apply_effect({
+                                    mode: AuraPageData.led_mode_data.mode,
+                                    zone: AuraPageData.led_mode_data.zone,
+                                    colour1: AuraPageData.led_mode_data.colour1,
+                                    colour2: AuraPageData.led_mode_data.colour2,
+                                    speed: AuraPageData.led_mode_data.speed,
+                                    direction: self.current-index,
+                                });
+                            }
+                        }
+                    }
+                }
+                RogItem {
+                    VerticalBox {
+                        Text { text: @tr("Speed"); vertical-alignment: TextVerticalAlignment.center; horizontal-alignment: TextHorizontalAlignment.center; }
+                        ComboBox {
+                            enabled: AuraPageData.speed_enabled;
+                            current_index <=> AuraPageData.speed;
+                            current_value: AuraPageData.speed_names[self.current-index];
+                            model <=> AuraPageData.speed_names;
+                            selected => {
+                                AuraPageData.apply_effect({
+                                    mode: AuraPageData.led_mode_data.mode,
+                                    zone: AuraPageData.led_mode_data.zone,
+                                    colour1: AuraPageData.led_mode_data.colour1,
+                                    colour2: AuraPageData.led_mode_data.colour2,
+                                    speed: self.current-index,
+                                    direction: AuraPageData.led_mode_data.direction,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                Button {
+                    text: @tr("Power Settings");
+                    clicked => {
+                        root.show_fade_cover = true;
+                        root.show_aura_power = true;
+                    }
+                }
+            }
+        }
+
+        if root.show_fade_cover: Rectangle {
+            background: Palette.background;
+            opacity: 0.8;
+            TouchArea {
+                height: 100%;
+                width: 100%;
+            }
+        }
+    }
+
+    if root.show_aura_power && AuraPageData.device_type == AuraDevType.New: Rectangle {
+        background: Palette.background;
+        width: 100%;
+        height: 100%;
+        opacity: 1;
+        ScrollView {
+            VerticalLayout {
+                padding: 30px;
+                padding-top: 10px;
+                spacing: 10px;
+                alignment: LayoutAlignment.start;
+
+                for state[idx] in AuraPageData.led_power.states: zone := AuraPowerGroup {
+                    group-title: AuraPageData.power_zone_names[state.zone_name_idx];
+                    // TODO: use the zone name
+                    boot_checked: state.boot;
+                    boot_toggled => {
+                        AuraPageData.led_power.states[idx].boot = zone.boot_checked;
+                        AuraPageData.cb_led_power(AuraPageData.led_power);
+                    }
+                    awake_checked: state.awake;
+                    awake_toggled => {
+                        AuraPageData.led_power.states[idx].awake = zone.awake_checked;
+                        AuraPageData.cb_led_power(AuraPageData.led_power);
+                    }
+                    sleep_checked: state.sleep;
+                    sleep_toggled => {
+                        AuraPageData.led_power.states[idx].sleep = zone.sleep_checked;
+                        AuraPageData.cb_led_power(AuraPageData.led_power);
+                    }
+                    shutdown_checked: state.shutdown;
+                    shutdown_toggled => {
+                        AuraPageData.led_power.states[idx].shutdown = zone.shutdown_checked;
+                        AuraPageData.cb_led_power(AuraPageData.led_power);
+                    }
+                }
+            }
+        }
+    }
+
+    // TUF devices: show the same configurable power groups as `New`, since
+    // `setup_aura` fills `AuraPageData.supported_power_zones` and `led_power`
+    // appropriately for TUF devices. This ensures the Power Settings panel
+    // reflects what the firmware reports for TUF models.
+    if root.show_aura_power && AuraPageData.device_type == AuraDevType.Tuf: Rectangle {
+        background: Palette.background;
+        width: 100%;
+        height: 100%;
+        opacity: 1;
+        ScrollView {
+            VerticalLayout {
+                padding: 30px;
+                padding-top: 10px;
+                spacing: 10px;
+                alignment: LayoutAlignment.start;
+
+                for state[idx] in AuraPageData.led_power.states: tuf_zone := AuraPowerGroup {
+                    group-title: AuraPageData.power_zone_names[state.zone_name_idx];
+                    boot_checked: state.boot;
+                    boot_toggled => {
+                        AuraPageData.led_power.states[idx].boot = tuf_zone.boot_checked;
+                        AuraPageData.cb_led_power(AuraPageData.led_power);
+                    }
+                    awake_checked: state.awake;
+                    awake_toggled => {
+                        AuraPageData.led_power.states[idx].awake = tuf_zone.awake_checked;
+                        AuraPageData.cb_led_power(AuraPageData.led_power);
+                    }
+                    sleep_checked: state.sleep;
+                    sleep_toggled => {
+                        AuraPageData.led_power.states[idx].sleep = tuf_zone.sleep_checked;
+                        AuraPageData.cb_led_power(AuraPageData.led_power);
+                    }
+                    shutdown_checked: state.shutdown;
+                    shutdown_toggled => {
+                        AuraPageData.led_power.states[idx].shutdown = tuf_zone.shutdown_checked;
+                        AuraPageData.cb_led_power(AuraPageData.led_power);
+                    }
+                }
+            }
+        }
+    }
+
+    if root.show_aura_power && AuraPageData.device_type == AuraDevType.Old: Rectangle {
+        background: Palette.background;
+        width: 100%;
+        height: 100%;
+        opacity: 1;
+        ScrollView {
+            VerticalLayout {
+                padding: 30px;
+                padding-top: 10px;
+                spacing: 10px;
+                alignment: LayoutAlignment.start;
+
+                Text {
+                    text: "TODO: In progress";
+                }
+
+                for state[idx] in AuraPageData.led_power.states: old_zone := AuraPowerGroupOld {
+                    group-title: @tr("Power Zones");
+                    zone_strings <=> AuraPageData.power_zone_names_old;
+                    selected_zone => {
+                        AuraPageData.led_power.states[idx].zone = AuraPageData.supported_power_zones[old_zone.current_zone];
+                        AuraPageData.cb_led_power(AuraPageData.led_power);
+                    }
+                    boot_checked: state.boot;
+                    boot_toggled => {
+                        AuraPageData.led_power.states[idx].boot = old_zone.boot_checked;
+                        AuraPageData.cb_led_power(AuraPageData.led_power);
+                    }
+                    awake_checked: state.awake;
+                    awake_toggled => {
+                        AuraPageData.led_power.states[idx].awake = old_zone.awake_checked;
+                        AuraPageData.cb_led_power(AuraPageData.led_power);
+                    }
+                    sleep_checked: state.sleep;
+                    sleep_toggled => {
+                        AuraPageData.led_power.states[idx].sleep = old_zone.sleep_checked;
+                        AuraPageData.cb_led_power(AuraPageData.led_power);
+                    }
+                }
+            }
+        }
+    }
+
+    if root.show_aura_power: Button {
+        x: root.width - self.width - 6px;
+        y: 6px;
+        text: "✕";
+        height: 36px;
+        clicked => {
+            root.show_aura_power = false;
+            root.show_fade_cover = false;
+        }
+    }
+}

@@ -1,0 +1,256 @@
+import { Palette, TabWidget, Button, CheckBox } from "std-widgets.slint";
+import { Graph, Node } from "../widgets/graph.slint";
+import { SystemToggle } from "../widgets/common.slint";
+import { Profile, FanType, FanPageData } from "../types/fan_types.slint";
+
+component FanTab inherits Rectangle {
+    in-out property <bool> enabled: false;
+    in-out property <bool> tab_enabled: true;
+    in property <Profile> profile;
+    in property <FanType> fan_type;
+    callback apply();
+    callback cancel();
+    callback default();
+    callback toggled();
+    in property <string> title;
+    in-out property <[Node]> nodes;
+
+    VerticalLayout {
+        padding: 5px;
+        HorizontalLayout {
+            if root.tab_enabled: Graph {
+                nodes <=> root.nodes;
+            }
+            if !root.tab_enabled: Rectangle {
+                Text {
+                    font-size: 16px;
+                    text: @tr("This fan is not avilable on this machine");
+                }
+            }
+        }
+
+        Rectangle {
+            background: Palette.border;
+            height: 1px;
+        }
+
+        HorizontalLayout {
+            alignment: LayoutAlignment.end;
+            spacing: 10px;
+            padding: 10px;
+            CheckBox {
+                text: @tr("Enabled");
+                checked <=> root.enabled;
+                enabled <=> root.tab_enabled;
+                toggled => {
+                    root.toggled();
+                }
+            }
+
+            Button {
+                text: @tr("Apply");
+                enabled <=> root.tab_enabled;
+                clicked => {
+                    root.apply();
+                }
+            }
+
+            Button {
+                text: @tr("Cancel");
+                enabled <=> root.tab_enabled;
+                clicked => {
+                    root.cancel()
+                }
+            }
+
+            Button {
+                text: @tr("Factory Default (all fans)");
+                enabled <=> root.tab_enabled;
+                clicked => {
+                    root.default();
+                }
+            }
+        }
+    }
+}
+
+export component PageFans inherits VerticalLayout {
+    TabWidget {
+        Tab {
+            title: @tr("Balanced");
+            TabWidget {
+                Tab {
+                    title: @tr("CPU");
+                    FanTab {
+                        tab_enabled <=> FanPageData.cpu_fan_available;
+                        enabled <=> FanPageData.balanced_cpu_enabled;
+                        nodes <=> FanPageData.balanced_cpu;
+                        apply => {
+                            FanPageData.set_fan_data(FanType.CPU, Profile.Balanced, self.enabled, FanPageData.balanced_cpu);
+                        }
+                        toggled => {
+                            FanPageData.set_fan_data(FanType.CPU, Profile.Balanced, self.enabled, FanPageData.balanced_cpu);
+                        }
+                        default => {
+                            FanPageData.set_profile_default(Profile.Balanced);
+                        }
+                    }
+                }
+
+                Tab {
+                    title: @tr("Mid");
+                    FanTab {
+                        tab_enabled <=> FanPageData.mid_fan_available;
+                        enabled <=> FanPageData.balanced_mid_enabled;
+                        nodes <=> FanPageData.balanced_mid;
+                        apply => {
+                            FanPageData.set_fan_data(FanType.Middle, Profile.Balanced, self.enabled, FanPageData.balanced_mid);
+                        }
+                        toggled => {
+                            FanPageData.set_fan_data(FanType.Middle, Profile.Balanced, self.enabled, FanPageData.balanced_mid);
+                        }
+                        default => {
+                            FanPageData.set_profile_default(Profile.Balanced);
+                        }
+                    }
+                }
+
+                Tab {
+                    title: @tr("GPU");
+                    FanTab {
+                        tab_enabled <=> FanPageData.gpu_fan_available;
+                        enabled <=> FanPageData.balanced_gpu_enabled;
+                        nodes <=> FanPageData.balanced_gpu;
+                        apply => {
+                            FanPageData.set_fan_data(FanType.GPU, Profile.Balanced, self.enabled, FanPageData.balanced_gpu);
+                        }
+                        toggled => {
+                            FanPageData.set_fan_data(FanType.GPU, Profile.Balanced, self.enabled, FanPageData.balanced_gpu);
+                        }
+                        default => {
+                            FanPageData.set_profile_default(Profile.Balanced);
+                        }
+                    }
+                }
+            }
+        }
+
+        Tab {
+            title: @tr("Performance");
+            TabWidget {
+                Tab {
+                    title: @tr("CPU");
+                    FanTab {
+                        tab_enabled <=> FanPageData.cpu_fan_available;
+                        enabled <=> FanPageData.performance_cpu_enabled;
+                        nodes <=> FanPageData.performance_cpu;
+                        apply => {
+                            FanPageData.set_fan_data(FanType.CPU, Profile.Performance, self.enabled, FanPageData.performance_cpu);
+                        }
+                        toggled => {
+                            FanPageData.set_fan_data(FanType.CPU, Profile.Performance, self.enabled, FanPageData.performance_cpu);
+                        }
+                        default => {
+                            FanPageData.set_profile_default(Profile.Performance);
+                        }
+                    }
+                }
+
+                Tab {
+                    title: @tr("Mid");
+                    FanTab {
+                        tab_enabled <=> FanPageData.mid_fan_available;
+                        enabled <=> FanPageData.performance_mid_enabled;
+                        nodes <=> FanPageData.performance_mid;
+                        apply => {
+                            FanPageData.set_fan_data(FanType.Middle, Profile.Performance, self.enabled, FanPageData.performance_mid);
+                        }
+                        toggled => {
+                            FanPageData.set_fan_data(FanType.Middle, Profile.Performance, self.enabled, FanPageData.performance_mid);
+                        }
+                        default => {
+                            FanPageData.set_profile_default(Profile.Performance);
+                        }
+                    }
+                }
+
+                Tab {
+                    title: @tr("GPU");
+                    FanTab {
+                        tab_enabled <=> FanPageData.gpu_fan_available;
+                        enabled <=> FanPageData.performance_gpu_enabled;
+                        nodes <=> FanPageData.performance_gpu;
+                        apply => {
+                            FanPageData.set_fan_data(FanType.GPU, Profile.Performance, self.enabled, FanPageData.performance_gpu);
+                        }
+                        toggled => {
+                            FanPageData.set_fan_data(FanType.GPU, Profile.Performance, self.enabled, FanPageData.performance_gpu);
+                        }
+                        default => {
+                            FanPageData.set_profile_default(Profile.Performance);
+                        }
+                    }
+                }
+            }
+        }
+
+        Tab {
+            title: @tr("Quiet");
+            TabWidget {
+                Tab {
+                    title: @tr("CPU");
+                    FanTab {
+                        tab_enabled <=> FanPageData.cpu_fan_available;
+                        enabled <=> FanPageData.quiet_cpu_enabled;
+                        nodes <=> FanPageData.quiet_cpu;
+                        apply => {
+                            FanPageData.set_fan_data(FanType.CPU, Profile.Quiet, self.enabled, FanPageData.quiet_cpu);
+                        }
+                        toggled => {
+                            FanPageData.set_fan_data(FanType.CPU, Profile.Quiet, self.enabled, FanPageData.quiet_cpu);
+                        }
+                        default => {
+                            FanPageData.set_profile_default(Profile.Quiet);
+                        }
+                    }
+                }
+
+                Tab {
+                    title: @tr("Mid");
+                    FanTab {
+                        tab_enabled <=> FanPageData.mid_fan_available;
+                        enabled <=> FanPageData.quiet_mid_enabled;
+                        nodes <=> FanPageData.quiet_mid;
+                        apply => {
+                            FanPageData.set_fan_data(FanType.Middle, Profile.Quiet, self.enabled, FanPageData.quiet_mid);
+                        }
+                        toggled => {
+                            FanPageData.set_fan_data(FanType.Middle, Profile.Quiet, self.enabled, FanPageData.quiet_mid);
+                        }
+                        default => {
+                            FanPageData.set_profile_default(Profile.Quiet);
+                        }
+                    }
+                }
+
+                Tab {
+                    title: @tr("GPU");
+                    FanTab {
+                        tab_enabled <=> FanPageData.gpu_fan_available;
+                        enabled <=> FanPageData.quiet_gpu_enabled;
+                        nodes <=> FanPageData.quiet_gpu;
+                        apply => {
+                            FanPageData.set_fan_data(FanType.GPU, Profile.Quiet, self.enabled, FanPageData.quiet_gpu);
+                        }
+                        toggled => {
+                            FanPageData.set_fan_data(FanType.GPU, Profile.Quiet, self.enabled, FanPageData.quiet_gpu);
+                        }
+                        default => {
+                            FanPageData.set_profile_default(Profile.Quiet);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

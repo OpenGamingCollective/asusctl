@@ -1,0 +1,175 @@
+import { Palette, VerticalBox, ScrollView } from "std-widgets.slint";
+import { SystemDropdown, SystemSlider, SystemToggle, RogItem } from "../widgets/common.slint";
+
+export global SlashPageData {
+    in-out property <bool> enabled: false;
+    callback cb_enabled(bool);
+
+    in-out property <int> brightness: 255;
+    callback cb_brightness(int);
+
+    in-out property <int> interval: 0;
+    callback cb_interval(int);
+
+    in-out property <[string]> mode_choices: [];
+    in-out property <int> mode: 0;
+    callback cb_mode(int);
+
+    in-out property <bool> show_on_boot: true;
+    callback cb_show_on_boot(bool);
+    in-out property <bool> show_on_shutdown: true;
+    callback cb_show_on_shutdown(bool);
+    in-out property <bool> show_on_sleep: true;
+    callback cb_show_on_sleep(bool);
+    in-out property <bool> show_on_battery: true;
+    callback cb_show_on_battery(bool);
+    in-out property <bool> show_battery_warning: true;
+    callback cb_show_battery_warning(bool);
+    in-out property <bool> show_on_lid_closed: true;
+    callback cb_show_on_lid_closed(bool);
+}
+
+export component PageSlash inherits Rectangle {
+    clip: true;
+
+    ScrollView {
+        VerticalLayout {
+            padding: 12px;
+            spacing: 8px;
+            alignment: LayoutAlignment.start;
+
+            Rectangle {
+                background: Palette.alternate-background;
+                border-color: Palette.border;
+                border-width: 1px;
+                border-radius: 2px;
+                height: 36px;
+                Text {
+                    font-size: 16px;
+                    color: Palette.control-foreground;
+                    horizontal-alignment: TextHorizontalAlignment.center;
+                    text: @tr("Slash lighting");
+                }
+            }
+
+            SystemToggle {
+                text: @tr("Enable A-cover lighting");
+                checked <=> SlashPageData.enabled;
+                toggled => {
+                    SlashPageData.cb_enabled(SlashPageData.enabled);
+                }
+            }
+
+            SystemSlider {
+                text: @tr("Brightness");
+                minimum: 0;
+                maximum: 255;
+                has_reset: false;
+                enabled <=> SlashPageData.enabled;
+                value: SlashPageData.brightness;
+                released => {
+                    SlashPageData.brightness = Math.round(self.value);
+                    SlashPageData.cb_brightness(SlashPageData.brightness);
+                }
+            }
+
+            SystemSlider {
+                text: @tr("Animation speed");
+                minimum: 0;
+                maximum: 5;
+                has_reset: false;
+                enabled <=> SlashPageData.enabled;
+                value: SlashPageData.interval;
+                released => {
+                    SlashPageData.interval = Math.round(self.value);
+                    SlashPageData.cb_interval(SlashPageData.interval);
+                }
+            }
+
+            if SlashPageData.mode_choices.length > 0: SystemDropdown {
+                text: @tr("Animation");
+                current_index <=> SlashPageData.mode;
+                current_value: SlashPageData.mode_choices[SlashPageData.mode];
+                model <=> SlashPageData.mode_choices;
+                enabled <=> SlashPageData.enabled;
+                selected => {
+                    SlashPageData.cb_mode(SlashPageData.mode);
+                }
+            }
+
+            Rectangle {
+                background: Palette.alternate-background;
+                border-color: Palette.border;
+                border-width: 1px;
+                border-radius: 2px;
+                height: 36px;
+                Text {
+                    font-size: 16px;
+                    color: Palette.control-foreground;
+                    horizontal-alignment: TextHorizontalAlignment.center;
+                    text: @tr("Visibility triggers");
+                }
+            }
+
+            SystemToggle {
+                text: @tr("Show on boot");
+                checked <=> SlashPageData.show_on_boot;
+                toggled => {
+                    SlashPageData.cb_show_on_boot(SlashPageData.show_on_boot);
+                }
+            }
+
+            SystemToggle {
+                text: @tr("Show on shutdown");
+                checked <=> SlashPageData.show_on_shutdown;
+                toggled => {
+                    SlashPageData.cb_show_on_shutdown(SlashPageData.show_on_shutdown);
+                }
+            }
+
+            SystemToggle {
+                text: @tr("Show on sleep");
+                checked <=> SlashPageData.show_on_sleep;
+                toggled => {
+                    SlashPageData.cb_show_on_sleep(SlashPageData.show_on_sleep);
+                }
+            }
+
+            SystemToggle {
+                text: @tr("Show on battery");
+                checked <=> SlashPageData.show_on_battery;
+                toggled => {
+                    SlashPageData.cb_show_on_battery(SlashPageData.show_on_battery);
+                }
+            }
+
+            SystemToggle {
+                text: @tr("Show low-battery warning");
+                checked <=> SlashPageData.show_battery_warning;
+                toggled => {
+                    SlashPageData.cb_show_battery_warning(SlashPageData.show_battery_warning);
+                }
+            }
+
+            SystemToggle {
+                text: @tr("Show when lid is closed");
+                checked <=> SlashPageData.show_on_lid_closed;
+                toggled => {
+                    SlashPageData.cb_show_on_lid_closed(SlashPageData.show_on_lid_closed);
+                }
+            }
+
+            RogItem {
+                min-height: 64px;
+                max-height: 64px;
+                Text {
+                    width: parent.width - 20px;
+                    x: 10px;
+                    wrap: TextWrap.word-wrap;
+                    color: Palette.control-foreground;
+                    text: @tr("Slash_tip" => "Slash Lighting controls the A-cover LED strip found on supported Zephyrus models.");
+                }
+            }
+        }
+    }
+}

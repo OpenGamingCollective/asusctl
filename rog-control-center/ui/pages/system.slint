@@ -81,8 +81,8 @@ export global PowerData {
     callback cb_ppt_enabled(bool);
 
     in-out property <int> platform_profile: 0;
-    in-out property <[string]> platform_profile_choices: [@tr("Balanced"), @tr("Performance"), @tr("Quiet"), @tr("LowPower")];
-    in-out property <[int]> platform_profile_indexes: [0, 1, 2, 3];
+    in-out property <[string]> platform_profile_choices: [@tr("LowPower"), @tr("Quiet"), @tr("Balanced"), @tr("Performance")];
+    in-out property <[int]> platform_profile_indexes: [3, 2, 0, 1];
     callback cb_platform_profile(int);
 
     in-out property <[string]> energy_performance_choices: [

@@ -45,7 +45,7 @@ pub fn setup_window(config: Arc<Mutex<Config>>) -> MainWindow {
     //);
     ui.set_sidebar_items_avilable(
         [
-            true, true, true, true, true, true, true, true, true, true,
+            true, true, true, true, true, true, true, true, true,
         ]
         .into(),
     );

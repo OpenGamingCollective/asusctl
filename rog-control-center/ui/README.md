@@ -75,9 +75,12 @@ workaround (`home.slint`) should then be removable.
 `home.slint` (`PageHome`):
 
 - Responsive properties on the root:
-  - `compact: self.width < 1000px` — tighter layout for small laptops.
-  - `card-side`, `gap-lg`, `gap-md`, `metric-max`, `pad-x` — all lengths derived
-    from `compact`. Metric cards use `max-width: root.metric-max`.
+  - `compact: root.width < 1000px` — tighter layout for small laptops.
+  - `card-side`, `gap-lg`, `gap-md`, `metric-max`, `pad-x` — above the compact
+    breakpoint these scale **continuously** with `root.width` (see the
+    coefficients in `home.slint`). Metric cards use `max-width: root.metric-max`.
+  - Therefore the dashboard fills whatever width the page gets: no fixed 1100px
+    cap, no hardcoded card metric sizes.
 - Layout:
   - Root `VerticalLayout`: titlebar (52px) + dashboard (`vertical-stretch: 1`).
   - Dashboard `VerticalLayout`: padding + the columns `HorizontalLayout`.
@@ -91,9 +94,10 @@ workaround (`home.slint`) should then be removable.
 - Window sizing restored from `AppSize`: `min-width/height` (1100×630),
   `preferred-width/height` (1000×700).
 - Page host is a `Rectangle { horizontal-stretch: 1 }`; `PageHome` gets
-  `width: parent.width > 1100px ? 1100px : parent.width; height: parent.height;
-  x: (parent.width - self.width)/2;` → fills monitors, capped at 1100px and
-  centered; fits 1366-laptops at min size; `compact` covers narrower windows.
+  `width: 100%; height: 100%` → it fills the whole area right of the sidebar,
+  and the page's own continuous sizing scales the content on big monitors.
+  (Older layout had a 1100px cap + centering here — do not reintroduce a fixed
+  width for the page host; size scaling belongs to `PageHome`.)
 
 ## Verifying the UI
 

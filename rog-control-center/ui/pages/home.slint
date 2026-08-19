@@ -15,14 +15,19 @@ export component PageHome inherits RogPage {
 
     // ====== Responsive sizing ======
     // Below ~1000px of page width (narrower laptops) the dashboard tightens:
-    // smaller product card, tighter gaps and capped metric cards. On bigger
-    // windows it expands back up to the 1100px cap set by the page host.
-    property <bool> compact: self.width < 1000px;
-    property <length> card-side: root.compact ? 300px : 360px;
-    property <length> gap-lg: root.compact ? 24px : 36px;
-    property <length> gap-md: root.compact ? 16px : 20px;
-    property <length> metric-max: root.compact ? 300px : 340px;
-    property <length> pad-x: root.compact ? 20px : 24px;
+    // smaller product card, tighter gaps and capped metric cards (compact).
+    // Above that everything scales continuously with the page width (which now
+    // fills the whole window right of the sidebar) so big monitors grow the
+    // product card and metric cards instead of leaving a fixed-width block.
+    // The 0.31/0.031/0.017/0.02 coefficients reproduce the old fixed sizes
+    // (~360px card / 340px metrics) at a ~1150px page (1366px laptop).
+    property <bool> compact: root.width < 1000px;
+    property <length> card-side: root.compact ? 300px : Math.min(520px, root.width * 0.31);
+    property <length> gap-lg: root.compact ? 24px : Math.min(48px, root.width * 0.031);
+    property <length> gap-md: root.compact ? 16px : Math.min(28px, root.width * 0.017);
+    property <length> pad-x: root.compact ? 20px : Math.min(44px, root.width * 0.02);
+    property <length> right-col: root.width - 2 * root.pad-x - root.card-side - root.gap-lg;
+    property <length> metric-max: root.compact ? 300px : Math.min(600px, (root.right-col - root.gap-lg) / 2);
 
     // ====== Titlebar + Dashboard Root Layout ======
     VerticalLayout {

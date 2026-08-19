@@ -16,11 +16,10 @@ export component MainWindow inherits Window {
     icon: @image-url("../data/rog-control-center.png");
     in property <[bool]> sidebar_items_avilable: [
         true, // System Control (Home)
-        true, 
-        true,
-        true,
-        true,
-        true,
+        true, // Keyboard Aura
+        true, // AniMe Matrix
+        true, // Slash Lighting
+        true, // Fan Curves
         true, // GPU Configuration
         true, // Battery Info
         true, // App Settings
@@ -56,7 +55,6 @@ export component MainWindow inherits Window {
             // to keep in sync when entries are added or reordered.
             model: [
                 { title: @tr("Menu1" => "System Control"), icon: @image-url("images/nav-home.svg") },
-                { title: @tr("Menu_system" => "System Tuning"), icon: @image-url("images/ic-cpu.svg") },
                 { title: @tr("Menu2" => "Keyboard Aura"), icon: @image-url("images/nav-keyboard.svg") },
                 { title: @tr("Menu3" => "AniMe Matrix"), icon: @image-url("images/nav-matrix.svg") },
                 { title: @tr("Menu4" => "Slash Lighting"), icon: @image-url("images/nav-slash.svg") },
@@ -69,18 +67,16 @@ export component MainWindow inherits Window {
             available: root.sidebar_items_avilable;
         }
 
-        // Page host: stretches to fill everything right of the sidebar, and
-        // centers each page horizontally when it's narrower than the cap.
+        // Page host: stretches to fill everything right of the sidebar.
         Rectangle {
             horizontal-stretch: 1;
             background: Theme.bg-base;
 
-            // Home dashboard fills the area right of the sidebar, capped at
-            // 1100px and centered on wide monitors.
+            // Home dashboard fills the whole area right of the sidebar; the
+            // page scales its content up on wide monitors on its own.
             if side-bar.current-item == 0: PageHome {
-                width: parent.width > 1100px ? 1100px : parent.width;
-                height: parent.height;
-                x: (parent.width - self.width) / 2;
+                width: 100%;
+                height: 100%;
             }
             // Every not-yet-ported page.
             if side-bar.current-item > 0: Rectangle {
