@@ -44,6 +44,9 @@
             (pkgs system).SDL2
             (pkgs system).cargo-cranky
             (pkgs system).eslint
+            (pkgs system).ninja
+            (pkgs system).freetype
+            (pkgs system).fontconfig
           ];
           LD_LIBRARY_PATH = (pkgs system).lib.makeLibraryPath [
             (pkgs system).wayland
@@ -57,6 +60,8 @@
             (pkgs system).egl-x11
             (pkgs system).libglvnd
             (pkgs system).fontconfig
+            (pkgs system).ninja
+            (pkgs system).freetype
           ];
           LIBCLANG_PATH = "${(pkgs system).llvmPackages.libclang.lib}/lib";
           RUST_SRC_PATH = "${toolchainFor system}/lib/rustlib/src/rust/library";
