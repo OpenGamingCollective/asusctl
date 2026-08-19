@@ -56,6 +56,7 @@
             (pkgs system).egl-wayland
             (pkgs system).egl-x11
             (pkgs system).libglvnd
+            (pkgs system).fontconfig
           ];
           LIBCLANG_PATH = "${(pkgs system).llvmPackages.libclang.lib}/lib";
           RUST_SRC_PATH = "${toolchainFor system}/lib/rustlib/src/rust/library";
