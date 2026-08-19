@@ -49,7 +49,7 @@ pub fn bind_ui_events(ui: &MainWindow, tx: UnboundedSender<Event>) {
         tx,
         PowerData,
         on_cb_platform_profile,
-        Event::UserRequestedProfile
+        Event::UserRequestedPowerProfile
     );
 
     bind!(
@@ -60,4 +60,9 @@ pub fn bind_ui_events(ui: &MainWindow, tx: UnboundedSender<Event>) {
         Event::UserRequestedBatteryLimit,
         u8
     );
+
+    // Retry asusd
+    ui.on_retry_asusd(move || {
+        let _ = tx.send(Event::RetryAsusd);
+    });
 }

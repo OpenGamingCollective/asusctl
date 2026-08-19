@@ -29,9 +29,26 @@ pub fn apply_ui_update(ui: &MainWindow, update: UiUpdate) {
         }
         UiUpdate::ShowToast {
             message,
-            is_error: _,
+            toast_type,
         } => {
-            crate::ui::toast::show_toast(message.into(), ui.as_weak());
+            crate::ui::toast::show_toast(message.into(), toast_type, ui.as_weak());
+        }
+        UiUpdate::ShowPermanentToast {
+            message,
+            toast_type,
+        } => {
+            crate::ui::toast::show_permanent_toast(message.into(), toast_type, ui.as_weak());
+        }
+        UiUpdate::AsusdState(running) => {
+            let sys = ui.global::<SystemInfo>();
+            sys.set_asusd_running(running);
+            if running {
+                crate::ui::toast::show_toast(
+                    "asusd connected".into(),
+                    crate::state::ToastType::Info,
+                    ui.as_weak(),
+                );
+            }
         }
         UiUpdate::ToggleWindow => {
             if ui.window().is_visible() {

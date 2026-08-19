@@ -1,5 +1,5 @@
 use std::env;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use config_traits::{StdConfig, StdConfigLoad1};
 use dmi_id::DMIID;
@@ -8,14 +8,16 @@ use log::{error, info, warn};
 
 use rog_control_center::cli_options::CliStart;
 use rog_control_center::config::Config;
-use rog_control_center::error::Result;
 use rog_control_center::print_versions;
 
 use rog_control_center::state::Event;
 use rog_control_center::ui::actions::ActionHandler;
+use rog_control_center::zbus_proxies::AsusdInterface;
 use slint::ComponentHandle;
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
+
+use anyhow::Result;
 
 fn main() -> Result<()> {
     // Setup Logging
@@ -124,9 +126,32 @@ fn main() -> Result<()> {
     ));
     // subscribe_telemetry(event_tx.clone(), true);
 
+    // Detect asusd and send the result to the GUI
+    let asusd = Arc::new(OnceLock::new());
+    let asusd_set = asusd.clone();
+    let asusd_tx = event_tx.clone();
+    rt.spawn(async move {
+        match AsusdInterface::build().await {
+            Ok(int) if int.present() => {
+                let _ = asusd_set.set(int);
+                let _ = asusd_tx.send(Event::AsusdState(true));
+            }
+            Ok(_) => {
+                warn!("asusd reachable but no known interfaces found");
+                let _ = asusd_tx.send(Event::AsusdState(false));
+            }
+            Err(err) => {
+                warn!("asusd is not available: {err}");
+                let _ = asusd_tx.send(Event::AsusdState(false));
+            }
+        }
+    });
+
     let mut action_handler = ActionHandler {
         tray_tx: tray_tx.clone(),
         config: config.clone(),
+        asusd: asusd.clone(),
+        event_tx: event_tx.clone(),
     };
 
     // Start Event Loop

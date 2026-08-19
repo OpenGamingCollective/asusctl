@@ -27,12 +27,33 @@ export component MainWindow inherits Window {
         true, // About
     ];
     private property <bool> toast: false;
+    private property <bool> toast_permanent: false;
     private property <string> toast_text: "I show when something is waiting";
-    callback show_toast(string);
-    show_toast(text) => {
+    // 0 = info, 1 = warn, 2 = error
+    private property <int> toast_type: 0;
+    callback show_toast(string, int);
+    show_toast(text, kind) => {
         toast = text != "";
+        toast_permanent = false;
         toast_text = text;
+        toast_type = kind;
     }
+    callback show_permanent_toast(string, int);
+    show_permanent_toast(text, kind) => {
+        toast = text != "";
+        toast_permanent = true;
+        toast_text = text;
+        toast_type = kind;
+    }
+    callback clear_permanent_toast();
+    clear_permanent_toast() => {
+        if (toast_permanent) {
+            toast = false;
+            toast_text = "";
+        }
+    }
+    // User pressed "Retry" on the permanent asusd-unavailable toast.
+    callback retry_asusd();
     callback clear_toast_if_matches(string);
     clear_toast_if_matches(text) => {
         if (toast && toast_text == text) {
@@ -101,44 +122,6 @@ export component MainWindow inherits Window {
         }
     }
 
-    // Toast: pill that fades + slides in from the bottom, centred on
-    // the WHOLE window (independent of the sidebar width). Tap to
-    // dismiss. Always mounted so the enter/exit animations can play.
-    Rectangle {
-        property <length> pill-w: (toast-lbl.preferred-width + 48px) > (root.width - 32px) ? (root.width - 32px) : (toast-lbl.preferred-width + 48px);
-        x: (root.width - self.width) / 2;
-        y: root.height - 24px - (toast ? 0px : 16px) - self.height;
-        width: pill-w;
-        height: 40px;
-        border-radius: 20px;
-        background: Theme.bg-elevated;
-        border-width: 1px;
-        border-color: Theme.line;
-        drop-shadow-blur: 18px;
-        drop-shadow-color: #00000060;
-        opacity: toast ? 1.0 : 0.0;
-        visible: self.opacity > 0.01;
-        animate opacity { duration: 220ms; easing: ease-out; }
-        animate y { duration: 220ms; easing: cubic-bezier(0.22, 0.61, 0.36, 1); }
-        TouchArea {
-            height: 100%;
-            width: 100%;
-            mouse-cursor: pointer;
-            clicked => {
-                toast = false;
-            }
-        }
-        toast-lbl := Text {
-            width: parent.width - 48px;
-            color: Theme.text-primary;
-            font-size: Theme.font-sm;
-            text: root.toast_text;
-            horizontal-alignment: center;
-            vertical-alignment: center;
-            overflow: elide;
-        }
-    }
-
     if SomeError.error_message != "": Rectangle {
         x: 0px;
         y: 0px;
@@ -177,6 +160,104 @@ export component MainWindow inherits Window {
         open: root.show_per_profile_overlay;
         close() => {
             root.close_per_profile_settings();
+        }
+    }
+
+    // Grey-out: full-window dim when asusd is unreachable. Blocks every click
+    // underneath (whole window), so the UI is visually greyed + interaction
+    // disabled but the app keeps running. The permanent toast below is on top
+    // of this so its Retry button stays clickable.
+    if !SystemInfo.asusd_running: Rectangle {
+        x: 0px;
+        y: 0px;
+        width: 100%;
+        height: 100%;
+        background: Theme.dark ? #000000 : #FFFFFF;
+        opacity: 0.55;
+        TouchArea {
+            width: 100%;
+            height: 100%;
+        }
+        VerticalLayout {
+            alignment: center;
+            spacing: 10px;
+            Text {
+                text: @tr("asusd-unavailable" => "asusd is not running");
+                color: Theme.text-primary;
+                font-size: Theme.font-lg;
+                font-weight: 600;
+                horizontal-alignment: center;
+            }
+            Text {
+                text: @tr("asusd-unavailable-hint" => "Controls are disabled. Press Retry once asusd is up.");
+                color: Theme.text-secondary;
+                font-size: Theme.font-sm;
+                horizontal-alignment: center;
+            }
+        }
+    }
+
+    toast-pill := Rectangle {
+        property <color> toast_accent: root.toast_type == 2 ? #E85656 : (root.toast_type == 1 ? #FFBD00 : #00A8E4);
+        property <brush> toast_bg: root.toast_type == 2 ? #5C1F24E6 : (root.toast_type == 1 ? #4D3A10E6 : #103247E6);
+        x: (root.width - self.width) / 2;
+        width: Math.min(640px, root.width - 32px);
+        height: 40px;
+        border-radius: 20px;
+        background: toast-pill.toast_bg;
+        border-width: 1px;
+        border-color: toast-pill.toast_accent;
+        drop-shadow-blur: 18px;
+        drop-shadow-color: #00000060;
+        opacity: toast ? 1.0 : 0.0;
+        visible: self.opacity > 0.01;
+        animate opacity { duration: 220ms; easing: ease-out; }
+        animate y { duration: 220ms; easing: cubic-bezier(0.22, 0.61, 0.36, 1); }
+        TouchArea {
+            height: 100%;
+            width: 100%;
+            mouse-cursor: pointer;
+            clicked => {
+                if (!toast_permanent) {
+                    toast = false;
+                }
+            }
+        }
+        toast-lbl := Text {
+            color: Theme.text-primary;
+            x: 20px;
+            width: parent.width - (toast_permanent ? 96px : 40px);
+            y: 0px;
+            height: 100%;
+            font-size: Theme.font-sm;
+            text: root.toast_text;
+            vertical-alignment: center;
+            horizontal-alignment: center;
+            overflow: elide;
+        }
+        if toast_permanent: Rectangle {
+            x: parent.width - 70px - 6px;
+            y: 6px;
+            width: 70px;
+            height: parent.height - 12px;
+            border-radius: 14px;
+            background: toast-pill.toast_accent;
+            Text {
+                text: @tr("Retry");
+                color: #FFFFFF;
+                font-size: Theme.font-sm;
+                font-weight: 600;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+            retry-ta := TouchArea {
+                width: 100%;
+                height: 100%;
+                mouse-cursor: pointer;
+                clicked => {
+                    root.retry_asusd();
+                }
+            }
         }
     }
 }
