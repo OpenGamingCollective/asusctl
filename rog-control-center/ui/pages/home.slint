@@ -18,18 +18,31 @@ export component PageHome inherits RogPage {
     // ====== Responsive sizing ======
     // Below ~1000px of page width (narrower laptops) the dashboard tightens:
     // smaller product card, tighter gaps and capped metric cards (compact).
-    // Above that everything scales continuously with the page width (which now
-    // fills the whole window right of the sidebar) so big monitors grow the
-    // product card and metric cards instead of leaving a fixed-width block.
-    // The 0.31/0.031/0.017/0.02 coefficients reproduce the old fixed sizes
-    // (~360px card / 340px metrics) at a ~1150px page (1366px laptop).
+    // Above that everything scales with `content-width`. On wide screens a
+    // future-graphs zone appears on the right (show-graphs); then the left
+    // dashboard is bounded to `left-bound` (≈ the 1366 laptop width) instead of
+    // stretching endlessly, and the graphs take the remaining space.
     property <bool> compact: root.width < 1000px;
-    property <length> card-side: root.compact ? 300px : Math.min(520px, root.width * 0.31);
-    property <length> gap-lg: root.compact ? 24px : Math.min(48px, root.width * 0.031);
-    property <length> gap-md: root.compact ? 16px : Math.min(28px, root.width * 0.017);
-    property <length> pad-x: root.compact ? 20px : Math.min(44px, root.width * 0.02);
-    property <length> right-col: root.width - 2 * root.pad-x - root.card-side - root.gap-lg;
+    // Graphs zone shows only on big windows; hidden on laptops → current layout.
+    property <bool> show-graphs: root.width >= 1500px;
+    // Width the dashboard content should occupy when the graphs zone is visible.
+    property <length> left-bound: 1260px;
+    property <length> content-width: root.compact ? root.width : (root.show-graphs ? root.left-bound : root.width);
+    property <length> card-side: root.compact ? 300px : Math.min(520px, root.content-width * 0.31);
+    property <length> gap-lg: root.compact ? 24px : Math.min(48px, root.content-width * 0.031);
+    property <length> gap-md: root.compact ? 16px : Math.min(28px, root.content-width * 0.017);
+    property <length> pad-x: root.compact ? 20px : Math.min(44px, root.content-width * 0.02);
+    property <length> right-col: root.content-width - 2 * root.pad-x - root.card-side - root.gap-lg;
     property <length> metric-max: root.compact ? 300px : Math.min(600px, (root.right-col - root.gap-lg) / 2);
+
+    // Columns-row bookkeeping for the graphs zone (slint 1.13.1 is unreliable
+    // with an invisible/stretched cell, so the zone's width is explicit):
+    // the row spans the page minus the dashboard padding.
+    property <length> columns-w: root.width - 2 * root.pad-x;
+    // Cap for the telemetry (right column) when the graphs zone is shown.
+    property <length> rightcap: root.left-bound - root.card-side - root.gap-lg;
+    // Width the graphs zone takes when shown = everything left over.
+    property <length> graphs-w: root.columns-w - root.card-side - 2 * root.gap-lg - root.rightcap;
 
     // ====== Titlebar + Dashboard Root Layout ======
     VerticalLayout {
@@ -60,13 +73,15 @@ export component PageHome inherits RogPage {
             padding-bottom: 24px;
             spacing: 0px;
 
+            // Columns: bounded left dashboard (product card + telemetry) and, only
+            // on wide windows (show-graphs), a graphs zone on the right.
             HorizontalLayout {
                 spacing: root.gap-lg;
 
-                // Left column: the product card, directly as a (Rectangle-based)
-                // child — never wrapped in a VerticalLayout (see note above).
-                // Square via the fixed card-side length; no parent geometry.
-                product-card := RogProductCard {
+                    // Left column: the product card, directly as a (Rectangle-based)
+                    // child — never wrapped in a VerticalLayout (see note above).
+                    // Square via the fixed card-side length; no parent geometry.
+                    product-card := RogProductCard {
                     width: root.card-side;
                     height: root.card-side;
                     name: SystemInfo.product_name != "" ? SystemInfo.product_name : "ROG Laptop";
@@ -83,6 +98,10 @@ export component PageHome inherits RogPage {
                 // gaps and nothing overflows on short ones.
                 VerticalLayout {
                     horizontal-stretch: 1;
+                    // Bound the telemetry when the graphs zone is shown so the
+                    // dashboard keeps its laptop look instead of stretching far
+                    // right; otherwise it fills the whole width (like today).
+                    max-width: root.show-graphs ? root.rightcap : 999999px;
                     spacing: root.gap-md;
 
                     // System Usage header
@@ -253,6 +272,62 @@ export component PageHome inherits RogPage {
                             }
                         }
                     }
+                }
+
+            // Future graphs zone: CPU / GPU placeholders — only on wide windows.
+            // NOTE: an invisible stretch cell still absorbs free space on
+            // slint 1.13.1, so when hidden it must contribute 0 to the layout.
+            graphs-zone := Rectangle {
+                visible: root.show-graphs;
+                horizontal-stretch: 0;
+                width: root.show-graphs ? root.graphs-w : 0px;
+                VerticalLayout {
+                    spacing: root.gap-md;
+                    Rectangle {
+                        vertical-stretch: 1;
+                        background: Theme.bg-card;
+                        border-radius: Theme.radius-card;
+                        border-width: 1px;
+                        border-color: Theme.line;
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 8px;
+                            Text {
+                                text: @tr("CPU");
+                                color: Theme.text-primary;
+                                font-size: 22px;
+                                font-weight: 700;
+                            }
+                            Text {
+                                text: @tr("graphs-coming-soon" => "Graphs coming soon");
+                                color: Theme.text-dim;
+                                font-size: 13px;
+                            }
+                        }
+                    }
+                    Rectangle {
+                        vertical-stretch: 1;
+                        background: Theme.bg-card;
+                        border-radius: Theme.radius-card;
+                        border-width: 1px;
+                        border-color: Theme.line;
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 8px;
+                            Text {
+                                text: @tr("GPU");
+                                color: Theme.text-primary;
+                                font-size: 22px;
+                                font-weight: 700;
+                            }
+                            Text {
+                                text: @tr("graphs-coming-soon" => "Graphs coming soon");
+                                color: Theme.text-dim;
+                                font-size: 13px;
+                            }
+                        }
+                    }
+                }
                 }
             }
         }
