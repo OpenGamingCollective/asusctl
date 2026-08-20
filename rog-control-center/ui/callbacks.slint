@@ -1,3 +1,4 @@
+//! This file contain the callbacks, the function that links the UI (Slint) with the "backend" (Rust)
 
 import { AttrMinMax, AttrBool } from "types.slint";
 
@@ -29,12 +30,7 @@ export global SystemInfo {
     in-out property <string> product_name: "";
 }
 
-export global TelemetryData {
-    in-out property <int> battery_health: -1;
-    in-out property <float> battery_power_consumption: -1.0;
-    in-out property <string> battery_status: "Unknown";
-    in-out property <string> battery_time_estimate: "";
-    
+export global TelemetryData {    
     in-out property <float> cpu_temp_val: -1.0;
     in-out property <float> gpu_temp_val: -1.0;
     in-out property <float> igpu_temp_val: -1.0;
@@ -104,7 +100,7 @@ export global PowerData {
     // stored per profile in the client config and applied when that profile
     // becomes active (see the Rust ActionHandler).
     in-out property <ProfileLimits> limits_quiet: {
-        ppt_pl1_spl: { min: 0, max: 100, current: 20 },
+        ppt_pl1_spl: { min: 0, max: 100, current: 20, supported: false },
         ppt_pl2_sppt: { min: 0, max: 100, current: 20 },
         ppt_pl3_fppt: { min: 0, max: 100, current: 20 },
         ppt_fppt: { min: 0, max: 100, current: 20 },

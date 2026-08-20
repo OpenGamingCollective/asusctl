@@ -3,8 +3,8 @@ import { RogSlashMark, RogPage } from "../widgets/layout.slint";
 import { RogMetric, RogReading, RogStatRow } from "../widgets/metrics.slint";
 import { RogModeGrid, RogToggle } from "../widgets/controls.slint";
 import { Theme } from "../globals.slint";
-import { SystemInfo, TelemetryData, PowerData, DeviceData } from "system.slint";
-import {AttrBool} from "types.slint";
+import { SystemInfo, TelemetryData, PowerData, DeviceData } from "../callbacks.slint";
+import {AttrBool} from "../types.slint";
 
 // NOTE (slint 1.13.1 engine bug): a VerticalLayout used as the FIRST child of
 // a HorizontalLayout makes every later cell render empty. The product card is
