@@ -1,5 +1,14 @@
 //! Types used to represent data
 
+use crate::AttrMinMax;
+
+pub const MINMAX: AttrMinMax = AttrMinMax {
+    min: 0,
+    max: 0,
+    current: -1.0,
+    supported: false,
+};
+
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct BatteryInfo {
     pub health: u8,
@@ -40,12 +49,4 @@ pub struct FanTelemetry {
     pub gpu: i32,
     // Some laptops does not have the mid fan
     pub mid: Option<i32>,
-}
-
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct AttrMinMaxData {
-    pub min: i32,
-    pub max: i32,
-    pub current: f32,
-    pub supported: bool,
 }

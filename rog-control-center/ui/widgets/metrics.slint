@@ -52,27 +52,33 @@ export component RogStatRow inherits Rectangle {
 
 
 // — One reading: label+value row + purple-red meter —
-export component RogReading inherits VerticalLayout {
+export component RogReading inherits Rectangle {
     in property <string> label;
     in property <string> value;
+    in property <int> weight; 
     in property <float> progress: 0.0;
-    spacing: 3px;
-    HorizontalLayout {
-        Text {
-            text: root.label;
-            color: Theme.text-secondary;
-            font-size: 13px;
-            vertical-alignment: center;
-        }
-        Rectangle { horizontal-stretch: 1; }
-        Text {
-            text: root.value;
-            color: Theme.text-secondary;
-            font-size: 13px;
-            vertical-alignment: center;
+    Rectangle {
+        VerticalLayout {
+            spacing: 8px;
+            HorizontalLayout {
+                Text {
+                    text: root.label;
+                    color: Theme.text-primary;
+                    font-size: Theme.font-md;
+                    font-weight: root.weight;
+                    vertical-alignment: center;
+                }
+                Rectangle { horizontal-stretch: 1; }
+                Text {
+                    text: root.value;
+                    color: Theme.text-secondary;
+                    font-size: 13px;
+                    vertical-alignment: center;
+                }
+            }
+            RogMeter { value: root.progress; }
         }
     }
-    RogMeter { value: root.progress; }
 }
 
 

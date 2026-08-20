@@ -3,8 +3,13 @@ import { RogSlashMark, RogPage } from "../widgets/layout.slint";
 import { RogMetric, RogReading, RogStatRow } from "../widgets/metrics.slint";
 import { RogModeGrid, RogToggle } from "../widgets/controls.slint";
 import { Theme } from "../globals.slint";
-import { SystemInfo, TelemetryData, PowerData, AsusArmouryData } from "../callbacks.slint";
-import {AttrBool} from "../types.slint";
+import {
+    SystemInfo,
+    TelemetryData,
+    PowerData,
+    AsusArmouryData,
+} from "../callbacks.slint";
+import { AttrBool } from "../types.slint";
 
 // NOTE (slint 1.13.1 engine bug): a VerticalLayout used as the FIRST child of
 // a HorizontalLayout makes every later cell render empty. The product card is
@@ -79,7 +84,7 @@ export component PageHome inherits RogPage {
             HorizontalLayout {
                 spacing: root.gap-lg;
 
-                    // Left column: the product card, directly as a (Rectangle-based)
+                // Left column: the product card, directly as a (Rectangle-based)
                     // child — never wrapped in a VerticalLayout (see note above).
                     // Square via the fixed card-side length; no parent geometry.
                     product-card := RogProductCard {
@@ -111,7 +116,8 @@ export component PageHome inherits RogPage {
                         vertical-stretch: 0;
                         HorizontalLayout {
                             spacing: 8px;
-                            RogSlashMark {}
+                            RogSlashMark { }
+
                             Text {
                                 text: @tr("System Usage");
                                 color: Theme.text-primary;
@@ -119,7 +125,10 @@ export component PageHome inherits RogPage {
                                 font-weight: 600;
                                 vertical-alignment: center;
                             }
-                            Rectangle { horizontal-stretch: 1; }
+
+                            Rectangle {
+                                horizontal-stretch: 1;
+                            }
                         }
                     }
 
@@ -137,11 +146,13 @@ export component PageHome inherits RogPage {
                                 value: TelemetryData.cpu_freq_mhz > 0.0 ? "\{Math.round(TelemetryData.cpu_freq_mhz)} MHz" : "--";
                                 progress: TelemetryData.cpu_freq_mhz / 5000.0;
                             }
+
                             RogReading {
                                 label: @tr("Usage");
                                 value: TelemetryData.cpu_usage_val >= 0.0 ? "\{Math.round(TelemetryData.cpu_usage_val)} %" : "--";
                                 progress: TelemetryData.cpu_usage_val / 100.0;
                             }
+
                             RogReading {
                                 label: @tr("Temperature");
                                 value: TelemetryData.cpu_temp_val > 0.0 ? "\{Math.round(TelemetryData.cpu_temp_val)} °C" : "--";
@@ -162,16 +173,19 @@ export component PageHome inherits RogPage {
                                 value: TelemetryData.dgpu_suspended ? @tr("Suspended") : (TelemetryData.gpu_freq_mhz > 0.0 ? "\{Math.round(TelemetryData.gpu_freq_mhz)} MHz" : "--");
                                 progress: TelemetryData.gpu_freq_mhz / 2500.0;
                             }
+
                             RogReading {
                                 label: @tr("Usage");
                                 value: TelemetryData.dgpu_suspended ? @tr("Suspended") : (TelemetryData.gpu_usage_val >= 0.0 ? "\{Math.round(TelemetryData.gpu_usage_val)} %" : "--");
                                 progress: TelemetryData.gpu_usage_val / 100.0;
                             }
+
                             RogReading {
                                 label: @tr("Temperature");
                                 value: TelemetryData.dgpu_suspended ? @tr("Suspended") : (TelemetryData.gpu_temp_val > 0.0 ? "\{Math.round(TelemetryData.gpu_temp_val)} °C" : "--");
                                 progress: TelemetryData.dgpu_suspended ? 0.0 : (TelemetryData.gpu_temp_val / 100.0);
                             }
+
                             RogStatRow {
                                 label: @tr("TGP");
                                 value: TelemetryData.dgpu_suspended ? @tr("Suspended") : (PowerData.nv_tgp.current >= 0 ? "\{Math.round(PowerData.nv_tgp.current)} W" : "--");
@@ -180,7 +194,10 @@ export component PageHome inherits RogPage {
                     }
 
                     // Vertical flex gap: grows in fullscreen, keeps the rows apart.
-                    Rectangle { vertical-stretch: 1; min-height: 0px; }
+                    Rectangle {
+                        vertical-stretch: 1;
+                        min-height: 0px;
+                    }
 
                     // Row 2: Fan | iGPU
                     HorizontalLayout {
@@ -199,11 +216,13 @@ export component PageHome inherits RogPage {
                                 value: TelemetryData.cpu_fan_rpm >= 0 ? "\{TelemetryData.cpu_fan_rpm} RPM" : "--";
                                 progress: Math.max(0, TelemetryData.cpu_fan_rpm) / 5000.0;
                             }
+
                             RogReading {
                                 label: @tr("GPU Fan");
                                 value: TelemetryData.gpu_fan_rpm >= 0 ? "\{TelemetryData.gpu_fan_rpm} RPM" : "--";
                                 progress: Math.max(0, TelemetryData.gpu_fan_rpm) / 5000.0;
                             }
+
                             RogReading {
                                 label: @tr("Mid Fan");
                                 value: TelemetryData.mid_fan_rpm >= 0 ? "\{TelemetryData.mid_fan_rpm} RPM" : "--";
@@ -224,6 +243,7 @@ export component PageHome inherits RogPage {
                                 value: TelemetryData.igpu_temp_val > 0.0 ? "\{Math.round(TelemetryData.igpu_temp_val)} °C" : "--";
                                 progress: TelemetryData.igpu_temp_val / 100.0;
                             }
+
                             RogReading {
                                 label: @tr("Usage");
                                 value: TelemetryData.igpu_usage_val >= 0.0 ? "\{Math.round(TelemetryData.igpu_usage_val)} %" : "--";
@@ -233,7 +253,10 @@ export component PageHome inherits RogPage {
                     }
 
                     // Vertical flex gap before the mode section.
-                    Rectangle { vertical-stretch: 1; min-height: 0px; }
+                    Rectangle {
+                        vertical-stretch: 1;
+                        min-height: 0px;
+                    }
 
                     // Operation Mode section — switches the real asusd platform
                     // profile. Buttons are generated from the device's actual
@@ -249,7 +272,8 @@ export component PageHome inherits RogPage {
                             height: 24px;
                             HorizontalLayout {
                                 spacing: 8px;
-                                RogSlashMark {}
+                                RogSlashMark { }
+
                                 Text {
                                     text: @tr("Operation Mode");
                                     color: Theme.text-primary;
@@ -257,7 +281,10 @@ export component PageHome inherits RogPage {
                                     font-weight: 600;
                                     vertical-alignment: center;
                                 }
-                                Rectangle { horizontal-stretch: 1; }
+
+                                Rectangle {
+                                    horizontal-stretch: 1;
+                                }
                             }
                         }
 
@@ -274,106 +301,137 @@ export component PageHome inherits RogPage {
                         }
                     }
 
-                    Rectangle {
-                        height: 24px;
-                        vertical-stretch: 1;
-                        VerticalLayout {
-                            spacing: 8px;
+                    RogMetric {
+                        horizontal-stretch: 1;
+                        title: @tr("Asus-Armoury");
+                        if !SystemInfo.asus_armoury_loaded: armoury_warning := Rectangle {
                             Text {
-                                text: @tr("Boot Sound");
+                                text: @tr("Asus-Armoury not loaded");
                                 color: Theme.text-primary;
                                 font-size: Theme.font-md;
                                 font-weight: 600;
                             }
-                            RogToggle {
-                                checked: AsusArmouryData.boot_sound.current;
-                                toggled(v) => {
-                                    AsusArmouryData.cb_boot_sound({
-                                        current: v,
-                                        supported: AsusArmouryData.boot_sound.supported,
-                                    });
+                        }
+                        if AsusArmouryData.boot_sound.supported: bount_sound_rect := Rectangle {
+                            height: 24px;
+                            vertical-stretch: 1;
+                            HorizontalLayout {
+                                spacing: 8px;
+                                Text {
+                                    text: @tr("Boot Sound");
+                                    color: Theme.text-primary;
+                                    font-size: Theme.font-md;
+                                    font-weight: 600;
+                                }
+
+                                RogToggle {
+                                    checked: AsusArmouryData.boot_sound.current;
+                                    toggled(v) => {
+                                        AsusArmouryData.cb_boot_sound({
+                                            current: v,
+                                            supported: AsusArmouryData.boot_sound.supported,
+                                        });
+                                    }
+                                }
+                            }
+                        }
+
+                        if AsusArmouryData.panel_overdrive.supported: panel_od_rect := Rectangle {
+                            height: 24px;
+                            vertical-stretch: 1;
+                            HorizontalLayout {
+                                spacing: 8px;
+                                Text {
+                                    text: @tr("Panel OverDrive");
+                                    color: Theme.text-primary;
+                                    font-size: Theme.font-md;
+                                    font-weight: 600;
+                                }
+
+                                RogToggle {
+                                    checked: AsusArmouryData.panel_overdrive.current;
+                                    toggled(v) => {
+                                        AsusArmouryData.cb_panel_overdrive({ current: v, supported: AsusArmouryData.panel_overdrive.supported });
+                                    }
                                 }
                             }
                         }
                     }
-                    Rectangle {
-                        height: 24px;
-                        vertical-stretch: 1;
-                        VerticalLayout {
-                            spacing: 8px;
-                            Text {
-                                text: @tr("Panel OverDrive");
-                                color: Theme.text-primary;
-                                font-size: Theme.font-md;
-                                font-weight: 600;
-                            }
-                            RogToggle {
-                                checked: AsusArmouryData.panel_overdrive.current;
-                                toggled(v) => {
-                                    AsusArmouryData.cb_panel_overdrive({
-                                        current: v,
-                                        supported: AsusArmouryData.panel_overdrive.supported
-                                    });
-                                }
-                            }
+
+                    RogMetric {
+                        horizontal-stretch: 1;
+                        title: @tr("PPT");
+                        RogReading {
+                            label: @tr("ppt_apu_sppt");
+                            value: PowerData.ppt_apu_sppt.current;
+                            progress: PowerData.ppt_apu_sppt.max;
+                        }
+
+                        RogReading {
+                            label: @tr("ppt_platform_sppt");
+                            value: PowerData.ppt_platform_sppt.current;
+                            progress: PowerData.ppt_platform_sppt.max;
                         }
                     }
                 }
 
-            // Future graphs zone: CPU / GPU placeholders — only on wide windows.
+                // Future graphs zone: CPU / GPU placeholders — only on wide windows.
             // NOTE: an invisible stretch cell still absorbs free space on
             // slint 1.13.1, so when hidden it must contribute 0 to the layout.
             graphs-zone := Rectangle {
-                visible: root.show-graphs;
-                horizontal-stretch: 0;
-                width: root.show-graphs ? root.graphs-w : 0px;
-                VerticalLayout {
-                    spacing: root.gap-md;
-                    Rectangle {
-                        vertical-stretch: 1;
-                        background: Theme.bg-card;
-                        border-radius: Theme.radius-card;
-                        border-width: 1px;
-                        border-color: Theme.line;
-                        VerticalLayout {
-                            alignment: center;
-                            spacing: 8px;
-                            Text {
-                                text: @tr("CPU");
-                                color: Theme.text-primary;
-                                font-size: 22px;
-                                font-weight: 700;
+                    visible: root.show-graphs;
+                    horizontal-stretch: 0;
+                    width: root.show-graphs ? root.graphs-w : 0px;
+                    VerticalLayout {
+                        spacing: root.gap-md;
+                        Rectangle {
+                            vertical-stretch: 1;
+                            background: Theme.bg-card;
+                            border-radius: Theme.radius-card;
+                            border-width: 1px;
+                            border-color: Theme.line;
+                            VerticalLayout {
+                                alignment: center;
+                                spacing: 8px;
+                                Text {
+                                    text: @tr("CPU");
+                                    color: Theme.text-primary;
+                                    font-size: 22px;
+                                    font-weight: 700;
+                                }
+
+                                Text {
+                                    text: @tr("graphs-coming-soon" => "Graphs coming soon");
+                                    color: Theme.text-dim;
+                                    font-size: 13px;
+                                }
                             }
-                            Text {
-                                text: @tr("graphs-coming-soon" => "Graphs coming soon");
-                                color: Theme.text-dim;
-                                font-size: 13px;
+                        }
+
+                        Rectangle {
+                            vertical-stretch: 1;
+                            background: Theme.bg-card;
+                            border-radius: Theme.radius-card;
+                            border-width: 1px;
+                            border-color: Theme.line;
+                            VerticalLayout {
+                                alignment: center;
+                                spacing: 8px;
+                                Text {
+                                    text: @tr("GPU");
+                                    color: Theme.text-primary;
+                                    font-size: 22px;
+                                    font-weight: 700;
+                                }
+
+                                Text {
+                                    text: @tr("graphs-coming-soon" => "Graphs coming soon");
+                                    color: Theme.text-dim;
+                                    font-size: 13px;
+                                }
                             }
                         }
                     }
-                    Rectangle {
-                        vertical-stretch: 1;
-                        background: Theme.bg-card;
-                        border-radius: Theme.radius-card;
-                        border-width: 1px;
-                        border-color: Theme.line;
-                        VerticalLayout {
-                            alignment: center;
-                            spacing: 8px;
-                            Text {
-                                text: @tr("GPU");
-                                color: Theme.text-primary;
-                                font-size: 22px;
-                                font-weight: 700;
-                            }
-                            Text {
-                                text: @tr("graphs-coming-soon" => "Graphs coming soon");
-                                color: Theme.text-dim;
-                                font-size: 13px;
-                            }
-                        }
-                    }
-                }
                 }
             }
         }
