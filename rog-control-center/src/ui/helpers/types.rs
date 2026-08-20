@@ -47,4 +47,5 @@ pub struct AttrMinMaxData {
     pub min: i32,
     pub max: i32,
     pub current: f32,
+    pub supported: bool,
 }

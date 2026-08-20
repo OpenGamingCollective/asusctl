@@ -1,8 +1,9 @@
 //! Handle UiUpdates
 
+use log::info;
 use slint::{ComponentHandle, SharedString};
 
-use crate::{MainWindow, PowerData, SystemInfo, TelemetryData, state::UiUpdate};
+use crate::{DeviceData, MainWindow, PowerData, SystemInfo, TelemetryData, state::UiUpdate};
 
 pub fn apply_ui_update(ui: &MainWindow, update: UiUpdate) {
     match update {
@@ -26,6 +27,14 @@ pub fn apply_ui_update(ui: &MainWindow, update: UiUpdate) {
         UiUpdate::PlatformProfile(p) => {
             let sys_data = ui.global::<PowerData>();
             sys_data.set_platform_profile(p);
+        }
+        UiUpdate::BootSound(b) => {
+            let dev_data = ui.global::<DeviceData>();
+            dev_data.set_boot_sound(b);
+        }
+        UiUpdate::PanelOD(b) => {
+            let dev_data = ui.global::<DeviceData>();
+            dev_data.set_panel_overdrive(b);
         }
         UiUpdate::ShowToast {
             message,
@@ -65,6 +74,9 @@ pub fn apply_ui_update(ui: &MainWindow, update: UiUpdate) {
         }
         UiUpdate::Quit => {
             let _ = slint::quit_event_loop();
+        }
+        _ => {
+            info!("uiupdate not implemented yet: {:?}", update);
         }
     }
 }

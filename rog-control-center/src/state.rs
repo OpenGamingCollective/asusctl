@@ -1,7 +1,10 @@
 //! AppState, contains all the datas and the Events
 
-use crate::ui::helpers::types::{BatteryInfo, SystemTelemetry};
-
+use crate::{
+    AttrBool,
+    ui::helpers::types::{BatteryInfo, SystemTelemetry},
+};
+use log::info;
 #[derive(Debug, Clone)]
 pub enum Event {
     // Hardware update events
@@ -19,10 +22,17 @@ pub enum Event {
 
     // System User Action
     UserRequestedPowerProfile(i32),
-    UserRequestedPanelOD(bool),
-    UserRequestedBootSound(bool),
+    UserRequestedPanelOD(AttrBool),
+    UserRequestedBootSound(AttrBool),
     UserRequestedScreenAutoBrightness(bool),
     UserRequestedMCUPowerSave(bool),
+
+    // System User Update
+    UpdatedPowerProfile(i32),
+    UpdatedPanelOD(AttrBool),
+    UpdatedBootSound(AttrBool),
+    UpdatedScreenAutoBrightness(bool),
+    UpdatedMCUPowerSave(bool),
 
     // System User Action Per Profile
     UserRequestedBatteryLimit(u8),
@@ -41,8 +51,8 @@ pub enum Event {
 pub enum Action {
     // System/Home Page
     SetPlatformProfile(i32),
-    SetPanelOD(bool),
-    SetBootSound(bool),
+    SetPanelOD(AttrBool),
+    SetBootSound(AttrBool),
     SetScreenAutoBrightness(bool),
     SetMCUPowerSave(bool),
 
@@ -79,6 +89,12 @@ pub enum UiUpdate {
         message: String,
         toast_type: ToastType,
     },
+
+    // Home
+    BootSound(AttrBool),
+    PanelOD(AttrBool),
+    ScreenAutoBrightness(bool),
+    MCUPowerSave(bool),
 
     // Window Management
     ToggleWindow,
@@ -174,6 +190,12 @@ impl AppState {
             Event::UserRequestedBatteryLimit(requested_limit) => {
                 actions.push(Action::SetBatteryLimit(requested_limit));
             }
+            Event::UpdatedBootSound(b) => {
+                ui_updates.push(UiUpdate::BootSound(b));
+            }
+            Event::UpdatedPanelOD(b) => {
+                ui_updates.push(UiUpdate::PanelOD(b));
+            }
             // Config
             Event::UserToggledTray(b) => {
                 actions.push(Action::SetTray(b));
@@ -184,6 +206,9 @@ impl AppState {
             Event::HideWindow => ui_updates.push(UiUpdate::HideWindow),
             Event::Quit => {
                 ui_updates.push(UiUpdate::Quit);
+            }
+            _ => {
+                info!("Event not implemented yet: {:?}", event);
             }
         }
 

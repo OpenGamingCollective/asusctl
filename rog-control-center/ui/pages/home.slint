@@ -1,9 +1,10 @@
 import { RogProductCard } from "../widgets/cards.slint";
 import { RogSlashMark, RogPage } from "../widgets/layout.slint";
 import { RogMetric, RogReading, RogStatRow } from "../widgets/metrics.slint";
-import { RogModeGrid } from "../widgets/controls.slint";
+import { RogModeGrid, RogToggle } from "../widgets/controls.slint";
 import { Theme } from "../globals.slint";
-import { SystemInfo, TelemetryData, PowerData } from "system.slint";
+import { SystemInfo, TelemetryData, PowerData, DeviceData } from "system.slint";
+import {AttrBool} from "types.slint";
 
 // NOTE (slint 1.13.1 engine bug): a VerticalLayout used as the FIRST child of
 // a HorizontalLayout makes every later cell render empty. The product card is
@@ -269,6 +270,51 @@ export component PageHome inherits RogPage {
                             }
                             advanced() => {
                                 root.open-per-profile-settings();
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        height: 24px;
+                        vertical-stretch: 1;
+                        VerticalLayout {
+                            spacing: 8px;
+                            Text {
+                                text: @tr("Boot Sound");
+                                color: Theme.text-primary;
+                                font-size: Theme.font-md;
+                                font-weight: 600;
+                            }
+                            RogToggle {
+                                checked: DeviceData.boot_sound.current;
+                                toggled(v) => {
+                                    DeviceData.cb_boot_sound({
+                                        current: v,
+                                        supported: DeviceData.boot_sound.supported,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    Rectangle {
+                        height: 24px;
+                        vertical-stretch: 1;
+                        VerticalLayout {
+                            spacing: 8px;
+                            Text {
+                                text: @tr("Panel OverDrive");
+                                color: Theme.text-primary;
+                                font-size: Theme.font-md;
+                                font-weight: 600;
+                            }
+                            RogToggle {
+                                checked: DeviceData.panel_overdrive.current;
+                                toggled(v) => {
+                                    DeviceData.cb_panel_overdrive({
+                                        current: v,
+                                        supported: DeviceData.panel_overdrive.supported
+                                    });
+                                }
                             }
                         }
                     }

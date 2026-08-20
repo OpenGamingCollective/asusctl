@@ -7,7 +7,7 @@ use crate::{
     state::Event,
     ui::helpers::{
         hardware::get_cpu_telemetry,
-        types::{BatteryInfo, CpuTelemetry, FanTelemetry, GpuTelemetry, SystemTelemetry},
+        types::{BatteryInfo, FanTelemetry, GpuTelemetry, SystemTelemetry},
     },
 };
 use std::time::Duration;
@@ -53,6 +53,4 @@ pub async fn subscribe_telemetry(tx: UnboundedSender<Event>) {
 }
 
 /// Loop that waits for ppd dbus event
-pub async fn subscribe_ppd(tx: UnboundedSender<Event>) {
-    loop {}
-}
+pub async fn subscribe_ppd(_tx: UnboundedSender<Event>) {}

@@ -1,5 +1,5 @@
 
-import { AttrMinMax } from "types.slint";
+import { AttrMinMax, AttrBool } from "types.slint";
 
 // Per-profile power limits edited in the Home "Advanced" overlay (G-Helper
 // style). One instance per configurable profile (Quiet / Balanced /
@@ -204,11 +204,11 @@ export global DeviceData {
     in-out property <float> charge_control_end_threshold: 30;
     callback cb_charge_control_end_threshold(int);
 
-    in-out property <int> panel_overdrive;
-    callback cb_panel_overdrive(int);
+    in-out property <AttrBool> panel_overdrive;
+    callback cb_panel_overdrive(AttrBool);
 
-    in-out property <int> boot_sound;
-    callback cb_boot_sound(int);
+    in-out property <AttrBool> boot_sound;
+    callback cb_boot_sound(AttrBool);
 
     in-out property <int> screen_auto_brightness;
     callback cb_screen_auto_brightness(int);

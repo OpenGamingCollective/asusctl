@@ -115,11 +115,7 @@ impl AsusdInterface {
     pub async fn build() -> Result<Self> {
         let conn = zbus::Connection::system().await?;
 
-        let proxy = zbus::fdo::ObjectManagerProxy::builder(&conn)
-            .destination(ZBUS_IFACE)?
-            .path("/")?
-            .build()
-            .await?;
+        let proxy = zbus::fdo::ObjectManagerProxy::new(&conn, "xyz.ljones.Asusd", "/").await?;
 
         let objects: HashMap<
             OwnedObjectPath,

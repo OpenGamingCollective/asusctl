@@ -61,6 +61,23 @@ pub fn bind_ui_events(ui: &MainWindow, tx: UnboundedSender<Event>) {
         u8
     );
 
+    // Home Page
+    bind!(
+        ui,
+        tx,
+        DeviceData,
+        on_cb_boot_sound,
+        Event::UserRequestedBootSound
+    );
+
+    bind!(
+        ui,
+        tx,
+        DeviceData,
+        on_cb_panel_overdrive,
+        Event::UserRequestedPanelOD
+    );
+
     // Retry asusd
     ui.on_retry_asusd(move || {
         let _ = tx.send(Event::RetryAsusd);

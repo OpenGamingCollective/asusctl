@@ -1,6 +1,6 @@
 use std::{fs, io, path::Path};
 
-use crate::ui::helpers::types::{BatteryInfo, CpuTelemetry, GpuTelemetry};
+use crate::ui::helpers::types::{BatteryInfo, CpuTelemetry};
 use anyhow::Result;
 
 pub fn get_dmi_product_name() -> io::Result<String> {

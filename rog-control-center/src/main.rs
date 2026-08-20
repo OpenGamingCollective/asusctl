@@ -22,7 +22,7 @@ use anyhow::Result;
 fn main() -> Result<()> {
     // Setup Logging
     env_logger::Builder::from_env(
-        Env::default().default_filter_or("warn,tracing=error,zbus=error"),
+        Env::default().default_filter_or("info,tracing=error,zbus=error"),
     )
     .format_timestamp(None)
     .init();

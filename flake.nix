@@ -47,6 +47,7 @@
             (pkgs system).ninja
             (pkgs system).freetype
             (pkgs system).fontconfig
+            (pkgs system).llvmPackages.libclang
           ];
           LD_LIBRARY_PATH = (pkgs system).lib.makeLibraryPath [
             (pkgs system).wayland

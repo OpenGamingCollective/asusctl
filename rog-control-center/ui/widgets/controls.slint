@@ -580,7 +580,6 @@ export component RogToggle inherits Rectangle {
     accessible-checked: root.checked;
     accessible-action-default => {
         if (root.enabled) {
-            root.checked = !root.checked;
             root.toggled(root.checked);
         }
     }
@@ -607,28 +606,7 @@ export component RogToggle inherits Rectangle {
                 ta := TouchArea {
                     enabled: root.enabled;
                     clicked => {
-                        root.checked = !root.checked;
-                        root.toggled(root.checked);
-                    }
-                }
-                FocusScope {
-                    enabled: root.enabled;
-                    key-pressed(event) => {
-                        if (event.text == Key.Return || event.text == Key.Space) {
-                            root.checked = !root.checked;
-                            root.toggled(root.checked);
-                            return accept;
-                        }
-                        reject
-                    }
-                    if self.has-focus: Rectangle {
-                        x: -3px; y: -3px;
-                        width: parent.width + 6px;
-                        height: parent.height + 6px;
-                        border-radius: 15px;
-                        border-width: 2px;
-                        border-color: Theme.rog-red;
-                        background: transparent;
+                        root.toggled(!root.checked);
                     }
                 }
                 Rectangle {
@@ -665,7 +643,6 @@ export component RogToggleInt inherits Rectangle {
     accessible-checked: root.checked-int != 0;
     accessible-action-default => {
         if (root.enabled && root.available) {
-            root.checked-int = root.checked-int != 0 ? 0 : 1;
             root.toggled(root.checked-int);
         }
     }
@@ -691,28 +668,7 @@ export component RogToggleInt inherits Rectangle {
                 ta := TouchArea {
                     enabled: root.enabled && root.available;
                     clicked => {
-                        root.checked-int = root.checked-int != 0 ? 0 : 1;
                         root.toggled(root.checked-int);
-                    }
-                }
-                FocusScope {
-                    enabled: root.enabled && root.available;
-                    key-pressed(event) => {
-                        if (event.text == Key.Return || event.text == Key.Space) {
-                            root.checked-int = root.checked-int != 0 ? 0 : 1;
-                            root.toggled(root.checked-int);
-                            return accept;
-                        }
-                        reject
-                    }
-                    if self.has-focus: Rectangle {
-                        x: -3px; y: -3px;
-                        width: parent.width + 6px;
-                        height: parent.height + 6px;
-                        border-radius: 15px;
-                        border-width: 2px;
-                        border-color: Theme.rog-red;
-                        background: transparent;
                     }
                 }
                 Rectangle {
