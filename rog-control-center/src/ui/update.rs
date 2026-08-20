@@ -3,7 +3,7 @@
 use log::info;
 use slint::{ComponentHandle, SharedString};
 
-use crate::{DeviceData, MainWindow, PowerData, SystemInfo, TelemetryData, state::UiUpdate};
+use crate::{AsusArmouryData, MainWindow, PowerData, SystemInfo, TelemetryData, state::UiUpdate};
 
 pub fn apply_ui_update(ui: &MainWindow, update: UiUpdate) {
     match update {
@@ -20,20 +20,16 @@ pub fn apply_ui_update(ui: &MainWindow, update: UiUpdate) {
             let sys_data = ui.global::<SystemInfo>();
             sys_data.set_product_name(SharedString::from(n));
         }
-        UiUpdate::Battery(b) => {
-            let sys_data = ui.global::<TelemetryData>();
-            sys_data.set_battery_health(b.health as i32);
-        }
         UiUpdate::PlatformProfile(p) => {
             let sys_data = ui.global::<PowerData>();
             sys_data.set_platform_profile(p);
         }
         UiUpdate::BootSound(b) => {
-            let dev_data = ui.global::<DeviceData>();
+            let dev_data = ui.global::<AsusArmouryData>();
             dev_data.set_boot_sound(b);
         }
         UiUpdate::PanelOD(b) => {
-            let dev_data = ui.global::<DeviceData>();
+            let dev_data = ui.global::<AsusArmouryData>();
             dev_data.set_panel_overdrive(b);
         }
         UiUpdate::ShowToast {

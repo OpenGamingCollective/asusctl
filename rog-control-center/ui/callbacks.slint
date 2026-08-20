@@ -100,37 +100,37 @@ export global PowerData {
     // stored per profile in the client config and applied when that profile
     // becomes active (see the Rust ActionHandler).
     in-out property <ProfileLimits> limits_quiet: {
-        ppt_pl1_spl: { min: 0, max: 100, current: 20, supported: false },
-        ppt_pl2_sppt: { min: 0, max: 100, current: 20 },
-        ppt_pl3_fppt: { min: 0, max: 100, current: 20 },
-        ppt_fppt: { min: 0, max: 100, current: 20 },
-        ppt_apu_sppt: { min: 0, max: 100, current: 20 },
-        ppt_platform_sppt: { min: 0, max: 100, current: 20 },
-        nv_tgp: { min: 0, max: 175, current: 80 },
-        nv_dynamic_boost: { min: 0, max: 30, current: 5 },
-        nv_temp_target: { min: 0, max: 80, current: 75 },
+        ppt_pl1_spl: { min: 0, max: -1, current: -1, supported: false },
+        ppt_pl2_sppt: { min: 0, max: -1, current: -1, supported: false },
+        ppt_pl3_fppt: { min: 0, max: -1, current: -1, supported: false },
+        ppt_fppt: { min: 0, max: -1, current: -1, supported: false },
+        ppt_apu_sppt: { min: 0, max: -1, current: -1, supported: false },
+        ppt_platform_sppt: { min: 0, max: -1, current: -1, supported: false },
+        nv_tgp: { min: 0, max: -1, current: -1, supported: false },
+        nv_dynamic_boost: { min: 0, max: -1, current: -1 },
+        nv_temp_target: { min: 0, max: -1, current: -1, supported: false },
     };
     in-out property <ProfileLimits> limits_balanced: {
-        ppt_pl1_spl: { min: 0, max: 100, current: 20 },
-        ppt_pl2_sppt: { min: 0, max: 100, current: 20 },
-        ppt_pl3_fppt: { min: 0, max: 100, current: 20 },
-        ppt_fppt: { min: 0, max: 100, current: 20 },
-        ppt_apu_sppt: { min: 0, max: 100, current: 20 },
-        ppt_platform_sppt: { min: 0, max: 100, current: 20 },
-        nv_tgp: { min: 0, max: 175, current: 80 },
-        nv_dynamic_boost: { min: 0, max: 30, current: 5 },
-        nv_temp_target: { min: 0, max: 80, current: 75 },
+        ppt_pl1_spl: { min: 0, max: -1, current: -1, supported: false },
+        ppt_pl2_sppt: { min: 0, max: -1, current: -1, supported: false },
+        ppt_pl3_fppt: { min: 0, max: -1, current: -1, supported: false },
+        ppt_fppt: { min: 0, max: -1, current: -1, supported: false },
+        ppt_apu_sppt: { min: 0, max: -1, current: -1, supported: false },
+        ppt_platform_sppt: { min: 0, max: -1, current: -1, supported: false },
+        nv_tgp: { min: 0, max: -1, current: -1, supported: false },
+        nv_dynamic_boost: { min: 0, max: -1, current: -1 },
+        nv_temp_target: { min: 0, max: -1, current: -1, supported: false },
     };
     in-out property <ProfileLimits> limits_performance: {
-        ppt_pl1_spl: { min: 0, max: 100, current: 20 },
-        ppt_pl2_sppt: { min: 0, max: 100, current: 20 },
-        ppt_pl3_fppt: { min: 0, max: 100, current: 20 },
-        ppt_fppt: { min: 0, max: 100, current: 20 },
-        ppt_apu_sppt: { min: 0, max: 100, current: 20 },
-        ppt_platform_sppt: { min: 0, max: 100, current: 20 },
-        nv_tgp: { min: 0, max: 175, current: 80 },
-        nv_dynamic_boost: { min: 0, max: 30, current: 5 },
-        nv_temp_target: { min: 0, max: 80, current: 75 },
+        ppt_pl1_spl: { min: 0, max: -1, current: -1, supported: false },
+        ppt_pl2_sppt: { min: 0, max: -1, current: -1, supported: false },
+        ppt_pl3_fppt: { min: 0, max: -1, current: -1, supported: false },
+        ppt_fppt: { min: 0, max: -1, current: -1, supported: false },
+        ppt_apu_sppt: { min: 0, max: -1, current: -1, supported: false },
+        ppt_platform_sppt: { min: 0, max: -1, current: -1, supported: false },
+        nv_tgp: { min: 0, max: -1, current: -1, supported: false },
+        nv_dynamic_boost: { min: 0, max: -1, current: -1 },
+        nv_temp_target: { min: 0, max: -1, current: -1, supported: false },
     };
     // Whether the PPT group for each profile is enabled (mirrors asusd's
     // per-profile tuning gate; NVIDIA has no such gate and is always stored).
@@ -195,33 +195,18 @@ export global PowerData {
     callback cb_change_platform_profile_on_battery(bool);
 }
 
-export global DeviceData {
-    in-out property <bool> charge_control_enabled: true;
-    in-out property <float> charge_control_end_threshold: 30;
-    callback cb_charge_control_end_threshold(int);
-
+export global AsusArmouryData {
     in-out property <AttrBool> panel_overdrive;
     callback cb_panel_overdrive(AttrBool);
 
     in-out property <AttrBool> boot_sound;
     callback cb_boot_sound(AttrBool);
 
-    in-out property <int> screen_auto_brightness;
-    callback cb_screen_auto_brightness(int);
 
-    in-out property <int> mcu_powersave;
-    callback cb_mcu_powersave(int);
+    in-out property <AttrBool> mcu_powersave;
+    callback cb_mcu_powersave(AttrBool);
 
-    in-out property <int> mini_led_mode;
-    callback cb_mini_led_mode(int);
-    in-out property <[string]> mini_led_mode_choices: [@tr("Off"), @tr("Multi-zone"), @tr("Multi-zone Strong")];
-    in-out property <[string]> mini_led_choices_onoff: [@tr("Off"), @tr("Multi-zone")];
-    in-out property <[string]> mini_led_choices_modes: [@tr("Off"), @tr("Multi-zone"), @tr("Multi-zone Strong")];
+    in-out property <AttrBool> screen_auto_brightness;
+    callback cb_screen_auto_brightness(AttrBool);
 
-    in-out property <float> screenpad_gamma;
-    callback cb_screenpad_gamma(float);
-    in-out property <int> screenpad_brightness: 50;
-    callback cb_screenpad_brightness(int);
-    in-out property <bool> screenpad_sync_with_primary: false;
-    callback cb_screenpad_sync_with_primary(bool);
 }

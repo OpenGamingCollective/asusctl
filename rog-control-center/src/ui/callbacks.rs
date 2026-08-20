@@ -1,5 +1,4 @@
-use crate::{DeviceData, MainWindow, PowerData, state::Event};
-use log::warn;
+use crate::{AsusArmouryData, MainWindow, PowerData, state::Event};
 use slint::ComponentHandle;
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -52,20 +51,11 @@ pub fn bind_ui_events(ui: &MainWindow, tx: UnboundedSender<Event>) {
         Event::UserRequestedPowerProfile
     );
 
-    bind!(
-        ui,
-        tx,
-        DeviceData,
-        on_cb_charge_control_end_threshold,
-        Event::UserRequestedBatteryLimit,
-        u8
-    );
-
     // Home Page
     bind!(
         ui,
         tx,
-        DeviceData,
+        AsusArmouryData,
         on_cb_boot_sound,
         Event::UserRequestedBootSound
     );
@@ -73,7 +63,7 @@ pub fn bind_ui_events(ui: &MainWindow, tx: UnboundedSender<Event>) {
     bind!(
         ui,
         tx,
-        DeviceData,
+        AsusArmouryData,
         on_cb_panel_overdrive,
         Event::UserRequestedPanelOD
     );

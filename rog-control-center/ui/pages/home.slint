@@ -3,7 +3,7 @@ import { RogSlashMark, RogPage } from "../widgets/layout.slint";
 import { RogMetric, RogReading, RogStatRow } from "../widgets/metrics.slint";
 import { RogModeGrid, RogToggle } from "../widgets/controls.slint";
 import { Theme } from "../globals.slint";
-import { SystemInfo, TelemetryData, PowerData, DeviceData } from "../callbacks.slint";
+import { SystemInfo, TelemetryData, PowerData, AsusArmouryData } from "../callbacks.slint";
 import {AttrBool} from "../types.slint";
 
 // NOTE (slint 1.13.1 engine bug): a VerticalLayout used as the FIRST child of
@@ -286,11 +286,11 @@ export component PageHome inherits RogPage {
                                 font-weight: 600;
                             }
                             RogToggle {
-                                checked: DeviceData.boot_sound.current;
+                                checked: AsusArmouryData.boot_sound.current;
                                 toggled(v) => {
-                                    DeviceData.cb_boot_sound({
+                                    AsusArmouryData.cb_boot_sound({
                                         current: v,
-                                        supported: DeviceData.boot_sound.supported,
+                                        supported: AsusArmouryData.boot_sound.supported,
                                     });
                                 }
                             }
@@ -308,11 +308,11 @@ export component PageHome inherits RogPage {
                                 font-weight: 600;
                             }
                             RogToggle {
-                                checked: DeviceData.panel_overdrive.current;
+                                checked: AsusArmouryData.panel_overdrive.current;
                                 toggled(v) => {
-                                    DeviceData.cb_panel_overdrive({
+                                    AsusArmouryData.cb_panel_overdrive({
                                         current: v,
-                                        supported: DeviceData.panel_overdrive.supported
+                                        supported: AsusArmouryData.panel_overdrive.supported
                                     });
                                 }
                             }
