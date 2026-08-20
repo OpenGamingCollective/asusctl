@@ -470,6 +470,11 @@ impl AsusArmouryAttribute {
                 }
             }
             FirmwareAttributeType::Gpu => {
+                if self.attr.current_value().ok() == Some(AttrValue::Integer(value)) {
+                    info!("GPU attribute {name} is already {value}, clearing any deferred queue");
+                    self.queued_gpu.lock().await.remove(&self.name());
+                    return Ok(());
+                }
                 debug!("Queueing GPU attribute {name} = {value} for delayed apply");
                 self.queued_gpu.lock().await.insert(self.name(), value);
                 return Ok(());
@@ -565,6 +570,18 @@ impl AsusArmouryAttribute {
             value
         };
 
+        if self.attr.current_value().ok() == Some(AttrValue::Integer(value)) {
+            info!(
+                "Queued GPU attribute {} = {value} is already active, skipping redundant write",
+                <&str>::from(name)
+            );
+            let mut queue = self.queued_gpu.lock().await;
+            if queue.get(&name).copied() == Some(value) {
+                queue.remove(&name);
+            }
+            return Ok(true);
+        }
+
         self.attr
             .set_current_value(&AttrValue::Integer(value))
             .map_err(|e| {
@@ -580,9 +597,12 @@ impl AsusArmouryAttribute {
             <&str>::from(name)
         );
 
-        // Remove only after successful firmware write so transient failures do
-        // not lose deferred shutdown values.
-        self.queued_gpu.lock().await.remove(&name);
+        // Remove only after successful firmware write, and only if the queued
+        // value was not updated concurrently by another call.
+        let mut queue = self.queued_gpu.lock().await;
+        if queue.get(&name).copied() == Some(value) {
+            queue.remove(&name);
+        }
 
         Ok(true)
     }
