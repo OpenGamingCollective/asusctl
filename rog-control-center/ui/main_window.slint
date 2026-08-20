@@ -201,6 +201,7 @@ export component MainWindow inherits Window {
         property <color> toast_accent: root.toast_type == 2 ? #E85656 : (root.toast_type == 1 ? #FFBD00 : #00A8E4);
         property <brush> toast_bg: root.toast_type == 2 ? #5C1F24E6 : (root.toast_type == 1 ? #4D3A10E6 : #103247E6);
         x: (root.width - self.width) / 2;
+        y: parent.height - self.height - 10px;
         width: Math.min(640px, root.width - 32px);
         height: 40px;
         border-radius: 20px;
