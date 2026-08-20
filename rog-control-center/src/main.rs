@@ -10,6 +10,7 @@ use rog_control_center::cli_options::CliStart;
 use rog_control_center::config::Config;
 use rog_control_center::print_versions;
 
+use rog_control_center::startup::populate_slint_properties;
 use rog_control_center::state::Event;
 use rog_control_center::ui::actions::ActionHandler;
 use rog_control_center::zbus_proxies::AsusdInterface;
@@ -118,9 +119,6 @@ fn main() -> Result<()> {
     rog_control_center::ui::callbacks::bind_ui_events(&ui, event_tx.clone());
 
     // Start Hardware Subscriptions
-    rt.spawn(rog_control_center::ui::subscriptions::subscribe_battery(
-        event_tx.clone(),
-    ));
     rt.spawn(rog_control_center::ui::subscriptions::subscribe_telemetry(
         event_tx.clone(),
     ));
@@ -130,7 +128,8 @@ fn main() -> Result<()> {
     let asusd = Arc::new(OnceLock::new());
     let asusd_set = asusd.clone();
     let asusd_tx = event_tx.clone();
-    rt.spawn(async move {
+    // Block here, we want to wait for the asusd interface connection
+    rt.block_on(async move {
         match AsusdInterface::build().await {
             Ok(int) if int.present() => {
                 let _ = asusd_set.set(int);
@@ -158,6 +157,8 @@ fn main() -> Result<()> {
     let ui_weak = ui.as_weak();
     rt.spawn(async move {
         let mut state = rog_control_center::state::AppState::new();
+        // Get the current values from asusd
+        populate_slint_properties(ui_weak.clone(), asusd.clone()).await;
         while let Some(event) = event_rx.recv().await {
             let (actions, ui_updates) = state.update(event);
 
