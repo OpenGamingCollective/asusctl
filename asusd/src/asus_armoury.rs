@@ -653,26 +653,39 @@ pub async fn set_config_or_default(
                     continue;
                 }
 
-                if let Some(tune) = tuning.group.get(&name) {
-                    attr.set_current_value(&AttrValue::Integer(*tune))
-                        .map_err(|e| {
-                            error!("Failed to set {}: {e}", <&str>::from(name));
-                        })
-                        .ok();
+                let target_val = tuning.group.get(&name).copied();
+                let applied = match target_val {
+                    Some(tune) => attr.set_current_value(&AttrValue::Integer(tune)).is_ok(),
+                    None => false,
+                };
+
+                let final_val = if applied {
+                    target_val
                 } else {
-                    let default = attr.default_value();
-                    attr.set_current_value(default)
-                        .map_err(|e| {
-                            error!("Failed to set {}: {e}", <&str>::from(name));
-                        })
-                        .ok();
-                    if let AttrValue::Integer(i) = default {
-                        tuning.group.insert(name, *i);
-                        info!(
-                            "Set default tuning config for {} = {:?}",
-                            <&str>::from(name),
-                            i
+                    if target_val.is_some() {
+                        warn!(
+                            "Failed to set PPT {}: falling back to default/current value.",
+                            <&str>::from(name)
                         );
+                    }
+                    let default = attr.default_value();
+                    if attr.set_current_value(default).is_ok() {
+                        match default {
+                            AttrValue::Integer(i) => Some(*i),
+                            _ => None,
+                        }
+                    } else {
+                        match attr.current_value() {
+                            Ok(AttrValue::Integer(cur)) => Some(cur),
+                            _ => None,
+                        }
+                    }
+                };
+
+                if let Some(val) = final_val {
+                    if target_val != Some(val) {
+                        tuning.group.insert(name, val);
+                        info!("Set tuning config for {} = {:?}", <&str>::from(name), val);
                         changed = true;
                     }
                 }
