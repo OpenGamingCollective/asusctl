@@ -4,9 +4,7 @@ use std::sync::Arc;
 
 use config_traits::StdConfig;
 use log::{debug, error, info, warn};
-use rog_platform::asus_armoury::{
-    AttrValue, FirmwareAttribute, FirmwareAttributeType, FirmwareAttributes,
-};
+use rog_platform::asus_armoury::FirmwareAttributes;
 use rog_platform::cpu::{CPUControl, CPUEPP, CPUGovernor};
 use rog_platform::platform::{PlatformProfile, Properties, RogPlatform};
 use rog_platform::power::AsusPower;
@@ -761,39 +759,13 @@ impl CtrlPlatform {
         }
 
         if enable {
-            // Clone to reduce blocking
-            let tuning = self
-                .config
-                .lock()
-                .await
-                .select_tunings(power_plugged == 1, profile)
-                .clone();
-
-            for attr in self.attributes.attributes() {
-                let name: FirmwareAttribute = attr.name().into();
-                if name.property_type() == FirmwareAttributeType::Ppt {
-                    // reset stored value
-                    if let Some(tune) = self
-                        .config
-                        .lock()
-                        .await
-                        .select_tunings(power_plugged == 1, profile)
-                        .group
-                        .get_mut(&name)
-                    {
-                        let value = tuning
-                            .group
-                            .get(&name)
-                            .map(|v| AttrValue::Integer(*v))
-                            .unwrap_or_else(|| attr.default_value().clone());
-                        // restore default
-                        attr.set_current_value(&value)?;
-                        if let AttrValue::Integer(i) = value {
-                            *tune = i
-                        }
-                    }
-                }
-            }
+            set_config_or_default(
+                &self.attributes,
+                &mut *self.config.lock().await,
+                power_plugged == 1,
+                profile,
+            )
+            .await;
         } else {
             // reapply the profile to ensure acpi resets PPT to defaults
             self.platform.set_platform_profile(profile.into())?;
