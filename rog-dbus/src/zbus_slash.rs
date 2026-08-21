@@ -30,6 +30,13 @@ pub trait Slash {
     #[zbus(property)]
     fn set_mode(&self, value: u8) -> zbus::Result<()>;
 
+    /// BatteryLevelMode property: software-computed battery fill pattern
+    /// instead of a fixed hardware animation
+    #[zbus(property)]
+    fn battery_level_mode(&self) -> zbus::Result<bool>;
+    #[zbus(property)]
+    fn set_battery_level_mode(&self, value: bool) -> zbus::Result<()>;
+
     /// ShowBatteryWarning property
     #[zbus(property)]
     fn show_battery_warning(&self) -> zbus::Result<bool>;

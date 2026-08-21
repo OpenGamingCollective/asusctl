@@ -13,6 +13,10 @@ pub struct SlashConfig {
     pub brightness: u8,
     pub display_interval: u8,
     pub display_mode: SlashMode,
+    /// When true, a background task renders a battery-percentage fill
+    /// pattern via the custom-pattern buffer instead of `display_mode`.
+    #[serde(default)]
+    pub battery_level_mode: bool,
     pub show_on_boot: bool,
     pub show_on_shutdown: bool,
     pub show_on_sleep: bool,
@@ -28,6 +32,7 @@ impl Default for SlashConfig {
             brightness: 255,
             display_interval: 0,
             display_mode: SlashMode::Bounce,
+            battery_level_mode: false,
             slash_type: SlashType::Unsupported,
             show_on_boot: true,
             show_on_shutdown: true,

@@ -237,3 +237,39 @@ pub struct DeviceState {
     pub slash_interval: u8,
     pub slash_mode: SlashMode,
 }
+
+/// Computes a per-segment brightness buffer, `length` bytes long, showing
+/// `percentage` (0-100) as a bar filled from the end of the array backwards,
+/// with a single partially-lit "leading" segment for a smooth edge instead
+/// of a hard step between segments.
+///
+/// `max_brightness` is the value used for fully-lit segments (0-255).
+pub fn battery_pattern(length: usize, percentage: f32, max_brightness: u8) -> Vec<u8> {
+    let mut segments = vec![0u8; length];
+    if length == 0 {
+        return segments;
+    }
+
+    let percentage = percentage.clamp(0.0, 100.0);
+    let step = 100.0 / length as f32;
+    let bracket = (percentage / step).floor() as usize;
+
+    if bracket >= length {
+        segments.fill(max_brightness);
+        return segments;
+    }
+
+    // Fully-lit segments, counting backwards from the end of the bar.
+    for seg in segments.iter_mut().skip(length - bracket) {
+        *seg = max_brightness;
+    }
+
+    // Partial "leading" segment: proportional brightness for the remainder.
+    let remainder = percentage - bracket as f32 * step;
+    let partial = (remainder * max_brightness as f32 / step)
+        .round()
+        .clamp(0.0, 255.0) as u8;
+    segments[length - 1 - bracket] = partial;
+
+    segments
+}
