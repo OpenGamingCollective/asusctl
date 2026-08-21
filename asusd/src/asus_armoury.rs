@@ -701,12 +701,17 @@ pub async fn set_config_or_default(
                     }
                 };
 
-                if let Some(val) = final_val
-                    && target_val != Some(val)
-                {
-                    tuning.group.insert(name, val);
-                    info!("Set tuning config for {} = {:?}", <&str>::from(name), val);
-                    changed = true;
+                if let Some(val) = final_val {
+                    if target_val.is_none() {
+                        tuning.group.insert(name, val);
+                        info!("Set tuning config for {} = {:?}", <&str>::from(name), val);
+                        changed = true;
+                    } else if target_val != Some(val) {
+                        warn!(
+                            "PPT {} is running at {val:?}; keeping stored target {target_val:?}",
+                            <&str>::from(name)
+                        );
+                    }
                 }
             }
             FirmwareAttributeType::Gpu => {
