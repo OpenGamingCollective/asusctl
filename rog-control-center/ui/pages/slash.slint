@@ -15,6 +15,9 @@ export global SlashPageData {
     in-out property <int> mode: 0;
     callback cb_mode(int);
 
+    in-out property <bool> battery_level_mode: false;
+    callback cb_battery_level_mode(bool);
+
     in-out property <bool> show_on_boot: true;
     callback cb_show_on_boot(bool);
     in-out property <bool> show_on_shutdown: true;
@@ -78,7 +81,7 @@ export component PageSlash inherits Rectangle {
                 minimum: 0;
                 maximum: 5;
                 has_reset: false;
-                enabled <=> SlashPageData.enabled;
+                enabled: SlashPageData.enabled && !SlashPageData.battery_level_mode;
                 value: SlashPageData.interval;
                 released => {
                     SlashPageData.interval = Math.round(self.value);
@@ -91,9 +94,18 @@ export component PageSlash inherits Rectangle {
                 current_index <=> SlashPageData.mode;
                 current_value: SlashPageData.mode_choices[SlashPageData.mode];
                 model <=> SlashPageData.mode_choices;
-                enabled <=> SlashPageData.enabled;
+                enabled: SlashPageData.enabled && !SlashPageData.battery_level_mode;
                 selected => {
                     SlashPageData.cb_mode(SlashPageData.mode);
+                }
+            }
+
+            SystemToggle {
+                text: @tr("Show battery level");
+                checked <=> SlashPageData.battery_level_mode;
+                enabled <=> SlashPageData.enabled;
+                toggled => {
+                    SlashPageData.cb_battery_level_mode(SlashPageData.battery_level_mode);
                 }
             }
 

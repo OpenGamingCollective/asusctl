@@ -8,9 +8,9 @@
 //!
 //! Step 1 needs to be applied only on fresh system boot.
 
-use crate::{SlashMode, SlashType};
+use crate::{SlashMode, SlashType, error::SlashError};
 
-const PACKET_SIZE: usize = 32;
+const PACKET_SIZE: usize = 128;
 const REPORT_ID_193B: u8 = 0x5e;
 const REPORT_ID_19B6: u8 = 0x5d;
 
@@ -20,6 +20,9 @@ pub const PROD_ID1: u16 = 0x193b;
 pub const PROD_ID1_STR: &str = "193B";
 pub const PROD_ID2: u16 = 0x19b6;
 pub const PROD_ID2_STR: &str = "19B6";
+
+pub const BASE_SEGMENT_COUNT: usize = 7;
+pub const ENHANCED_SEGMENT_COUNT: usize = 35;
 
 pub type SlashUsbPacket = [u8; PACKET_SIZE];
 
@@ -184,4 +187,98 @@ pub const fn slash_pkt_lid_closed(slash_type: SlashType, enabled: bool) -> [u8; 
     [
         typ, 0xd8, 0x00, 0x00, 0x02, 0xa5, status,
     ]
+}
+
+// Reverse-engineered by GHelper in `SlashDevice.cs` (Windows). This is
+// NOT part of the Asus fixed `SlashMode` animation set: instead of
+// picking a built-in hardware animation via`slash_pkt_set_mode` the firmware
+// is switched into rendering an arbitrary per-segment brightness buffer
+
+pub const fn segment_count(slash_type: SlashType) -> usize {
+    match slash_type {
+        SlashType::GU605_2024
+        | SlashType::GU605_2025
+        | SlashType::GU606_2026
+        | SlashType::GU405_2026 => ENHANCED_SEGMENT_COUNT,
+        _ => BASE_SEGMENT_COUNT,
+    }
+}
+
+/// Step 1 of arming the custom-pattern region: select region `0xAC`.
+/// Send once when switching into battery-level mode.
+#[inline]
+pub const fn slash_pkt_custom_select(slash_type: SlashType) -> SlashUsbPacket {
+    let mut pkt = [0; PACKET_SIZE];
+    pkt[0] = report_id(slash_type);
+    pkt[1] = 0xd2;
+    pkt[2] = 0x02;
+    pkt[3] = 0x01;
+    pkt[4] = 0x08;
+    pkt[5] = 0xac;
+    pkt
+}
+
+/// Step 2 of arming the custom-pattern region: mark it active.
+#[inline]
+pub const fn slash_pkt_custom_enable(slash_type: SlashType) -> SlashUsbPacket {
+    let mut pkt = [0; PACKET_SIZE];
+    pkt[0] = report_id(slash_type);
+    pkt[1] = 0xd3;
+    pkt[2] = 0x03;
+    pkt[3] = 0x01;
+    pkt[4] = 0x08;
+    pkt[5] = 0xac;
+    pkt[6] = 0xff;
+    pkt[7] = 0xff;
+    pkt[8] = 0x01;
+    pkt[9] = 0x05;
+    pkt[10] = 0xff;
+    pkt[11] = 0xff;
+    pkt
+}
+
+/// Step 3 of arming the custom-pattern region: commit/activate it so the
+/// firmware starts rendering whatever is written by
+/// [`slash_pkt_custom_frame`] instead of a built-in animation.
+#[inline]
+pub const fn slash_pkt_custom_commit(slash_type: SlashType) -> SlashUsbPacket {
+    let mut pkt = [0; PACKET_SIZE];
+    pkt[0] = report_id(slash_type);
+    pkt[1] = 0xd4;
+    pkt[2] = 0x00;
+    pkt[3] = 0x00;
+    pkt[4] = 0x01;
+    pkt[5] = 0xac;
+    pkt
+}
+
+/// Push a raw per-segment brightness frame to the custom-pattern buffer.
+/// Must be preceded (once) by [`slash_pkt_custom_select`] ->
+/// [`slash_pkt_custom_enable`] -> [`slash_pkt_custom_commit`].
+pub fn slash_pkt_custom_frame(
+    slash_type: SlashType,
+    segments: &[u8],
+) -> Result<SlashUsbPacket, SlashError> {
+    let expected = segment_count(slash_type);
+
+    if segments.len() != expected {
+        return Err(SlashError::SegmentCountMismatch {
+            expected,
+            actual: segments.len(),
+        });
+    }
+
+    const HEADER_SIZE: usize = 5;
+    if HEADER_SIZE + segments.len() > PACKET_SIZE {
+        return Err(SlashError::DataBufferLength);
+    }
+
+    let mut pkt = [0; PACKET_SIZE];
+    pkt[0] = report_id(slash_type);
+    pkt[1] = 0xd3;
+    pkt[2] = 0x00;
+    pkt[3] = 0x00;
+    pkt[4] = segments.len() as u8;
+    pkt[5..5 + segments.len()].copy_from_slice(segments);
+    Ok(pkt)
 }

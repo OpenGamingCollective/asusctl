@@ -47,6 +47,7 @@ pub fn setup_slash_page(ui: &MainWindow, _states: Arc<Mutex<Config>>) {
             set_ui_props_async!(handle, slash, SlashPageData, enabled);
             set_ui_props_async!(handle, slash, SlashPageData, brightness);
             set_ui_props_async!(handle, slash, SlashPageData, interval);
+            set_ui_props_async!(handle, slash, SlashPageData, battery_level_mode);
             set_ui_props_async!(handle, slash, SlashPageData, show_on_boot);
             set_ui_props_async!(handle, slash, SlashPageData, show_on_shutdown);
             set_ui_props_async!(handle, slash, SlashPageData, show_on_sleep);
@@ -164,6 +165,13 @@ pub fn setup_slash_page(ui: &MainWindow, _states: Arc<Mutex<Config>>) {
                         slash.interval(.try_into().unwrap_or_default()),
                         "Slash interval successfully set to {}",
                         "Setting Slash interval failed"
+                    );
+                    set_ui_callbacks!(
+                        handle,
+                        SlashPageData(),
+                        slash.battery_level_mode(),
+                        "Slash battery level mode successfully set to {}",
+                        "Setting Slash battery level mode failed"
                     );
                     set_ui_callbacks!(
                         handle,

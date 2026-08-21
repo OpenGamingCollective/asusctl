@@ -30,6 +30,9 @@ impl SlashZbus {
         self.reload()
             .await
             .unwrap_or_else(|err| warn!("Controller error: {}", err));
+        if self.0.lock_config().await.battery_level_mode {
+            self.0.start_battery_level_task().await;
+        }
         connection
             .object_server()
             .at(path.clone(), self)
@@ -52,6 +55,9 @@ impl SlashZbus {
     /// Set enabled true or false
     #[zbus(property)]
     async fn set_enabled(&self, enabled: bool) {
+        if !enabled {
+            self.0.stop_battery_level_task(false).await;
+        }
         let mut config = self.0.lock_config().await;
         let brightness = if enabled && config.brightness == 0 {
             0x88
@@ -95,18 +101,29 @@ impl SlashZbus {
     async fn set_brightness(&self, brightness: u8) {
         let mut config = self.0.lock_config().await;
         let enabled = brightness > 0;
-        self.0
-            .write_bytes(&slash_pkt_options(
-                config.slash_type,
-                enabled,
-                brightness,
-                config.display_interval,
-            ))
-            .await
-            .map_err(|err| {
-                warn!("ctrl_slash::set_options {}", err);
-            })
-            .ok();
+
+        if config.battery_level_mode {
+            self.0
+                .update_slash_battery_level_pattern(config.slash_type, brightness)
+                .await
+                .map_err(|err| {
+                    warn!("ctrl_slash::update_slash_battery_level_pattern {}", err);
+                })
+                .ok();
+        } else {
+            self.0
+                .write_bytes(&slash_pkt_options(
+                    config.slash_type,
+                    enabled,
+                    brightness,
+                    config.display_interval,
+                ))
+                .await
+                .map_err(|err| {
+                    warn!("ctrl_slash::set_options {}", err);
+                })
+                .ok();
+        }
 
         config.enabled = enabled;
         config.brightness = brightness;
@@ -149,6 +166,8 @@ impl SlashZbus {
         let mode = SlashMode::try_from(mode).map_err(|err| {
             zbus::fdo::Error::InvalidArgs(format!("ctrl_slash::set_mode {}", err))
         })?;
+        self.0.stop_battery_level_task(true).await;
+
         let mut config = self.0.lock_config().await;
 
         let command_packets = slash_pkt_set_mode(config.slash_type, mode);
@@ -159,8 +178,32 @@ impl SlashZbus {
             .await?;
 
         config.display_mode = mode;
+        config.battery_level_mode = false;
         config.write();
         Ok(())
+    }
+
+    /// Get whether the battery-level fill pattern (software-computed, not a
+    /// hardware `SlashMode`) is currently shown instead of `mode`
+    #[zbus(property)]
+    async fn battery_level_mode(&self) -> bool {
+        let config = self.0.lock_config().await;
+        config.battery_level_mode
+    }
+
+    /// Set whether to show the battery-level fill pattern instead of `mode`.
+    #[zbus(property)]
+    async fn set_battery_level_mode(&self, enabled: bool) {
+        {
+            let mut config = self.0.lock_config().await;
+            config.battery_level_mode = enabled;
+            config.write();
+        }
+        if enabled {
+            self.0.start_battery_level_task().await;
+        } else {
+            self.0.stop_battery_level_task(true).await;
+        }
     }
 
     /// Get the device state as stored by asusd
