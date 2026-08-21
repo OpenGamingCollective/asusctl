@@ -40,7 +40,7 @@ ashpd = { version = "=0.12.3", default-features = false, features = ["tokio"] }
 concat-idents = "^1.1.5"
 console-subscriber = "^0.5.0"
 dirs = "^6.0.0"
-env_logger = "^0.11.11"
+env_logger = { version = "^0.11.11", default-features = false, features = ["auto-color"] }
 # Pinned: fontdue 0.9.4 uses u*::cast_signed (stabilized in rustc 1.86), pulled
 # by slint 1.13.1
 fontdue = "=0.9.3"
@@ -54,7 +54,8 @@ libc = "^0.2.189"
 log = "^0.4.33"
 logind-zbus = { version = "^5.3.2" }
 mio = "^1.2.2"
-notify-rust = { version = "=4.17.0", features = ["z", "async"] }
+# z = ["zbus", "serde", "async"]
+notify-rust = { version = "=4.17.0", default-features = false, features = ["z"] }
 nvml-wrapper = "^0.12.1"
 pix = "=0.13.4"
 png = "^0.18.1"

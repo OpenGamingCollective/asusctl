@@ -111,10 +111,6 @@ fn main() -> Result<()> {
     let (tray_tx, tray_rx) = tokio::sync::watch::channel(config.lock().unwrap().enable_tray_icon);
     rog_control_center::tray::init_tray(tray_rx, event_tx.clone());
 
-    // Start Global Shortcuts
-    #[cfg(not(feature = "rog_ally"))]
-    let _shortcuts = rog_control_center::shortcuts::start(rt.handle(), event_tx.clone());
-
     // Bind UI Inputs to the Channel
     rog_control_center::ui::callbacks::bind_ui_events(&ui, event_tx.clone());
 

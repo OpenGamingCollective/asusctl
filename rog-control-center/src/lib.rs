@@ -9,8 +9,6 @@ pub use slint;
 pub mod cli_options;
 pub mod config;
 pub mod error;
-pub mod shortcuts;
-pub mod startup;
 pub mod state;
 pub mod tray;
 pub mod ui;

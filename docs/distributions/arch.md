@@ -61,9 +61,6 @@ choose either amd-ucode or intel-ucode depending on your CPU.
 
 ### Repository
 
-> [!NOTE]
-> If you are using CachyOS, it doesn't require adding this repo; you can skip this step.
-
 OGC repo contains all the tools you need on a ROG laptop precompiled for you.
 
 Before adding the repo you need to add the repo sign key to your pacman-key. Run the following commands to add it:
