@@ -247,13 +247,19 @@ impl crate::Reloadable for AsusArmouryAttribute {
             }
             _ => {
                 info!("Applying value {apply_value:?} to attribute {name}");
-                self.attr.set_current_value(&apply_value).map_err(|e| {
-                    error!("Could not set {name} value: {e:?}");
-                    self.attr.base_path_exists();
-                    e
-                })?;
-
-                info!("Restored asus-armoury setting {name} to {apply_value:?}");
+                if let Err(e) = self.attr.set_current_value(&apply_value) {
+                    if attribute.property_type() == FirmwareAttributeType::Ppt {
+                        warn!(
+                            "Could not restore PPT setting {name} to {apply_value:?}: {e:?}. Hardware may restrict this setting in current power state."
+                        );
+                    } else {
+                        error!("Could not set {name} value: {e:?}");
+                        self.attr.base_path_exists();
+                        return Err(e.into());
+                    }
+                } else {
+                    info!("Restored asus-armoury setting {name} to {apply_value:?}");
+                }
             }
         }
 
@@ -317,36 +323,47 @@ impl AsusArmouryAttribute {
     }
 
     async fn restore_default(&self) -> fdo::Result<()> {
-        self.attr.restore_default()?;
-        if self.name().property_type() == FirmwareAttributeType::Ppt {
-            let profile: PlatformProfile = self.platform.get_platform_profile()?.into();
-            let power_plugged = self
-                .power
-                .get_online()
-                .map_err(|e| {
-                    error!("Could not get power status: {e:?}");
-                    e
-                })
-                .unwrap_or_default();
+        let name = self.attr.name();
+        match self.name().property_type() {
+            FirmwareAttributeType::ReadOnly => {
+                warn!("Attempted to restore read-only attribute {name}: write discarded");
+                Err(fdo::Error::NotSupported(format!(
+                    "{name} is read-only and cannot be changed"
+                )))
+            }
+            FirmwareAttributeType::Ppt => {
+                let AttrValue::Integer(default_val) = *self.attr.default_value() else {
+                    return Err(fdo::Error::NotSupported(format!(
+                        "No default value available for {name}"
+                    )));
+                };
 
-            let mut config = self.config.lock().await;
-            let tuning = config.select_tunings(power_plugged == 1, profile);
-            if let Some(tune) = tuning.group.get_mut(&self.name()) {
-                if let AttrValue::Integer(i) = self.attr.default_value() {
-                    *tune = *i;
+                let profile: PlatformProfile = self.platform.get_platform_profile()?.into();
+                let power_plugged = self.power.get_online().unwrap_or_default() == 1;
+
+                let mut config = self.config.lock().await;
+                let tuning = config.select_tunings(power_plugged, profile);
+                if tuning.enabled {
+                    self.attr
+                        .set_current_value(&AttrValue::Integer(default_val))
+                        .map_err(|e| {
+                            error!("Could not set value: {e:?}");
+                            e
+                        })?;
                 }
+                tuning.group.insert(self.name(), default_val);
+                config.write();
+                Ok(())
             }
-            if tuning.enabled {
-                self.attr
-                    .set_current_value(self.attr.default_value())
-                    .map_err(|e| {
-                        error!("Could not set value: {e:?}");
-                        e
-                    })?;
+            _ => {
+                self.attr.restore_default()?;
+                let mut config = self.config.lock().await;
+                if config.armoury_settings.remove(&self.name()).is_some() {
+                    config.write();
+                }
+                Ok(())
             }
-            config.write();
         }
-        Ok(())
     }
 
     #[zbus(property)]
@@ -379,20 +396,17 @@ impl AsusArmouryAttribute {
     async fn current_value(&self) -> fdo::Result<i32> {
         if self.name().property_type() == FirmwareAttributeType::Ppt {
             let profile: PlatformProfile = self.platform.get_platform_profile()?.into();
-            let power_plugged = self
-                .power
-                .get_online()
-                .map_err(|e| {
-                    error!("Could not get power status: {e:?}");
-                    e
-                })
-                .unwrap_or_default()
-                == 1;
+            let power_plugged = self.power.get_online().unwrap_or_default() == 1;
             let config = self.config.lock().await;
             if let Some(tuning) = config.select_tunings_ref(power_plugged, profile) {
-                if let Some(tune) = tuning.group.get(&self.name()) {
-                    return Ok(*tune);
+                if tuning.enabled {
+                    if let Some(tune) = tuning.group.get(&self.name()) {
+                        return Ok(*tune);
+                    }
                 }
+            }
+            if let Ok(AttrValue::Integer(cur)) = self.attr.current_value() {
+                return Ok(cur);
             }
             if let AttrValue::Integer(i) = self.attr.default_value() {
                 return Ok(*i);
@@ -436,38 +450,28 @@ impl AsusArmouryAttribute {
             )));
         }
 
-        let apply_value = match self.name().property_type() {
+        let (apply_value, ppt_context) = match self.name().property_type() {
             FirmwareAttributeType::Ppt => {
                 let profile: PlatformProfile = self.platform.get_platform_profile()?.into();
-                let power_plugged = self
-                    .power
-                    .get_online()
-                    .map_err(|e| {
-                        error!("Could not get power status: {e:?}");
-                        e
-                    })
-                    .unwrap_or_default();
+                let power_plugged = self.power.get_online().unwrap_or_default() == 1;
 
-                let mut config = self.config.lock().await;
-                let tuning = config.select_tunings(power_plugged == 1, profile);
+                let config = self.config.lock().await;
+                let tuning_enabled = config
+                    .select_tunings_ref(power_plugged, profile)
+                    .map(|t| t.enabled)
+                    .unwrap_or(false);
 
-                if let Some(tune) = tuning.group.get_mut(&self.name()) {
-                    *tune = value;
-                } else {
-                    tuning.group.insert(self.name(), value);
-                    debug!("Store tuning config for {name} = {:?}", value);
+                if !tuning_enabled {
+                    warn!(
+                        "Cannot set PPT property {name}: profile tuning is disabled for current profile and power state"
+                    );
+                    return Err(fdo::Error::Failed(format!(
+                        "Cannot set PPT property {name}: profile tuning is disabled for current profile and power state. Enable tuning first."
+                    )));
                 }
 
-                match tuning.enabled {
-                    true => {
-                        debug!("Tuning is enabled: setting value to PPT property {name} = {value}");
-                        AttrValue::Integer(value)
-                    }
-                    false => {
-                        warn!("Tuning is disabled: skipping setting value to PPT property {name}");
-                        AttrValue::None
-                    }
-                }
+                debug!("Tuning is enabled: setting value to PPT property {name} = {value}");
+                (AttrValue::Integer(value), Some((profile, power_plugged)))
             }
             FirmwareAttributeType::Gpu => {
                 debug!("Queueing GPU attribute {name} = {value} for delayed apply");
@@ -484,36 +488,29 @@ impl AsusArmouryAttribute {
                     })?;
                 return Ok(());
             }
-            _ => {
-                let mut settings = self.config.lock().await;
-                settings
-                    .armoury_settings
-                    .entry(self.name())
-                    .and_modify(|setting| {
-                        debug!("Set config for {name} = {value}");
-                        *setting = value;
-                    })
-                    .or_insert_with(|| {
-                        debug!("Adding config for {name} = {value}");
-                        value
-                    });
-
-                AttrValue::Integer(value)
-            }
+            _ => (AttrValue::Integer(value), None),
         };
 
-        // Only write to sysfs if we have a real value to apply.
-        // When tuning is disabled, the value is stored in config but not
-        // written to hardware — it will be applied when tuning is enabled.
-        if !matches!(apply_value, AttrValue::None) {
-            self.attr.set_current_value(&apply_value).map_err(|e| {
-                error!("Could not set value {value} to attribute {name}: {e:?}");
-                e
-            })?;
-        }
+        // Write to sysfs first. If kernel rejects the value (e.g. invalid on battery),
+        // we return Err immediately and DO NOT modify in-memory or persisted config.
+        self.attr.set_current_value(&apply_value).map_err(|e| {
+            error!("Could not set value {value} to attribute {name}: {e:?}");
+            e
+        })?;
 
-        // write config after setting value
-        self.config.lock().await.write();
+        // Commit to in-memory config and persist to disk ONLY AFTER successful hardware write.
+        {
+            let mut config = self.config.lock().await;
+            if let Some((profile, power_plugged)) = ppt_context {
+                let tuning = config.select_tunings(power_plugged, profile);
+                tuning.group.insert(self.name(), value);
+                debug!("Store tuning config for {name} = {:?}", value);
+            } else {
+                config.armoury_settings.insert(self.name(), value);
+                debug!("Set config for {name} = {value}");
+            }
+            config.write();
+        }
 
         // When an nv_* attribute (Nvidia TDP/temp) is written, restart
         // nvidia-powerd so it re-reads the new TDP limits from hardware.
@@ -540,14 +537,8 @@ impl AsusArmouryAttribute {
         if self.name().property_type() != FirmwareAttributeType::Gpu {
             return Ok(-1);
         }
-
-        Ok(self
-            .queued_gpu
-            .lock()
-            .await
-            .get(&self.name())
-            .copied()
-            .unwrap_or(-1))
+        let queued = self.queued_gpu.lock().await;
+        Ok(queued.get(&self.name()).copied().unwrap_or(-1))
     }
 
     /// Applies queued GPU value if present and returns whether anything was applied.
@@ -613,6 +604,8 @@ pub async fn start_attributes_zbus(
                 "Skipping attribute '{}' due to reload error: {e:?}",
                 attr.attr.name()
             );
+            // Stop registering remaining attributes on reload failure to prevent
+            // exposing partially initialized or inconsistent hardware state.
             break;
         }
 
