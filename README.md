@@ -229,4 +229,4 @@ References to ASUS products, services, or trademarks within this repository do n
 
 ## AI Disclaimer
 
-AI contributions are welcomed like any other contributions, as long as they are reviewed and tested by the human pushing them before being merged.
+We do not accept code blindly written with just AI or "vibecoding". We encourage use of AI for finding bugs and as a tool used to assist development, but all of these must be verified by a human as AI makes mistakes and gives false bug reports as well. For further details, refer to [our contribution policy](./CONTRIBUTING.md)
