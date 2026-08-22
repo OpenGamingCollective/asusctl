@@ -1,4 +1,5 @@
 pub use asusd::{DBUS_IFACE, DBUS_NAME, DBUS_PATH};
+use log::warn;
 use std::sync::OnceLock;
 use tokio::sync::OnceCell;
 use zbus::proxy::ProxyImpl;
@@ -12,6 +13,16 @@ pub mod zbus_fan_curves;
 pub mod zbus_platform;
 pub mod zbus_slash;
 pub mod zbus_xgm_led;
+
+pub use asus_armoury::{AsusArmouryProxy, AsusArmouryProxyBlocking};
+pub use scsi_aura::{ScsiAuraProxy, ScsiAuraProxyBlocking};
+pub use zbus_anime::{AnimeProxy, AnimeProxyBlocking};
+pub use zbus_aura::{AuraProxy, AuraProxyBlocking};
+pub use zbus_backlight::{BacklightProxy, BacklightProxyBlocking};
+pub use zbus_fan_curves::{FanCurvesProxy, FanCurvesProxyBlocking};
+pub use zbus_platform::{PlatformProxy, PlatformProxyBlocking};
+pub use zbus_slash::{SlashProxy, SlashProxyBlocking};
+pub use zbus_xgm_led::{XgmLedProxy, XgmLedProxyBlocking};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -92,31 +103,32 @@ where
 {
     let f = zbus::fdo::ObjectManagerProxy::new(conn, "xyz.ljones.Asusd", "/").await?;
     let interfaces = f.get_managed_objects().await?;
-    let mut paths = Vec::new();
-    for (path, ifaces) in &interfaces {
-        if ifaces.contains_key(iface_name) {
-            paths.push(path.clone());
-        }
-    }
-    if paths.len() > 1 {
-        log::warn!("Multiple asusd interfaces devices found for {iface_name}");
-    }
-    if !paths.is_empty() {
-        let mut ctrl = Vec::new();
-        paths.sort_by(cmp_object_paths);
-        for path in paths {
-            ctrl.push(
-                T::builder(conn)
-                    .path(path)?
-                    .destination("xyz.ljones.Asusd")?
-                    .build()
-                    .await?,
-            );
-        }
-        return Ok(ctrl);
+    let mut paths: Vec<_> = interfaces
+        .iter()
+        .filter(|(_, ifaces)| ifaces.contains_key(iface_name))
+        .map(|(path, _)| path.clone())
+        .collect();
+
+    if paths.is_empty() {
+        return Err(format!("Did not find {iface_name}").into());
     }
 
-    Err(format!("Did not find {iface_name}").into())
+    if paths.len() > 1 {
+        warn!("Multiple asusd interfaces devices found for {iface_name}");
+    }
+
+    paths.sort_by(cmp_object_paths);
+    let mut ctrl = Vec::with_capacity(paths.len());
+    for path in paths {
+        ctrl.push(
+            T::builder(conn)
+                .path(path)?
+                .destination("xyz.ljones.Asusd")?
+                .build()
+                .await?,
+        );
+    }
+    Ok(ctrl)
 }
 
 pub fn find_iface_blocking<T>(iface_name: &str) -> Result<Vec<T>, Box<dyn std::error::Error>>
@@ -136,30 +148,136 @@ where
 {
     let f = zbus::blocking::fdo::ObjectManagerProxy::new(conn, "xyz.ljones.Asusd", "/")?;
     let interfaces = f.get_managed_objects()?;
-    let mut paths = Vec::new();
-    for (path, ifaces) in &interfaces {
-        if ifaces.contains_key(iface_name) {
-            paths.push(path.clone());
-        }
-    }
-    if paths.len() > 1 {
-        log::warn!("Multiple asusd interfaces devices found for {iface_name}");
-    }
-    if !paths.is_empty() {
-        let mut ctrl = Vec::new();
-        paths.sort_by(cmp_object_paths);
-        for path in paths {
-            ctrl.push(
-                T::builder(conn)
-                    .path(path)?
-                    .destination("xyz.ljones.Asusd")?
-                    .build()?,
-            );
-        }
-        return Ok(ctrl);
+    let mut paths: Vec<_> = interfaces
+        .iter()
+        .filter(|(_, ifaces)| ifaces.contains_key(iface_name))
+        .map(|(path, _)| path.clone())
+        .collect();
+
+    if paths.is_empty() {
+        return Err(format!("Did not find {iface_name}").into());
     }
 
-    Err(format!("Did not find {iface_name}").into())
+    if paths.len() > 1 {
+        warn!("Multiple asusd interfaces devices found for {iface_name}");
+    }
+
+    paths.sort_by(cmp_object_paths);
+    let mut ctrl = Vec::with_capacity(paths.len());
+    for path in paths {
+        ctrl.push(
+            T::builder(conn)
+                .path(path)?
+                .destination("xyz.ljones.Asusd")?
+                .build()?,
+        );
+    }
+    Ok(ctrl)
+}
+
+/// Obtain a PlatformProxy instance using the shared async system connection.
+pub async fn platform_proxy() -> zbus::Result<PlatformProxy<'static>> {
+    let conn = system_connection().await?;
+    PlatformProxy::new(conn).await
+}
+
+/// Obtain a PlatformProxyBlocking instance using the shared blocking system connection.
+pub fn platform_proxy_blocking() -> zbus::Result<PlatformProxyBlocking<'static>> {
+    let conn = system_connection_blocking()?;
+    PlatformProxyBlocking::new(conn)
+}
+
+/// Obtain a FanCurvesProxy instance using the shared async system connection.
+pub async fn fan_curves_proxy() -> zbus::Result<FanCurvesProxy<'static>> {
+    let conn = system_connection().await?;
+    FanCurvesProxy::new(conn).await
+}
+
+/// Obtain a FanCurvesProxyBlocking instance using the shared blocking system connection.
+pub fn fan_curves_proxy_blocking() -> zbus::Result<FanCurvesProxyBlocking<'static>> {
+    let conn = system_connection_blocking()?;
+    FanCurvesProxyBlocking::new(conn)
+}
+
+/// Obtain a BacklightProxy instance using the shared async system connection.
+pub async fn backlight_proxy() -> zbus::Result<BacklightProxy<'static>> {
+    let conn = system_connection().await?;
+    BacklightProxy::new(conn).await
+}
+
+/// Obtain a BacklightProxyBlocking instance using the shared blocking system connection.
+pub fn backlight_proxy_blocking() -> zbus::Result<BacklightProxyBlocking<'static>> {
+    let conn = system_connection_blocking()?;
+    BacklightProxyBlocking::new(conn)
+}
+
+/// Discover all AsusArmoury devices (async).
+pub async fn find_armoury_proxies()
+-> Result<Vec<AsusArmouryProxy<'static>>, Box<dyn std::error::Error>> {
+    find_iface_async("xyz.ljones.AsusArmoury").await
+}
+
+/// Discover all AsusArmoury devices (blocking).
+pub fn find_armoury_proxies_blocking()
+-> Result<Vec<AsusArmouryProxyBlocking<'static>>, Box<dyn std::error::Error>> {
+    find_iface_blocking("xyz.ljones.AsusArmoury")
+}
+
+/// Discover all Aura devices (async).
+pub async fn find_aura_proxies() -> Result<Vec<AuraProxy<'static>>, Box<dyn std::error::Error>> {
+    find_iface_async("xyz.ljones.Aura").await
+}
+
+/// Discover all Aura devices (blocking).
+pub fn find_aura_proxies_blocking()
+-> Result<Vec<AuraProxyBlocking<'static>>, Box<dyn std::error::Error>> {
+    find_iface_blocking("xyz.ljones.Aura")
+}
+
+/// Discover all Slash lighting devices (async).
+pub async fn find_slash_proxies() -> Result<Vec<SlashProxy<'static>>, Box<dyn std::error::Error>> {
+    find_iface_async("xyz.ljones.Slash").await
+}
+
+/// Discover all Slash lighting devices (blocking).
+pub fn find_slash_proxies_blocking()
+-> Result<Vec<SlashProxyBlocking<'static>>, Box<dyn std::error::Error>> {
+    find_iface_blocking("xyz.ljones.Slash")
+}
+
+/// Discover all AniMe Matrix devices (async).
+pub async fn find_anime_proxies() -> Result<Vec<AnimeProxy<'static>>, Box<dyn std::error::Error>> {
+    find_iface_async("xyz.ljones.Anime").await
+}
+
+/// Discover all AniMe Matrix devices (blocking).
+pub fn find_anime_proxies_blocking()
+-> Result<Vec<AnimeProxyBlocking<'static>>, Box<dyn std::error::Error>> {
+    find_iface_blocking("xyz.ljones.Anime")
+}
+
+/// Discover all XG Mobile LED devices (async).
+pub async fn find_xgm_led_proxies() -> Result<Vec<XgmLedProxy<'static>>, Box<dyn std::error::Error>>
+{
+    find_iface_async("xyz.ljones.XgmLed").await
+}
+
+/// Discover all XG Mobile LED devices (blocking).
+pub fn find_xgm_led_proxies_blocking()
+-> Result<Vec<XgmLedProxyBlocking<'static>>, Box<dyn std::error::Error>> {
+    find_iface_blocking("xyz.ljones.XgmLed")
+}
+
+/// Discover all SCSI Aura devices (async).
+pub async fn find_scsi_aura_proxies()
+-> Result<Vec<ScsiAuraProxy<'static>>, Box<dyn std::error::Error>> {
+    find_iface_async("xyz.ljones.ScsiAura").await
+}
+
+/// Discover all SCSI Aura devices (blocking).
+pub fn find_scsi_aura_proxies_blocking()
+-> Result<Vec<ScsiAuraProxyBlocking<'static>>, Box<dyn std::error::Error>> {
+    find_iface_blocking("xyz.ljones.ScsiAura")
 }
 
 #[cfg(test)]
