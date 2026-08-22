@@ -19,10 +19,8 @@ pub fn setup_window(config: Arc<Mutex<Config>>) -> MainWindow {
         Err(_) => false,
     };
 
-    if !background_startup {
-        if let Err(e) = ui.window().show() {
-            warn!("Couldn't show main window: {e:?}");
-        }
+    if !background_startup && let Err(e) = ui.window().show() {
+        warn!("Couldn't show main window: {e:?}");
     }
 
     let _available = list_iface_blocking().unwrap_or_default();
