@@ -351,8 +351,8 @@ pub fn setup_gpu_page(ui: &MainWindow) {
         }
 
         // --- Disable nvidia-powerd on battery ---
-        let platform_proxy = match zbus::Connection::system().await {
-            Ok(conn) => match PlatformProxy::builder(&conn).build().await {
+        let platform_proxy = match rog_dbus::system_connection().await {
+            Ok(conn) => match PlatformProxy::builder(conn).build().await {
                 Ok(p) => p,
                 Err(e) => {
                     error!("setup_gpu: failed to create PlatformProxy: {e:?}");

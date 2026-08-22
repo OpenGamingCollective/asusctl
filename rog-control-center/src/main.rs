@@ -71,8 +71,8 @@ fn main() -> Result<()> {
 
     // version checks
     let self_version = env!("CARGO_PKG_VERSION");
-    let zbus_con = zbus::blocking::Connection::system()?;
-    let platform_proxy = rog_dbus::zbus_platform::PlatformProxyBlocking::new(&zbus_con)?;
+    let zbus_con = rog_dbus::system_connection_blocking()?;
+    let platform_proxy = rog_dbus::zbus_platform::PlatformProxyBlocking::new(zbus_con)?;
     let asusd_version = match platform_proxy.version() {
         Ok(v) => v,
         Err(e) => {

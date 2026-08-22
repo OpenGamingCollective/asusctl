@@ -101,7 +101,7 @@ pub fn setup_fan_curve_page(ui: &MainWindow, _config: Arc<Mutex<Config>>) {
 
     tokio::spawn(async move {
         // Create the connections/proxies here to prevent future delays in process
-        let conn = match zbus::Connection::system().await {
+        let conn = match rog_dbus::system_connection().await {
             Ok(conn) => conn,
             Err(e) => {
                 error!("{e:}");
@@ -109,7 +109,7 @@ pub fn setup_fan_curve_page(ui: &MainWindow, _config: Arc<Mutex<Config>>) {
             }
         };
 
-        let fans = match FanCurvesProxy::new(&conn).await {
+        let fans = match FanCurvesProxy::new(conn).await {
             Ok(fans) => fans,
             Err(e) => {
                 error!("{e:}");
@@ -117,7 +117,7 @@ pub fn setup_fan_curve_page(ui: &MainWindow, _config: Arc<Mutex<Config>>) {
             }
         };
 
-        let platform = match PlatformProxy::new(&conn).await {
+        let platform = match PlatformProxy::new(conn).await {
             Ok(platform) => platform,
             Err(e) => {
                 error!("{e:}");

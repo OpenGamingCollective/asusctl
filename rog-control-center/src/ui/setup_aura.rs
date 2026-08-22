@@ -34,25 +34,17 @@ fn decode_hex(s: &str) -> RgbaColor<u8> {
     }
 }
 
+/// Find and return the primary Aura interface.
+///
+/// When multiple Aura devices are detected (e.g. built-in laptop keyboard and external
+/// peripherals), `find_iface_async` returns them sorted ascendingly by D-Bus object path.
+/// We select the primary device (the first interface at the lowest path index, e.g. `/xyz/ljones/Aura/0`).
 async fn find_aura_iface() -> Result<AuraProxy<'static>, Box<dyn std::error::Error>> {
-    let conn = zbus::Connection::system().await?;
-    let mgr = zbus::fdo::ObjectManagerProxy::new(&conn, "xyz.ljones.Asusd", "/").await?;
-    let objs = mgr.get_managed_objects().await?;
-    let mut paths: Vec<zbus::zvariant::OwnedObjectPath> = objs
-        .iter()
-        .filter(|(_, ifaces)| ifaces.keys().any(|k| k.as_str() == "xyz.ljones.Aura"))
-        .map(|(p, _)| p.clone())
-        .collect();
-    if paths.len() > 1 {
-        log::debug!("Multiple aura devices: {paths:?}");
-    }
-    let path = paths.pop().ok_or("No Aura interface")?;
-    AuraProxy::builder(&conn)
-        .path(path)?
-        .destination("xyz.ljones.Asusd")?
-        .build()
-        .await
-        .map_err(Into::into)
+    let ifaces = rog_dbus::find_iface_async::<AuraProxy>("xyz.ljones.Aura").await?;
+    ifaces
+        .into_iter()
+        .next()
+        .ok_or_else(|| "No Aura interface".into())
 }
 
 pub async fn prefetch_supported_basic_modes() -> Option<Vec<i32>> {
