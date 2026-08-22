@@ -33,7 +33,7 @@ jobs:
                   "URIs: https://deb.debian.org/debian" \
                   "Suites: trixie-backports" \
                   "Components: main contrib non-free non-free-firmware" \
-                  "Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg" | sudo tee /etc/apt/sources.list.d/debian-backports.sources
+                  "Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg" | tee /etc/apt/sources.list.d/debian-backports.sources
             - name: Install dependencies
               run: |
                   apt-get update
@@ -77,7 +77,7 @@ jobs:
                   "URIs: https://deb.debian.org/debian" \
                   "Suites: trixie-backports" \
                   "Components: main contrib non-free non-free-firmware" \
-                  "Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg" | sudo tee /etc/apt/sources.list.d/debian-backports.sources
+                  "Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg" | tee /etc/apt/sources.list.d/debian-backports.sources
             - name: Install dependencies
               run: |
                   apt-get update
