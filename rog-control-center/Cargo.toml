@@ -48,7 +48,6 @@ udev.workspace = true
 serde_json.workspace = true
 
 slint.workspace = true
-fontdue.workspace = true
 
 [build-dependencies]
 slint-build.workspace = true
