@@ -260,6 +260,6 @@ impl AsusdInterface {
     }
 
     pub fn is_armoury_loaded(&self) -> bool {
-        self.armoury.is_empty()
+        !self.armoury.is_empty()
     }
 }
