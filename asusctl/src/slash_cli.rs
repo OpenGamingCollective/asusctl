@@ -1,6 +1,4 @@
 use argh::FromArgs;
-use rog_dbus::find_iface_blocking;
-use rog_dbus::zbus_slash::SlashProxyBlocking;
 use rog_slash::SlashMode;
 
 #[derive(FromArgs, Debug)]
@@ -82,7 +80,7 @@ pub fn handle_slash_set(cmd: &SlashSetCommand) -> Result<(), Box<dyn std::error:
         return Ok(());
     }
 
-    let slashes = find_iface_blocking::<SlashProxyBlocking>("xyz.ljones.Slash")?;
+    let slashes = rog_dbus::find_slash_proxies_blocking()?;
     for proxy in &slashes {
         if cmd.enable {
             proxy.set_enabled(true)?;
@@ -120,7 +118,7 @@ pub fn handle_slash_set(cmd: &SlashSetCommand) -> Result<(), Box<dyn std::error:
 }
 
 pub fn handle_slash_get() -> Result<(), Box<dyn std::error::Error>> {
-    let slashes = find_iface_blocking::<SlashProxyBlocking>("xyz.ljones.Slash")?;
+    let slashes = rog_dbus::find_slash_proxies_blocking()?;
     for proxy in &slashes {
         let enabled = proxy.enabled()?;
         let brightness = proxy.brightness()?;

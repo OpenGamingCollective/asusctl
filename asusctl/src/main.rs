@@ -13,22 +13,14 @@ use rog_anime::usb::get_anime_type;
 use rog_anime::{AnimTime, AnimeDataBuffer, AnimeDiagonal, AnimeGif, AnimeImage, AnimeType, Vec2};
 use rog_aura::keyboard::{AuraPowerState, LaptopAuraPower};
 use rog_aura::{self, AuraEffect, PowerZones};
-use rog_dbus::asus_armoury::AsusArmouryProxyBlocking;
-use rog_dbus::find_iface_blocking;
 use rog_dbus::list_iface_blocking;
-use rog_dbus::scsi_aura::ScsiAuraProxyBlocking;
-use rog_dbus::zbus_anime::AnimeProxyBlocking;
-use rog_dbus::zbus_aura::AuraProxyBlocking;
-use rog_dbus::zbus_backlight::BacklightProxyBlocking;
-use rog_dbus::zbus_fan_curves::FanCurvesProxyBlocking;
-use rog_dbus::zbus_platform::PlatformProxyBlocking;
+use rog_dbus::{AsusArmouryProxyBlocking, AuraProxyBlocking};
 use rog_platform::asus_armoury::FirmwareAttributeType;
 use rog_platform::platform::{PlatformProfile, Properties};
 use rog_profiles::error::ProfileError;
 use rog_scsi::AuraMode;
 use ron::ser::PrettyConfig;
 use scsi_cli::ScsiCommand;
-use zbus::blocking::Connection;
 
 use crate::cli_opts::*;
 use crate::slash_cli::{
@@ -53,53 +45,49 @@ fn main() {
 
     let parsed: CliStart = argh::from_env();
 
-    let conn = match Connection::system() {
-        Ok(c) => c,
-        Err(e) => {
-            error!("Could not connect to D-Bus system bus: {e}\nIs dbus-daemon running?");
-            return;
-        }
-    };
-    if let Ok(platform_proxy) = PlatformProxyBlocking::new(&conn).map_err(|e| {
+    let platform_proxy = match rog_dbus::platform_proxy_blocking().map_err(|e| {
         check_service("asusd");
         println!("\nError: {e}\n");
         print_info();
     }) {
-        let asusd_version = match platform_proxy.version() {
-            Ok(version) => version,
-            Err(e) => {
-                error!(
-                    "Could not get asusd version: {e:?}\nIs asusd.service running? {}",
-                    check_service("asusd")
-                );
-                return;
-            }
-        };
+        Ok(p) => p,
+        Err(_) => return,
+    };
 
-        let self_version = env!("CARGO_PKG_VERSION");
-        if asusd_version != self_version {
-            println!("Version mismatch: asusctl = {self_version}, asusd = {asusd_version}");
+    let asusd_version = match platform_proxy.version() {
+        Ok(version) => version,
+        Err(e) => {
+            error!(
+                "Could not get asusd version: {e:?}\nIs asusd.service running? {}",
+                check_service("asusd")
+            );
             return;
         }
+    };
 
-        let supported_properties = match platform_proxy.supported_properties() {
-            Ok(props) => props,
-            Err(e) => {
-                error!("Could not get supported properties: {e:?}");
-                return;
-            }
-        };
-        let supported_interfaces = match list_iface_blocking() {
-            Ok(ifaces) => ifaces,
-            Err(e) => {
-                error!("Could not get supported interfaces: {e:?}");
-                return;
-            }
-        };
+    let self_version = env!("CARGO_PKG_VERSION");
+    if asusd_version != self_version {
+        println!("Version mismatch: asusctl = {self_version}, asusd = {asusd_version}");
+        return;
+    }
 
-        if let Err(err) = do_parsed(&parsed, &supported_interfaces, &supported_properties, conn) {
-            print_error_help(&*err, &supported_interfaces, &supported_properties);
+    let supported_properties = match platform_proxy.supported_properties() {
+        Ok(props) => props,
+        Err(e) => {
+            error!("Could not get supported properties: {e:?}");
+            return;
         }
+    };
+    let supported_interfaces = match list_iface_blocking() {
+        Ok(ifaces) => ifaces,
+        Err(e) => {
+            error!("Could not get supported interfaces: {e:?}");
+            return;
+        }
+    };
+
+    if let Err(err) = do_parsed(&parsed, &supported_interfaces, &supported_properties) {
+        print_error_help(&*err, &supported_interfaces, &supported_properties);
     }
 }
 
@@ -149,7 +137,6 @@ fn do_parsed(
     parsed: &CliStart,
     supported_interfaces: &[String],
     supported_properties: &[Properties],
-    conn: Connection,
 ) -> Result<(), Box<dyn std::error::Error>> {
     match &parsed.command {
         CliCommand::Aura(a) => match &a.command {
@@ -158,14 +145,14 @@ fn do_parsed(
             crate::cli_opts::AuraSubCommand::Power(pow) => handle_led_power2(pow)?,
         },
         CliCommand::Brightness(cmd) => handle_brightness(cmd)?,
-        CliCommand::Profile(cmd) => handle_throttle_profile(&conn, supported_properties, cmd)?,
-        CliCommand::FanCurve(cmd) => handle_fan_curve(&conn, cmd)?,
+        CliCommand::Profile(cmd) => handle_throttle_profile(supported_properties, cmd)?,
+        CliCommand::FanCurve(cmd) => handle_fan_curve(cmd)?,
         CliCommand::Anime(cmd) => handle_anime(cmd)?,
         CliCommand::Slash(cmd) => handle_slash(cmd)?,
         CliCommand::Scsi(cmd) => handle_scsi(cmd)?,
-        CliCommand::Armoury(cmd) => handle_armoury_command(cmd, &conn)?,
+        CliCommand::Armoury(cmd) => handle_armoury_command(cmd)?,
         CliCommand::Backlight(cmd) => handle_backlight(cmd)?,
-        CliCommand::Battery(cmd) => handle_battery(cmd, &conn)?,
+        CliCommand::Battery(cmd) => handle_battery(cmd)?,
         CliCommand::XgmLed(cmd) => xgm_led_cli::handle_xgm_led(&cmd.command)?,
         CliCommand::Info(info_opt) => {
             handle_info(info_opt, supported_interfaces, supported_properties)?
@@ -175,24 +162,21 @@ fn do_parsed(
     Ok(())
 }
 
-fn handle_battery(
-    cmd: &BatteryCommand,
-    conn: &Connection,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn handle_battery(cmd: &BatteryCommand) -> Result<(), Box<dyn std::error::Error>> {
     match &cmd.command {
         BatterySubCommand::Limit(l) => {
-            let proxy = PlatformProxyBlocking::new(conn)?;
+            let proxy = rog_dbus::platform_proxy_blocking()?;
             proxy.set_charge_control_end_threshold(l.limit)?;
         }
         BatterySubCommand::OneShot(o) => {
-            let proxy = PlatformProxyBlocking::new(conn)?;
+            let proxy = rog_dbus::platform_proxy_blocking()?;
             if let Some(p) = o.percent {
                 proxy.set_charge_control_end_threshold(p)?;
             }
             proxy.one_shot_full_charge()?;
         }
         BatterySubCommand::Info(_) => {
-            let proxy = PlatformProxyBlocking::new(conn)?;
+            let proxy = rog_dbus::platform_proxy_blocking()?;
             let limit = proxy.charge_control_end_threshold()?;
             println!("Current battery charge limit: {}%", limit);
         }
@@ -217,7 +201,7 @@ fn handle_info(
             "Supported Platform Properties:\n{:#?}",
             supported_properties
         );
-        if let Ok(aura) = find_iface_blocking::<AuraProxyBlocking>("xyz.ljones.Aura") {
+        if let Ok(aura) = rog_dbus::find_aura_proxies_blocking() {
             // TODO: multiple RGB check
             if let Some(first_aura) = aura.first() {
                 let bright = first_aura.supported_brightness()?;
@@ -240,44 +224,40 @@ fn handle_info(
 }
 
 fn handle_backlight(cmd: &BacklightCommand) -> Result<(), Box<dyn std::error::Error>> {
+    let backlight = rog_dbus::backlight_proxy_blocking()?;
+
     if cmd.screenpad_brightness.is_none()
         && cmd.screenpad_gamma.is_none()
         && cmd.sync_screenpad_brightness.is_none()
     {
-        let backlights = find_iface_blocking::<BacklightProxyBlocking>("xyz.ljones.Backlight")?;
-        for backlight in backlights {
-            println!("Current screenpad settings:");
-            println!("  Brightness: {}", backlight.screenpad_brightness()?);
-            println!("  Gamma: {}", backlight.screenpad_gamma()?);
-            println!(
-                "  Sync with primary: {}",
-                backlight.screenpad_sync_with_primary()?
-            );
-        }
+        println!("Current screenpad settings:");
+        println!("  Brightness: {}", backlight.screenpad_brightness()?);
+        println!("  Gamma: {}", backlight.screenpad_gamma()?);
+        println!(
+            "  Sync with primary: {}",
+            backlight.screenpad_sync_with_primary()?
+        );
 
         return Ok(());
     }
 
-    let backlights = find_iface_blocking::<BacklightProxyBlocking>("xyz.ljones.Backlight")?;
-    for backlight in backlights {
-        if let Some(brightness) = cmd.screenpad_brightness {
-            backlight.set_screenpad_brightness(brightness)?;
-        }
+    if let Some(brightness) = cmd.screenpad_brightness {
+        backlight.set_screenpad_brightness(brightness)?;
+    }
 
-        if let Some(gamma) = cmd.screenpad_gamma {
-            backlight.set_screenpad_gamma(gamma.to_string().as_str())?;
-        }
+    if let Some(gamma) = cmd.screenpad_gamma {
+        backlight.set_screenpad_gamma(gamma.to_string().as_str())?;
+    }
 
-        if let Some(sync) = cmd.sync_screenpad_brightness {
-            backlight.set_screenpad_sync_with_primary(sync)?;
-        }
+    if let Some(sync) = cmd.sync_screenpad_brightness {
+        backlight.set_screenpad_sync_with_primary(sync)?;
     }
 
     Ok(())
 }
 
 fn handle_brightness(cmd: &BrightnessCommand) -> Result<(), Box<dyn std::error::Error>> {
-    let Ok(aura_proxies) = find_iface_blocking::<AuraProxyBlocking>("xyz.ljones.Aura") else {
+    let Ok(aura_proxies) = rog_dbus::find_aura_proxies_blocking() else {
         println!("No aura interface found");
         return Ok(());
     };
@@ -332,7 +312,7 @@ fn handle_anime(cmd: &AnimeCommand) -> Result<(), Box<dyn std::error::Error>> {
         println!("Missing arg or command; run 'asusctl anime --help' for usage");
     }
 
-    let animes = find_iface_blocking::<AnimeProxyBlocking>("xyz.ljones.Anime").map_err(|e| {
+    let animes = rog_dbus::find_anime_proxies_blocking().map_err(|e| {
         error!("Did not find any interface for xyz.ljones.Anime: {e:?}");
         e
     })?;
@@ -515,7 +495,7 @@ fn handle_scsi(cmd: &ScsiCommand) -> Result<(), Box<dyn std::error::Error>> {
         println!("Missing arg or command; run 'asusctl scsi --help' for usage");
     }
 
-    let scsis = find_iface_blocking::<ScsiAuraProxyBlocking>("xyz.ljones.ScsiAura")?;
+    let scsis = rog_dbus::find_scsi_aura_proxies_blocking()?;
 
     for scsi in scsis {
         if let Some(enable) = cmd.enable {
@@ -579,7 +559,7 @@ fn handle_led_mode(mode: &LedModeCommand) -> Result<(), Box<dyn std::error::Erro
     if mode.command.is_none() && !mode.prev_mode && !mode.next_mode {
         println!("Missing arg or command; run 'asusctl aura --help' for usage");
         // print available modes when possible
-        if let Ok(aura) = find_iface_blocking::<AuraProxyBlocking>("xyz.ljones.Aura")
+        if let Ok(aura) = rog_dbus::find_aura_proxies_blocking()
             && let Some(first_aura) = aura.first()
         {
             let modes = first_aura.supported_basic_modes()?;
@@ -595,7 +575,7 @@ fn handle_led_mode(mode: &LedModeCommand) -> Result<(), Box<dyn std::error::Erro
         println!("Please specify either next or previous");
         return Ok(());
     }
-    let aura = find_iface_blocking::<AuraProxyBlocking>("xyz.ljones.Aura")?;
+    let aura = rog_dbus::find_aura_proxies_blocking()?;
     if mode.next_mode {
         for aura in aura {
             let mode = aura.led_mode()?;
@@ -636,7 +616,7 @@ fn handle_led_mode(mode: &LedModeCommand) -> Result<(), Box<dyn std::error::Erro
 }
 
 fn handle_led_power1(power: &LedPowerCommand1) -> Result<(), Box<dyn std::error::Error>> {
-    let aura = find_iface_blocking::<AuraProxyBlocking>("xyz.ljones.Aura")?;
+    let aura = rog_dbus::find_aura_proxies_blocking()?;
     for aura in aura {
         let dev_type = aura.device_type()?;
         if !dev_type.is_old_laptop() && !dev_type.is_tuf_laptop() {
@@ -693,7 +673,7 @@ fn handle_led_power_1_do_1866(
 }
 
 fn handle_led_power2(power: &LedPowerCommand2) -> Result<(), Box<dyn std::error::Error>> {
-    let aura = find_iface_blocking::<AuraProxyBlocking>("xyz.ljones.Aura")?;
+    let aura = rog_dbus::find_aura_proxies_blocking()?;
     for aura in aura {
         let dev_type = aura.device_type()?;
         if !dev_type.is_new_laptop() {
@@ -753,7 +733,6 @@ fn handle_led_power2(power: &LedPowerCommand2) -> Result<(), Box<dyn std::error:
 }
 
 fn handle_throttle_profile(
-    conn: &Connection,
     supported: &[Properties],
     cmd: &ProfileCommand,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -762,7 +741,7 @@ fn handle_throttle_profile(
         return Err(ProfileError::NotSupported.into());
     }
 
-    let proxy = PlatformProxyBlocking::new(conn)?;
+    let proxy = rog_dbus::platform_proxy_blocking()?;
     let current = proxy.platform_profile()?;
     let choices = proxy.platform_profile_choices()?;
 
@@ -811,11 +790,8 @@ fn handle_throttle_profile(
     Ok(())
 }
 
-fn handle_fan_curve(
-    conn: &Connection,
-    cmd: &FanCurveCommand,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let Ok(fan_proxy) = FanCurvesProxyBlocking::new(conn).map_err(|e| {
+fn handle_fan_curve(cmd: &FanCurveCommand) -> Result<(), Box<dyn std::error::Error>> {
+    let Ok(fan_proxy) = rog_dbus::fan_curves_proxy_blocking().map_err(|e| {
         println!("Fan-curves not supported by either this kernel or by the laptop: {e:?}");
     }) else {
         return Err(ProfileError::NotSupported.into());
@@ -836,7 +812,7 @@ fn handle_fan_curve(
         return Ok(());
     }
 
-    let plat_proxy = PlatformProxyBlocking::new(conn)?;
+    let plat_proxy = rog_dbus::platform_proxy_blocking()?;
     if cmd.get_enabled {
         let profile = plat_proxy.platform_profile()?;
         let curves = fan_proxy.fan_curve_data(profile)?;
@@ -984,16 +960,11 @@ fn print_firmware_attr(attr: &AsusArmouryProxyBlocking) -> Result<(), Box<dyn st
 // `unknown_lints` is silenced first so older toolchains (rustc 1.85) don't
 // reject the newer lint names while newer ones still honor them.
 #[allow(unknown_lints, clippy::manual_is_multiple_of, clippy::nonminimal_bool)]
-fn handle_armoury_command(
-    cmd: &ArmouryCommand,
-    conn: &Connection,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn handle_armoury_command(cmd: &ArmouryCommand) -> Result<(), Box<dyn std::error::Error>> {
     // If nested subcommand provided, handle set/get/list.
     match &cmd.command {
         ArmourySubCommand::List(_) => {
-            if let Ok(attrs) =
-                find_iface_blocking::<AsusArmouryProxyBlocking>("xyz.ljones.AsusArmoury")
-            {
+            if let Ok(attrs) = rog_dbus::find_armoury_proxies_blocking() {
                 for attr in attrs.iter() {
                     print_firmware_attr(attr)?;
                 }
@@ -1002,7 +973,7 @@ fn handle_armoury_command(
         }
         ArmourySubCommand::Get(g) => {
             let mut found = false;
-            let attrs = find_iface_blocking::<AsusArmouryProxyBlocking>("xyz.ljones.AsusArmoury")
+            let attrs = rog_dbus::find_armoury_proxies_blocking()
                 .map_err(|e| format!("Could not reach asusd armoury interface: {e}"))?;
             for attr in attrs.iter() {
                 let name = attr.name()?;
@@ -1018,7 +989,7 @@ fn handle_armoury_command(
         }
         ArmourySubCommand::Set(s) => {
             let mut found = false;
-            let attrs = find_iface_blocking::<AsusArmouryProxyBlocking>("xyz.ljones.AsusArmoury")
+            let attrs = rog_dbus::find_armoury_proxies_blocking()
                 .map_err(|e| format!("Could not reach asusd armoury interface: {e}"))?;
             for attr in attrs.iter() {
                 let name = attr.name()?;
@@ -1032,7 +1003,8 @@ fn handle_armoury_command(
 
                     if attr.name()?.property_type() == FirmwareAttributeType::Ppt {
                         // Only Ok(true) means the value was applied to hardware now
-                        match PlatformProxyBlocking::new(conn).and_then(|p| p.enable_ppt_group()) {
+                        match rog_dbus::platform_proxy_blocking().and_then(|p| p.enable_ppt_group())
+                        {
                             Ok(true) => {}
                             Ok(false) => println!(
                                 "PPT config updated and will be applied when tuning is enabled\n\

@@ -1,9 +1,7 @@
 use crate::cli_opts::XgmLedSubCommand;
-use rog_dbus::find_iface_blocking;
-use rog_dbus::zbus_xgm_led::XgmLedProxyBlocking;
 
 pub fn handle_xgm_led(cmd: &XgmLedSubCommand) -> Result<(), Box<dyn std::error::Error>> {
-    let xgm_leds = find_iface_blocking::<XgmLedProxyBlocking>("xyz.ljones.XgmLed")?;
+    let xgm_leds = rog_dbus::find_xgm_led_proxies_blocking()?;
 
     for proxy in &xgm_leds {
         match cmd {
