@@ -67,7 +67,3 @@ pub trait ROGCCZbus {
     #[zbus(property)]
     fn set_state(&self, state: AppState) -> zbus::Result<()>;
 }
-
-pub use rog_dbus::find_iface_async;
-pub use rog_dbus::find_iface_blocking as find_iface;
-pub use rog_dbus::find_iface_blocking;

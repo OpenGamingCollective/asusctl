@@ -1,14 +1,11 @@
 use std::sync::Arc;
 
 use log::{error, info};
-use rog_dbus::asus_armoury::AsusArmouryProxy;
-use rog_dbus::zbus_platform::PlatformProxy;
-use rog_dbus::zbus_xgm_led::XgmLedProxy;
+use rog_dbus::{AsusArmouryProxy, XgmLedProxy};
 use rog_platform::asus_armoury::FirmwareAttribute;
 use slint::{ComponentHandle, SharedString, Weak};
 
 use super::show_toast;
-use crate::zbus_proxies::find_iface_async;
 use crate::{GPUPageData, MainWindow};
 
 /// A selectable GPU mode, independent of which sysfs attributes back it.
@@ -42,7 +39,7 @@ struct GpuCaps {
 impl GpuCaps {
     /// Collect the dgpu_disable / gpu_mux_mode proxies from asusd.
     async fn discover() -> Result<Self, Box<dyn std::error::Error>> {
-        let attrs = find_iface_async::<AsusArmouryProxy>("xyz.ljones.AsusArmoury").await?;
+        let attrs = rog_dbus::find_armoury_proxies().await?;
         let mut caps = GpuCaps {
             dgpu: None,
             mux: None,
@@ -240,8 +237,7 @@ pub fn setup_gpu_page(ui: &MainWindow) {
 
         // --- APU mem ---
         let apu_mem_proxy: Option<AsusArmouryProxy<'static>> = async {
-            let Ok(attrs) = find_iface_async::<AsusArmouryProxy>("xyz.ljones.AsusArmoury").await
-            else {
+            let Ok(attrs) = rog_dbus::find_armoury_proxies().await else {
                 error!("setup_gpu: failed to find AsusArmoury proxies for apu_mem");
                 return None;
             };
@@ -292,7 +288,7 @@ pub fn setup_gpu_page(ui: &MainWindow) {
 
         // --- XG Mobile LED ---
         let xgm_results: Option<(XgmLedProxy<'static>, bool)> = async {
-            let Ok(mut proxies) = find_iface_async::<XgmLedProxy>("xyz.ljones.XgmLed").await else {
+            let Ok(mut proxies) = rog_dbus::find_xgm_led_proxies().await else {
                 info!("setup_gpu: no XG Mobile LED interface");
                 return None;
             };
@@ -351,16 +347,10 @@ pub fn setup_gpu_page(ui: &MainWindow) {
         }
 
         // --- Disable nvidia-powerd on battery ---
-        let platform_proxy = match rog_dbus::system_connection().await {
-            Ok(conn) => match PlatformProxy::builder(conn).build().await {
-                Ok(p) => p,
-                Err(e) => {
-                    error!("setup_gpu: failed to create PlatformProxy: {e:?}");
-                    return;
-                }
-            },
+        let platform_proxy = match rog_dbus::platform_proxy().await {
+            Ok(p) => p,
             Err(e) => {
-                error!("setup_gpu: failed to connect to system bus: {e:?}");
+                error!("setup_gpu: failed to create PlatformProxy: {e:?}");
                 return;
             }
         };

@@ -2,8 +2,6 @@ use std::sync::{Arc, Mutex};
 
 use log::{error, info};
 use rog_anime::Animations;
-use rog_dbus::find_iface_async;
-use rog_dbus::zbus_anime::AnimeProxy;
 use slint::ComponentHandle;
 
 use crate::config::Config;
@@ -13,7 +11,7 @@ use crate::{AnimePageData, MainWindow, set_ui_callbacks, set_ui_props_async};
 pub fn setup_anime_page(ui: &MainWindow, _states: Arc<Mutex<Config>>) {
     let handle = ui.as_weak();
     tokio::spawn(async move {
-        let Ok(animes) = find_iface_async::<AnimeProxy>("xyz.ljones.Anime").await else {
+        let Ok(animes) = rog_dbus::find_anime_proxies().await else {
             info!("This device appears to have no aura interfaces");
             return;
         };

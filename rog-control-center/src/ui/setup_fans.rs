@@ -1,8 +1,6 @@
 use std::sync::{Arc, Mutex};
 
 use log::error;
-use rog_dbus::zbus_fan_curves::FanCurvesProxy;
-use rog_dbus::zbus_platform::PlatformProxy;
 use rog_platform::platform::PlatformProfile;
 use rog_profiles::fan_curve_set::CurveData;
 use slint::{ComponentHandle, Model, Weak};
@@ -101,15 +99,7 @@ pub fn setup_fan_curve_page(ui: &MainWindow, _config: Arc<Mutex<Config>>) {
 
     tokio::spawn(async move {
         // Create the connections/proxies here to prevent future delays in process
-        let conn = match rog_dbus::system_connection().await {
-            Ok(conn) => conn,
-            Err(e) => {
-                error!("{e:}");
-                return;
-            }
-        };
-
-        let fans = match FanCurvesProxy::new(conn).await {
+        let fans = match rog_dbus::fan_curves_proxy().await {
             Ok(fans) => fans,
             Err(e) => {
                 error!("{e:}");
@@ -117,7 +107,7 @@ pub fn setup_fan_curve_page(ui: &MainWindow, _config: Arc<Mutex<Config>>) {
             }
         };
 
-        let platform = match PlatformProxy::new(conn).await {
+        let platform = match rog_dbus::platform_proxy().await {
             Ok(platform) => platform,
             Err(e) => {
                 error!("{e:}");
@@ -223,10 +213,7 @@ pub fn setup_fan_curve_page(ui: &MainWindow, _config: Arc<Mutex<Config>>) {
 fn fan_data_for(fan: FanType, enabled: bool, data: Vec<Node>) -> CurveData {
     let mut temp = [0u8; 8];
     let mut pwm = [0u8; 8];
-    for (i, n) in data.iter().enumerate() {
-        if i == 8 {
-            break;
-        }
+    for (i, n) in data.iter().take(8).enumerate() {
         temp[i] = n.x as u8;
         pwm[i] = n.y as u8;
     }

@@ -107,7 +107,7 @@ pub fn show_toast(
             let delayed_handle = handle.clone();
             let delayed_text = fail.clone();
             slint::invoke_from_event_loop(move || {
-                log::warn!("{fail}: {e}");
+                warn!("{fail}: {e}");
                 if let Some(h) = handle.upgrade() {
                     h.invoke_show_toast(fail);
                 }
@@ -164,7 +164,7 @@ pub fn setup_window(
 
     ui.on_exit_app(move || {
         if let Err(e) = slint::quit_event_loop() {
-            log::warn!("Failed to quit event loop: {e:?}");
+            warn!("Failed to quit event loop: {e:?}");
         }
     });
 

@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use log::{debug, error, info};
 use rog_aura::keyboard::LaptopAuraPower;
 use rog_aura::{AuraDeviceType, PowerZones};
-use rog_dbus::zbus_aura::AuraProxy;
+use rog_dbus::AuraProxy;
 use slint::{ComponentHandle, Model, RgbaColor, SharedString};
 
 use crate::config::Config;
@@ -37,10 +37,10 @@ fn decode_hex(s: &str) -> RgbaColor<u8> {
 /// Find and return the primary Aura interface.
 ///
 /// When multiple Aura devices are detected (e.g. built-in laptop keyboard and external
-/// peripherals), `find_iface_async` returns them sorted ascendingly by D-Bus object path.
+/// peripherals), `find_aura_proxies` returns them sorted ascendingly by D-Bus object path.
 /// We select the primary device (the first interface at the lowest path index, e.g. `/xyz/ljones/Aura/0`).
 async fn find_aura_iface() -> Result<AuraProxy<'static>, Box<dyn std::error::Error>> {
-    let ifaces = rog_dbus::find_iface_async::<AuraProxy>("xyz.ljones.Aura").await?;
+    let ifaces = rog_dbus::find_aura_proxies().await?;
     ifaces
         .into_iter()
         .next()

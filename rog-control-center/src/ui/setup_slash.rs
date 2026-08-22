@@ -1,9 +1,7 @@
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
-use log::{error, info};
-use rog_dbus::find_iface_async;
-use rog_dbus::zbus_slash::SlashProxy;
+use log::{error, info, warn};
 use rog_slash::SlashMode;
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
@@ -38,7 +36,7 @@ fn slash_mode_from_index(index: i32) -> SlashMode {
 pub fn setup_slash_page(ui: &MainWindow, _states: Arc<Mutex<Config>>) {
     let handle = ui.as_weak();
     tokio::spawn(async move {
-        let Ok(slashes) = find_iface_async::<SlashProxy>("xyz.ljones.Slash").await else {
+        let Ok(slashes) = rog_dbus::find_slash_proxies().await else {
             info!("This device appears to have no slash interface");
             return;
         };
@@ -62,15 +60,15 @@ pub fn setup_slash_page(ui: &MainWindow, _states: Arc<Mutex<Config>>) {
             match slash.mode().await {
                 Ok(raw) => match SlashMode::try_from(raw) {
                     Ok(m) => mode = Some(m),
-                    Err(e) => log::warn!("slash mode at startup: unknown byte 0x{raw:02x}: {e}"),
+                    Err(e) => warn!("slash mode at startup: unknown byte 0x{raw:02x}: {e}"),
                 },
                 Err(e) => {
-                    log::warn!("slash mode unreadable at startup: {e}; retrying once");
+                    warn!("slash mode unreadable at startup: {e}; retrying once");
                     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
                     if let Ok(raw) = slash.mode().await {
                         match SlashMode::try_from(raw) {
                             Ok(m) => mode = Some(m),
-                            Err(e) => log::warn!(
+                            Err(e) => warn!(
                                 "slash mode at startup (retry): unknown byte 0x{raw:02x}: {e}"
                             ),
                         }
@@ -79,7 +77,7 @@ pub fn setup_slash_page(ui: &MainWindow, _states: Arc<Mutex<Config>>) {
             }
             if let Some(m) = mode {
                 let idx = slash_mode_to_index(m);
-                log::info!("slash mode at startup: {:?} (index {})", m, idx);
+                info!("slash mode at startup: {:?} (index {})", m, idx);
                 let choices = slash_modes();
                 handle
                     .upgrade_in_event_loop(move |handle| {
@@ -89,7 +87,7 @@ pub fn setup_slash_page(ui: &MainWindow, _states: Arc<Mutex<Config>>) {
                     })
                     .ok();
             } else {
-                log::error!("slash mode unreadable after retries; UI will show Static");
+                error!("slash mode unreadable after retries; UI will show Static");
             }
 
             handle
@@ -136,7 +134,7 @@ pub fn setup_slash_page(ui: &MainWindow, _states: Arc<Mutex<Config>>) {
                                             })
                                             .ok();
                                     }
-                                    Err(e) => log::warn!(
+                                    Err(e) => warn!(
                                         "setup_slash: received unknown slash mode 0x{raw:02x}: {e}"
                                     ),
                                 }

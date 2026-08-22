@@ -2,16 +2,13 @@ use std::sync::{Arc, Mutex};
 
 use concat_idents::concat_idents;
 use log::{debug, error};
-use rog_dbus::asus_armoury::AsusArmouryProxy;
-use rog_dbus::zbus_backlight::BacklightProxy;
-use rog_dbus::zbus_platform::{PlatformProxy, PlatformProxyBlocking};
 use rog_platform::asus_armoury::FirmwareAttribute;
 use rog_platform::platform::Properties;
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
 use super::show_toast;
 use crate::config::Config;
-use crate::zbus_proxies::{AppState, find_iface_async};
+use crate::zbus_proxies::AppState;
 use crate::{AttrMinMax, MainWindow, SystemPageData, set_ui_callbacks};
 
 const MINMAX: AttrMinMax = AttrMinMax {
@@ -77,16 +74,10 @@ pub fn setup_system_page(
         .set_dgpu_name(dgpu_model.into());
     ui.global::<SystemPageData>().set_has_igpu(has_igpu);
 
-    let platform = match rog_dbus::system_connection_blocking() {
-        Ok(c) => match PlatformProxyBlocking::builder(c).build() {
-            Ok(p) => Some(p),
-            Err(e) => {
-                error!("PlatformProxy failed: {e:?}");
-                None
-            }
-        },
+    let platform = match rog_dbus::platform_proxy_blocking() {
+        Ok(p) => Some(p),
         Err(e) => {
-            error!("DBus system connection failed: {e:?}");
+            error!("PlatformProxy failed: {e:?}");
             None
         }
     };
@@ -94,7 +85,7 @@ pub fn setup_system_page(
     if let Some(platform) = platform
         && let Ok(sys_props) = platform
             .supported_properties()
-            .map_err(|e| log::error!("Failed to get supported properties: {}", e))
+            .map_err(|e| error!("Failed to get supported properties: {}", e))
     {
         log::debug!("Available system properties: {:?}", sys_props);
         if sys_props.contains(&Properties::ChargeControlEndThreshold) {
@@ -222,21 +213,21 @@ macro_rules! init_minmax_property {
             let min = match proxy_copy.min_value().await {
                 Ok(m) => m,
                 Err(e) => {
-                    log::error!("Failed to read min value for property {}: {}", stringify!($property), e);
+                    error!("Failed to read min value for property {}: {}", stringify!($property), e);
                     return;
                 }
             };
             let max = match proxy_copy.max_value().await {
                 Ok(m) => m,
                 Err(e) => {
-                    log::error!("Failed to read max value for property {}: {}", stringify!($property), e);
+                    error!("Failed to read max value for property {}: {}", stringify!($property), e);
                     return;
                 }
             };
             let current = match proxy_copy.current_value().await {
                 Ok(c) => c as f32,
                 Err(e) => {
-                    log::error!("Failed to read current value for property {}: {}", stringify!($property), e);
+                    error!("Failed to read current value for property {}: {}", stringify!($property), e);
                     return;
                 }
             };
@@ -367,21 +358,21 @@ macro_rules! setup_minmax_external {
                     let min = match proxy_copy.min_value().await {
                         Ok(m) => m,
                         Err(e) => {
-                            log::error!("Failed to get min value on profile change: {e}");
+                            error!("Failed to get min value on profile change: {e}");
                             continue;
                         }
                     };
                     let max = match proxy_copy.max_value().await {
                         Ok(m) => m,
                         Err(e) => {
-                            log::error!("Failed to get max value on profile change: {e}");
+                            error!("Failed to get max value on profile change: {e}");
                             continue;
                         }
                     };
                     let current = match proxy_copy.current_value().await {
                         Ok(c) => c as f32,
                         Err(e) => {
-                            log::error!("Failed to get current value on profile change: {e}");
+                            error!("Failed to get current value on profile change: {e}");
                             continue;
                         }
                     };
@@ -422,24 +413,17 @@ pub fn setup_system_page_callbacks(ui: &MainWindow, _states: Arc<Mutex<Config>>)
 
     tokio::spawn(async move {
         // Create the connections/proxies here to prevent future delays in process
-        let conn = match rog_dbus::system_connection().await {
-            Ok(c) => c,
-            Err(e) => {
-                log::error!("Failed to connect to system bus: {e}");
-                return;
-            }
-        };
-        let platform = match PlatformProxy::builder(conn).build().await {
+        let platform = match rog_dbus::platform_proxy().await {
             Ok(p) => p,
             Err(e) => {
-                log::error!("Failed to create platform proxy: {e}");
+                error!("Failed to create platform proxy: {e}");
                 return;
             }
         };
-        let backlight = match BacklightProxy::builder(conn).build().await {
+        let backlight = match rog_dbus::backlight_proxy().await {
             Ok(b) => b,
             Err(e) => {
-                log::error!("Failed to create backlight proxy: {e}");
+                error!("Failed to create backlight proxy: {e}");
                 return;
             }
         };
@@ -700,7 +684,7 @@ pub fn setup_system_page_callbacks(ui: &MainWindow, _states: Arc<Mutex<Config>>)
             .ok();
 
         let armoury_attrs;
-        if let Ok(attrs) = find_iface_async::<AsusArmouryProxy>("xyz.ljones.AsusArmoury").await {
+        if let Ok(attrs) = rog_dbus::find_armoury_proxies().await {
             debug!("Found AsusArmoury interfaces");
             armoury_attrs = attrs;
             handle
@@ -718,131 +702,129 @@ pub fn setup_system_page_callbacks(ui: &MainWindow, _states: Arc<Mutex<Config>>)
         }
 
         for attr in armoury_attrs {
-            if let Ok(value) = attr.current_value().await {
-                if let Ok(name) = attr.name().await {
-                    debug!("Setting up {} = {value}", <&str>::from(name));
-                    let platform = platform.clone();
-                    handle
-                        .upgrade_in_event_loop(move |handle| match name {
-                            FirmwareAttribute::ApuMem => {}
-                            FirmwareAttribute::CoresPerformance => {}
-                            FirmwareAttribute::CoresEfficiency => {}
-                            FirmwareAttribute::PptPl1Spl => {
-                                init_minmax_property!(ppt_pl1_spl, handle, attr);
-                                setup_callback!(ppt_pl1_spl, handle, attr);
-                                setup_callback_restore_default!(ppt_pl1_spl, handle, attr);
-                                setup_minmax_external!(ppt_pl1_spl, handle, attr, platform);
-                            }
-                            FirmwareAttribute::PptPl2Sppt => {
-                                init_minmax_property!(ppt_pl2_sppt, handle, attr);
-                                setup_callback!(ppt_pl2_sppt, handle, attr);
-                                setup_callback_restore_default!(ppt_pl2_sppt, handle, attr);
-                                setup_minmax_external!(ppt_pl2_sppt, handle, attr, platform);
-                            }
-                            FirmwareAttribute::PptPl3Fppt => {
-                                init_minmax_property!(ppt_pl3_fppt, handle, attr);
-                                setup_callback!(ppt_pl3_fppt, handle, attr);
-                                setup_callback_restore_default!(ppt_pl3_fppt, handle, attr);
-                                setup_minmax_external!(ppt_pl3_fppt, handle, attr, platform);
-                            }
-                            FirmwareAttribute::PptFppt => {
-                                init_minmax_property!(ppt_fppt, handle, attr);
-                                setup_callback!(ppt_fppt, handle, attr);
-                                setup_callback_restore_default!(ppt_fppt, handle, attr);
-                                setup_minmax_external!(ppt_fppt, handle, attr, platform);
-                            }
-                            FirmwareAttribute::PptApuSppt => {
-                                init_minmax_property!(ppt_apu_sppt, handle, attr);
-                                setup_callback!(ppt_apu_sppt, handle, attr);
-                                setup_callback_restore_default!(ppt_apu_sppt, handle, attr);
-                                setup_minmax_external!(ppt_apu_sppt, handle, attr, platform);
-                            }
-                            FirmwareAttribute::PptPlatformSppt => {
-                                init_minmax_property!(ppt_platform_sppt, handle, attr);
-                                setup_callback!(ppt_platform_sppt, handle, attr);
-                                setup_callback_restore_default!(ppt_platform_sppt, handle, attr);
-                                setup_minmax_external!(ppt_platform_sppt, handle, attr, platform);
-                            }
-                            FirmwareAttribute::NvDynamicBoost => {
-                                init_minmax_property!(nv_dynamic_boost, handle, attr);
-                                setup_callback!(nv_dynamic_boost, handle, attr);
-                                setup_callback_restore_default!(nv_dynamic_boost, handle, attr);
-                                setup_minmax_external!(nv_dynamic_boost, handle, attr, platform);
-                            }
-                            FirmwareAttribute::NvTempTarget => {
-                                init_minmax_property!(nv_temp_target, handle, attr);
-                                setup_callback!(nv_temp_target, handle, attr);
-                                setup_callback_restore_default!(nv_temp_target, handle, attr);
-                                setup_minmax_external!(nv_temp_target, handle, attr, platform);
-                            }
-                            FirmwareAttribute::DgpuBaseTgp => {}
-                            FirmwareAttribute::DgpuTgp => {
-                                init_minmax_property!(nv_tgp, handle, attr);
-                                setup_callback!(nv_tgp, handle, attr);
-                                setup_callback_restore_default!(nv_tgp, handle, attr);
-                                setup_minmax_external!(nv_tgp, handle, attr, platform);
-                            }
-                            FirmwareAttribute::ChargeMode => {}
-                            FirmwareAttribute::BootSound => {
-                                init_property!(boot_sound, handle, value);
-                                setup_callback!(boot_sound, handle, attr);
-                                setup_external!(boot_sound, handle, attr, value)
-                            }
-                            FirmwareAttribute::ScreenAutoBrightness => {
-                                init_property!(screen_auto_brightness, handle, value);
-                                setup_callback!(screen_auto_brightness, handle, attr);
-                                setup_external!(screen_auto_brightness, handle, attr, value)
-                            }
-                            FirmwareAttribute::McuPowersave => {
-                                init_property!(mcu_powersave, handle, value);
-                                setup_callback!(mcu_powersave, handle, attr);
-                                setup_external!(mcu_powersave, handle, attr, value)
-                            }
-                            FirmwareAttribute::PanelOverdrive => {
-                                init_property!(panel_overdrive, handle, value);
-                                setup_callback!(panel_overdrive, handle, attr);
-                                setup_external!(panel_overdrive, handle, attr, value)
-                            }
-                            FirmwareAttribute::PanelHdMode => {}
-                            FirmwareAttribute::EgpuConnected => {}
-                            FirmwareAttribute::EgpuEnable => {}
-                            FirmwareAttribute::DgpuDisable => {}
-                            FirmwareAttribute::GpuMuxMode => {}
-                            FirmwareAttribute::MiniLedMode => {
-                                init_property!(mini_led_mode, handle, value);
-                                setup_callback!(mini_led_mode, handle, attr);
-                                setup_external!(mini_led_mode, handle, attr, value);
+            if let Ok(value) = attr.current_value().await
+                && let Ok(name) = attr.name().await
+            {
+                debug!("Setting up {} = {value}", <&str>::from(name));
+                let platform = platform.clone();
+                handle
+                    .upgrade_in_event_loop(move |handle| match name {
+                        FirmwareAttribute::ApuMem => {}
+                        FirmwareAttribute::CoresPerformance => {}
+                        FirmwareAttribute::CoresEfficiency => {}
+                        FirmwareAttribute::PptPl1Spl => {
+                            init_minmax_property!(ppt_pl1_spl, handle, attr);
+                            setup_callback!(ppt_pl1_spl, handle, attr);
+                            setup_callback_restore_default!(ppt_pl1_spl, handle, attr);
+                            setup_minmax_external!(ppt_pl1_spl, handle, attr, platform);
+                        }
+                        FirmwareAttribute::PptPl2Sppt => {
+                            init_minmax_property!(ppt_pl2_sppt, handle, attr);
+                            setup_callback!(ppt_pl2_sppt, handle, attr);
+                            setup_callback_restore_default!(ppt_pl2_sppt, handle, attr);
+                            setup_minmax_external!(ppt_pl2_sppt, handle, attr, platform);
+                        }
+                        FirmwareAttribute::PptPl3Fppt => {
+                            init_minmax_property!(ppt_pl3_fppt, handle, attr);
+                            setup_callback!(ppt_pl3_fppt, handle, attr);
+                            setup_callback_restore_default!(ppt_pl3_fppt, handle, attr);
+                            setup_minmax_external!(ppt_pl3_fppt, handle, attr, platform);
+                        }
+                        FirmwareAttribute::PptFppt => {
+                            init_minmax_property!(ppt_fppt, handle, attr);
+                            setup_callback!(ppt_fppt, handle, attr);
+                            setup_callback_restore_default!(ppt_fppt, handle, attr);
+                            setup_minmax_external!(ppt_fppt, handle, attr, platform);
+                        }
+                        FirmwareAttribute::PptApuSppt => {
+                            init_minmax_property!(ppt_apu_sppt, handle, attr);
+                            setup_callback!(ppt_apu_sppt, handle, attr);
+                            setup_callback_restore_default!(ppt_apu_sppt, handle, attr);
+                            setup_minmax_external!(ppt_apu_sppt, handle, attr, platform);
+                        }
+                        FirmwareAttribute::PptPlatformSppt => {
+                            init_minmax_property!(ppt_platform_sppt, handle, attr);
+                            setup_callback!(ppt_platform_sppt, handle, attr);
+                            setup_callback_restore_default!(ppt_platform_sppt, handle, attr);
+                            setup_minmax_external!(ppt_platform_sppt, handle, attr, platform);
+                        }
+                        FirmwareAttribute::NvDynamicBoost => {
+                            init_minmax_property!(nv_dynamic_boost, handle, attr);
+                            setup_callback!(nv_dynamic_boost, handle, attr);
+                            setup_callback_restore_default!(nv_dynamic_boost, handle, attr);
+                            setup_minmax_external!(nv_dynamic_boost, handle, attr, platform);
+                        }
+                        FirmwareAttribute::NvTempTarget => {
+                            init_minmax_property!(nv_temp_target, handle, attr);
+                            setup_callback!(nv_temp_target, handle, attr);
+                            setup_callback_restore_default!(nv_temp_target, handle, attr);
+                            setup_minmax_external!(nv_temp_target, handle, attr, platform);
+                        }
+                        FirmwareAttribute::DgpuBaseTgp => {}
+                        FirmwareAttribute::DgpuTgp => {
+                            init_minmax_property!(nv_tgp, handle, attr);
+                            setup_callback!(nv_tgp, handle, attr);
+                            setup_callback_restore_default!(nv_tgp, handle, attr);
+                            setup_minmax_external!(nv_tgp, handle, attr, platform);
+                        }
+                        FirmwareAttribute::ChargeMode => {}
+                        FirmwareAttribute::BootSound => {
+                            init_property!(boot_sound, handle, value);
+                            setup_callback!(boot_sound, handle, attr);
+                            setup_external!(boot_sound, handle, attr, value)
+                        }
+                        FirmwareAttribute::ScreenAutoBrightness => {
+                            init_property!(screen_auto_brightness, handle, value);
+                            setup_callback!(screen_auto_brightness, handle, attr);
+                            setup_external!(screen_auto_brightness, handle, attr, value)
+                        }
+                        FirmwareAttribute::McuPowersave => {
+                            init_property!(mcu_powersave, handle, value);
+                            setup_callback!(mcu_powersave, handle, attr);
+                            setup_external!(mcu_powersave, handle, attr, value)
+                        }
+                        FirmwareAttribute::PanelOverdrive => {
+                            init_property!(panel_overdrive, handle, value);
+                            setup_callback!(panel_overdrive, handle, attr);
+                            setup_external!(panel_overdrive, handle, attr, value)
+                        }
+                        FirmwareAttribute::PanelHdMode => {}
+                        FirmwareAttribute::EgpuConnected => {}
+                        FirmwareAttribute::EgpuEnable => {}
+                        FirmwareAttribute::DgpuDisable => {}
+                        FirmwareAttribute::GpuMuxMode => {}
+                        FirmwareAttribute::MiniLedMode => {
+                            init_property!(mini_led_mode, handle, value);
+                            setup_callback!(mini_led_mode, handle, attr);
+                            setup_external!(mini_led_mode, handle, attr, value);
 
-                                // possible_values count tells us how many dimming
-                                // modes the device has: 2 (MODE1) or 3 (MODE2).
-                                let handle_copy = handle.as_weak();
-                                let proxy_copy = attr.clone();
-                                tokio::spawn(async move {
-                                    let count = proxy_copy
-                                        .possible_values()
-                                        .await
-                                        .map(|v| v.len())
-                                        .unwrap_or(2);
-                                    handle_copy
-                                        .upgrade_in_event_loop(move |handle| {
-                                            let data = handle.global::<SystemPageData>();
-                                            let choices = if count >= 3 {
-                                                data.get_mini_led_choices_modes()
-                                            } else {
-                                                data.get_mini_led_choices_onoff()
-                                            };
-                                            data.set_mini_led_mode_choices(choices);
-                                        })
-                                        .ok();
-                                });
-                            }
-                            FirmwareAttribute::PendingReboot => {}
-                            FirmwareAttribute::None => {}
-                        })
-                        .ok();
-                } else {
-                    error!("Attribute with no name, skipping");
-                }
+                            // possible_values count tells us how many dimming
+                            // modes the device has: 2 (MODE1) or 3 (MODE2).
+                            let handle_copy = handle.as_weak();
+                            let proxy_copy = attr.clone();
+                            tokio::spawn(async move {
+                                let count = proxy_copy
+                                    .possible_values()
+                                    .await
+                                    .map(|v| v.len())
+                                    .unwrap_or(2);
+                                handle_copy
+                                    .upgrade_in_event_loop(move |handle| {
+                                        let data = handle.global::<SystemPageData>();
+                                        let choices = if count >= 3 {
+                                            data.get_mini_led_choices_modes()
+                                        } else {
+                                            data.get_mini_led_choices_onoff()
+                                        };
+                                        data.set_mini_led_mode_choices(choices);
+                                    })
+                                    .ok();
+                            });
+                        }
+                        FirmwareAttribute::PendingReboot => {}
+                        FirmwareAttribute::None => {}
+                    })
+                    .ok();
             }
         }
         handle
