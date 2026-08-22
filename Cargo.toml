@@ -28,7 +28,6 @@ members = [
   "rog-profiles",
   "rog-control-center",
   "rog-slash",
-  "simulators",
   "rog-scsi",
 ]
 
@@ -80,7 +79,6 @@ tokio = { version = "^1.53.1", default-features = false, features = [
   "rt-multi-thread",
 ] }
 udev = { version = "^0.9.3", features = ["mio"] }
-uhid-virt = "^0.0.8"
 zbus = "^5.19.0"
 
 [profile.release]
