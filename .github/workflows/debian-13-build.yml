@@ -52,7 +52,7 @@ jobs:
                       libusb-1.0-0-dev \
                       libclang-dev \
                       libsdl2-dev \
-                      fontconfig-config
+                      libfontconfig-dev
 
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
