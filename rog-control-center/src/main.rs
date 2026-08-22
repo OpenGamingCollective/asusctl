@@ -15,6 +15,7 @@ use rog_control_center::helpers::zbus_proxies::AsusdInterface;
 use rog_control_center::startup::populate_slint_properties;
 use rog_control_center::state::Event;
 use rog_control_center::ui::actions::ActionHandler;
+use rog_control_center::ui::window::setup_window;
 use slint::ComponentHandle;
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
@@ -100,7 +101,7 @@ fn main() -> Result<()> {
     }
 
     // Create the Slint UI Window
-    let ui = rog_control_center::ui::window::setup_window(config.clone());
+    let ui = setup_window();
 
     // Create the Central Event Channel
     let (event_tx, mut event_rx) = mpsc::unbounded_channel::<rog_control_center::state::Event>();
@@ -141,6 +142,16 @@ fn main() -> Result<()> {
             }
         }
     });
+
+    // Show the window after the pre-startup is done
+    let background_startup = match config.try_lock() {
+        Ok(c) => c.startup_in_background,
+        Err(_) => false,
+    };
+
+    if !background_startup && let Err(e) = ui.window().show() {
+        warn!("Couldn't show main window: {e:?}");
+    }
 
     let mut action_handler = ActionHandler {
         config: config.clone(),
