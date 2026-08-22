@@ -303,10 +303,8 @@ impl Device {
                     .canonicalize()
                     .ok()
                     .is_some_and(|p| p == self.dev_path || p.starts_with(&self.dev_path));
-                if is_match {
-                    if let Some(value) = read(&path) {
-                        return Some(value);
-                    }
+                if is_match && let Some(value) = read(&path) {
+                    return Some(value);
                 }
             }
         }
@@ -360,19 +358,17 @@ impl Device {
                     .canonicalize()
                     .ok()
                     .is_some_and(|p| p == self.dev_path || p.starts_with(&self.dev_path));
-                if is_match {
-                    if let Some(busy) = read_drm_busy(&path) {
-                        return Some(busy);
-                    }
+                if is_match && let Some(busy) = read_drm_busy(&path) {
+                    return Some(busy);
                 }
             }
         }
 
         // 4. Fallback to NVML if this is an NVIDIA device and DRM busy is not available
-        if self.pci_id.to_uppercase().starts_with(NVIDIA_PCI_VENDOR) {
-            if let Some(usage) = read_nvml_usage() {
-                return Some(usage);
-            }
+        if self.pci_id.to_uppercase().starts_with(NVIDIA_PCI_VENDOR)
+            && let Some(usage) = read_nvml_usage()
+        {
+            return Some(usage);
         }
 
         None
@@ -413,79 +409,78 @@ impl Device {
         })? {
             let sysname = device.sysname().to_string_lossy();
             trace!("Looking at PCI device {:?}", sysname);
-            if let Some(id) = device.property_value("PCI_ID") {
-                if let Some(class) = device.property_value("PCI_CLASS") {
-                    let id = id.to_string_lossy();
-                    let class = class.to_string_lossy();
-                    // Match only Nvidia or AMD
-                    if is_gpu_vendor(&id) {
-                        let mut dgpu = false;
-                        // Check connected displays to distinguish dGPU from iGPU.
-                        // eDP-1 is the internal panel, always on iGPU.
-                        let displays =
-                            find_connected_displays(device.syspath()).unwrap_or_default();
-                        if !displays.contains(&"eDP-1".to_string()) {
+            if let Some(id) = device.property_value("PCI_ID")
+                && let Some(class) = device.property_value("PCI_CLASS")
+            {
+                let id = id.to_string_lossy();
+                let class = class.to_string_lossy();
+                // Match only Nvidia or AMD
+                if is_gpu_vendor(&id) {
+                    let mut dgpu = false;
+                    // Check connected displays to distinguish dGPU from iGPU.
+                    // eDP-1 is the internal panel, always on iGPU.
+                    let displays = find_connected_displays(device.syspath()).unwrap_or_default();
+                    if !displays.contains(&"eDP-1".to_string()) {
+                        trace!(
+                            "Matched dGPU {id} at {:?} by checking display connections",
+                            device.sysname()
+                        );
+                        dgpu = is_display_class(&class);
+                    } else {
+                        trace!(
+                            "Device {id} at {:?} appears to be the iGPU",
+                            device.sysname()
+                        );
+                    }
+                    if !dgpu && id.starts_with(AMD_PCI_VENDOR) {
+                        trace!(
+                            "Found dGPU Device {id} without boot_vga attribute at {:?}",
+                            device.sysname()
+                        );
+                        // Fallback: check hwmon for AMD iGPU detection
+                        let mut dev_path = PathBuf::from(device.syspath());
+                        dev_path.push("hwmon");
+
+                        let hwmon_n_opt = match dev_path.read_dir() {
+                            Ok(mut entries) => entries.next(),
+                            Err(e) => {
+                                trace!("Error reading hwmon directory: {}", e);
+                                None
+                            }
+                        };
+
+                        if let Some(Ok(hwmon_n)) = hwmon_n_opt {
+                            let mut hwmon_path = hwmon_n.path();
+                            hwmon_path.push("in1_input");
+                            dgpu = !hwmon_path.exists();
+                        }
+                    }
+                    if !dgpu {
+                        if let Some(label) = device.property_value("ID_MODEL_FROM_DATABASE") {
                             trace!(
-                                "Matched dGPU {id} at {:?} by checking display connections",
+                                "Found ID_MODEL_FROM_DATABASE property {id} at {:?} : {label:?}",
                                 device.sysname()
                             );
+                            dgpu = lspci_dgpu_check(&label.to_string_lossy());
+                        } else if let Some(model) = device.property_value("ID_MODEL") {
+                            dgpu = lspci_dgpu_check(&model.to_string_lossy());
+                        } else if id.starts_with(NVIDIA_PCI_VENDOR) {
                             dgpu = is_display_class(&class);
+                        }
+                    }
+
+                    if dgpu || (!parent.is_empty() && sysname.contains(&parent)) {
+                        if dgpu {
+                            info!("Found dgpu {id} at {:?}", device.sysname());
                         } else {
-                            trace!(
-                                "Device {id} at {:?} appears to be the iGPU",
-                                device.sysname()
-                            );
+                            info!("Found additional device {id} at {:?}", device.sysname());
                         }
-                        if !dgpu && id.starts_with(AMD_PCI_VENDOR) {
-                            trace!(
-                                "Found dGPU Device {id} without boot_vga attribute at {:?}",
-                                device.sysname()
-                            );
-                            // Fallback: check hwmon for AMD iGPU detection
-                            let mut dev_path = PathBuf::from(device.syspath());
-                            dev_path.push("hwmon");
-
-                            let hwmon_n_opt = match dev_path.read_dir() {
-                                Ok(mut entries) => entries.next(),
-                                Err(e) => {
-                                    trace!("Error reading hwmon directory: {}", e);
-                                    None
-                                }
-                            };
-
-                            if let Some(Ok(hwmon_n)) = hwmon_n_opt {
-                                let mut hwmon_path = hwmon_n.path();
-                                hwmon_path.push("in1_input");
-                                dgpu = !hwmon_path.exists();
-                            }
-                        }
-                        if !dgpu {
-                            if let Some(label) = device.property_value("ID_MODEL_FROM_DATABASE") {
-                                trace!(
-                                    "Found ID_MODEL_FROM_DATABASE property {id} at {:?} : {label:?}",
-                                    device.sysname()
-                                );
-                                dgpu = lspci_dgpu_check(&label.to_string_lossy());
-                            } else if let Some(model) = device.property_value("ID_MODEL") {
-                                dgpu = lspci_dgpu_check(&model.to_string_lossy());
-                            } else if id.starts_with(NVIDIA_PCI_VENDOR) {
-                                dgpu = is_display_class(&class);
-                            }
-                        }
-
-                        if dgpu || (!parent.is_empty() && sysname.contains(&parent)) {
-                            if dgpu {
-                                info!("Found dgpu {id} at {:?}", device.sysname());
-                            } else {
-                                info!("Found additional device {id} at {:?}", device.sysname());
-                            }
-                            parent = get_parent(&device);
-                            devices.push(Self {
-                                dev_path: PathBuf::from(device.syspath()),
-                                is_dgpu: dgpu,
-                                pci_id: id.to_string(),
-                            });
-                        }
+                        parent = get_parent(&device);
+                        devices.push(Self {
+                            dev_path: PathBuf::from(device.syspath()),
+                            is_dgpu: dgpu,
+                            pci_id: id.to_string(),
+                        });
                     }
                 }
             }
@@ -593,60 +588,57 @@ pub fn get_gpu_names() -> (String, String) {
     let mut igpu = None;
     let mut dgpu = None;
 
-    if let Ok(mut enumerator) = udev::Enumerator::new() {
-        if enumerator.match_subsystem("pci").is_ok() {
-            if let Ok(devices) = enumerator.scan_devices() {
-                for device in devices {
-                    if let Some(class) = device.property_value("PCI_CLASS") {
-                        let class_str = class.to_string_lossy();
-                        if class_str.starts_with("03") || class_str.starts_with("3") {
-                            let id_val = device
-                                .property_value("PCI_ID")
-                                .map(|s| s.to_string_lossy().into_owned())
-                                .unwrap_or_default();
+    if let Ok(mut enumerator) = udev::Enumerator::new()
+        && enumerator.match_subsystem("pci").is_ok()
+        && let Ok(devices) = enumerator.scan_devices()
+    {
+        for device in devices {
+            if let Some(class) = device.property_value("PCI_CLASS") {
+                let class_str = class.to_string_lossy();
+                if class_str.starts_with("03") || class_str.starts_with("3") {
+                    let id_val = device
+                        .property_value("PCI_ID")
+                        .map(|s| s.to_string_lossy().into_owned())
+                        .unwrap_or_default();
 
-                            let mut parts = id_val.split(':');
-                            let vendor = parts.next().unwrap_or("").to_lowercase();
-                            let device_id = parts.next().unwrap_or("").to_lowercase();
+                    let mut parts = id_val.split(':');
+                    let vendor = parts.next().unwrap_or("").to_lowercase();
+                    let device_id = parts.next().unwrap_or("").to_lowercase();
 
-                            let mut model_name = String::new();
-                            if vendor.eq_ignore_ascii_case(AMD_PCI_VENDOR) && !device_id.is_empty()
-                            {
-                                let revision_path = device.syspath().join("revision");
-                                let revision = std::fs::read_to_string(revision_path)
-                                    .unwrap_or_default()
-                                    .trim()
-                                    .trim_start_matches("0x")
-                                    .to_lowercase();
-                                if let Some(amd_name) = lookup_amdgpu_name(&device_id, &revision) {
-                                    model_name = amd_name;
-                                }
-                            }
-
-                            if model_name.is_empty() {
-                                if let Some(model) = device.property_value("ID_MODEL_FROM_DATABASE")
-                                {
-                                    model_name = model.to_string_lossy().into_owned();
-                                }
-                            }
-                            if model_name.is_empty() {
-                                model_name = id_val.clone();
-                            }
-                            if model_name.is_empty() {
-                                model_name = "Unknown GPU".to_string();
-                            }
-
-                            let is_dgpu = vendor.eq_ignore_ascii_case(NVIDIA_PCI_VENDOR)
-                                || model_name.contains("GeForce")
-                                || model_name.contains("Radeon RX")
-                                || model_name.contains("Discrete");
-
-                            if is_dgpu {
-                                dgpu = Some(model_name);
-                            } else {
-                                igpu = Some(model_name);
-                            }
+                    let mut model_name = String::new();
+                    if vendor.eq_ignore_ascii_case(AMD_PCI_VENDOR) && !device_id.is_empty() {
+                        let revision_path = device.syspath().join("revision");
+                        let revision = std::fs::read_to_string(revision_path)
+                            .unwrap_or_default()
+                            .trim()
+                            .trim_start_matches("0x")
+                            .to_lowercase();
+                        if let Some(amd_name) = lookup_amdgpu_name(&device_id, &revision) {
+                            model_name = amd_name;
                         }
+                    }
+
+                    if model_name.is_empty()
+                        && let Some(model) = device.property_value("ID_MODEL_FROM_DATABASE")
+                    {
+                        model_name = model.to_string_lossy().into_owned();
+                    }
+                    if model_name.is_empty() {
+                        model_name = id_val.clone();
+                    }
+                    if model_name.is_empty() {
+                        model_name = "Unknown GPU".to_string();
+                    }
+
+                    let is_dgpu = vendor.eq_ignore_ascii_case(NVIDIA_PCI_VENDOR)
+                        || model_name.contains("GeForce")
+                        || model_name.contains("Radeon RX")
+                        || model_name.contains("Discrete");
+
+                    if is_dgpu {
+                        dgpu = Some(model_name);
+                    } else {
+                        igpu = Some(model_name);
                     }
                 }
             }

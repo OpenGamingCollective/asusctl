@@ -4,9 +4,7 @@ use std::sync::Arc;
 
 use config_traits::StdConfig;
 use log::{debug, error, info, warn};
-use rog_platform::asus_armoury::{
-    AttrValue, FirmwareAttribute, FirmwareAttributeType, FirmwareAttributes,
-};
+use rog_platform::asus_armoury::FirmwareAttributes;
 use rog_platform::cpu::{CPUControl, CPUEPP, CPUGovernor};
 use rog_platform::platform::{PlatformProfile, Properties, RogPlatform};
 use rog_platform::power::AsusPower;
@@ -126,24 +124,23 @@ impl CtrlPlatform {
                 };
 
                 while let Some(ev) = events.next().await {
-                    if let Ok(ev) = ev {
-                        if ev.mask == inotify::EventMask::IGNORED {
-                            warn!(
-                                "Something modified asusd.ron vi/vim style. Now need to reload \
+                    if let Ok(ev) = ev
+                        && ev.mask == inotify::EventMask::IGNORED
+                    {
+                        warn!(
+                            "Something modified asusd.ron vi/vim style. Now need to reload \
                                  inotify watch"
-                            );
-                            break;
-                        }
+                        );
+                        break;
                     }
 
                     let res = config1.lock().await.read_new();
-                    if let Some(new_cfg) = res {
-                        if let Err(e) = inotify_self
+                    if let Some(new_cfg) = res
+                        && let Err(e) = inotify_self
                             .reload_and_notify(&signal_context, new_cfg)
                             .await
-                        {
-                            error!("Failed to reload and notify config: {e:?}");
-                        }
+                    {
+                        error!("Failed to reload and notify config: {e:?}");
                     }
                 }
             }
@@ -239,25 +236,25 @@ impl CtrlPlatform {
             return;
         }
         info!("ThrottlePolicy setting EPP");
-        if let Some(cpu) = self.cpu_control.as_ref() {
-            if let Ok(epp) = cpu.get_available_epp() {
-                debug!("Available EPP: {epp:?}");
+        if let Some(cpu) = self.cpu_control.as_ref()
+            && let Ok(epp) = cpu.get_available_epp()
+        {
+            debug!("Available EPP: {epp:?}");
+            if epp.contains(&enegy_pref) {
+                debug!("Setting {enegy_pref:?}");
+                cpu.set_epp(enegy_pref).ok();
+            } else if let Ok(gov) = cpu.get_governor()
+                && gov != CPUGovernor::Powersave
+            {
+                warn!("powersave governor is not is use, trying to set.");
+                cpu.set_governor(CPUGovernor::Powersave)
+                    .map_err(|e| error!("couldn't set powersave: {e:?}"))
+                    .ok();
                 if epp.contains(&enegy_pref) {
                     debug!("Setting {enegy_pref:?}");
-                    cpu.set_epp(enegy_pref).ok();
-                } else if let Ok(gov) = cpu.get_governor() {
-                    if gov != CPUGovernor::Powersave {
-                        warn!("powersave governor is not is use, trying to set.");
-                        cpu.set_governor(CPUGovernor::Powersave)
-                            .map_err(|e| error!("couldn't set powersave: {e:?}"))
-                            .ok();
-                        if epp.contains(&enegy_pref) {
-                            debug!("Setting {enegy_pref:?}");
-                            cpu.set_epp(enegy_pref)
-                                .map_err(|e| error!("couldn't set EPP: {e:?}"))
-                                .ok();
-                        }
-                    }
+                    cpu.set_epp(enegy_pref)
+                        .map_err(|e| error!("couldn't set EPP: {e:?}"))
+                        .ok();
                 }
             }
         }
@@ -761,39 +758,13 @@ impl CtrlPlatform {
         }
 
         if enable {
-            // Clone to reduce blocking
-            let tuning = self
-                .config
-                .lock()
-                .await
-                .select_tunings(power_plugged == 1, profile)
-                .clone();
-
-            for attr in self.attributes.attributes() {
-                let name: FirmwareAttribute = attr.name().into();
-                if name.property_type() == FirmwareAttributeType::Ppt {
-                    // reset stored value
-                    if let Some(tune) = self
-                        .config
-                        .lock()
-                        .await
-                        .select_tunings(power_plugged == 1, profile)
-                        .group
-                        .get_mut(&name)
-                    {
-                        let value = tuning
-                            .group
-                            .get(&name)
-                            .map(|v| AttrValue::Integer(*v))
-                            .unwrap_or_else(|| attr.default_value().clone());
-                        // restore default
-                        attr.set_current_value(&value)?;
-                        if let AttrValue::Integer(i) = value {
-                            *tune = i
-                        }
-                    }
-                }
-            }
+            set_config_or_default(
+                &self.attributes,
+                &mut *self.config.lock().await,
+                power_plugged == 1,
+                profile,
+            )
+            .await;
         } else {
             // reapply the profile to ensure acpi resets PPT to defaults
             self.platform.set_platform_profile(profile.into())?;
@@ -942,42 +913,38 @@ impl CtrlTask for CtrlPlatform {
                             )
                             .ok();
                     }
-                    if let Ok(power_plugged) = platform1.power.get_online() {
-                        if platform1.config.lock().await.last_power_plugged != power_plugged {
-                            if !sleeping && platform1.platform.has_platform_profile() {
-                                let change_epp =
-                                    platform1.config.lock().await.platform_profile_linked_epp;
+                    if let Ok(power_plugged) = platform1.power.get_online()
+                        && platform1.config.lock().await.last_power_plugged != power_plugged
+                    {
+                        if !sleeping && platform1.platform.has_platform_profile() {
+                            let change_epp =
+                                platform1.config.lock().await.platform_profile_linked_epp;
+                            platform1
+                                .update_policy_ac_or_bat(power_plugged > 0, change_epp)
+                                .await;
+                        }
+                        if !sleeping {
+                            platform1.run_ac_or_bat_cmd(power_plugged > 0).await;
+                            if let Ok(profile) =
+                                platform1.platform.get_platform_profile().map(|p| p.into())
+                            {
+                                let attrs = FirmwareAttributes::new();
                                 platform1
-                                    .update_policy_ac_or_bat(power_plugged > 0, change_epp)
+                                    .apply_fan_curves_and_ppt(&attrs, power_plugged > 0, profile)
                                     .await;
-                            }
-                            if !sleeping {
-                                platform1.run_ac_or_bat_cmd(power_plugged > 0).await;
-                                if let Ok(profile) =
-                                    platform1.platform.get_platform_profile().map(|p| p.into())
+                                if let Err(e) = platform1
+                                    .armoury_registry
+                                    .emit_limits(&platform1.connection)
+                                    .await
                                 {
-                                    let attrs = FirmwareAttributes::new();
-                                    platform1
-                                        .apply_fan_curves_and_ppt(
-                                            &attrs,
-                                            power_plugged > 0,
-                                            profile,
-                                        )
-                                        .await;
-                                    if let Err(e) = platform1
-                                        .armoury_registry
-                                        .emit_limits(&platform1.connection)
-                                        .await
-                                    {
-                                        error!(
-                                            "Failed to emit armoury updates after power change: \
+                                    error!(
+                                        "Failed to emit armoury updates after power change: \
                                              {e:?}"
-                                        );
-                                    }
+                                    );
                                 }
                             }
-                            platform1.config.lock().await.last_power_plugged = power_plugged;
                         }
+                        platform1.config.lock().await.last_power_plugged = power_plugged;
                     }
                 }
             },

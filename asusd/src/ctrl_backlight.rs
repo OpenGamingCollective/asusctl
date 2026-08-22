@@ -59,13 +59,13 @@ impl CtrlBacklight {
             .unwrap_or_default();
 
         // If sync is enabled and we're setting screenpad brightness, set primary first
-        if sync && *device_type == BacklightType::Screenpad {
-            if let Some(primary) = self.get_backlight(&BacklightType::Primary) {
-                if let Ok(primary_max) = primary.get_max_brightness() {
-                    let primary_scaled = level * primary_max / 100;
-                    let _ = primary.set_brightness(primary_scaled);
-                }
-            }
+        if sync
+            && *device_type == BacklightType::Screenpad
+            && let Some(primary) = self.get_backlight(&BacklightType::Primary)
+            && let Ok(primary_max) = primary.get_max_brightness()
+        {
+            let primary_scaled = level * primary_max / 100;
+            let _ = primary.set_brightness(primary_scaled);
         }
 
         if let Some(backlight) = self.get_backlight(device_type) {
@@ -155,10 +155,10 @@ impl CtrlBacklight {
             return Ok(());
         }
 
-        if let Some(sync) = self.config.lock().await.screenpad_sync_primary {
-            if !sync {
-                return Ok(());
-            }
+        if let Some(sync) = self.config.lock().await.screenpad_sync_primary
+            && !sync
+        {
+            return Ok(());
         }
 
         if let Some(backlight) = self.get_backlight(&BacklightType::Primary) {

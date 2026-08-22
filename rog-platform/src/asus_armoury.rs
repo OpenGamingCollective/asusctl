@@ -352,7 +352,7 @@ define_attribute_getters!(
 
         apu_mem: Norestore,
 
-        charge_mode: Immediate,
+        charge_mode: ReadOnly,
     }
 );
 
