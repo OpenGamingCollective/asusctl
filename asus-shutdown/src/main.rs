@@ -9,11 +9,10 @@ use std::time::Duration;
 use futures_util::StreamExt;
 use log::{debug, error, info, warn};
 use logind_zbus::manager::{InhibitType, ManagerProxy};
-use rog_dbus::asus_armoury::AsusArmouryProxy;
+use rog_dbus::AsusArmouryProxy;
 use tokio::signal::unix::{SignalKind, signal};
 use tokio::sync::Mutex;
 use tokio::time::{Instant, sleep};
-use zbus::Connection;
 use zbus::proxy::CacheProperties;
 use zbus::zvariant::OwnedFd;
 
@@ -23,7 +22,6 @@ const WAIT_FOR_GPU_IDLE: Duration = Duration::from_secs(15);
 const GPU_IDLE_POLL_INTERVAL: Duration = Duration::from_millis(500);
 const GPU_IDLE_STABLE_FOR: Duration = Duration::from_secs(2);
 const ASUSD_BUS_NAME: &str = "xyz.ljones.Asusd";
-const ASUSD_ARMOURY_IFACE: &str = "xyz.ljones.AsusArmoury";
 const ATTR_DGPU_DISABLE: &str = "dgpu_disable";
 const SYSTEMD1_BUS_NAME: &str = "org.freedesktop.systemd1";
 const SYSTEMD1_MANAGER_PATH: &str = "/org/freedesktop/systemd1";
@@ -79,8 +77,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("Starting {}", SERVICE_NAME);
 
-    let connection = Connection::system().await?;
-    let manager = ManagerProxy::builder(&connection)
+    let connection = rog_dbus::system_connection().await?;
+    let manager = ManagerProxy::builder(connection)
         .cache_properties(CacheProperties::No)
         .build()
         .await?;
@@ -175,22 +173,10 @@ async fn print_dry_run_actions() {
 }
 
 async fn fetch_pending_actions() -> Result<Vec<PendingAction>, Box<dyn std::error::Error>> {
-    let conn = Connection::system().await?;
-    let manager = zbus::fdo::ObjectManagerProxy::new(&conn, ASUSD_BUS_NAME, "/").await?;
-    let managed = manager.get_managed_objects().await?;
+    let proxies = rog_dbus::find_armoury_proxies().await?;
 
     let mut actions = Vec::new();
-    for (path, ifaces) in managed {
-        if !ifaces.contains_key(ASUSD_ARMOURY_IFACE) {
-            continue;
-        }
-
-        let proxy = AsusArmouryProxy::builder(&conn)
-            .path(path.clone())?
-            .destination(ASUSD_BUS_NAME)?
-            .build()
-            .await?;
-
+    for proxy in proxies {
         let value = proxy.queued_gpu_value().await?;
         if value < 0 {
             continue;
@@ -198,7 +184,7 @@ async fn fetch_pending_actions() -> Result<Vec<PendingAction>, Box<dyn std::erro
 
         let name = proxy.name().await?;
         actions.push(PendingAction {
-            path: path.to_string(),
+            path: proxy.inner().path().to_string(),
             name: <&str>::from(name).to_owned(),
             value,
         });
@@ -251,9 +237,9 @@ async fn apply_shutdown_settings() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("[phase 5/6] Proceeding with applying deferred GPU settings");
 
-    let conn = Connection::system().await?;
+    let conn = rog_dbus::system_connection().await?;
     for action in queued {
-        let proxy = AsusArmouryProxy::builder(&conn)
+        let proxy = AsusArmouryProxy::builder(conn)
             .path(action.path.as_str())?
             .destination(ASUSD_BUS_NAME)?
             .build()
@@ -341,7 +327,7 @@ async fn wait_for_unit_to_exit(unit_name: &str, timeout: Duration) -> bool {
     );
     let started = Instant::now();
 
-    let conn = match Connection::system().await {
+    let conn = match rog_dbus::system_connection().await {
         Ok(conn) => conn,
         Err(err) => {
             warn!("Failed to connect to system bus while waiting for {unit_name}: {err}");
@@ -350,7 +336,7 @@ async fn wait_for_unit_to_exit(unit_name: &str, timeout: Duration) -> bool {
     };
 
     let manager = match zbus::Proxy::new(
-        &conn,
+        conn,
         SYSTEMD1_BUS_NAME,
         SYSTEMD1_MANAGER_PATH,
         SYSTEMD1_MANAGER_IFACE,
@@ -389,7 +375,7 @@ async fn wait_for_unit_to_exit(unit_name: &str, timeout: Duration) -> bool {
         };
 
         let props_builder =
-            match zbus::fdo::PropertiesProxy::builder(&conn).destination(SYSTEMD1_BUS_NAME) {
+            match zbus::fdo::PropertiesProxy::builder(conn).destination(SYSTEMD1_BUS_NAME) {
                 Ok(builder) => builder,
                 Err(err) => {
                     warn!(
@@ -651,7 +637,10 @@ fn busy_gpu_nodes() -> Result<HashSet<PathBuf>, Box<dyn std::error::Error>> {
 }
 
 fn is_card_entry(name: &str) -> bool {
-    name.starts_with("card") && name[4..].chars().all(|ch| ch.is_ascii_digit())
+    let Some(rest) = name.strip_prefix("card") else {
+        return false;
+    };
+    !rest.is_empty() && rest.chars().all(|ch| ch.is_ascii_digit())
 }
 
 fn read_trimmed(path: impl AsRef<Path>) -> Option<String> {
