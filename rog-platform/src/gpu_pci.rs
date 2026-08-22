@@ -419,9 +419,8 @@ impl Device {
                     let mut dgpu = false;
                     // Check connected displays to distinguish dGPU from iGPU.
                     // eDP-1 is the internal panel, always on iGPU.
-                    let displays =
-                        find_connected_displays(device.syspath()).unwrap_or_default();
-                    if !displays.contains(&"eDP-1".to_string()) {
+                    let displays = find_connected_displays(device.syspath()).unwrap_or_default();
+                    if !displays.iter().any(|d| d == "eDP-1") {
                         trace!(
                             "Matched dGPU {id} at {:?} by checking display connections",
                             device.sysname()
@@ -520,11 +519,11 @@ pub fn find_connected_displays(gpu_path: &Path) -> Result<Vec<String>> {
         .flatten()
         .filter_map(|entry| {
             let name = entry.file_name().into_string().ok()?;
-            if name.contains('-')
-                && fs::read_to_string(entry.path().join("status"))
-                    .is_ok_and(|status| status.trim() == "connected")
+            let (_, display) = name.split_once('-')?;
+            if fs::read_to_string(entry.path().join("status"))
+                .is_ok_and(|status| status.trim() == "connected")
             {
-                name.split_once('-').map(|(_, display)| display.to_string())
+                Some(display.to_string())
             } else {
                 None
             }
@@ -547,9 +546,8 @@ pub fn get_gpu_power_status() -> GfxPower {
         return GfxPower::AsusDisabled;
     }
 
-    if let Some(dgpu) = Device::find()
-        .ok()
-        .and_then(|devs| devs.into_iter().find(|d| d.is_dgpu()))
+    if let Ok(devs) = Device::find()
+        && let Some(dgpu) = devs.into_iter().find(|d| d.is_dgpu())
     {
         return dgpu.get_runtime_status().unwrap_or_default();
     }
