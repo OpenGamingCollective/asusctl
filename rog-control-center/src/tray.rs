@@ -6,6 +6,11 @@ pub fn setup_tray(tx: UnboundedSender<Event>) -> AsusTray {
     let tray = AsusTray::new().expect("Couldn't create tray");
 
     let tx_clone = tx.clone();
+    tray.on_show_window(move || {
+        let _ = tx_clone.send(Event::ShowWindow);
+    });
+
+    let tx_clone = tx.clone();
     tray.on_quit_window(move || {
         let _ = tx_clone.send(Event::Quit);
     });
