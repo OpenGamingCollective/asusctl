@@ -54,7 +54,7 @@ Run these checks before submitting your pull request:
 
 ### Submitting a PR
 
-- Fill out the pull request template completely, including tested hardware details and verification steps.
+- Fill out the pull request template completely, including verification steps and tested hardware details where applicable.
 - Do not bump workspace or package versions in `Cargo.toml`. Version updates are managed by maintainers during releases.
 - Link related issues using standard keywords such as `Fixes #123` or `Supersedes #456`.
 - Ensure commits are separated by concern and each commit is minimal, doing one thing.
