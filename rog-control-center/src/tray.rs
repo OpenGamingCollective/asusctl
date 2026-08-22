@@ -221,10 +221,10 @@ pub fn init_tray(
                 _ = config_check.tick() => {}
             }
 
-            if let Ok(lock) = config.try_lock() {
-                if !lock.enable_tray_icon {
-                    return;
-                }
+            if let Ok(lock) = config.try_lock()
+                && !lock.enable_tray_icon
+            {
+                return;
             }
         }
     });

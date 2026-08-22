@@ -59,13 +59,13 @@ fn main() -> Result<()> {
     // Try to open a proxy and check for app state first
     {
         let user_con = zbus::blocking::Connection::session()?;
-        if let Ok(proxy) = ROGCCZbusProxyBlocking::new(&user_con) {
-            if let Ok(state) = proxy.state() {
-                info!("App is already running: {state:?}, opening the window");
-                // if there is a proxy connection assume the app is already running
-                proxy.set_state(AppState::MainWindowShouldOpen)?;
-                std::process::exit(0);
-            }
+        if let Ok(proxy) = ROGCCZbusProxyBlocking::new(&user_con)
+            && let Ok(state) = proxy.state()
+        {
+            info!("App is already running: {state:?}, opening the window");
+            // if there is a proxy connection assume the app is already running
+            proxy.set_state(AppState::MainWindowShouldOpen)?;
+            std::process::exit(0);
         }
     }
 
@@ -176,10 +176,8 @@ fn main() -> Result<()> {
 
     start_notifications(config.clone(), &rt, gpu_status_tx)?;
 
-    if !startup_in_background {
-        if let Ok(mut app_state) = app_state.lock() {
-            *app_state = AppState::MainWindowShouldOpen;
-        }
+    if !startup_in_background && let Ok(mut app_state) = app_state.lock() {
+        *app_state = AppState::MainWindowShouldOpen;
     }
 
     if std::env::var("RUST_TRANSLATIONS").is_ok() {
@@ -296,15 +294,15 @@ fn main() -> Result<()> {
             } else if state == AppState::QuitApp {
                 window.request(WindowCommand::Quit);
                 break;
-            } else if state != AppState::MainWindowOpen {
-                if let Ok(config) = config.lock() {
-                    let shortcut_alive = shortcuts
-                        .as_ref()
-                        .is_some_and(|s| s.status().keeps_alive(config.enable_global_shortcut));
-                    if !config.run_in_background && !shortcut_alive {
-                        window.request(WindowCommand::Quit);
-                        break;
-                    }
+            } else if state != AppState::MainWindowOpen
+                && let Ok(config) = config.lock()
+            {
+                let shortcut_alive = shortcuts
+                    .as_ref()
+                    .is_some_and(|s| s.status().keeps_alive(config.enable_global_shortcut));
+                if !config.run_in_background && !shortcut_alive {
+                    window.request(WindowCommand::Quit);
+                    break;
                 }
             }
         }

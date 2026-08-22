@@ -398,12 +398,11 @@ impl AsusArmouryAttribute {
             let profile: PlatformProfile = self.platform.get_platform_profile()?.into();
             let power_plugged = self.power.get_online().unwrap_or_default() == 1;
             let config = self.config.lock().await;
-            if let Some(tuning) = config.select_tunings_ref(power_plugged, profile) {
-                if tuning.enabled {
-                    if let Some(tune) = tuning.group.get(&self.name()) {
-                        return Ok(*tune);
-                    }
-                }
+            if let Some(tuning) = config.select_tunings_ref(power_plugged, profile)
+                && tuning.enabled
+                && let Some(tune) = tuning.group.get(&self.name())
+            {
+                return Ok(*tune);
             }
             if let Ok(AttrValue::Integer(cur)) = self.attr.current_value() {
                 return Ok(cur);
@@ -702,12 +701,12 @@ pub async fn set_config_or_default(
                     }
                 };
 
-                if let Some(val) = final_val {
-                    if target_val != Some(val) {
-                        tuning.group.insert(name, val);
-                        info!("Set tuning config for {} = {:?}", <&str>::from(name), val);
-                        changed = true;
-                    }
+                if let Some(val) = final_val
+                    && target_val != Some(val)
+                {
+                    tuning.group.insert(name, val);
+                    info!("Set tuning config for {} = {:?}", <&str>::from(name), val);
+                    changed = true;
                 }
             }
             FirmwareAttributeType::Gpu => {

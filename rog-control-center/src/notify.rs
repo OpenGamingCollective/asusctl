@@ -131,10 +131,10 @@ fn start_dgpu_status_mon(config: Arc<Mutex<Config>>, gpu_status_tx: watch::Sende
                 let notify = enabled_notifications_copy.lock().is_ok_and(|config| {
                     config.notifications.enabled && config.notifications.receive_notify_gfx_status
                 });
-                if notify {
-                    if let Err(e) = do_gpu_status_notif("dGPU status changed:", &status).show() {
-                        warn!("Could not show dGPU status notification: {e}");
-                    }
+                if notify
+                    && let Err(e) = do_gpu_status_notif("dGPU status changed:", &status).show()
+                {
+                    warn!("Could not show dGPU status notification: {e}");
                 }
             }
             last_status = status;

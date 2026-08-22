@@ -361,10 +361,10 @@ fn handle_anime(cmd: &AnimeCommand) -> Result<(), Box<dyn std::error::Error>> {
         }
 
         let mut anime_type = get_anime_type();
-        if let AnimeType::Unsupported = anime_type {
-            if let Some(model) = cmd.override_type {
-                anime_type = model;
-            }
+        if let AnimeType::Unsupported = anime_type
+            && let Some(model) = cmd.override_type
+        {
+            anime_type = model;
         }
 
         if cmd.clear {
@@ -579,13 +579,13 @@ fn handle_led_mode(mode: &LedModeCommand) -> Result<(), Box<dyn std::error::Erro
     if mode.command.is_none() && !mode.prev_mode && !mode.next_mode {
         println!("Missing arg or command; run 'asusctl aura --help' for usage");
         // print available modes when possible
-        if let Ok(aura) = find_iface_blocking::<AuraProxyBlocking>("xyz.ljones.Aura") {
-            if let Some(first_aura) = aura.first() {
-                let modes = first_aura.supported_basic_modes()?;
-                println!("Available modes:");
-                for m in modes {
-                    println!("  {:?}", m);
-                }
+        if let Ok(aura) = find_iface_blocking::<AuraProxyBlocking>("xyz.ljones.Aura")
+            && let Some(first_aura) = aura.first()
+        {
+            let modes = first_aura.supported_basic_modes()?;
+            println!("Available modes:");
+            for m in modes {
+                println!("  {:?}", m);
             }
         }
         return Ok(());

@@ -111,11 +111,11 @@ pub fn is_autostart_in_background() -> bool {
         p.push(format!("{APP_ID}.desktop"));
         p
     });
-    if let Some(path) = path {
-        if let Ok(content) = std::fs::read_to_string(path) {
-            return content.contains("Exec=rog-control-center --autostart --background")
-                || content.contains("Exec=rog-control-center --background");
-        }
+    if let Some(path) = path
+        && let Ok(content) = std::fs::read_to_string(path)
+    {
+        return content.contains("Exec=rog-control-center --autostart --background")
+            || content.contains("Exec=rog-control-center --background");
     }
     false
 }
@@ -147,11 +147,11 @@ fn update_autostart_with_dir(
     let desktop_file = autostart_dir.join(format!("{APP_ID}.desktop"));
 
     if enable {
-        if !autostart_dir.exists() {
-            if let Err(e) = std::fs::create_dir_all(&autostart_dir) {
-                log::error!("Failed to create autostart directory: {e}");
-                return;
-            }
+        if !autostart_dir.exists()
+            && let Err(e) = std::fs::create_dir_all(&autostart_dir)
+        {
+            log::error!("Failed to create autostart directory: {e}");
+            return;
         }
 
         let exec_cmd = if in_background {

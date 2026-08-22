@@ -48,11 +48,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let name_clone = name.clone();
             std::thread::spawn(move || {
                 for signal in stream.by_ref() {
-                    if let Ok(args) = signal.args() {
-                        if args.name() == &name_clone && args.new_owner().is_some() {
-                            let _ = tx.send(());
-                            break;
-                        }
+                    if let Ok(args) = signal.args()
+                        && args.name() == &name_clone
+                        && args.new_owner().is_some()
+                    {
+                        let _ = tx.send(());
+                        break;
                     }
                 }
             });
@@ -76,68 +77,68 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let early_return = Arc::new(AtomicBool::new(false));
     // Set up the anime data and run loop/thread
-    if supported.contains(&"xyz.ljones.Anime".to_string()) {
-        if let Some(cfg) = config.active_anime {
-            let anime_type = get_anime_type();
-            let anime_config = ConfigAnime::new().set_name(cfg).load();
-            let anime = anime_config.create(anime_type)?;
-            let anime_config = Arc::new(Mutex::new(anime_config));
+    if supported.contains(&"xyz.ljones.Anime".to_string())
+        && let Some(cfg) = config.active_anime
+    {
+        let anime_type = get_anime_type();
+        let anime_config = ConfigAnime::new().set_name(cfg).load();
+        let anime = anime_config.create(anime_type)?;
+        let anime_config = Arc::new(Mutex::new(anime_config));
 
-            let anime_proxy_blocking = AnimeProxyBlocking::new(&conn)?;
-            tokio::spawn(async move {
-                // Create server
-                let mut connection = match Connection::session().await {
-                    Ok(c) => c,
-                    Err(e) => {
-                        error!("Failed to connect to D-Bus session bus: {e}");
-                        return;
-                    }
-                };
-                if let Err(e) = connection.request_name(DBUS_NAME).await {
-                    error!("Failed to request D-Bus name {DBUS_NAME}: {e}");
+        let anime_proxy_blocking = AnimeProxyBlocking::new(&conn)?;
+        tokio::spawn(async move {
+            // Create server
+            let mut connection = match Connection::session().await {
+                Ok(c) => c,
+                Err(e) => {
+                    error!("Failed to connect to D-Bus session bus: {e}");
                     return;
                 }
+            };
+            if let Err(e) = connection.request_name(DBUS_NAME).await {
+                error!("Failed to request D-Bus name {DBUS_NAME}: {e}");
+                return;
+            }
 
-                // Inner behind mutex required for thread safety
-                let inner = match CtrlAnimeInner::new(
-                    anime,
-                    anime_proxy_blocking.clone(),
-                    early_return.clone(),
-                ) {
-                    Ok(i) => Arc::new(Mutex::new(i)),
-                    Err(e) => {
-                        error!("Failed to initialize AniMe inner controller: {e}");
-                        return;
-                    }
-                };
-                // Need new client object for dbus control part
-                let anime_control = match CtrlAnime::new(
-                    anime_config,
-                    inner.clone(),
-                    anime_proxy_blocking,
-                    early_return,
-                ) {
-                    Ok(c) => c,
-                    Err(e) => {
-                        error!("Failed to initialize AniMe controller: {e}");
-                        return;
-                    }
-                };
-                anime_control.add_to_server(&mut connection).await;
-                if let Err(e) =
-                    tokio::task::spawn_blocking(move || -> Result<(), std::convert::Infallible> {
-                        loop {
-                            if let Ok(inner) = inner.clone().try_lock() {
-                                inner.run().ok();
-                            }
-                        }
-                    })
-                    .await
-                {
-                    error!("AniMe task failed: {e}");
+            // Inner behind mutex required for thread safety
+            let inner = match CtrlAnimeInner::new(
+                anime,
+                anime_proxy_blocking.clone(),
+                early_return.clone(),
+            ) {
+                Ok(i) => Arc::new(Mutex::new(i)),
+                Err(e) => {
+                    error!("Failed to initialize AniMe inner controller: {e}");
+                    return;
                 }
-            });
-        }
+            };
+            // Need new client object for dbus control part
+            let anime_control = match CtrlAnime::new(
+                anime_config,
+                inner.clone(),
+                anime_proxy_blocking,
+                early_return,
+            ) {
+                Ok(c) => c,
+                Err(e) => {
+                    error!("Failed to initialize AniMe controller: {e}");
+                    return;
+                }
+            };
+            anime_control.add_to_server(&mut connection).await;
+            if let Err(e) =
+                tokio::task::spawn_blocking(move || -> Result<(), std::convert::Infallible> {
+                    loop {
+                        if let Ok(inner) = inner.clone().try_lock() {
+                            inner.run().ok();
+                        }
+                    }
+                })
+                .await
+            {
+                error!("AniMe task failed: {e}");
+            }
+        });
     }
 
     // if supported.keyboard_led.per_key_led_mode {
