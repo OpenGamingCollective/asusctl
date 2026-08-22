@@ -46,8 +46,8 @@ jobs:
                       pkg-config \
                       cmake \
                       gettext \
-                      rustc \
-                      cargo \
+                      rustc=19.3.0 \
+                      cargo=19.3.0 \
                       libudev-dev \
                       libusb-1.0-0-dev \
                       libclang-dev \
