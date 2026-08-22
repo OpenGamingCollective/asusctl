@@ -278,9 +278,7 @@ impl Device {
         read: fn(&Path) -> Option<f32>,
         nvml: fn() -> Option<f32>,
     ) -> Option<f32> {
-        if self.is_dgpu
-            && self.get_runtime_status().unwrap_or(GfxPower::Unknown) != GfxPower::Active
-        {
+        if self.is_dgpu && self.get_runtime_status().unwrap_or_default() != GfxPower::Active {
             return None;
         }
 
@@ -310,7 +308,9 @@ impl Device {
         }
 
         // 3. Fallback to NVML if this is an NVIDIA device and hwmon is not available
-        if self.pci_id.to_uppercase().starts_with(NVIDIA_PCI_VENDOR) {
+        if self.pci_id.to_uppercase().starts_with(NVIDIA_PCI_VENDOR)
+            && self.get_runtime_status().unwrap_or_default() == GfxPower::Active
+        {
             return nvml();
         }
 
@@ -322,15 +322,14 @@ impl Device {
         self.probe_hwmon(read_hwmon_temp, read_nvml_temp)
     }
 
-    /// Read the GPU utilization percentage (0.0 - 100.0) from sysfs DRM nodes with NVML fallback.
+    /// Probe this device's DRM directories for usage percentage, falling back to
+    /// `nvml` on NVIDIA hardware whose proprietary driver registers no DRM usage node.
     ///
     /// If this is a discrete GPU and it is not in the `Active` power state,
     /// this immediately returns `None` without accessing DRM sysfs or NVML to prevent
     /// waking the PCIe device from runtime PM sleep.
-    pub fn get_usage_pct(&self) -> Option<f32> {
-        if self.is_dgpu
-            && self.get_runtime_status().unwrap_or(GfxPower::Unknown) != GfxPower::Active
-        {
+    fn probe_usage(&self, nvml: fn() -> Option<f32>) -> Option<f32> {
+        if self.is_dgpu && self.get_runtime_status().unwrap_or_default() != GfxPower::Active {
             return None;
         }
 
@@ -366,12 +365,22 @@ impl Device {
 
         // 4. Fallback to NVML if this is an NVIDIA device and DRM busy is not available
         if self.pci_id.to_uppercase().starts_with(NVIDIA_PCI_VENDOR)
-            && let Some(usage) = read_nvml_usage()
+            && self.get_runtime_status().unwrap_or_default() == GfxPower::Active
+            && let Some(usage) = nvml()
         {
             return Some(usage);
         }
 
         None
+    }
+
+    /// Read the GPU utilization percentage (0.0 - 100.0) from sysfs DRM nodes with NVML fallback.
+    ///
+    /// If this is a discrete GPU and it is not in the `Active` power state,
+    /// this immediately returns `None` without accessing DRM sysfs or NVML to prevent
+    /// waking the PCIe device from runtime PM sleep.
+    pub fn get_usage_pct(&self) -> Option<f32> {
+        self.probe_usage(read_nvml_usage)
     }
 
     /// Read the current graphics clock (MHz) of this GPU from sysfs hwmon with
@@ -383,7 +392,6 @@ impl Device {
     /// Enumerate PCI GPU devices via udev and identify the dGPU.
     pub fn find() -> Result<Vec<Self>> {
         let mut devices = Vec::new();
-        let mut parent = String::new();
 
         let mut enumerator = udev::Enumerator::new().map_err(|err| {
             warn!("{}", err);
@@ -394,14 +402,6 @@ impl Device {
             warn!("{}", err);
             PlatformError::Udev("match_subsystem failed".into(), err)
         })?;
-
-        let get_parent = |dev: &udev::Device| -> String {
-            dev.sysname()
-                .to_string_lossy()
-                .trim_end_matches(char::is_numeric)
-                .trim_end_matches('.')
-                .to_string()
-        };
 
         for device in enumerator.scan_devices().map_err(|err| {
             warn!("{}", err);
@@ -414,18 +414,19 @@ impl Device {
             {
                 let id = id.to_string_lossy();
                 let class = class.to_string_lossy();
-                // Match only Nvidia or AMD
-                if is_gpu_vendor(&id) {
+                // Match only Nvidia or AMD display devices
+                if is_gpu_vendor(&id) && is_display_class(&class) {
                     let mut dgpu = false;
                     // Check connected displays to distinguish dGPU from iGPU.
                     // eDP-1 is the internal panel, always on iGPU.
-                    let displays = find_connected_displays(device.syspath()).unwrap_or_default();
+                    let displays =
+                        find_connected_displays(device.syspath()).unwrap_or_default();
                     if !displays.contains(&"eDP-1".to_string()) {
                         trace!(
                             "Matched dGPU {id} at {:?} by checking display connections",
                             device.sysname()
                         );
-                        dgpu = is_display_class(&class);
+                        dgpu = true;
                     } else {
                         trace!(
                             "Device {id} at {:?} appears to be the iGPU",
@@ -465,27 +466,21 @@ impl Device {
                         } else if let Some(model) = device.property_value("ID_MODEL") {
                             dgpu = lspci_dgpu_check(&model.to_string_lossy());
                         } else if id.starts_with(NVIDIA_PCI_VENDOR) {
-                            dgpu = is_display_class(&class);
+                            dgpu = true;
                         }
                     }
 
-                    if dgpu || (!parent.is_empty() && sysname.contains(&parent)) {
-                        if dgpu {
-                            info!("Found dgpu {id} at {:?}", device.sysname());
-                        } else {
-                            info!("Found additional device {id} at {:?}", device.sysname());
-                        }
-                        parent = get_parent(&device);
-                        devices.push(Self {
-                            dev_path: PathBuf::from(device.syspath()),
-                            is_dgpu: dgpu,
-                            pci_id: id.to_string(),
-                        });
+                    if dgpu {
+                        info!("Found dgpu {id} at {:?}", device.sysname());
+                    } else {
+                        info!("Found igpu {id} at {:?}", device.sysname());
                     }
+                    devices.push(Self {
+                        dev_path: PathBuf::from(device.syspath()),
+                        is_dgpu: dgpu,
+                        pci_id: id.to_string(),
+                    });
                 }
-            }
-            if !parent.is_empty() && !sysname.contains(&parent) {
-                break;
             }
         }
 
@@ -556,7 +551,7 @@ pub fn get_gpu_power_status() -> GfxPower {
         .ok()
         .and_then(|devs| devs.into_iter().find(|d| d.is_dgpu()))
     {
-        return dgpu.get_runtime_status().unwrap_or(GfxPower::Unknown);
+        return dgpu.get_runtime_status().unwrap_or_default();
     }
 
     if asus_gpu_mux_discreet().unwrap_or(false) {
@@ -789,6 +784,8 @@ mod tests {
         assert!(is_display_class("30000")); // VGA controller
         assert!(is_display_class("30200")); // 3D controller
         assert!(is_display_class("38000")); // other display controller
+        assert!(!is_display_class("40300")); // Audio controller
+        assert!(!is_display_class("040300")); // Audio controller with leading zero
         assert!(!is_display_class("20000")); // network controller
         assert!(!is_display_class("c0330")); // USB controller
         assert!(!is_display_class("3")); // base class alone is not a class code
@@ -899,16 +896,53 @@ mod tests {
     }
 
     #[test]
+    fn device_get_temp_and_usage_non_dgpu_when_suspended()
+    -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let dir = TestDir::new("asusctl_test_non_dgpu_suspended");
+        fs::create_dir_all(dir.join("power"))?;
+        fs::write(dir.join("power/runtime_status"), "suspended\n")?;
+
+        let device = Device {
+            dev_path: dir.0.clone(),
+            is_dgpu: false,
+            pci_id: "10DE:228E".to_string(),
+        };
+
+        fn panic_on_nvml() -> Option<f32> {
+            panic!("NVML fallback must not be called when runtime_status is not Active");
+        }
+
+        // Non-dgpu Nvidia function without hwmon/drm in suspended state must not call NVML
+        assert_eq!(device.probe_hwmon(read_hwmon_temp, panic_on_nvml), None);
+        assert_eq!(device.probe_usage(panic_on_nvml), None);
+        assert_eq!(device.probe_hwmon(read_hwmon_freq, panic_on_nvml), None);
+        assert_eq!(device.get_temp(), None);
+        assert_eq!(device.get_usage_pct(), None);
+        assert_eq!(device.get_freq_mhz(), None);
+        Ok(())
+    }
+
+    #[test]
     #[ignore = "requires ASUS hardware with a dGPU"]
     fn live_dgpu_detection() -> std::result::Result<(), Box<dyn std::error::Error>> {
         let devices = Device::find()?;
+        println!("Found {} display devices:", devices.len());
+        for dev in &devices {
+            println!(
+                "  - Device {} (is_dgpu: {}, path: {:?}, status: {:?})",
+                dev.pci_id(),
+                dev.is_dgpu(),
+                dev.dev_path(),
+                dev.get_runtime_status()?
+            );
+        }
+        let (igpu_name, dgpu_name) = get_gpu_names();
+        println!("GPU Names: iGPU = '{igpu_name}', dGPU = '{dgpu_name}'");
+        let telemetry = get_gpu_telemetry();
+        println!("Telemetry: {telemetry:?}");
+
         let dgpu = devices.iter().find(|d| d.is_dgpu()).expect("no dGPU found");
         assert!(is_gpu_vendor(dgpu.pci_id()));
-        println!(
-            "dGPU {} runtime status: {:?}",
-            dgpu.pci_id(),
-            dgpu.get_runtime_status()?
-        );
         Ok(())
     }
 }
