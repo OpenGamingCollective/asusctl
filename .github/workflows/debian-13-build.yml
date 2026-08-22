@@ -1,85 +1,80 @@
 name: Build on Debian 13
-
 # Compile-check the whole workspace against the oldest supported toolchain:
 # Debian 13 (trixie) ships rustc/cargo 1.85 from apt (no rustup involved), which
 # matches the MSRV-oriented dependency pins in Cargo.lock.
 on:
-    push:
-        branches: ["main"]
-    pull_request:
-    workflow_dispatch:
-
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
 permissions:
-    contents: read
-
+  contents: read
 concurrency:
-    group: debian-13-${{ github.ref }}
-    cancel-in-progress: true
-
+  group: debian-13-${{ github.ref }}
+  cancel-in-progress: true
 env:
-    CARGO_TERM_COLOR: always
-
+  CARGO_TERM_COLOR: always
 jobs:
-    build:
-        name: cargo build --workspace (Debian 13 / rustc 1.85)
-        runs-on: ubuntu-latest
-        container:
-            image: debian:trixie
-        steps:
-            - name: Install dependencies
-              run: |
-                  apt-get update
-                  apt-get install -y --no-install-recommends \
-                      ca-certificates \
-                      git \
-                      build-essential \
-                      pkg-config \
-                      cmake \
-                      gettext \
-                      rustc \
-                      cargo \
-                      libudev-dev \
-                      libusb-1.0-0-dev \
-                      libclang-dev \
-                      libsdl2-dev
-
-            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-              with:
-                  persist-credentials: false
-
-            - name: Show toolchain
-              run: |
-                  rustc --version
-                  cargo --version
-
-            - name: Build workspace
-              run: cargo build --workspace --all-targets --locked
-
-    audit:
-        name: cargo audit (Debian 13 / rustc 1.85)
-        runs-on: ubuntu-latest
-        container:
-            image: debian:trixie
-        steps:
-            - name: Install dependencies
-              run: |
-                  apt-get update
-                  apt-get install -y --no-install-recommends \
-                      ca-certificates \
-                      git \
-                      rustc \
-                      cargo
-
-            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-              with:
-                  persist-credentials: false
-
-            - name: Install cargo-audit
-              # 0.22.1 is the last release buildable with rustc 1.85; anything
-              # newer requires rustc >= 1.88 (not available on Debian 13).
-              run: cargo install --locked cargo-audit@0.22.1
-
-            - name: Audit dependencies for vulnerabilities (RustSec)
-              # Advisories without an exploitable path are ignored via
-              # .cargo/audit.toml (each entry documented there).
-              run: cargo audit
+  build:
+    name: cargo build --workspace (Ubuntu / rustc 1.93)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+              ca-certificates \
+              git \
+              build-essential \
+              pkg-config \
+              cmake \
+              gettext \
+              rustc \
+              cargo \
+              libudev-dev \
+              libusb-1.0-0-dev \
+              libclang-dev \
+              libsdl2-dev \
+              libfontconfig-dev
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Show toolchain
+        run: |
+          rustc --version
+          cargo --version
+      - name: Build workspace
+        run: cargo build --workspace --all-targets --locked
+  audit:
+    name: cargo audit (Debian 13 / rustc 1.93)
+    runs-on: ubuntu-latest
+    container:
+      image: debian:trixie
+    steps:
+      - name: add backport repo
+        run: |
+          printf '%s\n' \
+          "Types: deb deb-src" \
+          "URIs: http://deb.debian.org/debian" \
+          "Suites: trixie-backports" \
+          "Enabled: yes" \
+          "Components: main" \
+          "Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg" | tee /etc/apt/sources.list.d/debian-backports.sources
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+             -t trixie-backports \
+              ca-certificates \
+              git \
+              rustc \
+              cargo
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install cargo-audit
+        run: cargo install --locked cargo-audit@0.22.2
+      - name: Audit dependencies for vulnerabilities (RustSec)
+        # Advisories without an exploitable path are ignored via
+        # .cargo/audit.toml (each entry documented there).
+        run: cargo audit

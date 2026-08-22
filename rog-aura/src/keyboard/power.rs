@@ -228,16 +228,16 @@ impl LaptopAuraPower {
     }
 
     pub fn to_bytes(&self, aura_type: AuraDeviceType) -> Vec<u8> {
-        if let Some(stuff) = self.states.first() {
-            if stuff.zone == PowerZones::Ally {
-                return vec![
-                    0x5d,
-                    0xd1,
-                    0x09,
-                    0x01,
-                    stuff.new_to_byte() as u8,
-                ];
-            }
+        if let Some(stuff) = self.states.first()
+            && stuff.zone == PowerZones::Ally
+        {
+            return vec![
+                0x5d,
+                0xd1,
+                0x09,
+                0x01,
+                stuff.new_to_byte() as u8,
+            ];
         }
         match aura_type {
             AuraDeviceType::LaptopKeyboard2021 | AuraDeviceType::Ally => self.new_to_bytes(),

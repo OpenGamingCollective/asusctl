@@ -1,6 +1,6 @@
 [workspace.package]
 version = "6.4.0"
-rust-version = "1.85"
+rust-version = "1.93"
 license = "MPL-2.0"
 readme = "README.md"
 authors = [
@@ -41,14 +41,12 @@ concat-idents = "^1.1.5"
 console-subscriber = "^0.5.0"
 dirs = "^6.0.0"
 env_logger = { version = "^0.11.11", default-features = false, features = ["auto-color"] }
-# Pinned: fontdue 0.9.4 uses u*::cast_signed (stabilized in rustc 1.86), pulled
-# by slint 1.13.1
-fontdue = "=0.9.3"
-futures-util = "^0.3.33"
+
+futures-util = "^0.3.34"
 gif = "^0.14.2"
-glam = { version = "^0.33.2", features = ["serde"] }
-image = "=0.25.9"
-inotify = "^0.11.4"
+glam = { version = "^0.33.5", features = ["serde"] }
+image = "=0.25.10"
+inotify = "^0.11.5"
 ksni = { version = "^0.3.6", default-features = false, features = ["async-io"] }
 libc = "^0.2.189"
 log = "^0.4.33"
@@ -57,6 +55,7 @@ mio = "^1.2.2"
 # z = ["zbus", "serde", "async"]
 notify-rust = { version = "=4.17.0", default-features = false, features = ["z"] }
 nvml-wrapper = "^0.12.1"
+# Pix and png_pong pinned because updating to 1.0.1 breaks rog-anime
 pix = "=0.13.4"
 png = "^0.18.1"
 png_pong = "=0.9.3"
@@ -65,16 +64,14 @@ rusb = "^0.9.4"
 sdl2 = { version = "^0.38.0", default-features = false }
 serde = { version = "^1.0.229", features = ["serde_derive"] }
 serde_json = "^1.0.151"
-# Pinned: slint >= 1.14 needs newer rustc than 1.85 (the previous git
-# dependency tracked slint master, which requires rustc 1.92).
-slint = { version = "=1.13.1", default-features = false, features = [
+slint = { version = "^1.17.1", default-features = false, features = [
   "compat-1-2",
   "gettext",
   "backend-winit-wayland",
   "renderer-femtovg",
 ] }
-slint-build = "=1.13.1"
-thiserror = "^2.0.19"
+slint-build = "=1.17.1"
+thiserror = "^2.0.20"
 tokio = { version = "^1.53.1", default-features = false, features = [
   "macros",
   "sync",
@@ -84,8 +81,7 @@ tokio = { version = "^1.53.1", default-features = false, features = [
 ] }
 udev = { version = "^0.9.3", features = ["mio"] }
 uhid-virt = "^0.0.8"
-# Pinned: zbus >= 5.14 requires rustc >= 1.87.
-zbus = "=5.13.2"
+zbus = "^5.19.0"
 
 [profile.release]
 lto = "thin"

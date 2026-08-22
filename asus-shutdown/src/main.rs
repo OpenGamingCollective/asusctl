@@ -24,6 +24,7 @@ const GPU_IDLE_POLL_INTERVAL: Duration = Duration::from_millis(500);
 const GPU_IDLE_STABLE_FOR: Duration = Duration::from_secs(2);
 const ASUSD_BUS_NAME: &str = "xyz.ljones.Asusd";
 const ASUSD_ARMOURY_IFACE: &str = "xyz.ljones.AsusArmoury";
+const ATTR_DGPU_DISABLE: &str = "dgpu_disable";
 const SYSTEMD1_BUS_NAME: &str = "org.freedesktop.systemd1";
 const SYSTEMD1_MANAGER_PATH: &str = "/org/freedesktop/systemd1";
 const SYSTEMD1_MANAGER_IFACE: &str = "org.freedesktop.systemd1.Manager";
@@ -203,8 +204,25 @@ async fn fetch_pending_actions() -> Result<Vec<PendingAction>, Box<dyn std::erro
         });
     }
 
-    actions.sort_by(|a, b| a.path.cmp(&b.path));
+    sort_pending_actions(&mut actions);
     Ok(actions)
+}
+
+fn sort_pending_actions(actions: &mut [PendingAction]) {
+    actions.sort_by(|a, b| {
+        apply_rank(a)
+            .cmp(&apply_rank(b))
+            .then_with(|| a.path.cmp(&b.path))
+    });
+}
+
+/// The kernel rejects `dgpu_disable=1` while the MUX is in dGPU mode, and vice versa.
+fn apply_rank(action: &PendingAction) -> u8 {
+    match (action.name.as_str(), action.value) {
+        (ATTR_DGPU_DISABLE, 0) => 0,
+        (ATTR_DGPU_DISABLE, _) => 2,
+        _ => 1,
+    }
 }
 
 async fn apply_shutdown_settings() -> Result<(), Box<dyn std::error::Error>> {
@@ -640,4 +658,64 @@ fn read_trimmed(path: impl AsRef<Path>) -> Option<String> {
     fs::read_to_string(path)
         .ok()
         .map(|content| content.trim().to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn action(name: &str, value: i32) -> PendingAction {
+        PendingAction {
+            path: format!("/xyz/ljones/asus_armoury/{name}"),
+            name: name.to_owned(),
+            value,
+        }
+    }
+
+    fn ordered(mut actions: Vec<PendingAction>) -> Vec<String> {
+        sort_pending_actions(&mut actions);
+        actions.into_iter().map(|a| a.name).collect()
+    }
+
+    #[test]
+    fn entering_ultimate_enables_the_dgpu_before_moving_the_mux() {
+        let queued = vec![
+            action("gpu_mux_mode", 0),
+            action("dgpu_disable", 0),
+        ];
+        assert_eq!(
+            ordered(queued),
+            [
+                "dgpu_disable", "gpu_mux_mode"
+            ]
+        );
+    }
+
+    #[test]
+    fn leaving_ultimate_moves_the_mux_before_disabling_the_dgpu() {
+        let queued = vec![
+            action("dgpu_disable", 1),
+            action("gpu_mux_mode", 1),
+        ];
+        assert_eq!(
+            ordered(queued),
+            [
+                "gpu_mux_mode", "dgpu_disable"
+            ]
+        );
+    }
+
+    #[test]
+    fn unrelated_attributes_keep_a_stable_order() {
+        let queued = vec![
+            action("gpu_mux_mode", 1),
+            action("egpu_enable", 1),
+        ];
+        assert_eq!(
+            ordered(queued),
+            [
+                "egpu_enable", "gpu_mux_mode"
+            ]
+        );
+    }
 }

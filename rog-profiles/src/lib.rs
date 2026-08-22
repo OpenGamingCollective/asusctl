@@ -20,12 +20,11 @@ pub fn find_fan_curve_node() -> Result<Device, ProfileError> {
     enumerator.match_subsystem("hwmon")?;
 
     for device in enumerator.scan_devices()? {
-        if device.parent_with_subsystem("platform")?.is_some() {
-            if let Some(name) = device.attribute_value("name") {
-                if name == "asus_custom_fan_curve" {
-                    return Ok(device);
-                }
-            }
+        if device.parent_with_subsystem("platform")?.is_some()
+            && let Some(name) = device.attribute_value("name")
+            && name == "asus_custom_fan_curve"
+        {
+            return Ok(device);
         }
     }
 

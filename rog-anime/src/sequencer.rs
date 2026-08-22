@@ -99,12 +99,12 @@ impl ActionData {
                 time,
                 brightness,
             } => {
-                if let Some(ext) = file.extension() {
-                    if ext.to_string_lossy().to_lowercase() == "png" {
-                        return Ok(ActionData::Animation(AnimeGif::from_png(
-                            file, *scale, *angle, *translation, *time, *brightness, anime_type,
-                        )?));
-                    }
+                if let Some(ext) = file.extension()
+                    && ext.to_string_lossy().to_lowercase() == "png"
+                {
+                    return Ok(ActionData::Animation(AnimeGif::from_png(
+                        file, *scale, *angle, *translation, *time, *brightness, anime_type,
+                    )?));
                 }
                 ActionData::Animation(AnimeGif::from_gif(
                     file, *scale, *angle, *translation, *time, *brightness, anime_type,
