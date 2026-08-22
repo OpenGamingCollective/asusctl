@@ -83,15 +83,25 @@ where
 
     /// Directly open the config file for read and write. If the config file
     /// does not exist it is created, including the directories the file
-    /// resides in.
+    /// resides in. If the file exists but is not writable (e.g. a symlink into
+    /// a read-only store) it is opened read-only instead.
     fn file_open(&self) -> File {
+        let path = self.file_path();
         OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
             .truncate(false)
-            .open(self.file_path())
-            .unwrap_or_else(|e| panic!("Could not open {:?} {e}", self.file_path()))
+            .open(&path)
+            .or_else(|e| {
+                if e.kind() == std::io::ErrorKind::PermissionDenied && path.exists() {
+                    warn!("Config {path:?} is not writable, opening read-only: {e}");
+                    File::open(&path)
+                } else {
+                    Err(e)
+                }
+            })
+            .unwrap_or_else(|e| panic!("Could not open {:?} {e}", path))
     }
 
     /// Open and parse the config file to self from ron format
@@ -253,6 +263,45 @@ std_config_load!(StdConfigLoad4: T1, T2, T3, T4);
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
+
+    #[test]
+    fn load_read_only_config() {
+        use crate::{StdConfig, StdConfigLoad};
+
+        #[derive(serde::Deserialize, serde::Serialize, Debug)]
+        struct Test {
+            value: u32,
+        }
+
+        impl crate::StdConfig for Test {
+            fn new() -> Self {
+                Self { value: 0 }
+            }
+
+            fn file_name(&self) -> String {
+                "read_only_test.ron".to_owned()
+            }
+
+            fn config_dir() -> PathBuf {
+                std::env::temp_dir().join("config_traits_read_only_test")
+            }
+        }
+
+        impl crate::StdConfigLoad for Test {}
+
+        let dir = Test::config_dir();
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("read_only_test.ron");
+        std::fs::write(&path, "(value: 7)").unwrap();
+        let mut perms = std::fs::metadata(&path).unwrap().permissions();
+        perms.set_readonly(true);
+        std::fs::set_permissions(&path, perms).unwrap();
+
+        let cfg = Test::new().load();
+        assert_eq!(cfg.value, 7);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn check_macro_from_1() {
