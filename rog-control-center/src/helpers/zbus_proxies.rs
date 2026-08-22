@@ -258,4 +258,8 @@ impl AsusdInterface {
     pub fn attribute(&self, attr: FirmwareAttribute) -> Option<&AsusArmouryProxy<'static>> {
         self.armoury.get(&attr)
     }
+
+    pub fn is_armoury_loaded(&self) -> bool {
+        self.armoury.is_empty()
+    }
 }

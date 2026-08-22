@@ -18,7 +18,6 @@ export struct ProfileLimits {
 }
 
 export global SystemInfo {
-    in-out property <bool> asus_armoury_loaded: false;
     in-out property <bool> has_dgpu: true;
     in-out property <bool> has_igpu: true;
     // Set from Rust: false when the asusd daemon is unreachable (all daemon
@@ -196,6 +195,8 @@ export global PowerData {
 }
 
 export global AsusArmouryData {
+    in-out property <bool> asus_armoury_loaded: false;
+
     in-out property <AttrBool> panel_overdrive;
     callback cb_panel_overdrive(AttrBool);
 

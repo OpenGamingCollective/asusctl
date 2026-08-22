@@ -304,7 +304,7 @@ export component PageHome inherits RogPage {
                     RogMetric {
                         horizontal-stretch: 1;
                         title: @tr("Asus-Armoury");
-                        if !SystemInfo.asus_armoury_loaded: armoury_warning := Rectangle {
+                        if !AsusArmouryData.asus_armoury_loaded: armoury_warning := Rectangle {
                             Text {
                                 text: @tr("Asus-Armoury not loaded");
                                 color: Theme.text-primary;
