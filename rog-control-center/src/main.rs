@@ -1,5 +1,5 @@
 use std::env;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use config_traits::{StdConfig, StdConfigLoad1};
 use dmi_id::DMIID;
@@ -8,19 +8,24 @@ use log::{error, info, warn};
 
 use rog_control_center::cli_options::CliStart;
 use rog_control_center::config::Config;
-use rog_control_center::error::Result;
 use rog_control_center::print_versions;
+use rog_control_center::tray::setup_tray;
 
+use rog_control_center::helpers::startup::populate_slint_properties;
+use rog_control_center::helpers::zbus_proxies::AsusdInterface;
 use rog_control_center::state::Event;
 use rog_control_center::ui::actions::ActionHandler;
+use rog_control_center::ui::window::setup_window;
 use slint::ComponentHandle;
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
 
+use anyhow::Result;
+
 fn main() -> Result<()> {
     // Setup Logging
     env_logger::Builder::from_env(
-        Env::default().default_filter_or("warn,tracing=error,zbus=error"),
+        Env::default().default_filter_or("info,tracing=error,zbus=error"),
     )
     .format_timestamp(None)
     .init();
@@ -36,10 +41,10 @@ fn main() -> Result<()> {
     if let Ok(gamescope) = env::var("GAMESCOPE_WAYLAND_DISPLAY") {
         if !gamescope.is_empty() {
             unsafe { env::set_var("WAYLAND_DISPLAY", gamescope) };
-        } else if let Ok(wayland) = env::var("WAYLAND_DISPLAY") {
-            if wayland.is_empty() {
-                unsafe { env::set_var("WAYLAND_DISPLAY", "gamescope-0") };
-            }
+        } else if let Ok(wayland) = env::var("WAYLAND_DISPLAY")
+            && wayland.is_empty()
+        {
+            unsafe { env::set_var("WAYLAND_DISPLAY", "gamescope-0") };
         }
     }
 
@@ -96,36 +101,69 @@ fn main() -> Result<()> {
     }
 
     // Create the Slint UI Window
-    let ui = rog_control_center::ui::window::setup_window(config.clone());
+    let ui = setup_window();
 
     // Create the Central Event Channel
     let (event_tx, mut event_rx) = mpsc::unbounded_channel::<rog_control_center::state::Event>();
 
+    // Create System Tray
+    let _tray = setup_tray(event_tx.clone());
+
     // Send the dmi product name to the UI
     let _ = event_tx.send(Event::DmiLoaded(dmi.product_name.clone()));
-
-    // Start System Tray
-    let (tray_tx, tray_rx) = tokio::sync::watch::channel(config.lock().unwrap().enable_tray_icon);
-    rog_control_center::tray::init_tray(tray_rx, event_tx.clone());
 
     // Bind UI Inputs to the Channel
     rog_control_center::ui::callbacks::bind_ui_events(&ui, event_tx.clone());
 
     // Start Hardware Subscriptions
-    rt.spawn(rog_control_center::ui::subscriptions::subscribe_battery(
+    rt.spawn(rog_control_center::ui::subscriptions::subscribe_telemetry(
         event_tx.clone(),
     ));
     // subscribe_telemetry(event_tx.clone(), true);
 
-    let mut action_handler = ActionHandler {
-        tray_tx: tray_tx.clone(),
-        config: config.clone(),
+    // Detect asusd and send the result to the GUI
+    let asusd = Arc::new(OnceLock::new());
+    let asusd_set = asusd.clone();
+    let asusd_tx = event_tx.clone();
+    // Block here, we want to wait for the asusd interface connection
+    rt.block_on(async move {
+        match AsusdInterface::build().await {
+            Ok(int) if int.present() => {
+                let _ = asusd_set.set(int);
+                let _ = asusd_tx.send(Event::AsusdState(true));
+            }
+            Ok(_) => {
+                warn!("asusd reachable but no known interfaces found");
+                let _ = asusd_tx.send(Event::AsusdState(false));
+            }
+            Err(err) => {
+                warn!("asusd is not available: {err}");
+                let _ = asusd_tx.send(Event::AsusdState(false));
+            }
+        }
+    });
+
+    // Show the window after the pre-startup is done
+    let background_startup = match config.try_lock() {
+        Ok(c) => c.startup_in_background,
+        Err(_) => false,
     };
 
+    if !background_startup && let Err(e) = ui.window().show() {
+        warn!("Couldn't show main window: {e:?}");
+    }
+
+    let mut action_handler = ActionHandler {
+        config: config.clone(),
+        asusd: asusd.clone(),
+        event_tx: event_tx.clone(),
+    };
     // Start Event Loop
     let ui_weak = ui.as_weak();
     rt.spawn(async move {
         let mut state = rog_control_center::state::AppState::new();
+        // Get the current values from asusd
+        populate_slint_properties(ui_weak.clone(), asusd.clone()).await;
         while let Some(event) = event_rx.recv().await {
             let (actions, ui_updates) = state.update(event);
 
@@ -165,7 +203,6 @@ fn main() -> Result<()> {
             slint::CloseRequestResponse::HideWindow
         }
     });
-
     if let Err(e) = slint::run_event_loop_until_quit() {
         error!("Slint event loop error: {e:?}");
     }
