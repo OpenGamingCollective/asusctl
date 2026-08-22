@@ -45,6 +45,7 @@
             (pkgs system).cargo-cranky
             (pkgs system).fontconfig
             (pkgs system).freetype
+            (pkgs system).slint-lsp
           ];
           LD_LIBRARY_PATH = (pkgs system).lib.makeLibraryPath [
             (pkgs system).wayland
