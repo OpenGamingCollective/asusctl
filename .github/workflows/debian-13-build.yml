@@ -26,10 +26,19 @@ jobs:
         container:
             image: debian:trixie
         steps:
+            - name: add backport repo
+              run: |
+                  printf '%s\n' \
+                  "Types: deb" \
+                  "URIs: https://deb.debian.org/debian" \
+                  "Suites: trixie-backports" \
+                  "Components: main contrib non-free non-free-firmware" \
+                  "Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg" | sudo tee /etc/apt/sources.list.d/debian-backports.sources
             - name: Install dependencies
               run: |
                   apt-get update
                   apt-get install -y --no-install-recommends \
+                      -t trixie-backports \
                       ca-certificates \
                       git \
                       build-essential \
@@ -61,10 +70,19 @@ jobs:
         container:
             image: debian:trixie
         steps:
+            - name: add backport repo
+              run: |
+                  printf '%s\n' \
+                  "Types: deb" \
+                  "URIs: https://deb.debian.org/debian" \
+                  "Suites: trixie-backports" \
+                  "Components: main contrib non-free non-free-firmware" \
+                  "Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg" | sudo tee /etc/apt/sources.list.d/debian-backports.sources
             - name: Install dependencies
               run: |
                   apt-get update
                   apt-get install -y --no-install-recommends \
+                     -t trixie-backports \
                       ca-certificates \
                       git \
                       rustc \
@@ -75,9 +93,7 @@ jobs:
                   persist-credentials: false
 
             - name: Install cargo-audit
-              # 0.22.1 is the last release buildable with rustc 1.85; anything
-              # newer requires rustc >= 1.88 (not available on Debian 13).
-              run: cargo install --locked cargo-audit@0.22.1
+              run: cargo install --locked cargo-audit@0.22.2
 
             - name: Audit dependencies for vulnerabilities (RustSec)
               # Advisories without an exploitable path are ignored via
