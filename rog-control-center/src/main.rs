@@ -9,6 +9,7 @@ use log::{error, info, warn};
 use rog_control_center::cli_options::CliStart;
 use rog_control_center::config::Config;
 use rog_control_center::print_versions;
+use rog_control_center::tray::setup_tray;
 
 use rog_control_center::startup::populate_slint_properties;
 use rog_control_center::state::Event;
@@ -104,12 +105,11 @@ fn main() -> Result<()> {
     // Create the Central Event Channel
     let (event_tx, mut event_rx) = mpsc::unbounded_channel::<rog_control_center::state::Event>();
 
+    // Create System Tray
+    let _tray = setup_tray(event_tx.clone());
+
     // Send the dmi product name to the UI
     let _ = event_tx.send(Event::DmiLoaded(dmi.product_name.clone()));
-
-    // Start System Tray
-    let (tray_tx, tray_rx) = tokio::sync::watch::channel(config.lock().unwrap().enable_tray_icon);
-    rog_control_center::tray::init_tray(tray_rx, event_tx.clone());
 
     // Bind UI Inputs to the Channel
     rog_control_center::ui::callbacks::bind_ui_events(&ui, event_tx.clone());
@@ -143,12 +143,10 @@ fn main() -> Result<()> {
     });
 
     let mut action_handler = ActionHandler {
-        tray_tx: tray_tx.clone(),
         config: config.clone(),
         asusd: asusd.clone(),
         event_tx: event_tx.clone(),
     };
-
     // Start Event Loop
     let ui_weak = ui.as_weak();
     rt.spawn(async move {
@@ -194,7 +192,6 @@ fn main() -> Result<()> {
             slint::CloseRequestResponse::HideWindow
         }
     });
-
     if let Err(e) = slint::run_event_loop_until_quit() {
         error!("Slint event loop error: {e:?}");
     }

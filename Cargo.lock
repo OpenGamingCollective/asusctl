@@ -2375,6 +2375,7 @@ version = "1.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4e407dc2bd5385dcbdd9c1cf927213d2e4bacda667545abf8839c60f8290f754"
 dependencies = [
+ "async-channel",
  "auto_enums",
  "bitflags 2.13.1",
  "cfg-if",
@@ -2388,6 +2389,7 @@ dependencies = [
  "i-slint-core-macros",
  "icu_normalizer",
  "image",
+ "ksni",
  "lyon_algorithms",
  "lyon_extra",
  "lyon_geom",
@@ -4681,7 +4683,6 @@ dependencies = [
  "env_logger",
  "futures-util",
  "image",
- "ksni",
  "log",
  "notify-rust",
  "rand 0.10.2",

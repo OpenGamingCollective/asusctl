@@ -3,10 +3,8 @@ use std::{
     sync::{Arc, Mutex, OnceLock},
 };
 
-use config_traits::StdConfig;
-use log::{debug, error, warn};
+use log::{debug, warn};
 use tokio::sync::mpsc::UnboundedSender;
-use tokio::sync::watch::Sender;
 
 use crate::{
     config::Config,
@@ -15,7 +13,6 @@ use crate::{
 };
 use rog_platform::asus_armoury::FirmwareAttribute;
 pub struct ActionHandler {
-    pub tray_tx: Sender<bool>,
     pub config: Arc<Mutex<Config>>,
     pub asusd: Arc<OnceLock<AsusdInterface>>,
     pub event_tx: UnboundedSender<Event>,
@@ -65,20 +62,7 @@ impl ActionHandler {
                 self.set_attribute(FirmwareAttribute::McuPowersave, b as i32)
                     .await;
             }
-            Action::SetBatteryLimit(_) => {}
-            Action::SetTray(b) => {
-                match self.config.lock() {
-                    Ok(mut c) => {
-                        // We got the lock, update the config and update the tray
-                        c.enable_tray_icon = b;
-                        c.write();
-                        let _ = self.tray_tx.send(b);
-                    }
-                    Err(err) => {
-                        error!("Couldn't get config lock: {}", err);
-                    }
-                }
-            }
+            _ => {}
         }
     }
 

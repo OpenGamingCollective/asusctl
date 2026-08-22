@@ -8,6 +8,21 @@ import { SideBar } from "widgets/sidebar.slint";
 
 export { AppSize, AttrMinMax, SystemInfo, TelemetryData, PowerData, AsusArmouryData }
 
+export component AsusTray inherits SystemTrayIcon {
+    icon: @image-url("/home/luytan/Projects/asusctl/rog-control-center/data/rog-sidebar-logo.png");
+    tooltip: "Rog Control Center";
+    callback show-window();
+    callback quit-window();
+    clicked => { show-window(); }
+
+    Menu {
+        MenuItem {
+            title: "Quit ROGCC";
+            activated => { quit-window(); }
+        }
+    }
+}
+
 export component MainWindow inherits Window {
     title: "ROG Control Center";
     always-on-top: true;
