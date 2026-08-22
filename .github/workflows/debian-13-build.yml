@@ -23,7 +23,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-              -t trixie-backports \
               ca-certificates \
               git \
               build-essential \
