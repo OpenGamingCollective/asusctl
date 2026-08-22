@@ -2,7 +2,7 @@
 
 use crate::{
     AttrBool,
-    ui::helpers::types::{BatteryInfo, SystemTelemetry},
+    helpers::types::{BatteryInfo, SystemTelemetry},
 };
 use log::info;
 #[derive(Debug, Clone)]

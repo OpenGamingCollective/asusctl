@@ -11,7 +11,8 @@ use rog_platform::asus_armoury::FirmwareAttribute;
 use slint::ComponentHandle;
 
 use crate::{
-    AsusArmouryData, AttrBool, AttrMinMax, MainWindow, PowerData, zbus_proxies::AsusdInterface,
+    AsusArmouryData, AttrBool, AttrMinMax, MainWindow, PowerData,
+    helpers::zbus_proxies::AsusdInterface,
 };
 
 /// Get asusd attribute and update the UI to reflect them

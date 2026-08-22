@@ -4,11 +4,11 @@ use rog_platform::cpu::get_ram_usage_pct;
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
-    state::Event,
-    ui::helpers::{
+    helpers::{
         hardware::get_cpu_telemetry,
         types::{BatteryInfo, FanTelemetry, GpuTelemetry, SystemTelemetry},
     },
+    state::Event,
 };
 use std::time::Duration;
 

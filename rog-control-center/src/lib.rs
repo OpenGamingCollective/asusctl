@@ -9,11 +9,11 @@ pub use slint;
 pub mod cli_options;
 pub mod config;
 pub mod error;
+pub mod helpers;
 pub mod startup;
 pub mod state;
 pub mod tray;
 pub mod ui;
-pub mod zbus_proxies;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const APP_ID: &str = "org.opengamingcollective.rog-control-center";

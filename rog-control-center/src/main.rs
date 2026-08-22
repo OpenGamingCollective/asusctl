@@ -11,10 +11,10 @@ use rog_control_center::config::Config;
 use rog_control_center::print_versions;
 use rog_control_center::tray::setup_tray;
 
+use rog_control_center::helpers::zbus_proxies::AsusdInterface;
 use rog_control_center::startup::populate_slint_properties;
 use rog_control_center::state::Event;
 use rog_control_center::ui::actions::ActionHandler;
-use rog_control_center::zbus_proxies::AsusdInterface;
 use slint::ComponentHandle;
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;

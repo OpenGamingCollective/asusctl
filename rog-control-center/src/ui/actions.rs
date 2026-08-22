@@ -8,8 +8,8 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
     config::Config,
+    helpers::zbus_proxies::AsusdInterface,
     state::{Action, Event},
-    zbus_proxies::AsusdInterface,
 };
 use rog_platform::asus_armoury::FirmwareAttribute;
 pub struct ActionHandler {
