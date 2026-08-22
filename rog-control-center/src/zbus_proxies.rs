@@ -1,5 +1,6 @@
 use log::info;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
+use tokio::sync::OnceCell;
 
 use zbus::blocking::proxy::ProxyImpl;
 use zbus::blocking::{Connection, fdo};
@@ -71,12 +72,29 @@ pub trait ROGCCZbus {
     fn set_state(&self, state: AppState) -> zbus::Result<()>;
 }
 
+static BLOCKING_CONN: OnceLock<Connection> = OnceLock::new();
+static ASYNC_CONN: OnceCell<zbus::Connection> = OnceCell::const_new();
+
+fn get_system_conn_blocking() -> Result<&'static Connection, zbus::Error> {
+    if let Some(conn) = BLOCKING_CONN.get() {
+        return Ok(conn);
+    }
+    let conn = Connection::system()?;
+    Ok(BLOCKING_CONN.get_or_init(|| conn))
+}
+
+async fn get_system_conn() -> Result<&'static zbus::Connection, zbus::Error> {
+    ASYNC_CONN
+        .get_or_try_init(|| async { zbus::Connection::system().await })
+        .await
+}
+
 pub fn find_iface<T>(iface_name: &str) -> Result<Vec<T>, Box<dyn std::error::Error>>
 where
     T: ProxyImpl<'static> + From<zbus::Proxy<'static>>,
 {
-    let conn = Connection::system()?;
-    let f = fdo::ObjectManagerProxy::new(&conn, "xyz.ljones.Asusd", "/")?;
+    let conn = get_system_conn_blocking()?;
+    let f = fdo::ObjectManagerProxy::new(conn, "xyz.ljones.Asusd", "/")?;
     let interfaces = f.get_managed_objects()?;
     let mut paths = Vec::new();
     for v in interfaces.iter() {
@@ -97,7 +115,7 @@ where
         paths.sort_by(|a, b| a.cmp(b));
         for path in paths {
             ctrl.push(
-                T::builder(&conn)
+                T::builder(conn)
                     .path(path.clone())?
                     .destination("xyz.ljones.Asusd")?
                     .build()?,
@@ -113,8 +131,8 @@ pub async fn find_iface_async<T>(iface_name: &str) -> Result<Vec<T>, Box<dyn std
 where
     T: zbus::proxy::ProxyImpl<'static> + From<zbus::Proxy<'static>>,
 {
-    let conn = zbus::Connection::system().await?;
-    let f = zbus::fdo::ObjectManagerProxy::new(&conn, "xyz.ljones.Asusd", "/").await?;
+    let conn = get_system_conn().await?;
+    let f = zbus::fdo::ObjectManagerProxy::new(conn, "xyz.ljones.Asusd", "/").await?;
     let interfaces = f.get_managed_objects().await?;
     let mut paths = Vec::new();
     for v in interfaces.iter() {
@@ -135,7 +153,7 @@ where
         paths.sort_by(|a, b| a.cmp(b));
         for path in paths {
             ctrl.push(
-                T::builder(&conn)
+                T::builder(conn)
                     .path(path.clone())?
                     .destination("xyz.ljones.Asusd")?
                     .build()
