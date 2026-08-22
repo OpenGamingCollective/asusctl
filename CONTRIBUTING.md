@@ -95,4 +95,4 @@ Unacceptable behaviors include sexualized language or imagery, trolling, derogat
 
 ### Enforcement
 
-Maintainers enforce these standards and may remove comments, reject code, or ban contributors who violate them. Report violations to project maintainers or contact `luke@ljones.dev`. All complaints are reviewed confidentially.
+Maintainers enforce these standards and may remove comments, reject code, or ban contributors who violate them. Report violations to project maintainers or contact `benato.denis96@gmail.com`. All complaints are reviewed confidentially.
