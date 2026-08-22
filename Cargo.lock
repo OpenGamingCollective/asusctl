@@ -4746,6 +4746,7 @@ dependencies = [
  "rog_profiles",
  "rog_scsi",
  "rog_slash",
+ "tokio",
  "zbus",
 ]
 

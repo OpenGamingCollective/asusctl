@@ -25,16 +25,6 @@ pub fn setup_system_page(
     _config: Arc<Mutex<Config>>,
     app_state: Arc<Mutex<AppState>>,
 ) {
-    let conn = zbus::blocking::Connection::system()
-        .map_err(|e| error!("DBus system connection failed: {e:?}"))
-        .unwrap();
-    let platform = PlatformProxyBlocking::builder(&conn)
-        .build()
-        .map_err(|e| error!("PlatformProxy failed: {e:?}"))
-        .unwrap();
-    // let armoury_attrs =
-    // find_iface::<AsusArmouryProxyBlocking>("xyz.ljones.AsusArmoury").unwrap();
-
     // Null everything before the setup step
     debug!("Defaulting system page values");
     ui.global::<SystemPageData>()
@@ -87,9 +77,24 @@ pub fn setup_system_page(
         .set_dgpu_name(dgpu_model.into());
     ui.global::<SystemPageData>().set_has_igpu(has_igpu);
 
-    if let Ok(sys_props) = platform
-        .supported_properties()
-        .map_err(|e| log::error!("Failed to get supported properties: {}", e))
+    let platform = match rog_dbus::system_connection_blocking() {
+        Ok(c) => match PlatformProxyBlocking::builder(c).build() {
+            Ok(p) => Some(p),
+            Err(e) => {
+                error!("PlatformProxy failed: {e:?}");
+                None
+            }
+        },
+        Err(e) => {
+            error!("DBus system connection failed: {e:?}");
+            None
+        }
+    };
+
+    if let Some(platform) = platform
+        && let Ok(sys_props) = platform
+            .supported_properties()
+            .map_err(|e| log::error!("Failed to get supported properties: {}", e))
     {
         log::debug!("Available system properties: {:?}", sys_props);
         if sys_props.contains(&Properties::ChargeControlEndThreshold) {
@@ -417,21 +422,21 @@ pub fn setup_system_page_callbacks(ui: &MainWindow, _states: Arc<Mutex<Config>>)
 
     tokio::spawn(async move {
         // Create the connections/proxies here to prevent future delays in process
-        let conn = match zbus::Connection::system().await {
+        let conn = match rog_dbus::system_connection().await {
             Ok(c) => c,
             Err(e) => {
                 log::error!("Failed to connect to system bus: {e}");
                 return;
             }
         };
-        let platform = match PlatformProxy::builder(&conn).build().await {
+        let platform = match PlatformProxy::builder(conn).build().await {
             Ok(p) => p,
             Err(e) => {
                 log::error!("Failed to create platform proxy: {e}");
                 return;
             }
         };
-        let backlight = match BacklightProxy::builder(&conn).build().await {
+        let backlight = match BacklightProxy::builder(conn).build().await {
             Ok(b) => b,
             Err(e) => {
                 log::error!("Failed to create backlight proxy: {e}");
