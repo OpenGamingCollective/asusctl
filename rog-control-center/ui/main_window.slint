@@ -1,13 +1,24 @@
 import { Palette } from "std-widgets.slint";
 import { AppSize, Theme } from "globals.slint";
-import { SystemInfo, TelemetryData, PowerData, AsusArmouryData } from "callbacks.slint";
+import {
+    SystemInfo,
+    TelemetryData,
+    PowerData,
+    AsusArmouryData,
+} from "callbacks.slint";
 import { AttrMinMax } from "types.slint";
 import { PageHome } from "pages/home.slint";
 import { PerProfileSettingsOverlay } from "pages/per_profile_settings.slint";
 import { SideBar } from "widgets/sidebar.slint";
 
-export { AppSize, AttrMinMax, SystemInfo, TelemetryData, PowerData, AsusArmouryData }
-
+export {
+    AppSize,
+    AttrMinMax,
+    SystemInfo,
+    TelemetryData,
+    PowerData,
+    AsusArmouryData,
+}
 export component AsusTray inherits SystemTrayIcon {
     icon: @image-url("/home/luytan/Projects/asusctl/rog-control-center/data/rog-sidebar-logo.png");
     tooltip: "Rog Control Center";
@@ -41,244 +52,259 @@ export component MainWindow inherits Window {
         true, // App Settings
         true, // About
     ];
-    private property <bool> toast: false;
-    private property <bool> toast_permanent: false;
-    private property <string> toast_text: "I show when something is waiting";
+        private property <bool> toast: false;
+        private property <bool> toast_permanent: false;
+        private property <string> toast_text: "I show when something is waiting";
     // 0 = info, 1 = warn, 2 = error
     private property <int> toast_type: 0;
-    callback show_toast(string, int);
-    show_toast(text, kind) => {
-        toast = text != "";
-        toast_permanent = false;
-        toast_text = text;
-        toast_type = kind;
-    }
-    callback show_permanent_toast(string, int);
-    show_permanent_toast(text, kind) => {
-        toast = text != "";
-        toast_permanent = true;
-        toast_text = text;
-        toast_type = kind;
-    }
-    callback clear_permanent_toast();
-    clear_permanent_toast() => {
-        if (toast_permanent) {
-            toast = false;
-            toast_text = "";
+        callback show_toast(string, int);
+        show_toast(text, kind) => {
+            toast = text != "";
+            toast_permanent = false;
+            toast_text = text;
+            toast_type = kind;
         }
-    }
+        callback show_permanent_toast(string, int);
+        show_permanent_toast(text, kind) => {
+            toast = text != "";
+            toast_permanent = true;
+            toast_text = text;
+            toast_type = kind;
+        }
+        callback clear_permanent_toast();
+        clear_permanent_toast() => {
+            if (toast_permanent) {
+                toast = false;
+                toast_text = "";
+            }
+        }
     // User pressed "Retry" on the permanent asusd-unavailable toast.
     callback retry_asusd();
-    callback clear_toast_if_matches(string);
-    clear_toast_if_matches(text) => {
-        if (toast && toast_text == text) {
-            toast = false;
-            toast_text = "";
+        callback clear_toast_if_matches(string);
+        clear_toast_if_matches(text) => {
+            if (toast && toast_text == text) {
+                toast = false;
+                toast_text = "";
+            }
         }
-    }
     // Advanced (per-profile power settings) overlay control.
     private property <bool> show_per_profile_overlay: false;
-    callback open_per_profile_settings();
-    callback close_per_profile_settings();
-    open_per_profile_settings() => {
-        root.show_per_profile_overlay = true;
-    }
-    close_per_profile_settings() => {
-        root.show_per_profile_overlay = false;
-    }
-    background: Theme.bg-base;
+        callback open_per_profile_settings();
+        callback close_per_profile_settings();
+        open_per_profile_settings() => {
+            root.show_per_profile_overlay = true;
+        }
+        close_per_profile_settings() => {
+            root.show_per_profile_overlay = false;
+        }
+        background: Theme.bg-base;
 
-    // Window sizing: min keeps the dashboard usable on small laptops, the
+        // Window sizing: min keeps the dashboard usable on small laptops, the
     // preferred size gives it room on normal laptops and monitors.
     min-width: AppSize.width;
-    min-height: AppSize.height;
-    preferred-width: 1000px;
-    preferred-height: 700px;
+        min-height: AppSize.height;
+        preferred-width: 1000px;
+        preferred-height: 700px;
 
-    HorizontalLayout {
-        padding: 0px;
-        side-bar := SideBar {
+        HorizontalLayout {
+            padding: 0px;
+            side-bar := SideBar {
             // Title + icon travel together as one model — no separate icon array
             // to keep in sync when entries are added or reordered.
             model: [
-                { title: @tr("Menu1" => "System Control"), icon: @image-url("images/nav-home.svg") },
-                { title: @tr("Menu2" => "Keyboard Aura"), icon: @image-url("images/nav-keyboard.svg") },
-                { title: @tr("Menu3" => "AniMe Matrix"), icon: @image-url("images/nav-matrix.svg") },
-                { title: @tr("Menu4" => "Slash Lighting"), icon: @image-url("images/nav-slash.svg") },
-                { title: @tr("Menu5" => "Fan Curves"), icon: @image-url("images/nav-fan.svg") },
-                { title: @tr("Menu6" => "GPU Configuration"), icon: @image-url("images/nav-gpu.svg") },
-                { title: @tr("Menu9" => "Battery Info"), icon: @image-url("images/nav-battery.svg") },
-                { title: @tr("Menu7" => "App Settings"), icon: @image-url("images/nav-apps.svg") },
-                { title: @tr("Menu8" => "About"), icon: @image-url("images/nav-about.svg") },
-            ];
-            available: root.sidebar_items_avilable;
-        }
+                    { title: @tr("Menu1" => "System Control"), icon: @image-url("images/nav-home.svg") },
+                    { title: @tr("Menu2" => "Keyboard Aura"), icon: @image-url("images/nav-keyboard.svg") },
+                    { title: @tr("Menu3" => "AniMe Matrix"), icon: @image-url("images/nav-matrix.svg") },
+                    { title: @tr("Menu4" => "Slash Lighting"), icon: @image-url("images/nav-slash.svg") },
+                    { title: @tr("Menu5" => "Fan Curves"), icon: @image-url("images/nav-fan.svg") },
+                    { title: @tr("Menu6" => "GPU Configuration"), icon: @image-url("images/nav-gpu.svg") },
+                    { title: @tr("Menu9" => "Battery Info"), icon: @image-url("images/nav-battery.svg") },
+                    { title: @tr("Menu7" => "App Settings"), icon: @image-url("images/nav-apps.svg") },
+                    { title: @tr("Menu8" => "About"), icon: @image-url("images/nav-about.svg") },
+                ];
+                available: root.sidebar_items_avilable;
+            }
 
-        // Page host: stretches to fill everything right of the sidebar.
+            // Page host: stretches to fill everything right of the sidebar.
         Rectangle {
-            horizontal-stretch: 1;
-            background: Theme.bg-base;
+                horizontal-stretch: 1;
+                background: Theme.bg-base;
 
-            // Home dashboard fills the whole area right of the sidebar; the
+                // Home dashboard fills the whole area right of the sidebar; the
             // page scales its content up on wide monitors on its own.
             if side-bar.current-item == 0: PageHome {
-                width: 100%;
-                height: 100%;
-                open-per-profile-settings => {
-                    root.open_per_profile_settings();
+                    width: 100%;
+                    height: 100%;
+                    open-per-profile-settings => {
+                        root.open_per_profile_settings();
+                    }
                 }
-            }
             // Every not-yet-ported page.
             if side-bar.current-item > 0: Rectangle {
+                    width: 100%;
+                    height: 100%;
+                    background: Theme.bg-base;
+                }
+            }
+        }
+
+        if SomeError.error_message != "": Rectangle {
+            x: 0px;
+            y: 0px;
+            width: root.width;
+            height: root.height;
+            background: Palette.background;
+            border-color: Palette.border;
+            border-width: 3px;
+            border-radius: 10px;
+
+            TouchArea {
                 width: 100%;
                 height: 100%;
-                background: Theme.bg-base;
+            }
+
+            VerticalLayout {
+                padding: 20px;
+                spacing: 12px;
+                alignment: center;
+                Text {
+                    text <=> SomeError.error_message;
+                    font-size: 18px;
+                    color: Palette.control-foreground;
+                    horizontal-alignment: center;
+                }
+
+                Text {
+                    text <=> SomeError.error_help;
+                    color: Palette.control-foreground;
+                    horizontal-alignment: center;
+                }
             }
         }
-    }
 
-    if SomeError.error_message != "": Rectangle {
-        x: 0px;
-        y: 0px;
-        width: root.width;
-        height: root.height;
-        background: Palette.background;
-        border-color: Palette.border;
-        border-width: 3px;
-        border-radius: 10px;
-
-        TouchArea { width: 100%; height: 100%; }
-
-        VerticalLayout {
-            padding: 20px;
-            spacing: 12px;
-            alignment: center;
-            Text {
-                text <=> SomeError.error_message;
-                font-size: 18px;
-                color: Palette.control-foreground;
-                horizontal-alignment: center;
-            }
-            Text {
-                text <=> SomeError.error_help;
-                color: Palette.control-foreground;
-                horizontal-alignment: center;
-            }
-        }
-    }
-
-    // Advanced per-profile power settings overlay — declared last so it sits on
+        // Advanced per-profile power settings overlay — declared last so it sits on
     // top of every page (including the toast + error overlays).
     PerProfileSettingsOverlay {
-        width: 100%;
-        height: 100%;
-        open: root.show_per_profile_overlay;
-        close() => {
-            root.close_per_profile_settings();
+            width: 100%;
+            height: 100%;
+            open: root.show_per_profile_overlay;
+            close() => {
+                root.close_per_profile_settings();
+            }
         }
-    }
 
-    // Grey-out: full-window dim when asusd is unreachable. Blocks every click
+        // Grey-out: full-window dim when asusd is unreachable. Blocks every click
     // underneath (whole window), so the UI is visually greyed + interaction
     // disabled but the app keeps running. The permanent toast below is on top
     // of this so its Retry button stays clickable.
     if !SystemInfo.asusd_running: Rectangle {
-        x: 0px;
-        y: 0px;
-        width: 100%;
-        height: 100%;
-        background: Theme.dark ? #000000 : #FFFFFF;
-        opacity: 0.55;
-        TouchArea {
-            width: 100%;
-            height: 100%;
-        }
-        VerticalLayout {
-            alignment: center;
-            spacing: 10px;
-            Text {
-                text: @tr("asusd-unavailable" => "asusd is not running");
-                color: Theme.text-primary;
-                font-size: Theme.font-lg;
-                font-weight: 600;
-                horizontal-alignment: center;
-            }
-            Text {
-                text: @tr("asusd-unavailable-hint" => "Controls are disabled. Press Retry once asusd is up.");
-                color: Theme.text-secondary;
-                font-size: Theme.font-sm;
-                horizontal-alignment: center;
-            }
-        }
-    }
-
-    toast-pill := Rectangle {
-        property <color> toast_accent: root.toast_type == 2 ? #E85656 : (root.toast_type == 1 ? #FFBD00 : #00A8E4);
-        property <brush> toast_bg: root.toast_type == 2 ? #5C1F24E6 : (root.toast_type == 1 ? #4D3A10E6 : #103247E6);
-        x: (root.width - self.width) / 2;
-        y: parent.height - self.height - 10px;
-        width: Math.min(640px, root.width - 32px);
-        height: 40px;
-        border-radius: 20px;
-        background: toast-pill.toast_bg;
-        border-width: 1px;
-        border-color: toast-pill.toast_accent;
-        drop-shadow-blur: 18px;
-        drop-shadow-color: #00000060;
-        opacity: toast ? 1.0 : 0.0;
-        visible: self.opacity > 0.01;
-        animate opacity { duration: 220ms; easing: ease-out; }
-        animate y { duration: 220ms; easing: cubic-bezier(0.22, 0.61, 0.36, 1); }
-        TouchArea {
-            height: 100%;
-            width: 100%;
-            mouse-cursor: pointer;
-            clicked => {
-                if (!toast_permanent) {
-                    toast = false;
-                }
-            }
-        }
-        toast-lbl := Text {
-            color: Theme.text-primary;
-            x: 20px;
-            width: parent.width - (toast_permanent ? 96px : 40px);
+            x: 0px;
             y: 0px;
+            width: 100%;
             height: 100%;
-            font-size: Theme.font-sm;
-            text: root.toast_text;
-            vertical-alignment: center;
-            horizontal-alignment: center;
-            overflow: elide;
-        }
-        if toast_permanent: Rectangle {
-            x: parent.width - 70px - 6px;
-            y: 6px;
-            width: 70px;
-            height: parent.height - 12px;
-            border-radius: 14px;
-            background: toast-pill.toast_accent;
-            Text {
-                text: @tr("Retry");
-                color: #FFFFFF;
-                font-size: Theme.font-sm;
-                font-weight: 600;
-                horizontal-alignment: center;
-                vertical-alignment: center;
-            }
-            retry-ta := TouchArea {
+            background: Theme.dark ? #000000 : #FFFFFF;
+            opacity: 0.55;
+            TouchArea {
                 width: 100%;
                 height: 100%;
+            }
+
+            VerticalLayout {
+                alignment: center;
+                spacing: 10px;
+                Text {
+                    text: @tr("asusd-unavailable" => "asusd is not running");
+                    color: Theme.text-primary;
+                    font-size: Theme.font-lg;
+                    font-weight: 600;
+                    horizontal-alignment: center;
+                }
+
+                Text {
+                    text: @tr("asusd-unavailable-hint" => "Controls are disabled. Press Retry once asusd is up.");
+                    color: Theme.text-secondary;
+                    font-size: Theme.font-sm;
+                    horizontal-alignment: center;
+                }
+            }
+        }
+
+        toast-pill := Rectangle {
+            property <color> toast_accent: root.toast_type == 2 ? #E85656 : (root.toast_type == 1 ? #FFBD00 : #00A8E4);
+            property <brush> toast_bg: root.toast_type == 2 ? #5C1F24E6 : (root.toast_type == 1 ? #4D3A10E6 : #103247E6);
+            x: (root.width - self.width) / 2;
+            y: parent.height - self.height - 10px;
+            width: Math.min(640px, root.width - 32px);
+            height: 40px;
+            border-radius: 20px;
+            background: toast-pill.toast_bg;
+            border-width: 1px;
+            border-color: toast-pill.toast_accent;
+            drop-shadow-blur: 18px;
+            drop-shadow-color: #00000060;
+            opacity: toast ? 1.0 : 0.0;
+            visible: self.opacity > 0.01;
+            animate opacity {
+                duration: 220ms;
+                easing: ease-out;
+            }
+            animate y {
+                duration: 220ms;
+                easing: cubic-bezier(0.22, 0.61, 0.36, 1);
+            }
+            TouchArea {
+                height: 100%;
+                width: 100%;
                 mouse-cursor: pointer;
                 clicked => {
-                    root.retry_asusd();
+                    if (!toast_permanent) {
+                        toast = false;
+                    }
+                }
+            }
+
+            toast-lbl := Text {
+                color: Theme.text-primary;
+                x: 20px;
+                width: parent.width - (toast_permanent ? 96px : 40px);
+                y: 0px;
+                height: 100%;
+                font-size: Theme.font-sm;
+                text: root.toast_text;
+                vertical-alignment: center;
+                horizontal-alignment: center;
+                overflow: elide;
+            }
+
+            if toast_permanent: Rectangle {
+                x: parent.width - 70px - 6px;
+                y: 6px;
+                width: 70px;
+                height: parent.height - 12px;
+                border-radius: 14px;
+                background: toast-pill.toast_accent;
+                Text {
+                    text: @tr("Retry");
+                    color: #FFFFFF;
+                    font-size: Theme.font-sm;
+                    font-weight: 600;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+
+                retry-ta := TouchArea {
+                    width: 100%;
+                    height: 100%;
+                    mouse-cursor: pointer;
+                    clicked => {
+                        root.retry_asusd();
+                    }
                 }
             }
         }
     }
-}
 
 export global SomeError {
-    in property <string> error_message: "";
-    in property <string> error_help: "";
-}
+        in property <string> error_message: "";
+        in property <string> error_help: "";
+    }

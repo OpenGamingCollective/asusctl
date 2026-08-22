@@ -31,7 +31,7 @@ export component RogProductCard inherits Rectangle {
             }
             if root.product-image.width == 0: Image {
                 source: Theme.dark ? @image-url("../images/laptop-placeholder.svg")
-                                   : @image-url("../images/laptop-placeholder-light.svg");
+                    : @image-url("../images/laptop-placeholder-light.svg");
                 width: 94%;
                 height: 94%;
                 horizontal-alignment: center;
@@ -56,6 +56,7 @@ export component RogProductCard inherits Rectangle {
                 // Long model names wrap instead of being clipped at the edge.
                 wrap: word-wrap;
             }
+
             for d in root.details: Text {
                 text: d;
                 color: Theme.text-secondary;
@@ -120,6 +121,7 @@ export component RogDisplayModeCard inherits Rectangle {
         enabled: root.enabled;
         clicked => { root.clicked(); }
     }
+
     accessible-role: button;
     accessible-label: root.title;
     accessible-action-default => {
@@ -199,6 +201,7 @@ export component RogEffectButton inherits Rectangle {
         enabled: root.enabled;
         clicked => { root.clicked(); }
     }
+
     accessible-role: button;
     accessible-label: root.label;
     accessible-action-default => {
@@ -214,8 +217,10 @@ export component RogEffectButton inherits Rectangle {
             reject
         }
         if self.has-focus: Rectangle {
-            x: 2px; y: 2px;
-            width: parent.width - 4px; height: parent.height - 4px;
+            x: 2px;
+            y: 2px;
+            width: parent.width - 4px;
+            height: parent.height - 4px;
             border-radius: 4px;
             border-width: 2px;
             border-color: Theme.rog-red;
@@ -235,4 +240,3 @@ export component RogCard inherits Rectangle {
     drop-shadow-offset-y: 4px;
     clip: true;
 }
-

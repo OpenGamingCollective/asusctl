@@ -5,7 +5,10 @@ import { Theme } from "../globals.slint";
 // — Page root: declares the opacity transition. The actual opacity value is
 // driven by main_window per active page (crossfade); this only provides the curve. —
 export component RogPage inherits Rectangle {
-    animate opacity { duration: 180ms; easing: ease-out; }
+    animate opacity {
+        duration: 180ms;
+        easing: ease-out;
+    }
 }
 
 
@@ -18,7 +21,10 @@ export component RogRebootBanner inherits Rectangle {
     background: #66550033;
     border-width: 1px;
     border-color: #E0B04033;
-    animate opacity { duration: 200ms; easing: ease-out; }
+    animate opacity {
+        duration: 200ms;
+        easing: ease-out;
+    }
     HorizontalLayout {
         padding-left: 14px;
         padding-right: 14px;
@@ -35,6 +41,7 @@ export component RogRebootBanner inherits Rectangle {
                 y: (parent.height - self.height) / 2;
             }
         }
+
         Text {
             text: @tr("Changes are staged. They will take effect after restarting.");
             color: Theme.text-secondary;
@@ -79,4 +86,3 @@ export component RogDarkSlashes inherits RogSlashMark {
     bar-w: 5px;
     bar-h: 22px;
 }
-

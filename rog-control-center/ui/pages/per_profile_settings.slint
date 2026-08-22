@@ -28,12 +28,14 @@ component RogToggle inherits Rectangle {
         drop-shadow-blur: 3px;
         drop-shadow-color: #00000040;
     }
+
     ta := TouchArea {
         width: 100%;
         height: 100%;
         mouse-cursor: pointer;
         clicked => { root.toggled(!root.checked); }
     }
+
     accessible-role: switch;
     accessible-checked: root.checked;
 }
@@ -63,12 +65,14 @@ component ChoicePills inherits Rectangle {
                 vertical-alignment: center;
                 overflow: elide;
             }
+
             ta := TouchArea {
                 width: 100%;
                 height: 100%;
                 mouse-cursor: pointer;
                 clicked => { root.chosen(i); }
             }
+
             accessible-role: button;
             accessible-label: c;
             accessible-action-default => { root.chosen(i); }
@@ -98,6 +102,7 @@ component LimitRow inherits Rectangle {
             enabled: root.enabled;
             released(v) => { root.changed(Math.round(v)); }
         }
+
         reset-chip := Rectangle {
             width: 52px;
             height: 30px;
@@ -112,12 +117,14 @@ component LimitRow inherits Rectangle {
                 horizontal-alignment: center;
                 vertical-alignment: center;
             }
+
             ta-reset := TouchArea {
                 width: 100%;
                 height: 100%;
                 mouse-cursor: pointer;
                 clicked => { root.reset(); }
             }
+
             accessible-role: button;
             accessible-label: @tr("Reset");
             accessible-action-default => { root.reset(); }
@@ -183,7 +190,8 @@ export component PerProfileSettingsOverlay inherits Rectangle {
                 height: 34px;
                 HorizontalLayout {
                     spacing: 8px;
-                    RogSlashMark {}
+                    RogSlashMark { }
+
                     Text {
                         text: @tr("Power profiles");
                         color: Theme.text-primary;
@@ -191,7 +199,11 @@ export component PerProfileSettingsOverlay inherits Rectangle {
                         font-weight: 700;
                         vertical-alignment: center;
                     }
-                    Rectangle { horizontal-stretch: 1; }
+
+                    Rectangle {
+                        horizontal-stretch: 1;
+                    }
+
                     close-box := Rectangle {
                         width: 28px;
                         height: 28px;
@@ -204,12 +216,14 @@ export component PerProfileSettingsOverlay inherits Rectangle {
                             horizontal-alignment: center;
                             vertical-alignment: center;
                         }
+
                         ta-close := TouchArea {
                             width: 100%;
                             height: 100%;
                             mouse-cursor: pointer;
                             clicked => { root.close(); }
                         }
+
                         accessible-role: button;
                         accessible-label: @tr("Close");
                         accessible-action-default => { root.close(); }
@@ -234,6 +248,7 @@ export component PerProfileSettingsOverlay inherits Rectangle {
                         color: Theme.text-secondary;
                         font-size: Theme.font-sm;
                     }
+
                     ChoicePills {
                         choices: PowerData.energy_performance_choices;
                         current: root.active-epp;
@@ -256,6 +271,7 @@ export component PerProfileSettingsOverlay inherits Rectangle {
                         color: Theme.text-secondary;
                         font-size: Theme.font-sm;
                     }
+
                     HorizontalLayout {
                         Text {
                             text: @tr("On AC use");
@@ -263,18 +279,24 @@ export component PerProfileSettingsOverlay inherits Rectangle {
                             font-size: Theme.font-sm;
                             vertical-alignment: center;
                         }
-                        Rectangle { horizontal-stretch: 1; }
+
+                        Rectangle {
+                            horizontal-stretch: 1;
+                        }
+
                         Text {
                             text: @tr("Change on AC");
                             color: Theme.text-secondary;
                             font-size: Theme.font-sm;
                             vertical-alignment: center;
                         }
+
                         RogToggle {
                             checked: PowerData.change_platform_profile_on_ac;
                             toggled(v) => { PowerData.cb_change_platform_profile_on_ac(v); }
                         }
                     }
+
                     ChoicePills {
                         choices: PowerData.platform_profile_choices;
                         current: PowerData.platform_profile_on_ac;
@@ -283,6 +305,7 @@ export component PerProfileSettingsOverlay inherits Rectangle {
                             PowerData.cb_platform_profile_on_ac(i);
                         }
                     }
+
                     HorizontalLayout {
                         Text {
                             text: @tr("On battery use");
@@ -290,18 +313,24 @@ export component PerProfileSettingsOverlay inherits Rectangle {
                             font-size: Theme.font-sm;
                             vertical-alignment: center;
                         }
-                        Rectangle { horizontal-stretch: 1; }
+
+                        Rectangle {
+                            horizontal-stretch: 1;
+                        }
+
                         Text {
                             text: @tr("Change on battery");
                             color: Theme.text-secondary;
                             font-size: Theme.font-sm;
                             vertical-alignment: center;
                         }
+
                         RogToggle {
                             checked: PowerData.change_platform_profile_on_battery;
                             toggled(v) => { PowerData.cb_change_platform_profile_on_battery(v); }
                         }
                     }
+
                     ChoicePills {
                         choices: PowerData.platform_profile_choices;
                         current: PowerData.platform_profile_on_battery;
@@ -321,7 +350,11 @@ export component PerProfileSettingsOverlay inherits Rectangle {
                     font-size: Theme.font-sm;
                     vertical-alignment: center;
                 }
-                Rectangle { horizontal-stretch: 1; }
+
+                Rectangle {
+                    horizontal-stretch: 1;
+                }
+
                 RogToggle {
                     checked: root.active-limits-enabled;
                     toggled(v) => {
@@ -344,6 +377,7 @@ export component PerProfileSettingsOverlay inherits Rectangle {
                         font-size: Theme.font-md;
                         font-weight: 600;
                     }
+
                     LimitRow {
                         label: @tr("CPU Sustained Power Limit");
                         minimum: root.active-limits.ppt_pl1_spl.min;
@@ -359,6 +393,7 @@ export component PerProfileSettingsOverlay inherits Rectangle {
                         }
                         reset() => { PowerData.cb_reset_ppt_pl1_spl(root.current-env); }
                     }
+
                     LimitRow {
                         label: @tr("CPU Turbo Power Limit");
                         minimum: root.active-limits.ppt_pl2_sppt.min;
@@ -374,6 +409,7 @@ export component PerProfileSettingsOverlay inherits Rectangle {
                         }
                         reset() => { PowerData.cb_reset_ppt_pl2_sppt(root.current-env); }
                     }
+
                     LimitRow {
                         label: @tr("CPU Fast Burst Power Limit");
                         minimum: root.active-limits.ppt_pl3_fppt.min;
@@ -389,6 +425,7 @@ export component PerProfileSettingsOverlay inherits Rectangle {
                         }
                         reset() => { PowerData.cb_reset_ppt_pl3_fppt(root.current-env); }
                     }
+
                     LimitRow {
                         label: @tr("Package Fast Power Limit");
                         minimum: root.active-limits.ppt_fppt.min;
@@ -404,6 +441,7 @@ export component PerProfileSettingsOverlay inherits Rectangle {
                         }
                         reset() => { PowerData.cb_reset_ppt_fppt(root.current-env); }
                     }
+
                     LimitRow {
                         label: @tr("APU Sustained Power Limit");
                         minimum: root.active-limits.ppt_apu_sppt.min;
@@ -419,6 +457,7 @@ export component PerProfileSettingsOverlay inherits Rectangle {
                         }
                         reset() => { PowerData.cb_reset_ppt_apu_sppt(root.current-env); }
                     }
+
                     LimitRow {
                         label: @tr("Platform Sustained Power Limit");
                         minimum: root.active-limits.ppt_platform_sppt.min;
@@ -441,6 +480,7 @@ export component PerProfileSettingsOverlay inherits Rectangle {
                         font-size: Theme.font-md;
                         font-weight: 600;
                     }
+
                     LimitRow {
                         label: @tr("GPU TGP");
                         minimum: root.active-limits.nv_tgp.min;
@@ -456,6 +496,7 @@ export component PerProfileSettingsOverlay inherits Rectangle {
                         }
                         reset() => { PowerData.cb_reset_nv_tgp(root.current-env); }
                     }
+
                     LimitRow {
                         label: @tr("GPU Dynamic Boost");
                         minimum: root.active-limits.nv_dynamic_boost.min;
@@ -471,6 +512,7 @@ export component PerProfileSettingsOverlay inherits Rectangle {
                         }
                         reset() => { PowerData.cb_reset_nv_dynamic_boost(root.current-env); }
                     }
+
                     LimitRow {
                         label: @tr("GPU Temperature Limit");
                         minimum: root.active-limits.nv_temp_target.min;

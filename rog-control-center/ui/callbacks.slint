@@ -30,23 +30,23 @@ export global SystemInfo {
     in-out property <string> product_name: "";
 }
 
-export global TelemetryData {    
+export global TelemetryData {
     in-out property <float> cpu_temp_val: -1.0;
     in-out property <float> gpu_temp_val: -1.0;
     in-out property <float> igpu_temp_val: -1.0;
-    
+
     in-out property <float> cpu_usage_val: -1.0;
     in-out property <float> gpu_usage_val: -1.0;
     in-out property <float> igpu_usage_val: -1.0;
     in-out property <float> ram_usage_val: -1.0;
-    
+
     in-out property <float> cpu_freq_mhz: -1.0;
     in-out property <float> gpu_freq_mhz: -1.0;
-    
+
     in-out property <int> cpu_fan_rpm: -1;
     in-out property <int> gpu_fan_rpm: -1;
     in-out property <int> mid_fan_rpm: -1;
-    
+
     in-out property <bool> dgpu_suspended: false;
 }
 
@@ -202,11 +202,9 @@ export global AsusArmouryData {
     in-out property <AttrBool> boot_sound;
     callback cb_boot_sound(AttrBool);
 
-
     in-out property <AttrBool> mcu_powersave;
     callback cb_mcu_powersave(AttrBool);
 
     in-out property <AttrBool> screen_auto_brightness;
     callback cb_screen_auto_brightness(AttrBool);
-
 }

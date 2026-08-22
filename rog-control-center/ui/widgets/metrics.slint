@@ -40,7 +40,11 @@ export component RogStatRow inherits Rectangle {
             font-size: 13px;
             vertical-alignment: center;
         }
-        Rectangle { horizontal-stretch: 1; }
+
+        Rectangle {
+            horizontal-stretch: 1;
+        }
+
         Text {
             text: root.value;
             color: root.dim ? Theme.text-dim : Theme.text-secondary;
@@ -55,7 +59,7 @@ export component RogStatRow inherits Rectangle {
 export component RogReading inherits Rectangle {
     in property <string> label;
     in property <string> value;
-    in property <int> weight; 
+    in property <int> weight;
     in property <float> progress: 0.0;
     Rectangle {
         VerticalLayout {
@@ -68,7 +72,11 @@ export component RogReading inherits Rectangle {
                     font-weight: root.weight;
                     vertical-alignment: center;
                 }
-                Rectangle { horizontal-stretch: 1; }
+
+                Rectangle {
+                    horizontal-stretch: 1;
+                }
+
                 Text {
                     text: root.value;
                     color: Theme.text-secondary;
@@ -76,7 +84,10 @@ export component RogReading inherits Rectangle {
                     vertical-alignment: center;
                 }
             }
-            RogMeter { value: root.progress; }
+
+            RogMeter {
+                value: root.progress;
+            }
         }
     }
 }
@@ -99,9 +110,14 @@ export component RogMetric inherits VerticalLayout {
             // overflowing the card width.
             wrap: word-wrap;
         }
-        Rectangle { horizontal-stretch: 1; }
-        RogDarkSlashes {}
+
+        Rectangle {
+            horizontal-stretch: 1;
+        }
+
+        RogDarkSlashes { }
     }
+
     @children
 }
 
