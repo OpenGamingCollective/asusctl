@@ -248,15 +248,18 @@ dependencies = [
 
 [[package]]
 name = "ashpd"
-version = "0.13.13"
+version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb8421aaa9644a5faf26735f258b669b15f063313ef8f8e2bdb28912a1a6f111"
+checksum = "33a3c86f3fd70c0ffa500ed189abfa90b5a52398a45d5dc372fcc38ebeb7a645"
 dependencies = [
  "enumflags2",
+ "futures-channel",
  "futures-util",
- "getrandom 0.4.3",
+ "rand",
  "serde",
+ "serde_repr",
  "tokio",
+ "url",
  "zbus",
 ]
 
@@ -6170,6 +6173,7 @@ dependencies = [
  "idna",
  "percent-encoding",
  "serde",
+ "serde_derive",
 ]
 
 [[package]]
@@ -7380,6 +7384,7 @@ dependencies = [
  "endi",
  "enumflags2",
  "serde",
+ "url",
  "winnow",
  "zcheapstr",
  "zvariant_derive",
