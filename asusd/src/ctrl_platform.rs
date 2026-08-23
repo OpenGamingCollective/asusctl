@@ -1056,11 +1056,15 @@ impl CtrlTask for CtrlPlatform {
         let attrs = FirmwareAttributes::new();
         tokio::spawn(async move {
             use futures_util::StreamExt;
+            use std::time::Duration;
+
+            const DEBOUNCE_DURATION: Duration = Duration::from_millis(500);
             let mut buffer = [0; 32];
             if let Ok(mut stream) = watch_platform_profile.into_event_stream(&mut buffer) {
-                while (stream.next().await).is_some() {
-                    // this blocks
-                    debug!("Platform: watch_platform_profile changed");
+                let mut debounce_timer = std::pin::pin!(tokio::time::sleep(DEBOUNCE_DURATION));
+                let mut pending = false;
+
+                let apply_settled_profile = || async {
                     if let Ok(profile) = ctrl
                         .platform
                         .get_platform_profile()
@@ -1069,6 +1073,7 @@ impl CtrlTask for CtrlPlatform {
                             error!("Platform: get_platform_profile error: {e}");
                         })
                     {
+                        info!("Platform: watch_platform_profile settled: {profile}");
                         let change_epp = ctrl.config.lock().await.platform_profile_linked_epp;
                         let epp = ctrl.get_config_epp_for_throttle(profile).await;
                         ctrl.check_and_set_epp(epp, change_epp);
@@ -1077,15 +1082,46 @@ impl CtrlTask for CtrlPlatform {
                         let power_plugged = ctrl
                             .power
                             .get_online()
-                            .map_err(|e| {
+                            .inspect_err(|e| {
                                 error!("Could not get power status: {e:?}");
-                                e
                             })
                             .unwrap_or_default();
                         ctrl.apply_fan_curves_and_ppt(&attrs, power_plugged == 1, profile)
                             .await;
                         if let Err(e) = ctrl.armoury_registry.emit_limits(&ctrl.connection).await {
                             error!("Failed to emit armoury updates after profile change: {e:?}");
+                        }
+                    }
+                };
+
+                loop {
+                    tokio::select! {
+                        biased;
+
+                        event = stream.next() => {
+                            match event {
+                                Some(Ok(_)) => {
+                                    pending = true;
+                                    debounce_timer
+                                        .as_mut()
+                                        .reset(tokio::time::Instant::now() + DEBOUNCE_DURATION);
+                                }
+                                Some(Err(e)) => {
+                                    error!("Platform: watch_platform_profile stream error: {e}");
+                                }
+                                None => {
+                                    if pending {
+                                        (&mut debounce_timer).await;
+                                        apply_settled_profile().await;
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+
+                        _ = &mut debounce_timer, if pending => {
+                            pending = false;
+                            apply_settled_profile().await;
                         }
                     }
                 }
