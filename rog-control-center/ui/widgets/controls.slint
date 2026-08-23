@@ -84,11 +84,19 @@ export component RogModeSelector inherits Rectangle {
 // — Performance mode grid (large icons + labels) —
 export component RogModeGrid inherits Rectangle {
     in property <[int]> profile-indexes;
-    in property <[string]> profile-choices;
     in property <int> current-profile;
     callback selected(int);
     // Opens the per-profile power settings overlay (Home dashboard).
     callback advanced();
+
+    function profile-label(ev: int) -> string {
+        if ev == 0 { return @tr("Balanced"); } 
+        if ev == 1 { return @tr("Performance"); }
+        if ev == 2 { return @tr("Quiet"); }
+        if ev == 3 { return @tr("LowPower"); }
+        if ev == 4 { return @tr("Custom"); }
+        return "";
+    }
 
     height: 104px;
 
@@ -99,7 +107,7 @@ export component RogModeGrid inherits Rectangle {
             height: 100%;
 
             accessible-role: button;
-            accessible-label: root.profile-choices[p];
+            accessible-label: root.profile-label(ev);
             accessible-action-default => { root.selected(ev); }
 
             if root.current-profile == ev: Rectangle {
@@ -128,7 +136,7 @@ export component RogModeGrid inherits Rectangle {
                 }
 
                 Text {
-                    text: root.profile-choices[p];
+                    text: root.profile-label(ev);
                     color: root.current-profile == ev ? Theme.text-primary : Theme.text-secondary;
                     font-size: 14px;
                     horizontal-alignment: center;

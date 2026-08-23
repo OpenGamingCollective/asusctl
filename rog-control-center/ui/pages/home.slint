@@ -290,7 +290,6 @@ export component PageHome inherits RogPage {
 
                         RogModeGrid {
                             profile-indexes: PowerData.platform_profile_indexes;
-                            profile-choices: PowerData.platform_profile_choices;
                             current-profile: PowerData.platform_profile;
                             selected(ev) => {
                                 PowerData.cb_platform_profile(ev);
@@ -357,27 +356,9 @@ export component PageHome inherits RogPage {
                             }
                         }
                     }
-
-                    RogMetric {
-                        horizontal-stretch: 1;
-                        title: @tr("PPT");
-                        RogReading {
-                            label: @tr("ppt_apu_sppt");
-                            value: PowerData.ppt_apu_sppt.current;
-                            progress: PowerData.ppt_apu_sppt.max;
-                        }
-
-                        RogReading {
-                            label: @tr("ppt_platform_sppt");
-                            value: PowerData.ppt_platform_sppt.current;
-                            progress: PowerData.ppt_platform_sppt.max;
-                        }
-                    }
                 }
 
-                // Future graphs zone: CPU / GPU placeholders — only on wide windows.
-            // NOTE: an invisible stretch cell still absorbs free space on
-            // slint 1.13.1, so when hidden it must contribute 0 to the layout.
+            // Future graphs zone: CPU / GPU placeholders — only on wide windows.
             graphs-zone := Rectangle {
                     visible: root.show-graphs;
                     horizontal-stretch: 0;

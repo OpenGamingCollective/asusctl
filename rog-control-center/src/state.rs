@@ -1,10 +1,11 @@
 //! AppState, contains all the datas and the Events
 
 use crate::{
-    AttrBool,
+    AttrBool, AttrMinMax,
     helpers::types::{BatteryInfo, SystemTelemetry},
 };
 use log::info;
+use rog_platform::asus_armoury::FirmwareAttribute;
 #[derive(Debug, Clone)]
 pub enum Event {
     // Hardware update events
@@ -24,15 +25,37 @@ pub enum Event {
     UserRequestedPowerProfile(i32),
     UserRequestedPanelOD(AttrBool),
     UserRequestedBootSound(AttrBool),
-    UserRequestedScreenAutoBrightness(bool),
-    UserRequestedMCUPowerSave(bool),
+    UserRequestedScreenAutoBrightness(AttrBool),
+    UserRequestedMCUPowerSave(AttrBool),
 
-    // System User Update
     UpdatedPowerProfile(i32),
-    UpdatedPanelOD(AttrBool),
+    // asus-armoury update
+    UpdatedApuMem(AttrMinMax),
+    UpdatedCorePerf(AttrMinMax),
+    UpdatedCoreEff(AttrMinMax),
+    UpdatedPptPl1Spl(AttrMinMax),
+    UpdatedPptPl2Sppt(AttrMinMax),
+    UpdatedPptPl3Fppt(AttrMinMax),
+    UpdatedPptFppt(AttrMinMax),
+    UpdatedPptApuSppt(AttrMinMax),
+    UpdatedPptPlatformSppt(AttrMinMax),
+    UpdatedNvDynamicBoost(AttrMinMax),
+    UpdatedNvTempTarget(AttrMinMax),
+    UpdatedDgpuBaseTgp(AttrMinMax),
+    UpdatedDgpuTgp(AttrMinMax),
+    UpdatedChargeMode(AttrMinMax),
     UpdatedBootSound(AttrBool),
-    UpdatedScreenAutoBrightness(bool),
-    UpdatedMCUPowerSave(bool),
+    UpdatedMCUPowerSave(AttrBool),
+    UpdatedPanelOD(AttrBool),
+    UpdatedPanelHdMode(AttrMinMax),
+    UpdatedEgpuConnected(AttrBool),
+    UpdatedEgpuEnable(AttrBool),
+    UpdatedDgpuDisable(AttrBool),
+    UpdatedGpuMuxMode(AttrBool),
+    UpdatedMiniLedMode(AttrMinMax),
+    UpdatedPendingRebbot(AttrBool),
+    // 30
+    UpdatedScreenAutoBrightness(AttrBool),
 
     // System User Action Per Profile
     UserRequestedBatteryLimit(u8),
@@ -45,6 +68,58 @@ pub enum Event {
     ShowWindow,
     HideWindow,
     Quit,
+    // Nothing
+    None,
+}
+
+impl Event {
+    /// Convert an asus-armoury firmware attribute into an event
+    pub fn firmware_attr_into_event(attr: &FirmwareAttribute, val: AttrMinMax) -> Event {
+        match attr {
+            FirmwareAttribute::ApuMem => Event::UpdatedApuMem(val),
+            FirmwareAttribute::CoresPerformance => Event::UpdatedCorePerf(val),
+            FirmwareAttribute::CoresEfficiency => Event::UpdatedCoreEff(val),
+            FirmwareAttribute::PptPl1Spl => Event::UpdatedPptPl1Spl(val),
+            FirmwareAttribute::PptPl2Sppt => Event::UpdatedPptPl2Sppt(val),
+            FirmwareAttribute::PptPl3Fppt => Event::UpdatedPptPl3Fppt(val),
+            FirmwareAttribute::PptFppt => Event::UpdatedPptFppt(val),
+            FirmwareAttribute::PptApuSppt => Event::UpdatedPptApuSppt(val),
+            FirmwareAttribute::PptPlatformSppt => Event::UpdatedPptPlatformSppt(val),
+            FirmwareAttribute::NvDynamicBoost => Event::UpdatedNvDynamicBoost(val),
+            FirmwareAttribute::NvTempTarget => Event::UpdatedNvTempTarget(val),
+            FirmwareAttribute::DgpuBaseTgp => Event::UpdatedDgpuBaseTgp(val),
+            FirmwareAttribute::DgpuTgp => Event::UpdatedDgpuTgp(val),
+            FirmwareAttribute::ChargeMode => Event::UpdatedChargeMode(val),
+            FirmwareAttribute::BootSound => Event::UpdatedBootSound(attr_i32_into_bool(val)),
+
+            FirmwareAttribute::McuPowersave => Event::UpdatedMCUPowerSave(attr_i32_into_bool(val)),
+            FirmwareAttribute::PanelOverdrive => Event::UpdatedPanelOD(attr_i32_into_bool(val)),
+
+            FirmwareAttribute::PanelHdMode => Event::UpdatedPanelHdMode(val),
+            FirmwareAttribute::EgpuConnected => {
+                Event::UpdatedEgpuConnected(attr_i32_into_bool(val))
+            }
+            FirmwareAttribute::EgpuEnable => Event::UpdatedEgpuEnable(attr_i32_into_bool(val)),
+            FirmwareAttribute::DgpuDisable => Event::UpdatedDgpuDisable(attr_i32_into_bool(val)),
+            FirmwareAttribute::GpuMuxMode => Event::UpdatedGpuMuxMode(attr_i32_into_bool(val)),
+            FirmwareAttribute::MiniLedMode => Event::UpdatedMiniLedMode(val),
+            FirmwareAttribute::PendingReboot => {
+                Event::UpdatedPendingRebbot(attr_i32_into_bool(val))
+            }
+            FirmwareAttribute::ScreenAutoBrightness => {
+                Event::UpdatedScreenAutoBrightness(attr_i32_into_bool(val))
+            }
+            // Unknown
+            FirmwareAttribute::None => Event::None,
+        }
+    }
+}
+
+pub fn attr_i32_into_bool(val: AttrMinMax) -> AttrBool {
+    AttrBool {
+        current: val.current == 1.0,
+        supported: val.supported,
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -53,8 +128,8 @@ pub enum Action {
     SetPlatformProfile(i32),
     SetPanelOD(AttrBool),
     SetBootSound(AttrBool),
-    SetScreenAutoBrightness(bool),
-    SetMCUPowerSave(bool),
+    SetScreenAutoBrightness(AttrBool),
+    SetMCUPowerSave(AttrBool),
 
     SetBatteryLimit(u8),
 
@@ -101,6 +176,9 @@ pub enum UiUpdate {
     ShowWindow,
     HideWindow,
     Quit,
+
+    // Unknown attribute / no event
+    None,
 }
 
 #[derive(Default)]

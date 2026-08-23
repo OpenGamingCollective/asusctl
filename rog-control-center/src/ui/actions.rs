@@ -1,7 +1,4 @@
-use std::{
-    println,
-    sync::{Arc, Mutex, OnceLock},
-};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use log::{debug, warn};
 use tokio::sync::mpsc::UnboundedSender;
@@ -41,8 +38,13 @@ impl ActionHandler {
                 warn!("asusd unavailable, ignoring action {action:?}");
             }
             // System
-            Action::SetPlatformProfile(_ppd) => {
-                println!("Hello from PPD");
+            Action::SetPlatformProfile(ppd) => {
+                if let Some(asusd_proxy) = self.asusd.get()
+                    && let Some(platform_proxy) = &asusd_proxy.platform
+                    && let Err(err) = platform_proxy.set_platform_profile(ppd.into()).await
+                {
+                    warn!("failed to set platform profile: {}", err);
+                };
             }
             Action::SetPanelOD(b) => {
                 self.set_attribute(FirmwareAttribute::PanelOverdrive, b.current as i32)
@@ -55,11 +57,11 @@ impl ActionHandler {
                 let _ = self.event_tx.send(Event::UpdatedBootSound(b));
             }
             Action::SetScreenAutoBrightness(b) => {
-                self.set_attribute(FirmwareAttribute::ScreenAutoBrightness, b as i32)
+                self.set_attribute(FirmwareAttribute::ScreenAutoBrightness, b.current as i32)
                     .await;
             }
             Action::SetMCUPowerSave(b) => {
-                self.set_attribute(FirmwareAttribute::McuPowersave, b as i32)
+                self.set_attribute(FirmwareAttribute::McuPowersave, b.current as i32)
                     .await;
             }
             _ => {}

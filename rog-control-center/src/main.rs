@@ -15,6 +15,9 @@ use rog_control_center::helpers::startup::populate_slint_properties;
 use rog_control_center::helpers::zbus_proxies::AsusdInterface;
 use rog_control_center::state::Event;
 use rog_control_center::ui::actions::ActionHandler;
+use rog_control_center::ui::subscriptions::{
+    subscribe_armoury, subscribe_ppd, subscribe_telemetry,
+};
 use rog_control_center::ui::window::setup_window;
 use slint::ComponentHandle;
 use tokio::runtime::Runtime;
@@ -115,10 +118,6 @@ fn main() -> Result<()> {
     // Bind UI Inputs to the Channel
     rog_control_center::ui::callbacks::bind_ui_events(&ui, event_tx.clone());
 
-    // Start Hardware Subscriptions
-    rt.spawn(rog_control_center::ui::subscriptions::subscribe_telemetry(
-        event_tx.clone(),
-    ));
     // subscribe_telemetry(event_tx.clone(), true);
 
     // Detect asusd and send the result to the GUI
@@ -142,6 +141,11 @@ fn main() -> Result<()> {
             }
         }
     });
+
+    // Start Hardware Subscriptions
+    rt.spawn(subscribe_telemetry(event_tx.clone()));
+    rt.spawn(subscribe_ppd(event_tx.clone(), asusd.clone()));
+    rt.spawn(subscribe_armoury(event_tx.clone(), asusd.clone()));
 
     // Show the window after the pre-startup is done
     let background_startup = match config.try_lock() {

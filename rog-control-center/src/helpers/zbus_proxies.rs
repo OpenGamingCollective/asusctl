@@ -18,6 +18,8 @@ use rog_platform::asus_armoury::FirmwareAttribute;
 use zbus::names::OwnedInterfaceName;
 use zbus::zvariant::{OwnedObjectPath, OwnedValue};
 
+use crate::AttrMinMax;
+
 pub const ZBUS_PATH: &str = "/xyz/ljones/rogcc";
 pub const ZBUS_IFACE: &str = "xyz.ljones.rogcc";
 
@@ -261,5 +263,22 @@ impl AsusdInterface {
 
     pub fn is_armoury_loaded(&self) -> bool {
         !self.armoury.is_empty()
+    }
+}
+
+pub async fn get_min_max_current(proxy: &AsusArmouryProxy<'_>) -> Option<AttrMinMax> {
+    if let (Ok(min), Ok(max), Ok(current)) = (
+        proxy.min_value().await,
+        proxy.max_value().await,
+        proxy.current_value().await,
+    ) {
+        Some(AttrMinMax {
+            min,
+            max,
+            current: current as f32,
+            supported: true,
+        })
+    } else {
+        None
     }
 }
