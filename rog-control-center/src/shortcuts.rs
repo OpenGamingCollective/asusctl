@@ -126,11 +126,11 @@ fn enable_action(
 
 // ashpd 0.13 migration point: this alias and the Portal impl below are the
 // only ashpd-dependent shapes in this module.
-type PortalSession = ashpd::desktop::Session<'static, GlobalShortcuts<'static>>;
+type PortalSession = ashpd::desktop::Session<GlobalShortcuts>;
 
 /// Portal proxy with the interface version, read once at init time.
 struct Portal {
-    gs: GlobalShortcuts<'static>,
+    gs: GlobalShortcuts,
     version: u32,
 }
 
@@ -150,8 +150,7 @@ impl Portal {
         }
         match GlobalShortcuts::new().await {
             Ok(gs) => {
-                // ashpd 0.12 has no version accessor: read the property once.
-                let version = gs.get_property::<u32>("version").await.unwrap_or(1);
+                let version = gs.version();
                 Some(Portal { gs, version })
             }
             Err(err) => {
@@ -162,11 +161,11 @@ impl Portal {
     }
 
     async fn create_session(&self) -> ashpd::Result<PortalSession> {
-        self.gs.create_session().await
+        self.gs.create_session(Default::default()).await
     }
 
     async fn list_assignment(&self, session: &PortalSession) -> ashpd::Result<Assignment> {
-        let request = self.gs.list_shortcuts(session).await?;
+        let request = self.gs.list_shortcuts(session, Default::default()).await?;
         Ok(assignment(request.response()?.shortcuts()))
     }
 
@@ -175,7 +174,10 @@ impl Portal {
         let shortcut = NewShortcut::new(SHORTCUT_ID, SHORTCUT_DESCRIPTION)
             .preferred_trigger(PREFERRED_TRIGGER);
         info!("Requesting shortcut bind via portal");
-        let request = self.gs.bind_shortcuts(session, &[shortcut], None).await?;
+        let request = self
+            .gs
+            .bind_shortcuts(session, &[shortcut], None, Default::default())
+            .await?;
         match request.response() {
             Ok(bound) => Ok(bound_assignment(bound.shortcuts())),
             Err(err) => {
@@ -187,7 +189,7 @@ impl Portal {
 
     async fn configure(&self, session: &PortalSession) -> ashpd::Result<()> {
         self.gs
-            .configure_shortcuts(session, None, None::<ashpd::ActivationToken>)
+            .configure_shortcuts(session, None, Default::default())
             .await
     }
 }
@@ -413,7 +415,7 @@ impl Actor<'_> {
 
         let mut session_loop = SessionLoop {
             portal,
-            session,
+            session: &session,
             window: self.window,
             status_tx: self.status,
             mode,
@@ -427,10 +429,10 @@ impl Actor<'_> {
     }
 }
 
-/// Owns the portal session and all per-session state.
+/// Borrows the portal session and owns all per-session state.
 struct SessionLoop<'a> {
     portal: &'a Portal,
-    session: PortalSession,
+    session: &'a PortalSession,
     window: &'a WeakWindowController,
     status_tx: &'a watch::Sender<ShortcutStatus>,
     mode: EnableMode,
@@ -486,7 +488,8 @@ impl SessionLoop<'_> {
                 return ShortcutStatus::Unavailable;
             }
         };
-        let mut closed = match self.session.receive_closed().await {
+        let session = self.session;
+        let mut closed = match session.receive_closed().await {
             Ok(stream) => stream,
             Err(err) => {
                 error!("Could not subscribe to session Closed: {err}");
@@ -495,7 +498,7 @@ impl SessionLoop<'_> {
         };
         debug!("Portal signal subscriptions ready");
 
-        self.current = match self.portal.list_assignment(&self.session).await {
+        self.current = match self.portal.list_assignment(session).await {
             Ok(found) => found,
             Err(err) => {
                 error!("Could not list shortcuts: {err}");
@@ -529,7 +532,7 @@ impl SessionLoop<'_> {
                         Some(Command::Configure { respond }) => {
                             debug!("Command: Configure");
                             let ok = if self.portal.version >= 2 {
-                                match self.portal.configure(&self.session).await {
+                                match self.portal.configure(self.session).await {
                                     Ok(()) => true,
                                     Err(err) => {
                                         warn!("ConfigureShortcuts failed: {err}");
@@ -610,10 +613,10 @@ impl SessionLoop<'_> {
         match action {
             EnableAction::Bind => {
                 self.bind_attempted = true;
-                self.current = self.portal.bind_shortcut(&self.session).await?;
+                self.current = self.portal.bind_shortcut(self.session).await?;
             }
             EnableAction::Configure => {
-                if let Err(err) = self.portal.configure(&self.session).await {
+                if let Err(err) = self.portal.configure(self.session).await {
                     warn!("Could not open shortcut configuration: {err}");
                 }
             }

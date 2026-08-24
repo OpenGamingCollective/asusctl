@@ -36,7 +36,7 @@ default-members = ["asusctl", "asusd", "asus-shutdown", "asusd-user", "rog-contr
 
 [workspace.dependencies]
 argh = "^0.1.19"
-ashpd = { version = "=0.12.3", default-features = false, features = ["tokio"] }
+ashpd = { version = "=0.13.13", default-features = false, features = ["tokio", "global_shortcuts"] }
 concat-idents = "^1.1.5"
 console-subscriber = "^0.5.0"
 dirs = "^6.0.0"
