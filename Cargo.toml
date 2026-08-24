@@ -55,10 +55,9 @@ mio = "^1.2.2"
 # z = ["zbus", "serde", "async"]
 notify-rust = { version = "=4.18.0", default-features = false, features = ["z"] }
 nvml-wrapper = "^0.12.1"
-# Pix and png_pong pinned because updating to 1.0.1 breaks rog-anime
-pix = "=0.13.4"
+pix = "=1.0.1"
 png = "^0.18.1"
-png_pong = "=0.9.3"
+png_pong = "=0.12.0"
 ron = "^0.12.2"
 rusb = "^0.9.4"
 sdl2 = { version = "^0.38.0", default-features = false }

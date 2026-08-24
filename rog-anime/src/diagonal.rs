@@ -96,11 +96,11 @@ impl AnimeDiagonal {
         for (y, row) in ras.pixels().chunks(width as usize).enumerate() {
             for (x, px) in row.iter().enumerate() {
                 let v = if grey {
-                    <u8>::from(px.one()) as f32
+                    <u8>::from(px.get::<0>()) as f32
                 } else {
-                    (<u8>::from(px.one()) / 3) as f32
-                        + (<u8>::from(px.two()) / 3) as f32
-                        + (<u8>::from(px.three()) / 3) as f32
+                    (<u8>::from(px.get::<0>()) / 3) as f32
+                        + (<u8>::from(px.get::<1>()) / 3) as f32
+                        + (<u8>::from(px.get::<2>()) / 3) as f32
                 };
                 if y < matrix.1.len() && x < matrix.1[y].len() {
                     matrix.1[y][x] = (v * bright) as u8;
@@ -121,11 +121,11 @@ impl AnimeDiagonal {
         for (y, row) in ras.pixels().chunks(width as usize).enumerate() {
             for (x, px) in row.iter().enumerate() {
                 let v = if grey {
-                    (<u16>::from(px.one()) >> 8) as f32
+                    (<u16>::from(px.get::<0>()) >> 8) as f32
                 } else {
-                    ((<u16>::from(px.one()) / 3) >> 8) as f32
-                        + ((<u16>::from(px.two()) / 3) >> 8) as f32
-                        + ((<u16>::from(px.three()) / 3) >> 8) as f32
+                    ((<u16>::from(px.get::<0>()) / 3) >> 8) as f32
+                        + ((<u16>::from(px.get::<1>()) / 3) >> 8) as f32
+                        + ((<u16>::from(px.get::<2>()) / 3) >> 8) as f32
                 };
                 matrix.1[y][x] = (v * bright) as u8;
             }
