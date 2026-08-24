@@ -1,6 +1,5 @@
-// Modal "Advanced" per-profile power settings (Home -> Operation Mode ->
-// Advanced). Three configurable profiles: Quiet / Balanced / Performance.
-// LowPower is deliberately not configurable.
+// Modal "Advanced" Manual (Custom) power settings (Home -> Operation Mode ->
+// Manual). A single set of power limits for the Custom platform profile.
 //
 // All rows here are kept Rectangle-based / use layouts in safe positions (this
 // project is pinned to slint 1.13.1, see ui/README.md about layouts).
@@ -40,7 +39,7 @@ component RogToggle inherits Rectangle {
     accessible-checked: root.checked;
 }
 
-// — Row of selectable pills (tabs / EPP / AC-battery targets) —
+// — Row of selectable pills (EPP / AC-battery targets) —
 // NOTE (slint 1.13.1): no explicit `height` on this component — a layout cell
 // that contains a nested layout AND has a fixed height makes every later
 // sibling render empty. Let the inner leaf Rectangles define the height.
@@ -132,23 +131,11 @@ component LimitRow inherits Rectangle {
     }
 }
 
-export component PerProfileSettingsOverlay inherits Rectangle {
+export component ManualSettingsOverlay inherits Rectangle {
     in property <bool> open: false;
     callback close();
-    // Tab index 0..2 -> Quiet, Balanced, Performance
-    in-out property <int> selected-profile: 0;
-    property <[int]> profile-enums: [2, 0, 1];
-    property <[string]> profile-labels: [@tr("Quiet"), @tr("Balanced"), @tr("Performance")];
-    property <int> current-env: root.profile-enums[root.selected-profile];
-    property <ProfileLimits> active-limits:
-        root.current-env == 2 ? PowerData.limits_quiet :
-        (root.current-env == 0 ? PowerData.limits_balanced : PowerData.limits_performance);
-    property <bool> active-limits-enabled:
-        root.current-env == 2 ? PowerData.limits_enabled_quiet :
-        (root.current-env == 0 ? PowerData.limits_enabled_balanced : PowerData.limits_enabled_performance);
-    property <int> active-epp:
-        root.current-env == 2 ? PowerData.profile_quiet_epp :
-        (root.current-env == 0 ? PowerData.profile_balanced_epp : PowerData.profile_performance_epp);
+    property <ProfileLimits> active-limits: PowerData.limits_custom;
+    property <bool> active-limits-enabled: PowerData.limits_enabled_custom;
 
     background: transparent;
     visible: root.open;
@@ -193,7 +180,7 @@ export component PerProfileSettingsOverlay inherits Rectangle {
                     RogSlashMark { }
 
                     Text {
-                        text: @tr("Power profiles");
+                        text: @tr("Manual mode");
                         color: Theme.text-primary;
                         font-size: Theme.font-lg;
                         font-weight: 700;
@@ -231,14 +218,7 @@ export component PerProfileSettingsOverlay inherits Rectangle {
                 }
             }
 
-            // Profile tabs
-            ChoicePills {
-                choices: root.profile-labels;
-                current: root.selected-profile;
-                chosen(i) => { root.selected-profile = i; }
-            }
-
-            // EPP for the selected profile
+            // EPP for the Custom profile
             // (no fixed height on this wrapper either — see the note on ChoicePills)
             Rectangle {
                 VerticalLayout {
@@ -251,12 +231,10 @@ export component PerProfileSettingsOverlay inherits Rectangle {
 
                     ChoicePills {
                         choices: PowerData.energy_performance_choices;
-                        current: root.active-epp;
+                        current: PowerData.profile_custom_epp;
                         chosen(i) => {
-                            if (root.current-env == 2) { PowerData.profile_quiet_epp = i; }
-                            if (root.current-env == 0) { PowerData.profile_balanced_epp = i; }
-                            if (root.current-env == 1) { PowerData.profile_performance_epp = i; }
-                            PowerData.cb_set_epp(root.current-env, i);
+                            PowerData.profile_custom_epp = i;
+                            PowerData.cb_set_epp(i);
                         }
                     }
                 }
@@ -342,7 +320,7 @@ export component PerProfileSettingsOverlay inherits Rectangle {
                 }
             }
 
-            // Per-profile enable gate
+            // Manual enable gate
             HorizontalLayout {
                 Text {
                     text: @tr("Apply these limits when this profile is active");
@@ -358,10 +336,8 @@ export component PerProfileSettingsOverlay inherits Rectangle {
                 RogToggle {
                     checked: root.active-limits-enabled;
                     toggled(v) => {
-                        if (root.current-env == 2) { PowerData.limits_enabled_quiet = v; }
-                        if (root.current-env == 0) { PowerData.limits_enabled_balanced = v; }
-                        if (root.current-env == 1) { PowerData.limits_enabled_performance = v; }
-                        PowerData.cb_enable_profile_limits(root.current-env, v);
+                        PowerData.limits_enabled_custom = v;
+                        PowerData.cb_enable_profile_limits(v);
                     }
                 }
             }
@@ -386,12 +362,10 @@ export component PerProfileSettingsOverlay inherits Rectangle {
                         unit: "W";
                         enabled: root.active-limits-enabled;
                         changed(v) => {
-                            if (root.current-env == 2) { PowerData.limits_quiet.ppt_pl1_spl.current = v; }
-                            if (root.current-env == 0) { PowerData.limits_balanced.ppt_pl1_spl.current = v; }
-                            if (root.current-env == 1) { PowerData.limits_performance.ppt_pl1_spl.current = v; }
-                            PowerData.cb_set_ppt_pl1_spl(root.current-env, v);
+                            PowerData.limits_custom.ppt_pl1_spl.current = v;
+                            PowerData.cb_set_ppt_pl1_spl(v);
                         }
-                        reset() => { PowerData.cb_reset_ppt_pl1_spl(root.current-env); }
+                        reset() => { PowerData.cb_reset_ppt_pl1_spl(); }
                     }
 
                     LimitRow {
@@ -402,12 +376,10 @@ export component PerProfileSettingsOverlay inherits Rectangle {
                         unit: "W";
                         enabled: root.active-limits-enabled;
                         changed(v) => {
-                            if (root.current-env == 2) { PowerData.limits_quiet.ppt_pl2_sppt.current = v; }
-                            if (root.current-env == 0) { PowerData.limits_balanced.ppt_pl2_sppt.current = v; }
-                            if (root.current-env == 1) { PowerData.limits_performance.ppt_pl2_sppt.current = v; }
-                            PowerData.cb_set_ppt_pl2_sppt(root.current-env, v);
+                            PowerData.limits_custom.ppt_pl2_sppt.current = v;
+                            PowerData.cb_set_ppt_pl2_sppt(v);
                         }
-                        reset() => { PowerData.cb_reset_ppt_pl2_sppt(root.current-env); }
+                        reset() => { PowerData.cb_reset_ppt_pl2_sppt(); }
                     }
 
                     LimitRow {
@@ -418,12 +390,10 @@ export component PerProfileSettingsOverlay inherits Rectangle {
                         unit: "W";
                         enabled: root.active-limits-enabled;
                         changed(v) => {
-                            if (root.current-env == 2) { PowerData.limits_quiet.ppt_pl3_fppt.current = v; }
-                            if (root.current-env == 0) { PowerData.limits_balanced.ppt_pl3_fppt.current = v; }
-                            if (root.current-env == 1) { PowerData.limits_performance.ppt_pl3_fppt.current = v; }
-                            PowerData.cb_set_ppt_pl3_fppt(root.current-env, v);
+                            PowerData.limits_custom.ppt_pl3_fppt.current = v;
+                            PowerData.cb_set_ppt_pl3_fppt(v);
                         }
-                        reset() => { PowerData.cb_reset_ppt_pl3_fppt(root.current-env); }
+                        reset() => { PowerData.cb_reset_ppt_pl3_fppt(); }
                     }
 
                     LimitRow {
@@ -434,12 +404,10 @@ export component PerProfileSettingsOverlay inherits Rectangle {
                         unit: "W";
                         enabled: root.active-limits-enabled;
                         changed(v) => {
-                            if (root.current-env == 2) { PowerData.limits_quiet.ppt_fppt.current = v; }
-                            if (root.current-env == 0) { PowerData.limits_balanced.ppt_fppt.current = v; }
-                            if (root.current-env == 1) { PowerData.limits_performance.ppt_fppt.current = v; }
-                            PowerData.cb_set_ppt_fppt(root.current-env, v);
+                            PowerData.limits_custom.ppt_fppt.current = v;
+                            PowerData.cb_set_ppt_fppt(v);
                         }
-                        reset() => { PowerData.cb_reset_ppt_fppt(root.current-env); }
+                        reset() => { PowerData.cb_reset_ppt_fppt(); }
                     }
 
                     LimitRow {
@@ -450,12 +418,10 @@ export component PerProfileSettingsOverlay inherits Rectangle {
                         unit: "W";
                         enabled: root.active-limits-enabled;
                         changed(v) => {
-                            if (root.current-env == 2) { PowerData.limits_quiet.ppt_apu_sppt.current = v; }
-                            if (root.current-env == 0) { PowerData.limits_balanced.ppt_apu_sppt.current = v; }
-                            if (root.current-env == 1) { PowerData.limits_performance.ppt_apu_sppt.current = v; }
-                            PowerData.cb_set_ppt_apu_sppt(root.current-env, v);
+                            PowerData.limits_custom.ppt_apu_sppt.current = v;
+                            PowerData.cb_set_ppt_apu_sppt(v);
                         }
-                        reset() => { PowerData.cb_reset_ppt_apu_sppt(root.current-env); }
+                        reset() => { PowerData.cb_reset_ppt_apu_sppt(); }
                     }
 
                     LimitRow {
@@ -466,12 +432,10 @@ export component PerProfileSettingsOverlay inherits Rectangle {
                         unit: "W";
                         enabled: root.active-limits-enabled;
                         changed(v) => {
-                            if (root.current-env == 2) { PowerData.limits_quiet.ppt_platform_sppt.current = v; }
-                            if (root.current-env == 0) { PowerData.limits_balanced.ppt_platform_sppt.current = v; }
-                            if (root.current-env == 1) { PowerData.limits_performance.ppt_platform_sppt.current = v; }
-                            PowerData.cb_set_ppt_platform_sppt(root.current-env, v);
+                            PowerData.limits_custom.ppt_platform_sppt.current = v;
+                            PowerData.cb_set_ppt_platform_sppt(v);
                         }
-                        reset() => { PowerData.cb_reset_ppt_platform_sppt(root.current-env); }
+                        reset() => { PowerData.cb_reset_ppt_platform_sppt(); }
                     }
 
                     Text {
@@ -489,12 +453,10 @@ export component PerProfileSettingsOverlay inherits Rectangle {
                         unit: "W";
                         enabled: true;
                         changed(v) => {
-                            if (root.current-env == 2) { PowerData.limits_quiet.nv_tgp.current = v; }
-                            if (root.current-env == 0) { PowerData.limits_balanced.nv_tgp.current = v; }
-                            if (root.current-env == 1) { PowerData.limits_performance.nv_tgp.current = v; }
-                            PowerData.cb_set_nv_tgp(root.current-env, v);
+                            PowerData.limits_custom.nv_tgp.current = v;
+                            PowerData.cb_set_nv_tgp(v);
                         }
-                        reset() => { PowerData.cb_reset_nv_tgp(root.current-env); }
+                        reset() => { PowerData.cb_reset_nv_tgp(); }
                     }
 
                     LimitRow {
@@ -505,12 +467,10 @@ export component PerProfileSettingsOverlay inherits Rectangle {
                         unit: "W";
                         enabled: true;
                         changed(v) => {
-                            if (root.current-env == 2) { PowerData.limits_quiet.nv_dynamic_boost.current = v; }
-                            if (root.current-env == 0) { PowerData.limits_balanced.nv_dynamic_boost.current = v; }
-                            if (root.current-env == 1) { PowerData.limits_performance.nv_dynamic_boost.current = v; }
-                            PowerData.cb_set_nv_dynamic_boost(root.current-env, v);
+                            PowerData.limits_custom.nv_dynamic_boost.current = v;
+                            PowerData.cb_set_nv_dynamic_boost(v);
                         }
-                        reset() => { PowerData.cb_reset_nv_dynamic_boost(root.current-env); }
+                        reset() => { PowerData.cb_reset_nv_dynamic_boost(); }
                     }
 
                     LimitRow {
@@ -521,12 +481,10 @@ export component PerProfileSettingsOverlay inherits Rectangle {
                         unit: "°C";
                         enabled: true;
                         changed(v) => {
-                            if (root.current-env == 2) { PowerData.limits_quiet.nv_temp_target.current = v; }
-                            if (root.current-env == 0) { PowerData.limits_balanced.nv_temp_target.current = v; }
-                            if (root.current-env == 1) { PowerData.limits_performance.nv_temp_target.current = v; }
-                            PowerData.cb_set_nv_temp_target(root.current-env, v);
+                            PowerData.limits_custom.nv_temp_target.current = v;
+                            PowerData.cb_set_nv_temp_target(v);
                         }
-                        reset() => { PowerData.cb_reset_nv_temp_target(root.current-env); }
+                        reset() => { PowerData.cb_reset_nv_temp_target(); }
                     }
                 }
             }

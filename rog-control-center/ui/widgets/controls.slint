@@ -86,7 +86,7 @@ export component RogModeGrid inherits Rectangle {
     in property <[int]> profile-indexes;
     in property <int> current-profile;
     callback selected(int);
-    // Opens the per-profile power settings overlay (Home dashboard).
+    // Opens the Manual (Custom mode) power settings overlay (Home dashboard).
     callback advanced();
 
     function profile-label(ev: int) -> string {
@@ -185,12 +185,12 @@ export component RogModeGrid inherits Rectangle {
             }
         }
 
-        // Trailing "Advanced" tile: opens the per-profile power settings overlay.
+        // Trailing "Advanced" tile: opens the Manual (Custom mode) power settings overlay.
         Rectangle {
             horizontal-stretch: 1;
             height: 100%;
             accessible-role: button;
-            accessible-label: @tr("Advanced");
+            accessible-label: @tr("Manual");
             accessible-action-default => { root.advanced(); }
 
             Rectangle {
@@ -213,7 +213,7 @@ export component RogModeGrid inherits Rectangle {
                 }
 
                 Text {
-                    text: @tr("Advanced");
+                    text: @tr("Manual");
                     color: Theme.text-secondary;
                     font-size: 14px;
                     horizontal-alignment: center;

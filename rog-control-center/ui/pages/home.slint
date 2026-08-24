@@ -19,7 +19,7 @@ export component PageHome inherits RogPage {
     background: Theme.bg-base;
     clip: true;
     // Forwarded to the main window host, which owns the Advanced overlay.
-    callback open-per-profile-settings();
+    callback open-manual-settings();
 
     // ====== Responsive sizing ======
     // Below ~1000px of page width (narrower laptops) the dashboard tightens:
@@ -295,7 +295,7 @@ export component PageHome inherits RogPage {
                                 PowerData.cb_platform_profile(ev);
                             }
                             advanced() => {
-                                root.open-per-profile-settings();
+                                root.open-manual-settings();
                             }
                         }
                     }

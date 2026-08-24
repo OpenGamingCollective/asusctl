@@ -8,7 +8,7 @@ import {
 } from "callbacks.slint";
 import { AttrMinMax } from "types.slint";
 import { PageHome } from "pages/home.slint";
-import { PerProfileSettingsOverlay } from "pages/per_profile_settings.slint";
+import { ManualSettingsOverlay } from "pages/manual_settings.slint";
 import { SideBar } from "widgets/sidebar.slint";
 
 export {
@@ -87,15 +87,15 @@ export component MainWindow inherits Window {
                 toast_text = "";
             }
         }
-    // Advanced (per-profile power settings) overlay control.
-    private property <bool> show_per_profile_overlay: false;
-        callback open_per_profile_settings();
-        callback close_per_profile_settings();
-        open_per_profile_settings() => {
-            root.show_per_profile_overlay = true;
+    // Advanced (Manual / Custom mode) power settings overlay control.
+    private property <bool> show_manual_settings_overlay: false;
+        callback open_manual_settings();
+        callback close_manual_settings();
+        open_manual_settings() => {
+            root.show_manual_settings_overlay = true;
         }
-        close_per_profile_settings() => {
-            root.show_per_profile_overlay = false;
+        close_manual_settings() => {
+            root.show_manual_settings_overlay = false;
         }
         background: Theme.bg-base;
 
@@ -135,8 +135,8 @@ export component MainWindow inherits Window {
             if side-bar.current-item == 0: PageHome {
                     width: 100%;
                     height: 100%;
-                    open-per-profile-settings => {
-                        root.open_per_profile_settings();
+                    open-manual-settings => {
+                        root.open_manual_settings();
                     }
                 }
             // Every not-yet-ported page.
@@ -182,14 +182,14 @@ export component MainWindow inherits Window {
             }
         }
 
-        // Advanced per-profile power settings overlay — declared last so it sits on
-    // top of every page (including the toast + error overlays).
-    PerProfileSettingsOverlay {
+        // Advanced Manual (Custom mode) power settings overlay, must be declared last
+    // so it sits on top of every page (including the toast + error overlays).
+    ManualSettingsOverlay {
             width: 100%;
             height: 100%;
-            open: root.show_per_profile_overlay;
+            open: root.show_manual_settings_overlay;
             close() => {
-                root.close_per_profile_settings();
+                root.close_manual_settings();
             }
         }
 
