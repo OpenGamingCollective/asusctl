@@ -474,50 +474,7 @@ impl AnimeImage {
         bright: f32,
         anime_type: AnimeType,
     ) -> Result<Self> {
-        let data = std::fs::read(path).map_err(|e| {
-            error!("Could not open {path:?}: {e:?}");
-            e
-        })?;
-        let data = std::io::Cursor::new(data);
-        let decoder = png_pong::Decoder::new(data)?.into_steps();
-        let png_pong::Step { raster, delay: _ } = decoder.last().ok_or(AnimeError::NoFrames)??;
-
-        let width;
-        let pixels = match &raster {
-            png_pong::PngRaster::Gray8(ras) => {
-                width = ras.width();
-                Self::pixels_from_8bit(ras, true)
-            }
-            png_pong::PngRaster::Graya8(ras) => {
-                width = ras.width();
-                Self::pixels_from_8bit(ras, true)
-            }
-            png_pong::PngRaster::Rgb8(ras) => {
-                width = ras.width();
-                Self::pixels_from_8bit(ras, false)
-            }
-            png_pong::PngRaster::Rgba8(ras) => {
-                width = ras.width();
-                Self::pixels_from_8bit(ras, false)
-            }
-            png_pong::PngRaster::Gray16(ras) => {
-                width = ras.width();
-                Self::pixels_from_16bit(ras, true)
-            }
-            png_pong::PngRaster::Rgb16(ras) => {
-                width = ras.width();
-                Self::pixels_from_16bit(ras, false)
-            }
-            png_pong::PngRaster::Graya16(ras) => {
-                width = ras.width();
-                Self::pixels_from_16bit(ras, true)
-            }
-            png_pong::PngRaster::Rgba16(ras) => {
-                width = ras.width();
-                Self::pixels_from_16bit(ras, false)
-            }
-            png_pong::PngRaster::Palette(..) => return Err(AnimeError::Format),
-        };
+        let (width, pixels) = pixels_from_png(path)?;
 
         let mut matrix = AnimeImage::new(
             Vec2::new(scale, scale),
@@ -532,44 +489,68 @@ impl AnimeImage {
         matrix.update();
         Ok(matrix)
     }
+}
 
-    fn pixels_from_8bit<P>(ras: &pix::Raster<P>, grey: bool) -> Vec<Pixel>
-    where
-        P: pix::el::Pixel<Chan = pix::chan::Ch8>,
-    {
-        ras.pixels()
-            .iter()
-            .map(|px| crate::image::Pixel {
-                color: if grey {
-                    <u8>::from(px.get::<0>()) as u32
-                } else {
-                    (<u8>::from(px.get::<0>()) / 3) as u32
-                        + (<u8>::from(px.get::<1>()) / 3) as u32
-                        + (<u8>::from(px.get::<2>()) / 3) as u32
-                },
-                alpha: <f32>::from(px.alpha()),
-            })
-            .collect()
-    }
+/// Decode a PNG to its width and a row-major buffer of greyscale pixels.
+/// Colour channels are averaged, and 16bit channels are truncated to 8bit.
+pub(crate) fn pixels_from_png(path: &Path) -> Result<(u32, Vec<Pixel>)> {
+    let data = std::fs::read(path).map_err(|e| {
+        error!("Could not open {path:?}: {e:?}");
+        e
+    })?;
+    let data = std::io::Cursor::new(data);
+    let decoder = png_pong::Decoder::new(data)?.into_steps();
+    let png_pong::Step { raster, delay: _ } = decoder.last().ok_or(AnimeError::NoFrames)??;
 
-    fn pixels_from_16bit<P>(ras: &pix::Raster<P>, grey: bool) -> Vec<Pixel>
-    where
-        P: pix::el::Pixel<Chan = pix::chan::Ch16>,
-    {
-        ras.pixels()
-            .iter()
-            .map(|px| crate::image::Pixel {
-                color: if grey {
-                    (<u16>::from(px.get::<0>()) >> 8) as u32
-                } else {
-                    ((<u16>::from(px.get::<0>()) / 3) >> 8) as u32
-                        + ((<u16>::from(px.get::<1>()) / 3) >> 8) as u32
-                        + ((<u16>::from(px.get::<2>()) / 3) >> 8) as u32
-                },
-                alpha: <f32>::from(px.alpha()),
-            })
-            .collect()
-    }
+    Ok(match &raster {
+        png_pong::PngRaster::Gray8(ras) => (ras.width(), pixels_from_8bit(ras, true)),
+        png_pong::PngRaster::Graya8(ras) => (ras.width(), pixels_from_8bit(ras, true)),
+        png_pong::PngRaster::Rgb8(ras) => (ras.width(), pixels_from_8bit(ras, false)),
+        png_pong::PngRaster::Rgba8(ras) => (ras.width(), pixels_from_8bit(ras, false)),
+        png_pong::PngRaster::Gray16(ras) => (ras.width(), pixels_from_16bit(ras, true)),
+        png_pong::PngRaster::Rgb16(ras) => (ras.width(), pixels_from_16bit(ras, false)),
+        png_pong::PngRaster::Graya16(ras) => (ras.width(), pixels_from_16bit(ras, true)),
+        png_pong::PngRaster::Rgba16(ras) => (ras.width(), pixels_from_16bit(ras, false)),
+        png_pong::PngRaster::Palette(..) => return Err(AnimeError::Format),
+    })
+}
+
+fn pixels_from_8bit<P>(ras: &pix::Raster<P>, grey: bool) -> Vec<Pixel>
+where
+    P: pix::el::Pixel<Chan = pix::chan::Ch8>,
+{
+    ras.pixels()
+        .iter()
+        .map(|px| Pixel {
+            color: if grey {
+                <u8>::from(px.get::<0>()) as u32
+            } else {
+                (<u8>::from(px.get::<0>()) / 3) as u32
+                    + (<u8>::from(px.get::<1>()) / 3) as u32
+                    + (<u8>::from(px.get::<2>()) / 3) as u32
+            },
+            alpha: <f32>::from(px.alpha()),
+        })
+        .collect()
+}
+
+fn pixels_from_16bit<P>(ras: &pix::Raster<P>, grey: bool) -> Vec<Pixel>
+where
+    P: pix::el::Pixel<Chan = pix::chan::Ch16>,
+{
+    ras.pixels()
+        .iter()
+        .map(|px| Pixel {
+            color: if grey {
+                (<u16>::from(px.get::<0>()) >> 8) as u32
+            } else {
+                ((<u16>::from(px.get::<0>()) / 3) >> 8) as u32
+                    + ((<u16>::from(px.get::<1>()) / 3) >> 8) as u32
+                    + ((<u16>::from(px.get::<2>()) / 3) >> 8) as u32
+            },
+            alpha: <f32>::from(px.alpha()),
+        })
+        .collect()
 }
 
 impl TryFrom<&AnimeImage> for AnimeDataBuffer {

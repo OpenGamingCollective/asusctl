@@ -2,11 +2,9 @@
 
 use std::path::Path;
 
-use log::error;
-
 use crate::AnimeType;
 use crate::data::AnimeDataBuffer;
-use crate::error::{AnimeError, Result};
+use crate::error::Result;
 
 /// Mostly intended to be used with ASUS gifs, but can be used for other
 /// purposes (like images)
@@ -43,93 +41,18 @@ impl AnimeDiagonal {
     /// `update()`.
     #[inline]
     pub fn from_png(path: &Path, bright: f32, anime_type: AnimeType) -> Result<Self> {
-        let data = std::fs::read(path).map_err(|e| {
-            error!("Could not open {path:?}: {e:?}");
-            e
-        })?;
-        let data = std::io::Cursor::new(data);
-        let decoder = png_pong::Decoder::new(data)?.into_steps();
-        let png_pong::Step { raster, delay: _ } = decoder.last().ok_or(AnimeError::NoFrames)??;
-
+        let (width, pixels) = crate::image::pixels_from_png(path)?;
         let mut matrix = AnimeDiagonal::new(anime_type);
 
-        match &raster {
-            png_pong::PngRaster::Gray8(ras) => {
-                Self::pixels_from_8bit(ras, &mut matrix, bright, true);
-            }
-            png_pong::PngRaster::Graya8(ras) => {
-                Self::pixels_from_8bit(ras, &mut matrix, bright, true);
-            }
-            png_pong::PngRaster::Rgb8(ras) => {
-                Self::pixels_from_8bit(ras, &mut matrix, bright, false);
-            }
-            png_pong::PngRaster::Rgba8(ras) => {
-                Self::pixels_from_8bit(ras, &mut matrix, bright, false);
-            }
-            png_pong::PngRaster::Gray16(ras) => {
-                Self::pixels_from_16bit(ras, &mut matrix, bright, true);
-            }
-            png_pong::PngRaster::Rgb16(ras) => {
-                Self::pixels_from_16bit(ras, &mut matrix, bright, false);
-            }
-            png_pong::PngRaster::Graya16(ras) => {
-                Self::pixels_from_16bit(ras, &mut matrix, bright, true);
-            }
-            png_pong::PngRaster::Rgba16(ras) => {
-                Self::pixels_from_16bit(ras, &mut matrix, bright, false);
-            }
-            png_pong::PngRaster::Palette(..) => return Err(AnimeError::Format),
-        };
-
-        Ok(matrix)
-    }
-
-    fn pixels_from_8bit<P>(
-        ras: &pix::Raster<P>,
-        matrix: &mut AnimeDiagonal,
-        bright: f32,
-        grey: bool,
-    ) where
-        P: pix::el::Pixel<Chan = pix::chan::Ch8>,
-    {
-        let width = ras.width();
-        for (y, row) in ras.pixels().chunks(width as usize).enumerate() {
+        for (y, row) in pixels.chunks(width as usize).enumerate() {
             for (x, px) in row.iter().enumerate() {
-                let v = if grey {
-                    <u8>::from(px.get::<0>()) as f32
-                } else {
-                    (<u8>::from(px.get::<0>()) / 3) as f32
-                        + (<u8>::from(px.get::<1>()) / 3) as f32
-                        + (<u8>::from(px.get::<2>()) / 3) as f32
-                };
                 if y < matrix.1.len() && x < matrix.1[y].len() {
-                    matrix.1[y][x] = (v * bright) as u8;
+                    matrix.1[y][x] = (px.color as f32 * bright) as u8;
                 }
             }
         }
-    }
 
-    fn pixels_from_16bit<P>(
-        ras: &pix::Raster<P>,
-        matrix: &mut AnimeDiagonal,
-        bright: f32,
-        grey: bool,
-    ) where
-        P: pix::el::Pixel<Chan = pix::chan::Ch16>,
-    {
-        let width = ras.width();
-        for (y, row) in ras.pixels().chunks(width as usize).enumerate() {
-            for (x, px) in row.iter().enumerate() {
-                let v = if grey {
-                    (<u16>::from(px.get::<0>()) >> 8) as f32
-                } else {
-                    ((<u16>::from(px.get::<0>()) / 3) >> 8) as f32
-                        + ((<u16>::from(px.get::<1>()) / 3) >> 8) as f32
-                        + ((<u16>::from(px.get::<2>()) / 3) >> 8) as f32
-                };
-                matrix.1[y][x] = (v * bright) as u8;
-            }
-        }
+        Ok(matrix)
     }
 
     /// Convert to a data buffer that can be sent over dbus
