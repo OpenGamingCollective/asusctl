@@ -248,18 +248,15 @@ dependencies = [
 
 [[package]]
 name = "ashpd"
-version = "0.12.3"
+version = "0.13.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33a3c86f3fd70c0ffa500ed189abfa90b5a52398a45d5dc372fcc38ebeb7a645"
+checksum = "fb8421aaa9644a5faf26735f258b669b15f063313ef8f8e2bdb28912a1a6f111"
 dependencies = [
  "enumflags2",
- "futures-channel",
  "futures-util",
- "rand 0.9.5",
+ "getrandom 0.4.3",
  "serde",
- "serde_repr",
  "tokio",
- "url",
  "zbus",
 ]
 
@@ -1488,9 +1485,9 @@ dependencies = [
 
 [[package]]
 name = "error-code"
-version = "3.4.0"
+version = "3.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b5343afd4a8365a643ac588dab4cf234a190c7f6c88c9f6dd6ffe00837661b7"
+checksum = "dea2df4cf52843e0452895c455a1a2cfbb842a1e7329671acf418fdc53ed4c59"
 
 [[package]]
 name = "euclid"
@@ -1530,7 +1527,7 @@ dependencies = [
  "bit_field",
  "half",
  "lebe",
- "miniz_oxide",
+ "miniz_oxide 0.8.9",
  "num-complex",
  "pulp",
  "rayon-core",
@@ -1623,7 +1620,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "843fba2746e448b37e26a819579957415c8cef339bf08564fe8b7ddbd959573c"
 dependencies = [
  "crc32fast",
- "miniz_oxide",
+ "miniz_oxide 0.8.9",
 ]
 
 [[package]]
@@ -3337,6 +3334,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "miniz_oxide"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b63fbc4a50860e98e7b2aa7804ded1db5cbc3aff9193adaff57a6931bf7c4b4c"
+dependencies = [
+ "adler2",
+ "simd-adler32",
+]
+
+[[package]]
 name = "mio"
 version = "1.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3467,9 +3474,9 @@ checksum = "0676bb32a98c1a483ce53e500a81ad9c3d5b3f7c920c28c24e9cb0980d0b5bc8"
 
 [[package]]
 name = "notify-rust"
-version = "4.17.0"
+version = "4.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50ff2e74231b72c832d82982193b417f230945be6bdb5575b251d941d31adb00"
+checksum = "c5b4c1b4f2aa9f25f63a7a49d3dd0ed567b3670da15330a66b29434be899b891"
 dependencies = [
  "futures-lite",
  "log",
@@ -4176,9 +4183,9 @@ dependencies = [
 
 [[package]]
 name = "pix"
-version = "0.13.4"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6574ffbea793ab0c9a9b09ae99831f1513fdd7732b12aca4c7182c46dc3bc9f"
+checksum = "193abc7f41904036e50a389a6298b3f4f49f0be03756bbfa1b3d3f3cb34be3ee"
 
 [[package]]
 name = "pkg-config"
@@ -4202,18 +4209,25 @@ dependencies = [
  "crc32fast",
  "fdeflate",
  "flate2",
- "miniz_oxide",
+ "miniz_oxide 0.8.9",
 ]
 
 [[package]]
-name = "png_pong"
-version = "0.9.3"
+name = "png_filters"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a767b8b17e388cb7f1e74cf3c2ebce14e6b7ae123fa27150889a353fd9eb981f"
+checksum = "bdad86b89bada24e69d5fdc7626519a32a23f08f48a4ca229db06a1624c5ddd0"
+
+[[package]]
+name = "png_pong"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da7b3e4dc29e87554adf86748e0ba4c948c137bb9e8fbfd8e1e8948544f16b30"
 dependencies = [
- "miniz_oxide",
+ "miniz_oxide 0.9.1",
  "parsenic",
  "pix",
+ "png_filters",
  "simd-adler32",
  "traitful",
 ]
@@ -6213,7 +6227,6 @@ dependencies = [
  "idna",
  "percent-encoding",
  "serde",
- "serde_derive",
 ]
 
 [[package]]
@@ -7424,7 +7437,6 @@ dependencies = [
  "endi",
  "enumflags2",
  "serde",
- "url",
  "winnow",
  "zcheapstr",
  "zvariant_derive",

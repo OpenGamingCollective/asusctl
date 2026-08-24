@@ -167,15 +167,13 @@ impl CtrlPlatform {
         }
     }
 
-    /// Re-apply fan curves for the given profile, then write PPT values.
-    /// Fan curves must be applied first because PPT writes require the EC
-    /// to be in Manual fan mode (FANM=4), which is set by fan curve writes.
-    async fn apply_fan_curves_and_ppt(
-        &self,
-        attrs: &FirmwareAttributes,
-        power_plugged: bool,
-        profile: PlatformProfile,
-    ) {
+    /// Re-apply the custom fan curves for the given profile.
+    ///
+    /// Writing the platform profile makes the kernel disable every custom fan
+    /// curve at once, so this must follow every such write. Writing the same
+    /// profile value still disables them while emitting no change event, so the
+    /// platform profile watcher cannot be relied on to notice.
+    async fn reapply_fan_curves(&self, profile: PlatformProfile) {
         if let Some(ref fc_config) = self.fan_curve_config {
             let mut fc = fc_config.lock().await;
             if let Ok(mut device) = find_fan_curve_node() {
@@ -186,6 +184,32 @@ impl CtrlPlatform {
             }
             fc.current = profile;
         }
+    }
+
+    /// Write the platform profile and restore the fan curves it just wiped.
+    ///
+    /// This is the only sanctioned way to set the profile from this type;
+    /// calling `self.platform.set_platform_profile()` directly leaves the
+    /// custom fan curves disabled.
+    async fn write_platform_profile(
+        &self,
+        profile: PlatformProfile,
+    ) -> Result<(), rog_platform::error::PlatformError> {
+        self.platform.set_platform_profile(profile.into())?;
+        self.reapply_fan_curves(profile).await;
+        Ok(())
+    }
+
+    /// Re-apply fan curves for the given profile, then write PPT values.
+    /// Fan curves must be applied first because PPT writes require the EC
+    /// to be in Manual fan mode (FANM=4), which is set by fan curve writes.
+    async fn apply_fan_curves_and_ppt(
+        &self,
+        attrs: &FirmwareAttributes,
+        power_plugged: bool,
+        profile: PlatformProfile,
+    ) {
+        self.reapply_fan_curves(profile).await;
         set_config_or_default(
             attrs,
             &mut *self.config.lock().await,
@@ -357,7 +381,7 @@ impl CtrlPlatform {
         let throttle = self.select_power_profile_for_source(power_plugged).await;
         debug!("Setting {throttle:?} before EPP");
         let epp = self.get_config_epp_for_throttle(throttle).await;
-        if let Err(err) = self.platform.set_platform_profile(throttle.into()) {
+        if let Err(err) = self.write_platform_profile(throttle).await {
             warn!("Failed to set platform profile {throttle:?} on AC/BAT change: {err}");
             return;
         }
@@ -487,12 +511,10 @@ impl CtrlPlatform {
             let change_epp = self.config.lock().await.platform_profile_linked_epp;
             let epp = self.get_config_epp_for_throttle(policy).await;
             self.check_and_set_epp(epp, change_epp);
-            self.platform
-                .set_platform_profile(policy.into())
-                .map_err(|err| {
-                    warn!("platform_profile {}", err);
-                    FdoErr::Failed(format!("RogPlatform: platform_profile: {err}"))
-                })?;
+            self.write_platform_profile(policy).await.map_err(|err| {
+                warn!("platform_profile {}", err);
+                FdoErr::Failed(format!("RogPlatform: platform_profile: {err}"))
+            })?;
             self.enable_ppt_group_changed(&ctxt).await?;
             Ok(self.platform_profile_changed(&ctxt).await?)
         } else {
@@ -536,12 +558,10 @@ impl CtrlPlatform {
                 )));
             }
 
-            self.platform
-                .set_platform_profile(policy.into())
-                .map_err(|err| {
-                    warn!("platform_profile {}", err);
-                    FdoErr::Failed(format!("RogPlatform: platform_profile: {err}"))
-                })?;
+            self.write_platform_profile(policy).await.map_err(|err| {
+                warn!("platform_profile {}", err);
+                FdoErr::Failed(format!("RogPlatform: platform_profile: {err}"))
+            })?;
             self.enable_ppt_group_changed(&ctxt).await?;
             Ok(())
         } else {
@@ -767,7 +787,7 @@ impl CtrlPlatform {
             .await;
         } else {
             // reapply the profile to ensure acpi resets PPT to defaults
-            self.platform.set_platform_profile(profile.into())?;
+            self.write_platform_profile(profile).await?;
         }
 
         // Re-emit armoury attribute limits so GUI sees updated min/max for PPT
