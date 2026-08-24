@@ -36,10 +36,10 @@ fn main() -> Result<()> {
     if let Ok(gamescope) = env::var("GAMESCOPE_WAYLAND_DISPLAY") {
         if !gamescope.is_empty() {
             unsafe { env::set_var("WAYLAND_DISPLAY", gamescope) };
-        } else if let Ok(wayland) = env::var("WAYLAND_DISPLAY") {
-            if wayland.is_empty() {
-                unsafe { env::set_var("WAYLAND_DISPLAY", "gamescope-0") };
-            }
+        } else if let Ok(wayland) = env::var("WAYLAND_DISPLAY")
+            && wayland.is_empty()
+        {
+            unsafe { env::set_var("WAYLAND_DISPLAY", "gamescope-0") };
         }
     }
 
