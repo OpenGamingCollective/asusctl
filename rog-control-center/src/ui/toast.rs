@@ -4,6 +4,7 @@ use std::{
 };
 
 use crate::MainWindow;
+use crate::state::ToastType;
 use log::error;
 use slint::{SharedString, Weak};
 use tokio::runtime::Handle;
@@ -11,10 +12,25 @@ use tokio::runtime::Handle;
 // A counter of toast that appears
 static TOAST_SEQ: AtomicU64 = AtomicU64::new(0);
 
+/// Show a persistent toast with a retry button
+pub fn show_permanent_toast(
+    message: SharedString,
+    toast_type: ToastType,
+    handle: Weak<MainWindow>,
+) {
+    let code = toast_type as i32;
+    let _ = slint::invoke_from_event_loop(move || {
+        if let Some(h) = handle.upgrade() {
+            h.invoke_show_permanent_toast(message, code);
+        }
+    });
+}
+
 /// Show a toast on the user screen
-pub fn show_toast(message: SharedString, handle: Weak<MainWindow>) {
+pub fn show_toast(message: SharedString, toast_type: ToastType, handle: Weak<MainWindow>) {
     // Increase the counter
     let current_seq = TOAST_SEQ.fetch_add(1, Ordering::SeqCst) + 1;
+    let code = toast_type as i32;
 
     // Copy the handle to be able to use them in a later move
     let delayed_handle = handle.clone();
@@ -23,7 +39,7 @@ pub fn show_toast(message: SharedString, handle: Weak<MainWindow>) {
     // Display the toast on the screen
     let _ = slint::invoke_from_event_loop(move || {
         if let Some(h) = handle.upgrade() {
-            h.invoke_show_toast(message);
+            h.invoke_show_toast(message, code);
         }
     });
 

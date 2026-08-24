@@ -1,0 +1,88 @@
+// Structural Layout Components
+// Contains page wrappers, accent marks, and notice banners used to structure views.
+import { Theme } from "../globals.slint";
+
+// — Page root: declares the opacity transition. The actual opacity value is
+// driven by main_window per active page (crossfade); this only provides the curve. —
+export component RogPage inherits Rectangle {
+    animate opacity {
+        duration: 180ms;
+        easing: ease-out;
+    }
+}
+
+
+// — "Reboot required" notice banner —
+//   Shown inline next to controls whose changes only apply after a restart
+//   (GPU mode, MUX, reserved memory, miniLED...). Parent toggles `visible`.
+export component RogRebootBanner inherits Rectangle {
+    height: 40px;
+    border-radius: 8px;
+    background: #66550033;
+    border-width: 1px;
+    border-color: #E0B04033;
+    animate opacity {
+        duration: 200ms;
+        easing: ease-out;
+    }
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 14px;
+        spacing: 10px;
+        // Full-height cell so the icon can be centred inside it: Slint
+        // layouts own direct-child geometry, so an Image child can't set y.
+        Rectangle {
+            Image {
+                source: @image-url("../images/nav-about.svg");
+                colorize: #E0B040;
+                width: 18px;
+                height: 18px;
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+            }
+        }
+
+        Text {
+            text: @tr("Changes are staged. They will take effect after restarting.");
+            color: Theme.text-secondary;
+            font-size: Theme.font-sm;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+    }
+}
+
+
+// ============================================================
+//  AC home (dashboard) components — matched against ac-system-page.html (1:1)
+// ============================================================
+
+// — AC signature slash accent: compact slanted parallelograms. —
+// The source is pre-skewed, so there is no rotated bounding box and the mark
+// remains vertically centred relative to its title at every row height.
+export component RogSlashMark inherits Rectangle {
+    in property <color> bar-color: Theme.rog-red;
+    in property <int> count: 3;
+    in property <length> bar-w: 5px;
+    in property <length> bar-h: 14px;
+    width: root.count * (root.bar-w + 11px) - 2px;
+
+    for i in root.count: Image {
+        source: @image-url("../images/slash-bar.svg");
+        colorize: root.bar-color;
+        x: i * (root.bar-w + 11px);
+        y: (root.height - root.bar-h) / 2;
+        width: root.bar-w + 9px;
+        height: root.bar-h;
+        image-fit: fill;
+    }
+}
+
+
+// — Dark slashes by metric headings retain their original visual weight. —
+export component RogDarkSlashes inherits RogSlashMark {
+    bar-color: Theme.bg-elevated;
+    count: 3;
+    bar-w: 5px;
+    bar-h: 22px;
+}
