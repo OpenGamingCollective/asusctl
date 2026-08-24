@@ -1,6 +1,6 @@
 # Prefer dependency versions whose `rust-version` is compatible with the
-# toolchain in rust-toolchain.toml (rustc 1.85). Without this, `cargo update`
-# picks the newest semver-compatible versions, many of which require rustc
-# >= 1.86/1.87/1.9x and fail to build.
+# workspace `rust-version`. Without this, `cargo update` picks the newest
+# semver-compatible versions, some of which require a newer rustc and fail
+# to build.
 [resolver]
 incompatible-rust-versions = "fallback"
