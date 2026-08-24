@@ -53,7 +53,7 @@ log = "^0.4.33"
 logind-zbus = { version = "^5.3.2" }
 mio = "^1.2.2"
 # z = ["zbus", "serde", "async"]
-notify-rust = { version = "=4.17.0", default-features = false, features = ["z"] }
+notify-rust = { version = "=4.18.0", default-features = false, features = ["z"] }
 nvml-wrapper = "^0.12.1"
 # Pix and png_pong pinned because updating to 1.0.1 breaks rog-anime
 pix = "=0.13.4"
