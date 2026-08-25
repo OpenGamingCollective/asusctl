@@ -165,11 +165,32 @@ pub enum UiUpdate {
         toast_type: ToastType,
     },
 
-    // Home
+    // asus-armoury update
+    ApuMem(AttrMinMax),
+    CorePerf(AttrMinMax),
+    CoreEff(AttrMinMax),
+    PptPl1Spl(AttrMinMax),
+    PptPl2Sppt(AttrMinMax),
+    PptPl3Fppt(AttrMinMax),
+    PptFppt(AttrMinMax),
+    PptApuSppt(AttrMinMax),
+    PptPlatformSppt(AttrMinMax),
+    NvDynamicBoost(AttrMinMax),
+    NvTempTarget(AttrMinMax),
+    DgpuBaseTgp(AttrMinMax),
+    DgpuTgp(AttrMinMax),
+    ChargeMode(AttrMinMax),
     BootSound(AttrBool),
+    MCUPowerSave(AttrBool),
     PanelOD(AttrBool),
-    ScreenAutoBrightness(bool),
-    MCUPowerSave(bool),
+    PanelHdMode(AttrMinMax),
+    EgpuConnected(AttrBool),
+    EgpuEnable(AttrBool),
+    DgpuDisable(AttrBool),
+    GpuMuxMode(AttrBool),
+    MiniLedMode(AttrMinMax),
+    PendingRebbot(AttrBool),
+    ScreenAutoBrightness(AttrBool),
 
     // Window Management
     ToggleWindow,
@@ -273,6 +294,12 @@ impl AppState {
             }
             Event::UpdatedPanelOD(b) => {
                 ui_updates.push(UiUpdate::PanelOD(b));
+            }
+            Event::UpdatedPptPlatformSppt(v) => {
+                ui_updates.push(UiUpdate::PptPlatformSppt(v));
+            }
+            Event::UpdatedPptApuSppt(v) => {
+                ui_updates.push(UiUpdate::PptApuSppt(v));
             }
             // Config
             Event::UserToggledTray(b) => {

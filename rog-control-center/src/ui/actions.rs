@@ -64,7 +64,9 @@ impl ActionHandler {
                 self.set_attribute(FirmwareAttribute::McuPowersave, b.current as i32)
                     .await;
             }
-            _ => {}
+            _ => {
+                warn!("Action not implemented: {:?}", action);
+            }
         }
     }
 
