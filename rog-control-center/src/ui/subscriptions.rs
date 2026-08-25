@@ -10,7 +10,10 @@ use crate::{
 };
 use futures_util::{Stream, StreamExt, stream::SelectAll};
 use rog_dbus::asus_armoury::AsusArmouryProxy;
-use rog_platform::{asus_armoury::FirmwareAttribute, cpu::get_ram_usage_pct};
+use rog_platform::{
+    asus_armoury::FirmwareAttribute,
+    cpu::{CpuTicks, get_ram_usage_pct},
+};
 use std::{
     collections::HashMap,
     sync::{Arc, OnceLock},
@@ -35,9 +38,12 @@ pub async fn subscribe_battery(tx: UnboundedSender<Event>) {
 
 /// Loop that retrieve system telemetry every 1 sec
 pub async fn subscribe_telemetry(tx: UnboundedSender<Event>) {
+    let mut prev_tick: Option<CpuTicks> = None;
     loop {
         // CPU
-        let cpu = get_cpu_telemetry();
+        let cpu_res = get_cpu_telemetry(prev_tick);
+        let cpu = cpu_res.0;
+        prev_tick = cpu_res.1;
 
         let ram = get_ram_usage_pct();
 

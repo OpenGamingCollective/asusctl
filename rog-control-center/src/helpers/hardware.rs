@@ -2,6 +2,7 @@ use std::{fs, io, path::Path};
 
 use crate::helpers::types::{BatteryInfo, CpuTelemetry};
 use anyhow::Result;
+use rog_platform::cpu::CpuTicks;
 
 pub fn get_dmi_product_name() -> io::Result<String> {
     let path = Path::new("/sys/class/dmi/id/product_name");
@@ -37,8 +38,8 @@ pub fn battery_infos() -> Result<BatteryInfo> {
 
 /// Helper to calculate the CPU usage given the previous and current ticks
 pub fn calculate_cpu_usage(
-    prev: Option<&rog_platform::cpu::CpuTicks>,
-    curr: Option<&rog_platform::cpu::CpuTicks>,
+    prev: Option<rog_platform::cpu::CpuTicks>,
+    curr: Option<rog_platform::cpu::CpuTicks>,
 ) -> f32 {
     if let (Some(p), Some(c)) = (prev, curr) {
         let idle_diff = c.idle.saturating_sub(p.idle) as f32;
@@ -54,10 +55,15 @@ pub fn get_current_ram() -> f32 {
     rog_platform::cpu::get_ram_usage_pct()
 }
 
-pub fn get_cpu_telemetry() -> CpuTelemetry {
-    CpuTelemetry {
-        temp: rog_platform::cpu::get_cpu_temp(),
-        freq_mhz: rog_platform::cpu::get_cpu_frequency_mhz(),
-        usage_pct: 99.99,
-    }
+pub fn get_cpu_telemetry(prev_tick: Option<CpuTicks>) -> (CpuTelemetry, Option<CpuTicks>) {
+    let current_cpu_tick = rog_platform::cpu::read_cpu_ticks();
+    let cpu_usage = calculate_cpu_usage(prev_tick, current_cpu_tick);
+    (
+        CpuTelemetry {
+            temp: rog_platform::cpu::get_cpu_temp(),
+            freq_mhz: rog_platform::cpu::get_cpu_frequency_mhz(),
+            usage_pct: cpu_usage,
+        },
+        current_cpu_tick,
+    )
 }
