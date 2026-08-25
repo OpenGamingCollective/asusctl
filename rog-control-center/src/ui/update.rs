@@ -33,11 +33,11 @@ pub fn apply_ui_update(ui: &MainWindow, update: UiUpdate) {
             dev_data.set_panel_overdrive(b);
         }
         UiUpdate::PptPlatformSppt(v) => {
-            let armoury_data = ui.global::<PowerData>();
+            let armoury_data = ui.global::<AsusArmouryData>();
             armoury_data.set_ppt_platform_sppt(v);
         }
         UiUpdate::PptApuSppt(v) => {
-            let armoury_data = ui.global::<PowerData>();
+            let armoury_data = ui.global::<AsusArmouryData>();
             armoury_data.set_ppt_apu_sppt(v);
         }
         UiUpdate::ShowToast {

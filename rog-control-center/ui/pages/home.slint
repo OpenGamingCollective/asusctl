@@ -188,7 +188,7 @@ export component PageHome inherits RogPage {
 
                             RogStatRow {
                                 label: @tr("TGP");
-                                value: TelemetryData.dgpu_suspended ? @tr("Suspended") : (PowerData.nv_tgp.current >= 0 ? "\{Math.round(PowerData.nv_tgp.current)} W" : "--");
+                                value: TelemetryData.dgpu_suspended ? @tr("Suspended") : (AsusArmouryData.dgpu_tgp.current >= 0 ? "\{Math.round(AsusArmouryData.dgpu_tgp.current)} W" : "--");
                             }
                         }
                     }
@@ -358,7 +358,7 @@ export component PageHome inherits RogPage {
                     }
                 }
 
-            // Future graphs zone: CPU / GPU placeholders — only on wide windows.
+                // Future graphs zone: CPU / GPU placeholders — only on wide windows.
             graphs-zone := Rectangle {
                     visible: root.show-graphs;
                     horizontal-stretch: 0;

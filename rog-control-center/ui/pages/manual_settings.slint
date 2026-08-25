@@ -1,15 +1,10 @@
-// Modal "Advanced" Manual (Custom) power settings (Home -> Operation Mode ->
-// Manual). A single set of power limits for the Custom platform profile.
-//
-// All rows here are kept Rectangle-based / use layouts in safe positions (this
-// project is pinned to slint 1.13.1, see ui/README.md about layouts).
+// "Advanced" Manual (Custom)
 import { RogSlashMark } from "../widgets/layout.slint";
 import { RogSlider } from "../widgets/controls.slint";
 import { ScrollView } from "std-widgets.slint";
 import { Theme } from "../globals.slint";
-import { PowerData, ProfileLimits } from "../callbacks.slint";
+import { PowerData, ProfileLimits, AsusArmouryData } from "../callbacks.slint";
 
-// — AC-style toggle switch —
 component RogToggle inherits Rectangle {
     in property <bool> checked: false;
     callback toggled(bool);
@@ -39,10 +34,6 @@ component RogToggle inherits Rectangle {
     accessible-checked: root.checked;
 }
 
-// — Row of selectable pills (EPP / AC-battery targets) —
-// NOTE (slint 1.13.1): no explicit `height` on this component — a layout cell
-// that contains a nested layout AND has a fixed height makes every later
-// sibling render empty. Let the inner leaf Rectangles define the height.
 component ChoicePills inherits Rectangle {
     in property <[string]> choices: [];
     in property <int> current: -1;
@@ -134,8 +125,6 @@ component LimitRow inherits Rectangle {
 export component ManualSettingsOverlay inherits Rectangle {
     in property <bool> open: false;
     callback close();
-    property <ProfileLimits> active-limits: PowerData.limits_custom;
-    property <bool> active-limits-enabled: PowerData.limits_enabled_custom;
 
     background: transparent;
     visible: root.open;
@@ -240,7 +229,7 @@ export component ManualSettingsOverlay inherits Rectangle {
                 }
             }
 
-            // Throttle policy on AC / battery (global, not per profile)
+            // Throttle policy on AC / battery
             Rectangle {
                 VerticalLayout {
                     spacing: 6px;
@@ -323,7 +312,7 @@ export component ManualSettingsOverlay inherits Rectangle {
             // Manual enable gate
             HorizontalLayout {
                 Text {
-                    text: @tr("Apply these limits when this profile is active");
+                    text: @tr("Custom PPT enabled");
                     color: Theme.text-secondary;
                     font-size: Theme.font-sm;
                     vertical-alignment: center;
@@ -334,10 +323,10 @@ export component ManualSettingsOverlay inherits Rectangle {
                 }
 
                 RogToggle {
-                    checked: root.active-limits-enabled;
+                    checked: AsusArmouryData.ppt_enabled.current;
                     toggled(v) => {
-                        PowerData.limits_enabled_custom = v;
-                        PowerData.cb_enable_profile_limits(v);
+                        AsusArmouryData.ppt_enabled.current;
+                        AsusArmouryData.cb_ppt_enabled({ current: v, supported: AsusArmouryData.ppt_enabled.supported });
                     }
                 }
             }
@@ -356,86 +345,116 @@ export component ManualSettingsOverlay inherits Rectangle {
 
                     LimitRow {
                         label: @tr("CPU Sustained Power Limit");
-                        minimum: root.active-limits.ppt_pl1_spl.min;
-                        maximum: root.active-limits.ppt_pl1_spl.max;
-                        value: root.active-limits.ppt_pl1_spl.current;
+                        minimum: AsusArmouryData.ppt_pl1_spl.min;
+                        maximum: AsusArmouryData.ppt_pl1_spl.max;
+                        value: AsusArmouryData.ppt_pl1_spl.current;
                         unit: "W";
-                        enabled: root.active-limits-enabled;
+                        enabled: AsusArmouryData.ppt_enabled.current;
                         changed(v) => {
-                            PowerData.limits_custom.ppt_pl1_spl.current = v;
-                            PowerData.cb_set_ppt_pl1_spl(v);
+                            AsusArmouryData.ppt_pl1_spl.current = v;
+                            AsusArmouryData.cb_ppt_pl1_spl({
+                                min: AsusArmouryData.ppt_pl1_spl.min,
+                                max: AsusArmouryData.ppt_pl1_spl.max,
+                                current: v,
+                                supported: AsusArmouryData.ppt_pl1_spl.supported
+                            });
                         }
-                        reset() => { PowerData.cb_reset_ppt_pl1_spl(); }
+                        reset() => { AsusArmouryData.cb_reset_ppt_pl1_spl(); }
                     }
 
                     LimitRow {
                         label: @tr("CPU Turbo Power Limit");
-                        minimum: root.active-limits.ppt_pl2_sppt.min;
-                        maximum: root.active-limits.ppt_pl2_sppt.max;
-                        value: root.active-limits.ppt_pl2_sppt.current;
+                        minimum: AsusArmouryData.ppt_pl2_sppt.min;
+                        maximum: AsusArmouryData.ppt_pl2_sppt.max;
+                        value: AsusArmouryData.ppt_pl2_sppt.current;
                         unit: "W";
-                        enabled: root.active-limits-enabled;
+                        enabled: AsusArmouryData.ppt_enabled.current;
                         changed(v) => {
-                            PowerData.limits_custom.ppt_pl2_sppt.current = v;
-                            PowerData.cb_set_ppt_pl2_sppt(v);
+                            AsusArmouryData.ppt_pl2_sppt.current = v;
+                            AsusArmouryData.cb_ppt_pl2_sppt({
+                                min: AsusArmouryData.ppt_pl2_sppt.min,
+                                max: AsusArmouryData.ppt_pl2_sppt.max,
+                                current: v,
+                                supported: AsusArmouryData.ppt_pl2_sppt.supported
+                            });
                         }
-                        reset() => { PowerData.cb_reset_ppt_pl2_sppt(); }
+                        reset() => { AsusArmouryData.cb_reset_ppt_pl2_sppt(); }
                     }
 
                     LimitRow {
                         label: @tr("CPU Fast Burst Power Limit");
-                        minimum: root.active-limits.ppt_pl3_fppt.min;
-                        maximum: root.active-limits.ppt_pl3_fppt.max;
-                        value: root.active-limits.ppt_pl3_fppt.current;
+                        minimum: AsusArmouryData.ppt_pl3_fppt.min;
+                        maximum: AsusArmouryData.ppt_pl3_fppt.max;
+                        value: AsusArmouryData.ppt_pl3_fppt.current;
                         unit: "W";
-                        enabled: root.active-limits-enabled;
+                        enabled: AsusArmouryData.ppt_enabled.current;
                         changed(v) => {
-                            PowerData.limits_custom.ppt_pl3_fppt.current = v;
-                            PowerData.cb_set_ppt_pl3_fppt(v);
+                            AsusArmouryData.ppt_pl3_fppt.current = v;
+                            AsusArmouryData.cb_ppt_pl3_fppt({
+                                min: AsusArmouryData.ppt_pl3_fppt.min,
+                                max: AsusArmouryData.ppt_pl3_fppt.max,
+                                current: v,
+                                supported: AsusArmouryData.ppt_pl3_fppt.supported
+                            });
                         }
-                        reset() => { PowerData.cb_reset_ppt_pl3_fppt(); }
+                        reset() => { AsusArmouryData.cb_reset_ppt_pl3_fppt(); }
                     }
 
                     LimitRow {
                         label: @tr("Package Fast Power Limit");
-                        minimum: root.active-limits.ppt_fppt.min;
-                        maximum: root.active-limits.ppt_fppt.max;
-                        value: root.active-limits.ppt_fppt.current;
+                        minimum: AsusArmouryData.ppt_fppt.min;
+                        maximum: AsusArmouryData.ppt_fppt.max;
+                        value: AsusArmouryData.ppt_fppt.current;
                         unit: "W";
-                        enabled: root.active-limits-enabled;
+                        enabled: AsusArmouryData.ppt_enabled.current;
                         changed(v) => {
-                            PowerData.limits_custom.ppt_fppt.current = v;
-                            PowerData.cb_set_ppt_fppt(v);
+                            AsusArmouryData.ppt_fppt.current = v;
+                            AsusArmouryData.cb_ppt_fppt({
+                                min: AsusArmouryData.ppt_fppt.min,
+                                max: AsusArmouryData.ppt_fppt.max,
+                                current: v,
+                                supported: AsusArmouryData.ppt_fppt.supported
+                            });
                         }
-                        reset() => { PowerData.cb_reset_ppt_fppt(); }
+                        reset() => { AsusArmouryData.cb_reset_ppt_fppt(); }
                     }
 
                     LimitRow {
                         label: @tr("APU Sustained Power Limit");
-                        minimum: root.active-limits.ppt_apu_sppt.min;
-                        maximum: root.active-limits.ppt_apu_sppt.max;
-                        value: root.active-limits.ppt_apu_sppt.current;
+                        minimum: AsusArmouryData.ppt_apu_sppt.min;
+                        maximum: AsusArmouryData.ppt_apu_sppt.max;
+                        value: AsusArmouryData.ppt_apu_sppt.current;
                         unit: "W";
-                        enabled: root.active-limits-enabled;
+                        enabled: AsusArmouryData.ppt_enabled.current;
                         changed(v) => {
-                            PowerData.limits_custom.ppt_apu_sppt.current = v;
-                            PowerData.cb_set_ppt_apu_sppt(v);
+                            AsusArmouryData.ppt_apu_sppt.current = v;
+                            AsusArmouryData.cb_ppt_apu_sppt({
+                                min: AsusArmouryData.ppt_apu_sppt.min,
+                                max: AsusArmouryData.ppt_apu_sppt.max,
+                                current: v,
+                                supported: AsusArmouryData.ppt_apu_sppt.supported
+                            });
                         }
-                        reset() => { PowerData.cb_reset_ppt_apu_sppt(); }
+                        reset() => { AsusArmouryData.cb_reset_ppt_apu_sppt(); }
                     }
 
                     LimitRow {
                         label: @tr("Platform Sustained Power Limit");
-                        minimum: root.active-limits.ppt_platform_sppt.min;
-                        maximum: root.active-limits.ppt_platform_sppt.max;
-                        value: root.active-limits.ppt_platform_sppt.current;
+                        minimum: AsusArmouryData.ppt_platform_sppt.min;
+                        maximum: AsusArmouryData.ppt_platform_sppt.max;
+                        value: AsusArmouryData.ppt_platform_sppt.current;
                         unit: "W";
-                        enabled: root.active-limits-enabled;
+                        enabled: AsusArmouryData.ppt_enabled.current;
                         changed(v) => {
-                            PowerData.limits_custom.ppt_platform_sppt.current = v;
-                            PowerData.cb_set_ppt_platform_sppt(v);
+                            AsusArmouryData.ppt_platform_sppt.current = v;
+                            AsusArmouryData.cb_ppt_platform_sppt({
+                                min: AsusArmouryData.ppt_platform_sppt.min,
+                                max: AsusArmouryData.ppt_platform_sppt.max,
+                                current: v,
+                                supported: AsusArmouryData.ppt_platform_sppt.supported
+                            });
                         }
-                        reset() => { PowerData.cb_reset_ppt_platform_sppt(); }
+                        reset() => { AsusArmouryData.cb_reset_ppt_platform_sppt(); }
                     }
 
                     Text {
@@ -447,44 +466,59 @@ export component ManualSettingsOverlay inherits Rectangle {
 
                     LimitRow {
                         label: @tr("GPU TGP");
-                        minimum: root.active-limits.nv_tgp.min;
-                        maximum: root.active-limits.nv_tgp.max;
-                        value: root.active-limits.nv_tgp.current;
+                        minimum: AsusArmouryData.dgpu_tgp.min;
+                        maximum: AsusArmouryData.dgpu_tgp.max;
+                        value: AsusArmouryData.dgpu_tgp.current;
                         unit: "W";
-                        enabled: true;
+                        enabled: AsusArmouryData.ppt_enabled.current;
                         changed(v) => {
-                            PowerData.limits_custom.nv_tgp.current = v;
-                            PowerData.cb_set_nv_tgp(v);
+                            AsusArmouryData.dgpu_tgp.current = v;
+                            AsusArmouryData.cb_dgpu_tgp({
+                                min: AsusArmouryData.dgpu_tgp.min,
+                                max: AsusArmouryData.dgpu_tgp.max,
+                                current: v,
+                                supported: AsusArmouryData.dgpu_tgp.supported
+                            });
                         }
-                        reset() => { PowerData.cb_reset_nv_tgp(); }
+                        reset() => { AsusArmouryData.cb_reset_dgpu_tgp(); }
                     }
 
                     LimitRow {
                         label: @tr("GPU Dynamic Boost");
-                        minimum: root.active-limits.nv_dynamic_boost.min;
-                        maximum: root.active-limits.nv_dynamic_boost.max;
-                        value: root.active-limits.nv_dynamic_boost.current;
+                        minimum: AsusArmouryData.nv_dynamic_boost.min;
+                        maximum: AsusArmouryData.nv_dynamic_boost.max;
+                        value: AsusArmouryData.nv_dynamic_boost.current;
                         unit: "W";
-                        enabled: true;
+                        enabled: AsusArmouryData.ppt_enabled.current;
                         changed(v) => {
-                            PowerData.limits_custom.nv_dynamic_boost.current = v;
-                            PowerData.cb_set_nv_dynamic_boost(v);
+                            AsusArmouryData.nv_dynamic_boost.current = v;
+                            AsusArmouryData.cb_nv_dynamic_boost({
+                                min: AsusArmouryData.nv_dynamic_boost.min,
+                                max: AsusArmouryData.nv_dynamic_boost.max,
+                                current: v,
+                                supported: AsusArmouryData.nv_dynamic_boost.supported
+                            });
                         }
-                        reset() => { PowerData.cb_reset_nv_dynamic_boost(); }
+                        reset() => { AsusArmouryData.cb_reset_nv_dynamic_boost(); }
                     }
 
                     LimitRow {
                         label: @tr("GPU Temperature Limit");
-                        minimum: root.active-limits.nv_temp_target.min;
-                        maximum: root.active-limits.nv_temp_target.max;
-                        value: root.active-limits.nv_temp_target.current;
+                        minimum: AsusArmouryData.nv_temp_target.min;
+                        maximum: AsusArmouryData.nv_temp_target.max;
+                        value: AsusArmouryData.nv_temp_target.current;
                         unit: "°C";
-                        enabled: true;
+                        enabled: AsusArmouryData.ppt_enabled.current;
                         changed(v) => {
-                            PowerData.limits_custom.nv_temp_target.current = v;
-                            PowerData.cb_set_nv_temp_target(v);
+                            AsusArmouryData.nv_temp_target.current = v;
+                            AsusArmouryData.cb_nv_temp_target({
+                                min: AsusArmouryData.nv_temp_target.min,
+                                max: AsusArmouryData.nv_temp_target.max,
+                                current: v,
+                                supported: AsusArmouryData.nv_temp_target.supported
+                            });
                         }
-                        reset() => { PowerData.cb_reset_nv_temp_target(); }
+                        reset() => { AsusArmouryData.cb_reset_nv_temp_target(); }
                     }
                 }
             }
