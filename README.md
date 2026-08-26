@@ -1,4 +1,4 @@
-# asusctl for ASUS ROG
+# asusctl for ASUS
 
 <p align="center">
   <a href="https://www.patreon.com/bePatron?u=7602281"><img src="extra/icons/patreon-button.svg" width="190" height="32" alt="Become a Patron" /></a>
@@ -6,9 +6,6 @@
   <a href="https://asus-linux.org/"><img src="extra/icons/rog-logo-button.svg" width="190" height="32" alt="Asus Linux Website" /></a>
   <a href="https://discord.gg/B8GftRW2Hd"><img src="extra/icons/discord-button.svg" width="190" height="32" alt="Discord" /></a>
 </p>
-
-> [!WARNING]
-> **Kernel Patch Requirement:** Many features are developed alongside Linux kernel updates. If an expected feature is missing, ensure your system is running the latest stable kernel or a kernel containing the required patches.
 
 `asusctl` is a system control utility for Linux designed primarily for ASUS laptops, with reduced functionality available for non-ASUS hardware.
 
@@ -44,15 +41,19 @@ Devices displaying these hardware IDs typically function without extra configura
 
 Features such as battery charge thresholds use generic kernel interfaces and work on non-ASUS hardware, but platform and fan controls require ASUS-specific `asus-nb-wmi` or `asus-armoury` drivers.
 
+> [NOTE]  
+> For models that does not expose N-Key on lsusb, that mostly means your device need lamparray support. You can follow this [issue](https://github.com/OpenGamingCollective/asusctl/issues/119) for more info.
+
 ### Kernel requirements
 
-Due to ongoing development, the minimum suggested kernel version is always **the latest**, as improvements are merged upstream continuously.
-
-Support for Thermal Design Power (TDP) is tied to the new `asus-armoury` driver: available mainline since Linux 6.19: everything older is not supported.
+> [WARNING]  
+> **Kernel Patch Requirement:** Many features are developed alongside Linux kernel updates. Due to ongoing upstream development, the recommended kernel version is always **the latest stable release**.
+- **General features:** Require a recent upstream kernel or distribution kernel containing the necessary ASUS WMI patches.
+- **TDP & modern platform controls:** Require the `asus-armoury` driver, available in mainline Linux **6.19 or greater**. Older kernels are not supported for these features.
 
 ### Display server support (X11)
 
-> [!NOTE]
+> [NOTE]  
 > X11 is officially unsupported. Technical assistance is not provided for X11 environments due to developer resource constraints and the unmaintained status of X11 itself.
 >
 > Users who require X11 integration may compile the GUI application with X11 support enabled using `cargo build --features "rog-control-center/x11"`. Operation on unmaintained display servers remains the responsibility of the user.
@@ -63,17 +64,20 @@ Feature availability depends on upstream Linux kernel support and specific hardw
 
 ### Power and performance
 
-- [x] **Battery charge thresholds:** Configure maximum charging limits (requires kernel support)
+- [x] **Battery charge thresholds:** Configure maximum charging limits (requires kernel and EC support)
 - [x] **Custom fan curves:** Adjust fan profiles on supported hardware
 - [x] **GPU MUX toggling:** Switch GPU operational modes (G-Sync / MUX) on 2022 and newer laptops
 - [x] **Power profile management:** Control system performance profiles as detailed in [MANUAL.md](MANUAL.md)
+
+> [NOTE]  
+> The battery charge threshold requires a supported EC. The EC may not expose all the charging limit: that means you may be able to only limit it to 80% and not every percentage. See this [issue](https://github.com/OpenGamingCollective/asusctl/issues/153) for more info.
 
 ### Lighting and displays
 
 - [x] **Built-in LED controls:** Adjust integrated keyboard lighting modes
 - [x] **Per-key RGB configuration:** Customize individual key backlight settings
 - [x] **Advanced lighting effects:** Apply custom animation modes (currently undergoing revision)
-- [x] **AniMe Matrix displays:** Control panel rendering on equipped G14, M16, and Strix Scar 16/18 models
+- [x] **AniMe Matrix displays:** Control panel rendering on equipped G14, M16, and Strix Scar 16/18 models 
 
 ### System integration
 
@@ -83,7 +87,7 @@ Feature availability depends on upstream Linux kernel support and specific hardw
 
 ### Additional hardware configuration notes
 
-Keyboard backlight support relies on hardware mappings defined in [`./rog-aura/data/aura_support.ron`](./rog-aura/data/aura_support.ron), installed to `/usr/share/asusd/aura_support.ron`. Because keyboard controller configurations vary across model generations and firmware revisions, explicit layout definitions prevent misconfigurations. Refer to the [rog-aura README](./rog-aura/README.md) for configuration details.
+Keyboard backlight support relies on hardware mappings defined in [`aura_support.ron`](./rog-aura/data/aura_support.ron), installed to `/usr/share/asusd/aura_support.ron`. Because keyboard controller configurations vary across model generations and firmware revisions, explicit layout definitions prevent misconfigurations. Refer to the [rog-aura README](./rog-aura/README.md) for configuration details.
 
 ## Installation and setup
 
@@ -229,4 +233,4 @@ References to ASUS products, services, or trademarks within this repository do n
 
 ## AI Disclaimer
 
-We do not accept code blindly written with just AI or "vibecoding". We encourage use of AI for finding bugs and as a tool used to assist development, but all of these must be verified by a human as AI makes mistakes and gives false bug reports as well. For further details, refer to [our contribution policy](./CONTRIBUTING.md)
+We do not accept code blindly written with just AI or "vibecoding". We encourage use of AI for finding bugs and as a tool used to assist development, but all of these must be verified by a human as AI makes mistakes and gives false bug reports as well. For further details, refer to our [contribution policy](CONTRIBUTING.md)
