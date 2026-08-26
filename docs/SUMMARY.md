@@ -25,6 +25,13 @@
 
 - [asusctl](usage/asusctl.md)
 
+# Developers' docs
+
+- [Design patterns](docs/developers/design_patterns.md)
+- [GPU Mode Switching summary](docs/developers/gpu_mode_switching_summary.md)
+- [Developers' manual](docs/developers/manual.md)
+- [Packaging](docs/developers/packaging.md)
+
 # FAQ
 
 - [General](faq/general.md)
