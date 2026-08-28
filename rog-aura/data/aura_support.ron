@@ -378,6 +378,15 @@
         power_zones: [Keyboard, Lightbar, Logo],
     ),
     (
+        device_name: "G614PW",
+        product_id: "",
+        layout_name: "g634j-per-key",
+        basic_modes: [Static, Breathe, RainbowCycle, RainbowWave, Pulse],
+        basic_zones: [],
+        advanced_type: PerKey,
+        power_zones: [Keyboard, Lightbar],
+    ),
+    (
         device_name: "G614J",
         product_id: "",
         layout_name: "g634j-per-key",
