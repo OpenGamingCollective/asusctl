@@ -501,7 +501,7 @@
         basic_modes: [Static, Breathe, RainbowCycle, RainbowWave],
         basic_zones: [Key1, Key2, Key3, Key4],
         advanced_type: r#None,
-        power_zones: [Keyboard, Lightbar],
+        power_zones: [Keyboard, Lightbar, Logo],
     ),
     (
         device_name: "G634J",
