@@ -458,7 +458,7 @@
         advanced_type: PerKey,
         power_zones: [Keyboard, Lightbar],
     ),
-        (
+    (
         device_name: "G614PW",
         product_id: "",
         layout_name: "g634j-per-key",
