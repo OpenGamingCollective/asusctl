@@ -1,5 +1,5 @@
 use config_traits::StdConfig;
-use log::{debug, error, warn};
+use log::{error, warn};
 use rog_slash::usb::{
     slash_pkt_battery_saver, slash_pkt_boot, slash_pkt_enable, slash_pkt_lid_closed,
     slash_pkt_low_battery, slash_pkt_options, slash_pkt_save, slash_pkt_set_mode,
@@ -278,43 +278,6 @@ impl SlashZbus {
 
 impl Reloadable for SlashZbus {
     async fn reload(&mut self) -> Result<(), RogError> {
-        debug!("reloading slash settings");
-        let config = self.0.lock_config().await;
-        self.0
-            .write_bytes(&slash_pkt_options(
-                config.slash_type,
-                config.enabled,
-                config.brightness,
-                config.display_interval,
-            ))
-            .await
-            .map_err(|err| {
-                warn!("set_options {}", err);
-            })
-            .ok();
-
-        macro_rules! write_bytes_with_warning {
-            ($packet_fn:expr, $cfg:ident, $warn_msg:expr) => {
-                self.0
-                    .write_bytes(&$packet_fn(config.slash_type, config.$cfg))
-                    .await
-                    .map_err(|err| {
-                        warn!("{} {}", $warn_msg, err);
-                    })
-                    .ok();
-            };
-        }
-
-        write_bytes_with_warning!(slash_pkt_boot, show_on_boot, "show_on_boot");
-        write_bytes_with_warning!(slash_pkt_sleep, show_on_sleep, "show_on_sleep");
-        write_bytes_with_warning!(slash_pkt_shutdown, show_on_shutdown, "show_on_shutdown");
-        write_bytes_with_warning!(slash_pkt_battery_saver, show_on_battery, "show_on_battery");
-        write_bytes_with_warning!(
-            slash_pkt_low_battery,
-            show_battery_warning,
-            "show_battery_warning"
-        );
-
-        Ok(())
+        self.0.reload().await
     }
 }
