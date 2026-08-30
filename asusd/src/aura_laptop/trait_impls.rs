@@ -339,15 +339,15 @@ impl CtrlTask for AuraZbus {
 impl Reloadable for AuraZbus {
     async fn reload(&mut self) -> Result<(), RogError> {
         self.0.fix_ally_power().await?;
-        debug!("reloading keyboard mode");
         let mut config = self.0.lock_config().await;
-        self.0.write_current_config_mode(&mut config).await?;
         debug!("reloading power states");
         self.0
             .set_power_states(&config)
             .await
             .map_err(|err| warn!("{err}"))
             .ok();
+        debug!("reloading keyboard mode");
+        self.0.write_current_config_mode(&mut config).await?;
         Ok(())
     }
 }
