@@ -5,7 +5,8 @@ pub mod trait_impls;
 use std::convert::TryFrom;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::thread::sleep;
+use std::time::Duration;
+use tokio::time::sleep;
 
 use config_traits::StdConfig;
 use log::{debug, error, info, warn};
@@ -65,6 +66,67 @@ impl AniMe {
         } else {
             error!("AniMe Matrix could not init cache")
         }
+    }
+
+    async fn stop_animation_worker(&self) {
+        self.thread_exit.store(true, Ordering::Release);
+        let mut retries = 0;
+        while self.thread_running.load(Ordering::Acquire) && retries < 20 {
+            sleep(Duration::from_millis(5)).await;
+            retries += 1;
+        }
+    }
+
+    pub async fn on_resume(&self) -> Result<(), RogError> {
+        let config = {
+            let config_guard = self.config.lock().await;
+            config_guard.clone()
+        };
+
+        if config.display_enabled {
+            self.stop_animation_worker().await;
+            if let Err(err) = self.write_bytes(&pkt_set_enable_display(true)).await {
+                warn!("AniMe on_resume enable_display failed: {err}");
+            }
+
+            if config.builtin_anims_enabled {
+                if let Err(err) = self.write_bytes(&pkt_set_enable_powersave_anim(true)).await {
+                    warn!("AniMe on_resume enable_powersave_anim failed: {err}");
+                }
+            } else {
+                if let Err(err) = self
+                    .write_bytes(&pkt_set_enable_powersave_anim(false))
+                    .await
+                {
+                    warn!("AniMe on_resume disable_powersave_anim failed: {err}");
+                }
+                self.run_thread(self.cache.wake.clone(), true).await;
+            }
+        }
+        Ok(())
+    }
+
+    pub async fn on_suspend(&self) -> Result<(), RogError> {
+        let config = {
+            let config_guard = self.config.lock().await;
+            config_guard.clone()
+        };
+
+        if config.display_enabled && config.off_when_suspended {
+            self.stop_animation_worker().await;
+            if let Err(err) = self.write_bytes(&pkt_set_enable_display(false)).await {
+                warn!("AniMe on_suspend disable_display failed: {err}");
+            }
+            if config.builtin_anims_enabled {
+                let res = self
+                    .write_bytes(&pkt_set_enable_powersave_anim(false))
+                    .await;
+                if let Err(err) = res {
+                    warn!("AniMe on_suspend disable_powersave_anim failed: {err}");
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Initialise the device if required.
@@ -157,6 +219,7 @@ impl AniMe {
             while thread_running.load(Ordering::SeqCst) {
                 // Make any running loop exit first
                 thread_exit.store(true, Ordering::SeqCst);
+                sleep(Duration::from_millis(5)).await;
             }
 
             info!("AniMe no previous system thread running (now)");
@@ -200,7 +263,7 @@ impl AniMe {
                                 .map_err(|e| error!("{}", e))
                                 .ok();
                         }
-                        ActionData::Pause(duration) => sleep(*duration),
+                        ActionData::Pause(duration) => sleep(*duration).await,
                         ActionData::AudioEq
                         | ActionData::SystemInfo
                         | ActionData::TimeDate
