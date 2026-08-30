@@ -8,13 +8,16 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use dmi_id::DMIID;
+use futures_util::StreamExt;
 use log::{debug, error, info, warn};
+use logind_zbus::manager::{InhibitType, ManagerProxy};
 use mio::{Events, Interest, Poll, Token};
 use rog_platform::error::PlatformError;
 use rog_platform::hid_raw::HidRaw;
 use tokio::sync::Mutex;
 use udev::{Device, MonitorBuilder};
 use zbus::Connection;
+use zbus::proxy::CacheProperties;
 use zbus::zvariant::{ObjectPath, OwnedObjectPath};
 
 use crate::ASUS_ZBUS_PATH;
@@ -98,6 +101,7 @@ pub struct AsusDevice {
 pub struct DeviceManager {
     _dbus_connection: Connection,
     _hid_handles: Arc<Mutex<HashMap<String, Arc<Mutex<HidRaw>>>>>,
+    _devices: Arc<Mutex<Vec<AsusDevice>>>,
 }
 
 /// Returns true if this hidraw device is a non-Aura interface on the
@@ -545,6 +549,83 @@ impl DeviceManager {
         devices
     }
 
+    fn start_sys_events_listener(connection: &Connection, devices: Arc<Mutex<Vec<AsusDevice>>>) {
+        let conn = connection.clone();
+        tokio::spawn(async move {
+            let logind_manager = match ManagerProxy::builder(&conn)
+                .cache_properties(CacheProperties::Lazily)
+                .build()
+                .await
+            {
+                Ok(mgr) => mgr,
+                Err(err) => {
+                    warn!("DeviceManager could not create logind ManagerProxy: {err}");
+                    return;
+                }
+            };
+
+            let mut sleep_stream = match logind_manager.receive_prepare_for_sleep().await {
+                Ok(stream) => stream,
+                Err(err) => {
+                    warn!("DeviceManager could not subscribe to PrepareForSleep: {err}");
+                    return;
+                }
+            };
+
+            async fn acquire_inhibit_lock(
+                mgr: &ManagerProxy<'_>,
+            ) -> Option<zbus::zvariant::OwnedFd> {
+                match mgr
+                    .inhibit(
+                        InhibitType::Sleep,
+                        "asusd",
+                        "Preparing ASUS device states for sleep",
+                        "delay",
+                    )
+                    .await
+                {
+                    Ok(fd) => Some(fd),
+                    Err(err) => {
+                        warn!("DeviceManager could not acquire logind sleep inhibit lock: {err}");
+                        None
+                    }
+                }
+            }
+
+            let mut inhibit_fd = acquire_inhibit_lock(&logind_manager).await;
+
+            while let Some(event) = sleep_stream.next().await {
+                let Ok(args) = event.args() else { continue };
+                let sleeping = args.start;
+                let handles: Vec<_> = devices
+                    .lock()
+                    .await
+                    .iter()
+                    .map(|d| d.device.clone())
+                    .collect();
+
+                if sleeping {
+                    debug!("DeviceManager: logind prepare_for_sleep(true)");
+                    for handle in handles {
+                        if let Err(e) = handle.on_suspend().await {
+                            warn!("DeviceManager: failed suspend transition for device: {e}");
+                        }
+                    }
+                    // Release the inhibit lock so logind can proceed with system sleep
+                    drop(inhibit_fd.take());
+                } else {
+                    info!("DeviceManager: system resumed from sleep, restoring lighting states");
+                    inhibit_fd = acquire_inhibit_lock(&logind_manager).await;
+                    for handle in handles {
+                        if let Err(e) = handle.on_resume().await {
+                            warn!("DeviceManager: failed resume transition for device: {e}");
+                        }
+                    }
+                }
+            }
+        });
+    }
+
     pub async fn new(connection: Connection) -> Result<Self, RogError> {
         let conn_copy = connection.clone();
         let hid_handles = Arc::new(Mutex::new(HashMap::new()));
@@ -552,9 +633,12 @@ impl DeviceManager {
         info!("Found {} valid devices on startup", devices.len());
         let devices = Arc::new(Mutex::new(devices));
         let manager = Self {
-            _dbus_connection: connection,
+            _dbus_connection: connection.clone(),
             _hid_handles: hid_handles.clone(),
+            _devices: devices.clone(),
         };
+
+        Self::start_sys_events_listener(&connection, devices.clone());
 
         // TODO: The /sysfs/ LEDs don't cause events, so they need to be manually
         // checked for and added

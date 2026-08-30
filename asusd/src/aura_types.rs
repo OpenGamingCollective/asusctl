@@ -208,4 +208,39 @@ impl DeviceHandle {
         aura.do_initialization().await?;
         Ok(Self::Aura(aura))
     }
+
+    /// Restores device state upon resuming from system sleep.
+    pub async fn on_resume(&self) -> Result<(), RogError> {
+        match self {
+            Self::Aura(aura) => aura.reload().await,
+            Self::Slash(slash) => slash.reload().await,
+            Self::AniMe(anime) => anime.on_resume().await,
+            Self::Scsi(scsi) => scsi.do_initialization().await,
+            _ => Ok(()),
+        }
+    }
+
+    /// Handles device state upon preparing for system sleep.
+    pub async fn on_suspend(&self) -> Result<(), RogError> {
+        match self {
+            Self::AniMe(anime) => anime.on_suspend().await,
+            _ => Ok(()),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_device_handle_fallback_lifecycle() {
+        let none = DeviceHandle::None;
+        assert!(none.on_resume().await.is_ok());
+        assert!(none.on_suspend().await.is_ok());
+
+        let multicolour = DeviceHandle::MulticolourLed;
+        assert!(multicolour.on_resume().await.is_ok());
+        assert!(multicolour.on_suspend().await.is_ok());
+    }
 }
