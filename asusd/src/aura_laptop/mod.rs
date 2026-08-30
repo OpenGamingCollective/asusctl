@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use config::AuraConfig;
 use config_traits::StdConfig;
-use log::info;
+use log::{debug, info, warn};
 use rog_aura::keyboard::{AuraLaptopUsbPackets, LedUsbPackets};
 use rog_aura::usb::{AURA_LAPTOP_LED_APPLY, AURA_LAPTOP_LED_SET};
 use rog_aura::{AURA_LAPTOP_LED_MSG_LEN, AuraDeviceType, AuraEffect, LedBrightness, PowerZones};
@@ -25,6 +25,29 @@ pub struct Aura {
 impl Aura {
     /// Initialise the device if required.
     pub async fn do_initialization(&self) -> Result<(), RogError> {
+        self.reload().await
+    }
+
+    /// Reload keyboard mode, brightness, and power states.
+    pub async fn reload(&self) -> Result<(), RogError> {
+        self.fix_ally_power().await?;
+
+        let (brightness, config_snapshot) = {
+            let mut config = self.config.lock().await;
+            self.write_current_config_mode(&mut config).await?;
+            (config.brightness, config.clone())
+        };
+
+        debug!("reloading brightness");
+        if let Err(err) = self.set_brightness(brightness.into()).await {
+            warn!("Failed to set brightness on reload: {err}");
+        }
+
+        debug!("reloading power states");
+        if let Err(err) = self.set_power_states(&config_snapshot).await {
+            warn!("Failed to set power states on reload: {err}");
+        }
+
         Ok(())
     }
 
@@ -131,6 +154,8 @@ impl Aura {
         if let Some(backlight) = &self.backlight {
             backlight.lock().await.set_brightness(value)?;
             return Ok(());
+        } else if self.hid.is_some() {
+            return Ok(());
         }
         Err(RogError::MissingFunction(
             "No LED backlight control available".to_string(),
@@ -221,7 +246,7 @@ impl Aura {
         Ok(())
     }
 
-    pub async fn fix_ally_power(&mut self) -> Result<(), RogError> {
+    pub async fn fix_ally_power(&self) -> Result<(), RogError> {
         if self.config.lock().await.led_type == AuraDeviceType::Ally
             && let Some(hid_raw) = &self.hid
         {
@@ -237,5 +262,21 @@ impl Aura {
             config.write();
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_set_brightness_missing_function_when_no_backlight_and_no_hid() {
+        let aura = Aura {
+            hid: None,
+            backlight: None,
+            config: Arc::new(Mutex::new(AuraConfig::default())),
+        };
+        let res = aura.set_brightness(2).await;
+        assert!(matches!(res, Err(RogError::MissingFunction(_))));
     }
 }

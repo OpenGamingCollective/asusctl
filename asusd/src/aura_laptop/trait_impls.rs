@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use config_traits::StdConfig;
-use log::{debug, error, info, warn};
+use log::{error, warn};
 use rog_aura::keyboard::{AuraLaptopUsbPackets, LaptopAuraPower};
 use rog_aura::{AuraDeviceType, AuraEffect, AuraModeNum, AuraZone, LedBrightness, PowerZones};
 use zbus::fdo::Error as ZbErr;
@@ -27,11 +27,9 @@ impl AuraZbus {
     pub async fn start_tasks(
         mut self,
         connection: &Connection,
-        // _signal_ctx: SignalEmitter<'static>,
         path: OwnedObjectPath,
     ) -> Result<(), RogError> {
-        // let task = zbus.clone();
-        // let signal_ctx = signal_ctx.clone();
+        let task = self.clone();
         self.reload()
             .await
             .unwrap_or_else(|err| warn!("Controller error: {}", err));
@@ -41,9 +39,8 @@ impl AuraZbus {
             .await
             .map_err(|e| error!("Couldn't add server at path: {path}, {e:?}"))
             .ok();
-        // TODO: skip this until we keep handles to tasks so they can be killed
-        // task.create_tasks(signal_ctx).await
-        Ok(())
+        let signal_ctx = SignalEmitter::new(connection, path.clone())?;
+        task.create_tasks(signal_ctx).await
     }
 }
 
@@ -241,113 +238,33 @@ impl CtrlTask for AuraZbus {
     }
 
     async fn create_tasks(&self, _: SignalEmitter<'static>) -> Result<(), RogError> {
-        let inner1 = self.0.clone();
-        let inner3 = self.0.clone();
+        let inner = self.0.clone();
         self.create_sys_event_tasks(
-            move |sleeping| {
-                let inner1 = inner1.clone();
-                // unwrap as we want to bomb out of the task
-                async move {
-                    if !sleeping {
-                        info!("CtrlKbdLedTask reloading brightness and modes");
-                        if let Some(backlight) = &inner1.backlight {
-                            backlight
-                                .lock()
-                                .await
-                                .set_brightness(inner1.config.lock().await.brightness.into())
-                                .map_err(|e| {
-                                    error!("CtrlKbdLedTask: {e}");
-                                    e
-                                })
-                                .unwrap();
-                        }
-                        let mut config = inner1.config.lock().await;
-                        inner1
-                            .write_current_config_mode(&mut config)
-                            .await
-                            .map_err(|e| {
-                                error!("CtrlKbdLedTask: {e}");
-                                e
-                            })
-                            .unwrap();
-                    } else if sleeping {
-                        inner1
-                            .update_config()
-                            .await
-                            .map_err(|e| {
-                                error!("CtrlKbdLedTask: {e}");
-                                e
-                            })
-                            .unwrap();
-                    }
-                }
+            move |_sleeping| {
+                // Sleep/resume lifecycle is centrally managed by DeviceManager.
+                async move {}
             },
             move |_shutting_down| {
-                let inner3 = inner3.clone();
+                let inner = inner.clone();
                 async move {
-                    info!("CtrlKbdLedTask reloading brightness and modes");
-                    if let Some(backlight) = &inner3.backlight {
-                        // unwrap as we want to bomb out of the task
-                        backlight
-                            .lock()
-                            .await
-                            .set_brightness(inner3.config.lock().await.brightness.into())
-                            .map_err(|e| {
-                                error!("CtrlKbdLedTask: {e}");
-                                e
-                            })
-                            .unwrap();
+                    if let Some(backlight) = &inner.backlight {
+                        let brightness = inner.config.lock().await.brightness;
+                        if let Err(e) = backlight.lock().await.set_brightness(brightness.into()) {
+                            warn!("AuraZbus shutdown brightness refresh failed: {e}");
+                        }
                     }
                 }
             },
-            move |_lid_closed| {
-                // on lid change
-                async move {}
-            },
-            move |_power_plugged| {
-                // power change
-                async move {}
-            },
+            move |_lid_closed| async move {},
+            move |_power_plugged| async move {},
         )
         .await;
-
-        // let ctrl2 = self.0.clone();
-        // let ctrl = self.0.lock().await;
-        // if ctrl.led_node.has_brightness_control() {
-        //     let watch = ctrl.led_node.monitor_brightness()?;
-        //     tokio::spawn(async move {
-        //         let mut buffer = [0; 32];
-        //         watch
-        //             .into_event_stream(&mut buffer)
-        //             .unwrap()
-        //             .for_each(|_| async {
-        //                 if let Some(lock) = ctrl2.try_lock() {
-        //                     load_save(true, lock).unwrap(); // unwrap as we want
-        //                                                     // to
-        //                                                     // bomb out of the
-        //                                                     // task
-        //                 }
-        //             })
-        //             .await;
-        //     });
-        // }
-
         Ok(())
     }
 }
 
 impl Reloadable for AuraZbus {
     async fn reload(&mut self) -> Result<(), RogError> {
-        self.0.fix_ally_power().await?;
-        debug!("reloading keyboard mode");
-        let mut config = self.0.lock_config().await;
-        self.0.write_current_config_mode(&mut config).await?;
-        debug!("reloading power states");
-        self.0
-            .set_power_states(&config)
-            .await
-            .map_err(|err| warn!("{err}"))
-            .ok();
-        Ok(())
+        self.0.reload().await
     }
 }
