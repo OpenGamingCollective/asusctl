@@ -203,6 +203,25 @@ impl AsusPower {
             .map(|w| w as f32)
     }
 
+    /// Current charge level as a percentage (0-100). Prefers the `capacity`
+    /// sysfs attribute (already a percentage); falls back to computing it
+    /// from remaining/full energy or charge for batteries that don't expose
+    /// `capacity`.
+    pub fn get_battery_capacity_percent(&self) -> Result<u8> {
+        if let Ok(capacity) = self.read_battery_attr("capacity") {
+            return Ok(capacity.round().clamp(0.0, 100.0) as u8);
+        }
+        let remaining = self.get_battery_remaining_energy_wh()?;
+        let full = self.get_battery_full_energy_wh()?;
+        if full <= 0.0 {
+            return Err(PlatformError::Read(
+                self.battery.to_string_lossy().into(),
+                std::io::Error::new(std::io::ErrorKind::InvalidData, "full energy is zero"),
+            ));
+        }
+        Ok((remaining / full * 100.0).round().clamp(0.0, 100.0) as u8)
+    }
+
     pub fn get_battery_status(&self) -> Result<String> {
         let path = self.battery.join("status");
         if !path.exists() {
