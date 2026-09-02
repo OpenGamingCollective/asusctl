@@ -340,6 +340,21 @@ mod test {
     }
 
     #[test]
+    fn tuf_power_bytes_include_boot_awake_and_sleep() {
+        let power = LaptopAuraPower {
+            states: vec![AuraPowerState {
+                zone: PowerZones::Keyboard,
+                boot: true,
+                awake: false,
+                sleep: true,
+                shutdown: false,
+            }],
+        };
+
+        assert_eq!(power.to_bytes(AuraDeviceType::LaptopKeyboardTuf), vec![1, 1, 0, 1, 1]);
+    }
+
+    #[test]
     fn check_0x1866_control_bytes() {
         let power = LaptopAuraPower {
             states: vec![

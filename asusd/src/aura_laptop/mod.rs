@@ -41,7 +41,16 @@ impl Aura {
         } else {
             config.brightness.into()
         };
+        // These fields are derived during device discovery and deliberately
+        // excluded from the on-disk configuration. `read()` replaces the
+        // entire struct, so retain them when refreshing settings for sleep.
+        let led_type = config.led_type;
+        let support_data = config.support_data.clone();
+        let per_key_mode_active = config.per_key_mode_active;
         config.read();
+        config.led_type = led_type;
+        config.support_data = support_data;
+        config.per_key_mode_active = per_key_mode_active;
         config.brightness = bright.into();
         config.write();
         Ok(())
@@ -144,7 +153,17 @@ impl Aura {
             if let Some(backlight) = &self.backlight {
                 // TODO: tuf bool array
                 let buf = config.enabled.to_bytes(config.led_type);
-                backlight.lock().await.set_kbd_rgb_state(&buf)?;
+                let backlight = backlight.lock().await;
+                // Some FA401UH firmware/kernel combinations expose brightness
+                // and RGB mode but not the optional power-state attribute.
+                // Power changes must not make the whole Aura interface fail.
+                if backlight.has_kbd_rgb_state() {
+                    backlight.set_kbd_rgb_state(&buf)?;
+                } else {
+                    log::debug!(
+                        "TUF keyboard does not expose kbd_rgb_state; skipping power-state write"
+                    );
+                }
             }
         } else if let Some(hid_raw) = &self.hid {
             let hid_raw = hid_raw.lock().await;

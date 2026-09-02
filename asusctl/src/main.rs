@@ -668,7 +668,10 @@ fn handle_led_power_1_do_1866(
     power: &LedPowerCommand1,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut states = Vec::new();
-    if power.keyboard {
+    // TUF exposes one keyboard zone; the generic 0x1866 command may expose
+    // separate keyboard and lightbar zones.
+    let is_tuf = aura.device_type()?.is_tuf_laptop();
+    if power.keyboard || (is_tuf && power.lightbar) {
         states.push(AuraPowerState {
             zone: PowerZones::Keyboard,
             boot: power.boot.unwrap_or_default(),
@@ -677,7 +680,7 @@ fn handle_led_power_1_do_1866(
             shutdown: false,
         });
     }
-    if power.lightbar {
+    if power.lightbar && !is_tuf {
         states.push(AuraPowerState {
             zone: PowerZones::Lightbar,
             boot: power.boot.unwrap_or_default(),
