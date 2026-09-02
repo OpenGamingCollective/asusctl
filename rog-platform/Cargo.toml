@@ -16,6 +16,7 @@ concat-idents.workspace = true
 udev.workspace = true
 inotify.workspace = true
 rusb.workspace = true
+rustix.workspace = true
 thiserror.workspace = true
 nvml-wrapper.workspace = true
 

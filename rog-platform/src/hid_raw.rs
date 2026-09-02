@@ -25,8 +25,11 @@ struct GetRawInfo {
 
 unsafe impl rustix::ioctl::Ioctl for GetRawInfo {
     type Output = HidrawDevinfo;
-    const OPCODE: rustix::ioctl::Opcode = rustix::ioctl::Opcode::old(0x80084803);
     const IS_MUTATING: bool = true;
+
+    fn opcode(&self) -> rustix::ioctl::Opcode {
+        0x80084803
+    }
 
     fn as_ptr(&mut self) -> *mut std::ffi::c_void {
         &mut self.info as *mut HidrawDevinfo as *mut std::ffi::c_void
@@ -46,9 +49,11 @@ struct SetFeatureReport<const N: usize> {
 
 unsafe impl<const N: usize> rustix::ioctl::Ioctl for SetFeatureReport<N> {
     type Output = ();
-    const OPCODE: rustix::ioctl::Opcode =
-        rustix::ioctl::Opcode::from_components(rustix::ioctl::Direction::ReadWrite, b'H', 0x06, N);
     const IS_MUTATING: bool = false;
+
+    fn opcode(&self) -> rustix::ioctl::Opcode {
+        rustix::ioctl::opcode::from_components(rustix::ioctl::Direction::ReadWrite, b'H', 0x06, N)
+    }
 
     fn as_ptr(&mut self) -> *mut std::ffi::c_void {
         self.payload.as_mut_ptr() as *mut std::ffi::c_void
@@ -68,9 +73,11 @@ struct GetFeatureReport<const N: usize> {
 
 unsafe impl<const N: usize> rustix::ioctl::Ioctl for GetFeatureReport<N> {
     type Output = [u8; N];
-    const OPCODE: rustix::ioctl::Opcode =
-        rustix::ioctl::Opcode::from_components(rustix::ioctl::Direction::ReadWrite, b'H', 0x07, N);
     const IS_MUTATING: bool = true;
+
+    fn opcode(&self) -> rustix::ioctl::Opcode {
+        rustix::ioctl::opcode::from_components(rustix::ioctl::Direction::ReadWrite, b'H', 0x07, N)
+    }
 
     fn as_ptr(&mut self) -> *mut std::ffi::c_void {
         self.buf.as_mut_ptr() as *mut std::ffi::c_void
