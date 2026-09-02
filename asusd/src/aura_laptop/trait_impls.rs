@@ -256,28 +256,29 @@ impl CtrlTask for AuraZbus {
                 async move {
                     info!("CtrlKbdLedTask received prepare_for_sleep({sleeping})");
                     if sleeping {
-                        // Re-write the user's configured power state right
-                        // before suspend. The kernel patch re-asserts brightness
-                        // and enables all power modes to ensure the sleep
-                        // strobe works, but this overrides the user's "sleep
-                        // backlight off" preference. By writing the actual
-                        // user config here (after the kernel prepare callback
-                        // has already run), we restore the user's intent while
-                        // still allowing the kernel's brightness re-assertion
-                        // to have set up the EC correctly for the strobe case.
-                        let config = inner1.config.lock().await;
-                        let sleep_enabled = config.enabled.states.iter()
-                            .any(|s| s.zone == rog_aura::PowerZones::Keyboard && s.sleep);
-                        drop(config);
-
-                        if !sleep_enabled {
-                            info!("CtrlKbdLedTask sleep: user disabled sleep backlight, re-writing power state");
+                        let (sleep_enabled, led_type, user_brightness) = {
                             let config = inner1.config.lock().await;
-                            if let Err(e) = inner1.set_power_states(&config).await {
-                                error!("CtrlKbdLedTask sleep power state rewrite: {e}");
+                            (
+                                config.enabled.states.iter()
+                                    .any(|s| s.zone == rog_aura::PowerZones::Keyboard && s.sleep),
+                                config.led_type,
+                                u8::from(config.brightness),
+                            )
+                        };
+
+                        let config = inner1.config.lock().await;
+                        if let Err(e) = inner1.set_power_states(&config).await {
+                            error!("CtrlKbdLedTask sleep power state write: {e}");
+                        }
+
+                        if sleep_enabled && led_type.is_tuf_laptop() {
+                            info!("CtrlKbdLedTask sleep: TUF sleep strobe requires non-zero brightness");
+                            if let Some(backlight) = &inner1.backlight {
+                                let target_brightness: u8 = if user_brightness == 0 { 3 } else { user_brightness };
+                                if let Err(e) = backlight.lock().await.set_brightness(target_brightness) {
+                                    error!("CtrlKbdLedTask sleep brightness: {e}");
+                                }
                             }
-                        } else {
-                            info!("CtrlKbdLedTask sleep: sleep backlight enabled, no-op");
                         }
                     } else {
                         info!("CtrlKbdLedTask reloading brightness and modes");
@@ -308,17 +309,11 @@ impl CtrlTask for AuraZbus {
                 let inner3 = inner3.clone();
                 async move {
                     info!("CtrlKbdLedTask reloading brightness and modes");
+                    let brightness = inner3.config.lock().await.brightness.into();
                     if let Some(backlight) = &inner3.backlight {
-                        // unwrap as we want to bomb out of the task
-                        backlight
-                            .lock()
-                            .await
-                            .set_brightness(inner3.config.lock().await.brightness.into())
-                            .map_err(|e| {
-                                error!("CtrlKbdLedTask: {e}");
-                                e
-                            })
-                            .unwrap();
+                        if let Err(e) = backlight.lock().await.set_brightness(brightness) {
+                            error!("CtrlKbdLedTask: {e}");
+                        }
                     }
                 }
             },
