@@ -68,6 +68,16 @@ pub fn bind_ui_events(ui: &MainWindow, tx: UnboundedSender<Event>) {
         Event::UserRequestedPanelOD
     );
 
+    // cb_ppt_enabled passes a full AttrBool, but the platform API only needs the
+    // enabled flag; the supported flag is kept on the global.
+    {
+        let tx_clone = tx.clone();
+        ui.global::<AsusArmouryData>()
+            .on_cb_ppt_enabled(move |val| {
+                let _ = tx_clone.send(Event::UserEnabledPpt(val.current));
+            });
+    }
+
     // Retry asusd
     ui.on_retry_asusd(move || {
         let _ = tx.send(Event::RetryAsusd);

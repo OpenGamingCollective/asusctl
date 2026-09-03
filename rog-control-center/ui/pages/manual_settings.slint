@@ -5,7 +5,7 @@ import { ScrollView } from "std-widgets.slint";
 import { Theme } from "../globals.slint";
 import { PowerData, ProfileLimits, AsusArmouryData } from "../callbacks.slint";
 
-component RogToggle inherits Rectangle {
+component RogMiniToggle inherits Rectangle {
     in property <bool> checked: false;
     callback toggled(bool);
     width: 40px;
@@ -42,7 +42,7 @@ component ChoicePills inherits Rectangle {
         spacing: 8px;
         for c[i] in root.choices: Rectangle {
             horizontal-stretch: 1;
-            height: 30px;
+            min-height: 30px;
             border-radius: Theme.radius-item;
             background: i == root.current ? Theme.mode-selected : Theme.bg-elevated;
             border-width: 1px;
@@ -95,7 +95,7 @@ component LimitRow inherits Rectangle {
 
         reset-chip := Rectangle {
             width: 52px;
-            height: 30px;
+            min-height: 30px;
             border-radius: Theme.radius-item;
             background: ta-reset.has-hover ? Theme.bg-elevated : transparent;
             border-width: 1px;
@@ -122,20 +122,26 @@ component LimitRow inherits Rectangle {
     }
 }
 
-export component ManualSettingsOverlay inherits Rectangle {
-    in property <bool> open: false;
-    callback close();
-
-    background: transparent;
-    visible: root.open;
-    opacity: root.open ? 1.0 : 0.0;
-    animate opacity { duration: 160ms; }
+export component ManualSettingsOverlay inherits PopupWindow {
+    // Clicking the backdrop or pressing Escape dismisses the popup. The popup
+    // covers the whole window, so "outside" is unreachable; the backdrop
+    // TouchArea below handles backdrop clicks and the swallow TouchArea in
+    // the panel blocks clicks on empty panel space.
+    close-policy: close-on-click-outside;
+    // PopupWindow has no access to its enclosing window, so the caller passes
+    // the window size in to make this popup cover it fully.
+    in property <length> window-width: 0px;
+    in property <length> window-height: 0px;
+    x: 0;
+    y: 0;
+    width: root.window-width;
+    height: root.window-height;
 
     // Dimmed backdrop — tap to close
     Rectangle {
         width: 100%;
         height: 100%;
-        background: Theme.dark ? #000000 : #000000;
+        background: #000000;
         opacity: 0.55;
         ta-backdrop := TouchArea {
             width: 100%;
@@ -148,8 +154,8 @@ export component ManualSettingsOverlay inherits Rectangle {
     panel := Rectangle {
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2;
-        width: Math.min(880px, parent.width - 64px);
-        height: Math.min(700px, parent.height - 48px);
+        width: Math.max(0px, Math.min(880px, parent.width - 64px));
+        height: Math.max(0px, Math.min(700px, parent.height - 48px));
         background: Theme.bg-card;
         border-radius: Theme.radius-card;
         border-width: 1px;
@@ -157,13 +163,22 @@ export component ManualSettingsOverlay inherits Rectangle {
         drop-shadow-blur: 24px;
         drop-shadow-color: #00000080;
 
+        // Swallows clicks on empty panel space so they don't fall through to
+        // the backdrop's TouchArea. Declared before the content layout so the
+        // interactive controls stay on top (later siblings win).
+        TouchArea {
+            width: 100%;
+            height: 100%;
+        }
+
         VerticalLayout {
             padding: 20px;
             spacing: 12px;
 
             // Header
             Rectangle {
-                height: 34px;
+                min-height: 34px;
+                vertical-stretch: 0;
                 HorizontalLayout {
                     spacing: 8px;
                     RogSlashMark { }
@@ -181,8 +196,8 @@ export component ManualSettingsOverlay inherits Rectangle {
                     }
 
                     close-box := Rectangle {
-                        width: 28px;
-                        height: 28px;
+                        min-width: 28px;
+                        min-height: 28px;
                         border-radius: 14px;
                         background: ta-close.has-hover ? Theme.bg-elevated : transparent;
                         Text {
@@ -258,7 +273,7 @@ export component ManualSettingsOverlay inherits Rectangle {
                             vertical-alignment: center;
                         }
 
-                        RogToggle {
+                        RogMiniToggle {
                             checked: PowerData.change_platform_profile_on_ac;
                             toggled(v) => { PowerData.cb_change_platform_profile_on_ac(v); }
                         }
@@ -292,7 +307,7 @@ export component ManualSettingsOverlay inherits Rectangle {
                             vertical-alignment: center;
                         }
 
-                        RogToggle {
+                        RogMiniToggle {
                             checked: PowerData.change_platform_profile_on_battery;
                             toggled(v) => { PowerData.cb_change_platform_profile_on_battery(v); }
                         }
@@ -322,10 +337,9 @@ export component ManualSettingsOverlay inherits Rectangle {
                     horizontal-stretch: 1;
                 }
 
-                RogToggle {
+                RogMiniToggle {
                     checked: AsusArmouryData.ppt_enabled.current;
                     toggled(v) => {
-                        AsusArmouryData.ppt_enabled.current;
                         AsusArmouryData.cb_ppt_enabled({ current: v, supported: AsusArmouryData.ppt_enabled.supported });
                     }
                 }

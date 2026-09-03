@@ -88,15 +88,10 @@ export component MainWindow inherits Window {
             }
         }
     // Advanced (Manual / Custom mode) power settings overlay control.
-    private property <bool> show_manual_settings_overlay: false;
-        callback open_manual_settings();
-        callback close_manual_settings();
-        open_manual_settings() => {
-            root.show_manual_settings_overlay = true;
-        }
-        close_manual_settings() => {
-            root.show_manual_settings_overlay = false;
-        }
+    callback open_manual_settings();
+    open_manual_settings() => {
+        manual-overlay.show();
+    }
         background: Theme.bg-base;
 
         // Window sizing: min keeps the dashboard usable on small laptops, the
@@ -182,16 +177,12 @@ export component MainWindow inherits Window {
             }
         }
 
-        // Advanced Manual (Custom mode) power settings overlay, must be declared last
-    // so it sits on top of every page (including the toast + error overlays).
-    ManualSettingsOverlay {
-            width: 100%;
-            height: 100%;
-            open: root.show_manual_settings_overlay;
-            close() => {
-                root.close_manual_settings();
-            }
-        }
+        // Advanced Manual (Custom mode) power settings overlay. PopupWindow layers
+    // above every page (including the toast + error overlays).
+    manual-overlay := ManualSettingsOverlay {
+        window-width: root.width;
+        window-height: root.height;
+    }
 
         // Grey-out: full-window dim when asusd is unreachable. Blocks every click
     // underneath (whole window), so the UI is visually greyed + interaction

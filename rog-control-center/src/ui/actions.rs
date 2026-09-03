@@ -49,12 +49,10 @@ impl ActionHandler {
             Action::SetPanelOD(b) => {
                 self.set_attribute(FirmwareAttribute::PanelOverdrive, b.current as i32)
                     .await;
-                let _ = self.event_tx.send(Event::UpdatedPanelOD(b));
             }
             Action::SetBootSound(b) => {
                 self.set_attribute(FirmwareAttribute::BootSound, b.current as i32)
                     .await;
-                let _ = self.event_tx.send(Event::UpdatedBootSound(b));
             }
             Action::SetScreenAutoBrightness(b) => {
                 self.set_attribute(FirmwareAttribute::ScreenAutoBrightness, b.current as i32)
@@ -63,6 +61,18 @@ impl ActionHandler {
             Action::SetMCUPowerSave(b) => {
                 self.set_attribute(FirmwareAttribute::McuPowersave, b.current as i32)
                     .await;
+            }
+            Action::SetPPTEnabled(b) => {
+                if let Some(asusd_proxy) = self.asusd.get()
+                    && let Some(platform_proxy) = &asusd_proxy.platform
+                {
+                    match platform_proxy.set_enable_ppt_group(b).await {
+                        Ok(()) => {
+                            let _ = self.event_tx.send(Event::UpdatedPptEnabled(b));
+                        }
+                        Err(err) => warn!("failed to set ppt_group: {}", err),
+                    };
+                }
             }
             _ => {
                 warn!("Action not implemented: {:?}", action);

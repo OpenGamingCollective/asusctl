@@ -3,7 +3,9 @@
 use log::info;
 use slint::{ComponentHandle, SharedString};
 
-use crate::{AsusArmouryData, MainWindow, PowerData, SystemInfo, TelemetryData, state::UiUpdate};
+use crate::{
+    AsusArmouryData, AttrBool, MainWindow, PowerData, SystemInfo, TelemetryData, state::UiUpdate,
+};
 
 pub fn apply_ui_update(ui: &MainWindow, update: UiUpdate) {
     match update {
@@ -39,6 +41,14 @@ pub fn apply_ui_update(ui: &MainWindow, update: UiUpdate) {
         UiUpdate::PptApuSppt(v) => {
             let armoury_data = ui.global::<AsusArmouryData>();
             armoury_data.set_ppt_apu_sppt(v);
+        }
+        UiUpdate::PPT(b) => {
+            let armoury_data = ui.global::<AsusArmouryData>();
+            let current = armoury_data.get_ppt_enabled();
+            armoury_data.set_ppt_enabled(AttrBool {
+                current: b,
+                supported: current.supported,
+            });
         }
         UiUpdate::ShowToast {
             message,

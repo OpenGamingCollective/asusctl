@@ -30,6 +30,8 @@ pub enum Event {
 
     UpdatedPowerProfile(i32),
     // asus-armoury update
+    UserEnabledPpt(bool),
+    UpdatedPptEnabled(bool),
     UpdatedApuMem(AttrMinMax),
     UpdatedCorePerf(AttrMinMax),
     UpdatedCoreEff(AttrMinMax),
@@ -126,6 +128,7 @@ pub fn attr_i32_into_bool(val: AttrMinMax) -> AttrBool {
 pub enum Action {
     // System/Home Page
     SetPlatformProfile(i32),
+    SetPPTEnabled(bool),
     SetPanelOD(AttrBool),
     SetBootSound(AttrBool),
     SetScreenAutoBrightness(AttrBool),
@@ -166,6 +169,7 @@ pub enum UiUpdate {
     },
 
     // asus-armoury update
+    PPT(bool),
     ApuMem(AttrMinMax),
     CorePerf(AttrMinMax),
     CoreEff(AttrMinMax),
@@ -288,6 +292,12 @@ impl AppState {
 
             Event::UserRequestedBatteryLimit(requested_limit) => {
                 actions.push(Action::SetBatteryLimit(requested_limit));
+            }
+            Event::UserEnabledPpt(b) => {
+                actions.push(Action::SetPPTEnabled(b));
+            }
+            Event::UpdatedPptEnabled(b) => {
+                ui_updates.push(UiUpdate::PPT(b));
             }
             Event::UpdatedBootSound(b) => {
                 ui_updates.push(UiUpdate::BootSound(b));
