@@ -4,3 +4,9 @@
 # to build.
 [resolver]
 incompatible-rust-versions = "fallback"
+
+# Required by console-subscriber (used in rog-control-center): its startup
+# check panics unless Tokio was compiled with this cfg. Commit it so every
+# build (including distro builds from the release tarball) gets it by default.
+[build]
+rustflags = ["--cfg", "tokio_unstable"]
