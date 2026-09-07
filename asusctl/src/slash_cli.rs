@@ -45,6 +45,8 @@ pub struct SlashSetCommand {
     pub interval: Option<u8>,
     #[argh(option, description = "set SlashMode (use 'list' for options)")]
     pub mode: Option<SlashMode>,
+    #[argh(option, description = "show battery level instead of an animation")]
+    pub battery_level_mode: Option<bool>,
 
     #[argh(option, short = 'B', description = "show the animation on boot")]
     pub show_on_boot: Option<bool>,
@@ -75,6 +77,7 @@ pub fn handle_slash_set(cmd: &SlashSetCommand) -> Result<(), Box<dyn std::error:
         && cmd.show_on_battery.is_none()
         && cmd.show_battery_warning.is_none()
         && cmd.mode.is_none()
+        && cmd.battery_level_mode.is_none()
         && !cmd.enable
         && !cmd.disable
     {
@@ -98,6 +101,9 @@ pub fn handle_slash_set(cmd: &SlashSetCommand) -> Result<(), Box<dyn std::error:
         }
         if let Some(slash_mode) = cmd.mode {
             proxy.set_mode(slash_mode as u8)?;
+        }
+        if let Some(enabled) = cmd.battery_level_mode {
+            proxy.set_battery_level_mode(enabled)?;
         }
         if let Some(show) = cmd.show_on_boot {
             proxy.set_show_on_boot(show)?;
@@ -125,6 +131,7 @@ pub fn handle_slash_get() -> Result<(), Box<dyn std::error::Error>> {
         let enabled = proxy.enabled()?;
         let brightness = proxy.brightness()?;
         let interval = proxy.interval()?;
+        let battery_level_mode = proxy.battery_level_mode()?;
         let mode_raw = proxy.mode()?;
         let mode_name = SlashMode::try_from(mode_raw)
             .map(|m| m.to_string())
@@ -144,6 +151,14 @@ pub fn handle_slash_get() -> Result<(), Box<dyn std::error::Error>> {
         );
         println!("Brightness: {}", brightness);
         println!("Interval: {}", interval);
+        println!(
+            "Battery level mode: {}",
+            if battery_level_mode {
+                "enabled"
+            } else {
+                "disabled"
+            }
+        );
         println!("Mode: {}", mode_name);
         println!("Show on boot: {}", show_on_boot);
         println!("Show on shutdown: {}", show_on_shutdown);

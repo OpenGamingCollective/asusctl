@@ -95,6 +95,9 @@ pub enum RogError {
 
     #[error("Parse config error: {0}")]
     ParseRon(#[source] ron::Error),
+
+    #[error("Slash custom pattern buffer not armed")]
+    SlashCustomPatternNotArmed,
 }
 
 impl From<ProfileError> for RogError {

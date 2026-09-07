@@ -19,6 +19,9 @@ pub enum SlashError {
 
     #[error("Could not parse {0}")]
     ParseError(String),
+
+    #[error("Invalid segment count: expected {expected}, got {actual}")]
+    SegmentCountMismatch { expected: usize, actual: usize },
 }
 
 impl From<SlashError> for zbus::fdo::Error {
