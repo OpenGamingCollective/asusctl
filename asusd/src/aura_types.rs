@@ -176,8 +176,9 @@ impl DeviceHandle {
                 })
                 .ok();
             let kbd = DynamicLed::find("aura:keyboard")
+                .or_else(|_| DynamicLed::find("asus::kbd_backlight"))
                 .map(|k| {
-                    info!("Dynamic Lighting keyboard detected: aura:keyboard");
+                    info!("Dynamic Lighting keyboard detected: {}", k.name());
                     Arc::new(Mutex::new(k))
                 })
                 .ok();
