@@ -13,9 +13,8 @@ keywords = ["ROG", "ASUS", "AniMe", "Slash"]
 exclude = ["data"]
 
 [features]
-default = ["dbus", "detect"]
+default = ["dbus"]
 dbus = ["zbus"]
-detect = ["dmi_id"]
 
 [lib]
 name = "rog_slash"
@@ -24,5 +23,4 @@ path = "src/lib.rs"
 [dependencies]
 serde.workspace = true
 zbus = { workspace = true, optional = true }
-dmi_id = { path = "../dmi-id", optional = true }
 thiserror.workspace = true
