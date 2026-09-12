@@ -13,6 +13,7 @@ pub mod keyboard_led;
 pub(crate) mod macros;
 pub mod platform;
 pub mod power;
+pub mod slash_led;
 pub mod usb_raw;
 
 use std::path::Path;
@@ -21,6 +22,7 @@ pub use dynamic_led::DynamicLed;
 use error::{PlatformError, Result};
 use log::warn;
 use platform::PlatformProfile;
+pub use slash_led::SlashLed;
 use udev::Device;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
