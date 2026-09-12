@@ -4795,7 +4795,6 @@ dependencies = [
 name = "rog_scsi"
 version = "6.4.0"
 dependencies = [
- "libc",
  "ron",
  "serde",
  "thiserror 2.0.20",

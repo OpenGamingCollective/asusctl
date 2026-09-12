@@ -13,6 +13,7 @@ pub mod keyboard_led;
 pub(crate) mod macros;
 pub mod platform;
 pub mod power;
+pub mod scsi_led;
 pub mod slash_led;
 pub mod usb_raw;
 
@@ -22,6 +23,7 @@ pub use dynamic_led::DynamicLed;
 use error::{PlatformError, Result};
 use log::warn;
 use platform::PlatformProfile;
+pub use scsi_led::ScsiLed;
 pub use slash_led::SlashLed;
 use udev::Device;
 

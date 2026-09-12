@@ -28,9 +28,11 @@ impl ScsiZbus {
             .object_server()
             .at(path.clone(), self)
             .await
-            .map_err(|e| error!("Couldn't add server at path: {path}, {e:?}"))
-            .ok();
-        Ok(())
+            .map_err(|e| {
+                error!("Couldn't add server at path: {path}, {e:?}");
+                RogError::from(e)
+            })
+            .map(|_| ())
     }
 }
 

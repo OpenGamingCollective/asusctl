@@ -32,24 +32,24 @@ const MOD_NAME: &str = "aura";
 pub fn filename_partial(parent: &Device) -> Option<OwnedObjectPath> {
     if let Some(id_product) = parent.attribute_value("idProduct") {
         let id_product = id_product.to_string_lossy();
-        let mut path = if let Some(devnum) = parent.attribute_value("devnum") {
-            let devnum = devnum.to_string_lossy();
-            if let Some(devpath) = parent.attribute_value("devpath") {
-                let devpath = devpath.to_string_lossy();
-                format!("{id_product}_{devnum}_{devpath}")
-            } else {
-                format!("{id_product}_{devnum}")
-            }
+        let identity = if let Some(serial) = parent.attribute_value("serial") {
+            serial.to_string_lossy()
+        } else if let Some(devpath) = parent.attribute_value("devpath") {
+            devpath.to_string_lossy()
         } else {
-            format!("{id_product}")
+            parent.sysname().to_string_lossy()
         };
-        if path.contains('.') {
-            warn!("dbus path for {id_product} contains `.`, removing");
-            path.replace('.', "").clone_into(&mut path);
-        }
+        let path = sanitize_path_component(&format!("{id_product}_{identity}"));
         return Some(ObjectPath::from_str_unchecked(&path).into());
     }
     None
+}
+
+fn sanitize_path_component(value: &str) -> String {
+    value
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .collect()
 }
 
 fn dbus_path_for_dev(parent: &Device) -> Option<OwnedObjectPath> {
@@ -160,9 +160,13 @@ impl DeviceManager {
                 let hid_key = device
                     .devnode()
                     .map(|path| path.to_string_lossy().into_owned());
-                let hid = HidRaw::from_device(device)
-                    .map(|hid| Arc::new(Mutex::new(hid)))
-                    .ok();
+                let hid = if HidRaw::supports_output_report(&device, 0x5d) {
+                    HidRaw::from_device(device)
+                        .map(|hid| Arc::new(Mutex::new(hid)))
+                        .ok()
+                } else {
+                    None
+                };
                 if let Ok(dev_type) = DeviceHandle::maybe_laptop_aura(hid, usb_id_str).await
                     && let DeviceHandle::Aura(aura) = dev_type.clone()
                 {
@@ -192,9 +196,10 @@ impl DeviceManager {
     /// To be called on daemon startup
     async fn init_all_hid(connection: &Connection) -> Result<Vec<AsusDevice>, RogError> {
         // Ensure we only process one hidraw interface per physical USB device.
-        // A USB device can expose multiple HID interfaces (and thus multiple hidraw nodes).
-        // Processing more than one causes duplicate device initialisation which can
-        // interfere with the kernel's own HID driver and trigger a USB reset loop.
+        // A USB device can expose multiple HID interfaces (and thus multiple hidraw
+        // nodes). Processing more than one causes duplicate device
+        // initialisation which can interfere with the kernel's own HID driver
+        // and trigger a USB reset loop.
         let mut seen_usb_parents: HashSet<String> = HashSet::new();
         let mut devices: Vec<AsusDevice> = Vec::new();
 
@@ -218,44 +223,29 @@ impl DeviceManager {
                 continue;
             }
 
-            if let Ok(Some(usb_parent)) = device.parent_with_subsystem_devtype("usb", "usb_device")
+            let parent_path = if let Ok(Some(usb_parent)) =
+                device.parent_with_subsystem_devtype("usb", "usb_device")
             {
                 let parent_path = usb_parent.syspath().to_string_lossy().to_string();
-                if !seen_usb_parents.insert(parent_path) {
+                if seen_usb_parents.contains(&parent_path) {
                     debug!("Skipping duplicate ASUS hidraw for USB parent already processed");
                     continue;
                 }
-            }
+                Some(parent_path)
+            } else {
+                None
+            };
 
-            devices.append(&mut Self::init_hid_devices(connection, device).await?);
+            let mut found = Self::init_hid_devices(connection, device).await?;
+            if !found.is_empty() {
+                if let Some(parent_path) = parent_path {
+                    seen_usb_parents.insert(parent_path);
+                }
+                devices.append(&mut found);
+            }
         }
 
         Ok(devices)
-    }
-
-    /// Resolve the `/dev/sgN` (scsi_generic) node backing a block device.
-    ///
-    /// Walks up from the block device to its owning scsi_device and reads the
-    /// `scsi_generic/sgN` child. Works for whole-disk (`/dev/sda`) and
-    /// partition (`/dev/sda1`) nodes alike, since the scsi_device is a common
-    /// ancestor. Returns None if no sg node exists (e.g. the `sg` module is
-    /// not loaded).
-    fn sg_node_for_block(device: &Device) -> Option<String> {
-        let mut current = device.parent();
-        while let Some(d) = current {
-            if let Ok(entries) = std::fs::read_dir(d.syspath().join("scsi_generic")) {
-                for entry in entries.flatten() {
-                    if let Some(name) = entry.file_name().to_str() {
-                        let node = format!("/dev/{name}");
-                        if std::path::Path::new(&node).exists() {
-                            return Some(node);
-                        }
-                    }
-                }
-            }
-            current = d.parent();
-        }
-        None
     }
 
     async fn init_scsi(
@@ -272,40 +262,9 @@ impl DeviceManager {
                 .property_value("ID_MODEL_ID")
                 .unwrap_or_default()
                 .to_string_lossy();
-            // SG_IO with vendor commands on the block node (/dev/sdX)
-            // requires CAP_SYS_RAWIO, which the hardened asusd unit drops
-            // (every ioctl EPERMs and is silently swallowed by write_effect).
-            // The scsi_generic /dev/sgN node gates access at open() via
-            // file permissions instead, so it works with no capabilities,
-            // the same path sg3_utils / OpenRGB use.
-            //
-            // On hotplug the sg node can appear just after the block node,
-            // so retry briefly before falling back to the block device
-            // (which would EPERM). At startup the node already exists, so
-            // the first attempt succeeds with no delay.
-            let mut sg_node = None;
-            for attempt in 0..8u8 {
-                if let Some(sg) = Self::sg_node_for_block(device) {
-                    sg_node = Some(sg);
-                    break;
-                }
-                if attempt < 7 {
-                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-                }
-            }
-            let dev_str = match sg_node {
-                Some(sg) => Some(sg),
-                None => {
-                    warn!(
-                        "No /dev/sgN for SCSI device after retries; falling back to block \
-                             node {:?} (SG_IO will EPERM unless asusd has CAP_SYS_RAWIO)",
-                        dev_node
-                    );
-                    dev_node.as_os_str().to_str().map(|s| s.to_string())
-                }
-            };
-            if let Some(dev_str) = dev_str
-                && let Ok(dev_type) = DeviceHandle::maybe_scsi(&dev_str, &prod_id).await
+
+            let dev_str = dev_node.to_string_lossy();
+            if let Ok(dev_type) = DeviceHandle::maybe_scsi(&dev_str, &prod_id).await
                 && let DeviceHandle::Scsi(scsi) = dev_type.clone()
             {
                 let ctrl = ScsiZbus::new(scsi);
@@ -325,6 +284,7 @@ impl DeviceManager {
                 }
             }
         }
+
         None
     }
 
@@ -548,6 +508,12 @@ impl DeviceManager {
                                 if let Some(serial) = evdev.property_value("ID_SERIAL_SHORT") {
                                     let serial = serial.to_string_lossy().to_string();
                                     let path = dbus_path_for_scsi(&serial);
+                                    if devices.lock().await.iter().any(|d| d.dbus_path == path) {
+                                        debug!(
+                                            "SCSI hotplug add: device {path:?} already registered"
+                                        );
+                                        return Ok(());
+                                    }
                                     if let Some(new_devs) =
                                         Self::init_scsi(&conn_copy, &evdev, path).await
                                     {
@@ -667,5 +633,15 @@ impl DeviceManager {
             Ok::<(), RogError>(())
         });
         Ok(manager)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sanitize_path_component;
+
+    #[test]
+    fn physical_identity_is_a_valid_stable_object_component() {
+        assert_eq!(sanitize_path_component("19b6_1-3.2:1.0"), "19b6_1_3_2_1_0");
     }
 }

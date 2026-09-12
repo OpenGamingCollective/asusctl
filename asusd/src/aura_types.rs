@@ -6,12 +6,11 @@ use rog_anime::AnimeType;
 use rog_anime::error::AnimeError;
 use rog_anime::usb::get_anime_type;
 use rog_aura::AuraDeviceType;
-use rog_platform::DynamicLed;
-use rog_platform::SlashLed;
 use rog_platform::hid_raw::HidRaw;
 use rog_platform::keyboard_led::KeyboardBacklight;
 use rog_platform::usb_raw::USBRaw;
-use rog_scsi::{ScsiType, open_device};
+use rog_platform::{DynamicLed, ScsiLed, SlashLed};
+use rog_scsi::ScsiType;
 use rog_slash::SlashType;
 use tokio::sync::Mutex;
 
@@ -24,15 +23,6 @@ use crate::aura_scsi::config::ScsiConfig;
 use crate::aura_slash::Slash;
 use crate::aura_slash::config::SlashConfig;
 use crate::error::RogError;
-
-pub enum _DeviceHandle {
-    /// The AniMe devices require USBRaw as they are not HID devices
-    Usb(USBRaw),
-    LedClass(KeyboardBacklight),
-    /// TODO
-    MulticolourLed,
-    None,
-}
 
 #[derive(Clone)]
 pub enum DeviceHandle {
@@ -91,24 +81,51 @@ impl DeviceHandle {
     }
 
     pub async fn maybe_scsi(dev_node: &str, prod_id: &str) -> Result<Self, RogError> {
-        debug!("Testing for SCSI");
-        let prod_id = ScsiType::from(prod_id);
-        if prod_id == ScsiType::Unsupported {
-            log::info!("Unknown or invalid SCSI: {prod_id:?}, skipping");
+        let scsi_type = ScsiType::from(prod_id);
+        if scsi_type == ScsiType::Unsupported {
+            log::info!("Unknown or invalid SCSI: {scsi_type:?}, skipping");
             return Err(RogError::NotFound("No SCSI device".to_string()));
         }
-        info!("Found SCSI device {prod_id:?} on {dev_node}");
+
+        let mut last_error = None;
+        let mut led = None;
+        for _ in 0..20 {
+            match ScsiLed::find_for_dev(dev_node) {
+                Ok(found) => {
+                    led = Some(found);
+                    break;
+                }
+                Err(err @ rog_platform::error::PlatformError::MissingFunction(_)) => {
+                    last_error = Some(err);
+                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                }
+                Err(err) => return Err(err.into()),
+            }
+        }
+        let led = led.ok_or_else(|| {
+            let err = last_error
+                .map(|err| err.to_string())
+                .unwrap_or_else(|| "unknown discovery error".into());
+            log::warn!("No exact SCSI Dynamic Lighting device found for {dev_node}: {err}");
+            RogError::NotFound(format!(
+                "Dynamic Lighting registration timed out for {dev_node}"
+            ))
+        })?;
+
+        info!(
+            "Found SCSI Dynamic Lighting device {scsi_type:?} on {:?}",
+            led.path()
+        );
 
         let mut config = ScsiConfig::new().load();
         config.dev_type = AuraDeviceType::ScsiExtDisk;
-        let dev = Arc::new(Mutex::new(open_device(dev_node)?));
-        let scsi = ScsiAura::new(dev, Arc::new(Mutex::new(config)));
+        let scsi = ScsiAura::new(led, Arc::new(Mutex::new(config)));
         scsi.do_initialization().await?;
         Ok(Self::Scsi(scsi))
     }
 
     pub async fn maybe_laptop_aura(
-        device: Option<Arc<Mutex<HidRaw>>>,
+        hid: Option<Arc<Mutex<HidRaw>>>,
         prod_id: &str,
     ) -> Result<Self, RogError> {
         debug!("Testing for laptop aura");
@@ -153,22 +170,34 @@ impl DeviceHandle {
                     Arc::new(Mutex::new(l))
                 })
                 .ok();
-            if global.is_some() || kbd.is_some() || lb.is_some() {
-                (global, kbd, lb)
-            } else {
-                debug!("Dynamic Lighting not detected; using legacy hidraw fallback");
-                (None, None, None)
-            }
+            (global, kbd, lb)
         };
+
+        let dynamic_available =
+            dynamic_global.is_some() || dynamic_kbd.is_some() || dynamic_lightbar.is_some();
+        let fallback_available = if matches!(aura_type, AuraDeviceType::LaptopKeyboardTuf) {
+            backlight.is_some()
+        } else {
+            hid.is_some()
+        };
+        if !dynamic_available && !fallback_available {
+            debug!("Neither valid Dynamic Lighting nor device-specific fallback detected");
+            return Err(RogError::NotFound(
+                "No Dynamic Lighting or legacy Aura control path found".to_string(),
+            ));
+        }
 
         // Load saved mode, colours, brightness, power from disk; apply on reload
         let mut config = AuraConfig::load_and_update_config(prod_id);
         config.led_type = aura_type;
+        let use_hid = !dynamic_available;
         let aura = Aura {
             dynamic_global,
             dynamic_kbd,
             dynamic_lightbar,
-            hid: device,
+            // One device has exactly one owner: valid Dynamic Lighting nodes win,
+            // otherwise retain the matching hidraw handle for released kernels.
+            hid: use_hid.then_some(hid).flatten(),
             backlight,
             config: Arc::new(Mutex::new(config)),
         };

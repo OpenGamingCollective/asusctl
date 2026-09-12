@@ -56,42 +56,6 @@ impl Default for ScsiConfig {
                     AuraMode::RainbowWave,
                     AuraEffect::default_with_mode(AuraMode::RainbowWave),
                 ),
-                (
-                    AuraMode::RainbowCycleBreathe,
-                    AuraEffect::default_with_mode(AuraMode::RainbowCycleBreathe),
-                ),
-                (
-                    AuraMode::ChaseFade,
-                    AuraEffect::default_with_mode(AuraMode::ChaseFade),
-                ),
-                (
-                    AuraMode::RainbowCycleChaseFade,
-                    AuraEffect::default_with_mode(AuraMode::RainbowCycleChaseFade),
-                ),
-                (
-                    AuraMode::Chase,
-                    AuraEffect::default_with_mode(AuraMode::Chase),
-                ),
-                (
-                    AuraMode::RainbowCycleChase,
-                    AuraEffect::default_with_mode(AuraMode::RainbowCycleChase),
-                ),
-                (
-                    AuraMode::RainbowCycleWave,
-                    AuraEffect::default_with_mode(AuraMode::RainbowCycleWave),
-                ),
-                (
-                    AuraMode::RainbowPulseChase,
-                    AuraEffect::default_with_mode(AuraMode::RainbowPulseChase),
-                ),
-                (
-                    AuraMode::RandomFlicker,
-                    AuraEffect::default_with_mode(AuraMode::RandomFlicker),
-                ),
-                (
-                    AuraMode::DoubleFade,
-                    AuraEffect::default_with_mode(AuraMode::DoubleFade),
-                ),
             ]),
         }
     }
