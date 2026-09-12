@@ -30,4 +30,10 @@ pub struct CliStart {
     /// put ROGCC in layout viewing mode - this is helpful for finding existing layouts that might match your laptop
     #[argh(switch)]
     pub layout_viewing: bool,
+    /// setup keyboard shortcuts for your ASUS ROG model
+    #[argh(switch)]
+    pub setup_keyboard: bool,
+    /// remove all keyboard shortcuts previously created by ROGCC
+    #[argh(switch)]
+    pub remove_keyboard: bool,
 }

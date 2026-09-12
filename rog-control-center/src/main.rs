@@ -21,6 +21,7 @@ use rog_control_center::window::{WindowCommand, WindowController};
 use rog_control_center::zbus_proxies::{
     AppState, ROGCCZbus, ROGCCZbusProxyBlocking, ZBUS_IFACE, ZBUS_PATH,
 };
+use rog_control_center::config_loader::{ModelDetector, ProfileLoader, ShortcutApplier};
 use tokio::runtime::Runtime;
 
 fn main() -> Result<()> {
@@ -37,6 +38,79 @@ fn main() -> Result<()> {
         print_versions();
         return Ok(());
     }
+
+    // --- keyboard shortcut setup -------------------------------------------
+    // These are one-shot commands: configure and exit, never start the UI.
+    let cli_parsed: CliStart = argh::from_env();
+
+    if cli_parsed.version {
+        print_versions();
+        return Ok(());
+    }
+
+    // --- one-shot keyboard shortcut commands -------------------------------
+    // These run before the single-instance check and before any zbus
+    // connection: they only touch GNOME's dconf settings, so they must work
+    // even when another ROGCC instance is running or asusd is down.
+    if cli_parsed.remove_keyboard {
+        match ShortcutApplier::remove_all() {
+            Ok(n) => {
+                println!("Removed {n} ROGCC keyboard shortcut(s).");
+                return Ok(());
+            }
+            Err(e) => {
+                eprintln!("Failed to remove shortcuts: {e}");
+                std::process::exit(1);
+            }
+        }
+    }
+
+    if cli_parsed.setup_keyboard {
+        let model = ModelDetector::detect().unwrap_or_else(|_| "unknown".to_string());
+        info!("detected model: {model}");
+
+        let profile = match ProfileLoader::load_for_this_machine() {
+            Ok(p) => p,
+            Err(e) => {
+                eprintln!("No keyboard profile for this machine: {e}");
+                eprintln!();
+                eprintln!("You can add one at:");
+                eprintln!(
+                    "  ~/.config/rog-control-center/profiles/{}.yaml",
+                    model.replace(' ', "_")
+                );
+                std::process::exit(1);
+            }
+        };
+
+        let report = match ShortcutApplier::apply(&profile.keyboard_shortcuts) {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("Could not apply shortcuts: {e}");
+                std::process::exit(1);
+            }
+        };
+
+        println!("Profile: {} ({})", profile.name, profile.version);
+        for name in &report.applied {
+            println!("  applied  {name}");
+        }
+        for name in &report.skipped {
+            println!("  disabled {name}");
+        }
+        for (name, err) in &report.failed {
+            eprintln!("  FAILED   {name}: {err}");
+        }
+        println!();
+        println!("Check them in Settings > Keyboard > Custom Shortcuts.");
+
+        if !report.failed.is_empty() {
+            std::process::exit(1);
+        }
+        return Ok(());
+    }
+
+    // --- normal application startup ----------------------------------------
 
     // If we're running under gamescope we have to set WAYLAND_DISPLAY for winit to
     // use
@@ -63,7 +137,6 @@ fn main() -> Result<()> {
             && let Ok(state) = proxy.state()
         {
             info!("App is already running: {state:?}, opening the window");
-            // if there is a proxy connection assume the app is already running
             proxy.set_state(AppState::MainWindowShouldOpen)?;
             std::process::exit(0);
         }
@@ -82,12 +155,10 @@ fn main() -> Result<()> {
     };
     if asusd_version != self_version {
         warn!("Version mismatch: asusctl = {self_version}, asusd = {asusd_version}");
-        // return Ok(());
     }
 
     // start tokio
     let rt = Runtime::new().expect("Unable to create Runtime");
-    // Enter the runtime so that `tokio::spawn` is available immediately.
     let _enter = rt.enter();
 
     #[cfg(feature = "tokio-debug")]
@@ -95,8 +166,6 @@ fn main() -> Result<()> {
 
     let state_zbus = ROGCCZbus::new();
     let app_state = state_zbus.clone_state();
-    // Keep the connection alive for the lifetime of the app (holds the
-    // served ROGCCZbus interface and its well-known name).
     let _conn = rt
         .block_on(async {
             zbus::connection::Builder::session()?

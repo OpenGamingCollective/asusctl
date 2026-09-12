@@ -1,0 +1,19 @@
+name: "ROG Strix SCAR 18 G835LXG"
+product_code: "G835LXG"
+description: "Keyboard shortcuts for ROG Strix SCAR 18 G835LXG"
+version: "1.0"
+
+keyboard_shortcuts:
+  - id: "rog-control-center"
+    name: "ROG Control Center"
+    description: "Open ROG Control Center"
+    command: "rog-control-center"
+    keybinding: "XF86Launch1"
+    enabled: true
+
+  - id: "aura-next-mode"
+    name: "Aura Next Mode"
+    description: "Cycle to next RGB effect"
+    command: "asusctl aura effect --next-mode"
+    keybinding: "XF86Launch3"
+    enabled: true

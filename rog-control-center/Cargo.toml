@@ -17,6 +17,8 @@ rog_ally = []
 
 [dependencies]
 console-subscriber = { workspace = true, optional = true }
+serde_yaml = "0.9"
+
 
 ksni.workspace = true
 image.workspace = true
