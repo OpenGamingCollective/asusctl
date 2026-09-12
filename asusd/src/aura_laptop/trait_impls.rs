@@ -9,7 +9,7 @@ use zbus::object_server::SignalEmitter;
 use zbus::zvariant::OwnedObjectPath;
 use zbus::{Connection, interface};
 
-use super::Aura;
+use super::{Aura, supports_dynamic_zone};
 use crate::error::RogError;
 use crate::{CtrlTask, Reloadable};
 
@@ -27,11 +27,8 @@ impl AuraZbus {
     pub async fn start_tasks(
         mut self,
         connection: &Connection,
-        // _signal_ctx: SignalEmitter<'static>,
         path: OwnedObjectPath,
     ) -> Result<(), RogError> {
-        // let task = zbus.clone();
-        // let signal_ctx = signal_ctx.clone();
         self.reload()
             .await
             .unwrap_or_else(|err| warn!("Controller error: {}", err));
@@ -39,11 +36,11 @@ impl AuraZbus {
             .object_server()
             .at(path.clone(), self)
             .await
-            .map_err(|e| error!("Couldn't add server at path: {path}, {e:?}"))
-            .ok();
-        // TODO: skip this until we keep handles to tasks so they can be killed
-        // task.create_tasks(signal_ctx).await
-        Ok(())
+            .map_err(|e| {
+                error!("Couldn't add server at path: {path}, {e:?}");
+                RogError::from(e)
+            })
+            .map(|_| ())
     }
 }
 
@@ -61,25 +58,17 @@ impl AuraZbus {
     /// Return the current LED brightness
     #[zbus(property)]
     async fn brightness(&self) -> Result<LedBrightness, ZbErr> {
-        if let Some(bl) = self.0.backlight.as_ref() {
-            return Ok(bl.lock().await.get_brightness().map(|n| n.into())?);
-        }
-        Err(ZbErr::Failed("No sysfs brightness control".to_string()))
+        Ok(self.0.get_brightness().await?)
     }
 
-    /// Set the keyboard brightness level (0-3)
+    /// Set the keyboard brightness level (Off/Low/Med/High)
     #[zbus(property)]
     async fn set_brightness(&mut self, brightness: LedBrightness) -> Result<(), ZbErr> {
-        if let Some(bl) = self.0.backlight.as_ref() {
-            let res = bl.lock().await.set_brightness(brightness.into());
-            if res.is_ok() {
-                let mut config = self.0.config.lock().await;
-                config.brightness = brightness;
-                config.write();
-            }
-            return Ok(res?);
-        }
-        Err(ZbErr::Failed("No sysfs brightness control".to_string()))
+        self.0.set_brightness(brightness).await?;
+        let mut config = self.0.config.lock().await;
+        config.brightness = brightness;
+        config.write();
+        Ok(())
     }
 
     /// Total levels of brightness available
@@ -97,17 +86,55 @@ impl AuraZbus {
     #[zbus(property)]
     async fn supported_basic_modes(&self) -> Result<Vec<AuraModeNum>, ZbErr> {
         let config = self.0.config.lock().await;
+        if self.0.has_dynamic_lighting() {
+            let led_lock = if let Some(global) = &self.0.dynamic_global {
+                Some(global.lock().await)
+            } else if let Some(kbd) = &self.0.dynamic_kbd {
+                Some(kbd.lock().await)
+            } else {
+                None
+            };
+            if let Some(led) = led_lock {
+                let mut modes = Vec::new();
+                for mode in config.builtins.keys() {
+                    if let Some(eff_str) = mode.to_dynamic_effect_str()
+                        && led.supports_effect(eff_str)?
+                    {
+                        modes.push(*mode);
+                    }
+                }
+                return Ok(modes);
+            }
+        }
         Ok(config.builtins.keys().cloned().collect())
     }
 
     #[zbus(property)]
     async fn supported_basic_zones(&self) -> Result<Vec<AuraZone>, ZbErr> {
+        if self.0.has_dynamic_lighting() {
+            // The kernel nodes split keyboard from lightbar, but do not model
+            // the historical four keyboard or left/right lightbar zones.
+            return Ok(Vec::new());
+        }
         let config = self.0.config.lock().await;
         Ok(config.support_data.basic_zones.clone())
     }
 
     #[zbus(property)]
     async fn supported_power_zones(&self) -> Result<Vec<PowerZones>, ZbErr> {
+        if self.0.has_dynamic_lighting() {
+            let has_power_states = if let Some(global) = &self.0.dynamic_global {
+                global.lock().await.has_power_states()
+            } else if let Some(kbd) = &self.0.dynamic_kbd {
+                kbd.lock().await.has_power_states()
+            } else {
+                false
+            };
+            if !has_power_states {
+                // Avoid advertising zones the UI cannot actually control.
+                return Ok(Vec::new());
+            }
+        }
         let config = self.0.config.lock().await;
         Ok(config.support_data.power_zones.clone())
     }
@@ -116,8 +143,6 @@ impl AuraZbus {
     #[zbus(property)]
     async fn led_mode(&self) -> Result<AuraModeNum, ZbErr> {
         // entirely possible to deadlock here, so use try instead of lock()
-        // let ctrl = self.0.lock().await;
-        // Ok(config.current_mode)
         if let Ok(config) = self.0.config.try_lock() {
             Ok(config.current_mode)
         } else {
@@ -137,7 +162,7 @@ impl AuraZbus {
         if config.brightness == LedBrightness::Off {
             config.brightness = LedBrightness::Med;
         }
-        if let Err(e) = self.0.set_brightness(config.brightness.into()).await {
+        if let Err(e) = self.0.set_brightness(config.brightness).await {
             log::warn!("Could not set keyboard backlight brightness: {e}");
         }
         config.write();
@@ -166,10 +191,35 @@ impl AuraZbus {
     #[zbus(property)]
     async fn set_led_mode_data(&mut self, effect: AuraEffect) -> Result<(), ZbErr> {
         let mut config = self.0.config.lock().await;
-        if !config.support_data.basic_modes.contains(&effect.mode)
-            || effect.zone != AuraZone::None
-                && !config.support_data.basic_zones.contains(&effect.zone)
-        {
+        let (is_mode_supported, is_zone_supported) = if self.0.has_dynamic_lighting() {
+            let mode_ok = if let Some(eff_str) = effect.mode.to_dynamic_effect_str() {
+                let led_lock = if let Some(global) = &self.0.dynamic_global {
+                    Some(global.lock().await)
+                } else if let Some(kbd) = &self.0.dynamic_kbd {
+                    Some(kbd.lock().await)
+                } else {
+                    None
+                };
+                match led_lock {
+                    Some(led) => led.supports_effect(eff_str)?,
+                    None => false,
+                }
+            } else {
+                false
+            };
+            let zone_ok = supports_dynamic_zone(effect.zone);
+            (mode_ok, zone_ok)
+        } else {
+            (
+                config.support_data.basic_modes.contains(&effect.mode),
+                effect.zone == AuraZone::None
+                    || config.support_data.basic_zones.contains(&effect.zone)
+                    || (self.0.dynamic_lightbar.is_some()
+                        && matches!(effect.zone, AuraZone::BarLeft | AuraZone::BarRight)),
+            )
+        };
+
+        if !is_mode_supported || !is_zone_supported {
             return Err(ZbErr::NotSupported(format!(
                 "The Aura effect is not supported: {effect:?}"
             )));
@@ -181,7 +231,7 @@ impl AuraZbus {
         if config.brightness == LedBrightness::Off {
             config.brightness = LedBrightness::Med;
         }
-        if let Err(e) = self.0.set_brightness(config.brightness.into()).await {
+        if let Err(e) = self.0.set_brightness(config.brightness).await {
             log::warn!("Could not set keyboard backlight brightness: {e}");
         }
         config.set_builtin(effect);
@@ -250,35 +300,16 @@ impl CtrlTask for AuraZbus {
                 async move {
                     if !sleeping {
                         info!("CtrlKbdLedTask reloading brightness and modes");
-                        if let Some(backlight) = &inner1.backlight {
-                            backlight
-                                .lock()
-                                .await
-                                .set_brightness(inner1.config.lock().await.brightness.into())
-                                .map_err(|e| {
-                                    error!("CtrlKbdLedTask: {e}");
-                                    e
-                                })
-                                .unwrap();
+                        let brightness = inner1.config.lock().await.brightness;
+                        if let Err(e) = inner1.set_brightness(brightness).await {
+                            error!("CtrlKbdLedTask: {e}");
                         }
                         let mut config = inner1.config.lock().await;
-                        inner1
-                            .write_current_config_mode(&mut config)
-                            .await
-                            .map_err(|e| {
-                                error!("CtrlKbdLedTask: {e}");
-                                e
-                            })
-                            .unwrap();
-                    } else if sleeping {
-                        inner1
-                            .update_config()
-                            .await
-                            .map_err(|e| {
-                                error!("CtrlKbdLedTask: {e}");
-                                e
-                            })
-                            .unwrap();
+                        if let Err(e) = inner1.write_current_config_mode(&mut config).await {
+                            error!("CtrlKbdLedTask: {e}");
+                        }
+                    } else if let Err(e) = inner1.update_config().await {
+                        error!("CtrlKbdLedTask: {e}");
                     }
                 }
             },
@@ -286,17 +317,9 @@ impl CtrlTask for AuraZbus {
                 let inner3 = inner3.clone();
                 async move {
                     info!("CtrlKbdLedTask reloading brightness and modes");
-                    if let Some(backlight) = &inner3.backlight {
-                        // unwrap as we want to bomb out of the task
-                        backlight
-                            .lock()
-                            .await
-                            .set_brightness(inner3.config.lock().await.brightness.into())
-                            .map_err(|e| {
-                                error!("CtrlKbdLedTask: {e}");
-                                e
-                            })
-                            .unwrap();
+                    let brightness = inner3.config.lock().await.brightness;
+                    if let Err(e) = inner3.set_brightness(brightness).await {
+                        error!("CtrlKbdLedTask: {e}");
                     }
                 }
             },
@@ -310,27 +333,6 @@ impl CtrlTask for AuraZbus {
             },
         )
         .await;
-
-        // let ctrl2 = self.0.clone();
-        // let ctrl = self.0.lock().await;
-        // if ctrl.led_node.has_brightness_control() {
-        //     let watch = ctrl.led_node.monitor_brightness()?;
-        //     tokio::spawn(async move {
-        //         let mut buffer = [0; 32];
-        //         watch
-        //             .into_event_stream(&mut buffer)
-        //             .unwrap()
-        //             .for_each(|_| async {
-        //                 if let Some(lock) = ctrl2.try_lock() {
-        //                     load_save(true, lock).unwrap(); // unwrap as we want
-        //                                                     // to
-        //                                                     // bomb out of the
-        //                                                     // task
-        //                 }
-        //             })
-        //             .await;
-        //     });
-        // }
 
         Ok(())
     }

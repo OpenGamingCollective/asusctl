@@ -6,6 +6,7 @@ use rog_anime::AnimeType;
 use rog_anime::error::AnimeError;
 use rog_anime::usb::get_anime_type;
 use rog_aura::AuraDeviceType;
+use rog_platform::DynamicLed;
 use rog_platform::hid_raw::HidRaw;
 use rog_platform::keyboard_led::KeyboardBacklight;
 use rog_platform::usb_raw::USBRaw;
@@ -41,17 +42,13 @@ pub enum DeviceHandle {
     /// The AniMe devices require USBRaw as they are not HID devices
     AniMe(AniMe),
     Scsi(ScsiAura),
-    Ally(Arc<Mutex<HidRaw>>),
-    OldAura(Arc<Mutex<HidRaw>>),
-    /// TUF laptops have an aditional set of attributes added to the LED /sysfs/
-    TufLedClass(Arc<Mutex<HidRaw>>),
     /// TODO
     MulticolourLed,
     None,
 }
 
 impl DeviceHandle {
-    /// Try Slash HID. If one exists it is initialsed and returned.
+    /// Try Slash HID. If one exists it is initialised and returned.
     pub async fn new_slash_hid(
         device: Arc<Mutex<HidRaw>>,
         prod_id: &str,
@@ -77,7 +74,7 @@ impl DeviceHandle {
         Ok(Self::Slash(slash))
     }
 
-    /// Try Slash USB. If one exists it is initialsed and returned.
+    /// Try Slash USB. If one exists it is initialised and returned.
     pub async fn new_slash_usb() -> Result<Self, RogError> {
         debug!("Testing for USB Slash");
         let slash_type = SlashType::from_dmi();
@@ -102,32 +99,6 @@ impl DeviceHandle {
         }
     }
 
-    /// Try AniMe Matrix HID. If one exists it is initialsed and returned.
-    pub async fn maybe_anime_hid(
-        _device: Arc<Mutex<HidRaw>>,
-        _prod_id: &str,
-    ) -> Result<Self, RogError> {
-        // TODO: can't use HIDRAW for anime at the moment
-        Err(RogError::NotFound(
-            "Can't use anime over hidraw yet. Skip.".to_string(),
-        ))
-
-        // debug!("Testing for HIDRAW AniMe");
-        // let anime_type = AnimeType::from_dmi();
-        // dbg!(prod_id);
-        // if matches!(anime_type, AnimeType::Unsupported) || prod_id != "193b"
-        // {     log::info!("Unknown or invalid AniMe: {prod_id:?},
-        // skipping");     return Err(RogError::NotFound("No
-        // anime-matrix device".to_string())); }
-        // info!("Found AniMe Matrix HIDRAW {anime_type:?}: {prod_id}");
-
-        // let mut config = AniMeConfig::new().load();
-        // config.anime_type = anime_type;
-        // let mut anime = AniMe::new(Some(device), None,
-        // Arc::new(Mutex::new(config))); anime.do_initialization().
-        // await?; Ok(Self::AniMe(anime))
-    }
-
     pub async fn maybe_anime_usb() -> Result<Self, RogError> {
         debug!("Testing for USB AniMe");
         let anime_type = get_anime_type();
@@ -142,7 +113,6 @@ impl DeviceHandle {
             let mut config = AniMeConfig::new().load();
             config.anime_type = anime_type;
             let mut anime = AniMe::new(
-                None,
                 Some(Arc::new(Mutex::new(usb))),
                 Arc::new(Mutex::new(config)),
             );
@@ -197,10 +167,41 @@ impl DeviceHandle {
                 Some(Arc::new(Mutex::new(k)))
             });
 
+        // Check for Dynamic Lighting interface
+        let (dynamic_global, dynamic_kbd, dynamic_lightbar) = {
+            let global = DynamicLed::find("aura:global")
+                .map(|g| {
+                    info!("Dynamic Lighting global aggregate detected: aura:global");
+                    Arc::new(Mutex::new(g))
+                })
+                .ok();
+            let kbd = DynamicLed::find("aura:keyboard")
+                .map(|k| {
+                    info!("Dynamic Lighting keyboard detected: aura:keyboard");
+                    Arc::new(Mutex::new(k))
+                })
+                .ok();
+            let lb = DynamicLed::find("aura:lightbar")
+                .map(|l| {
+                    info!("Dynamic Lighting lightbar detected: aura:lightbar");
+                    Arc::new(Mutex::new(l))
+                })
+                .ok();
+            if global.is_some() || kbd.is_some() || lb.is_some() {
+                (global, kbd, lb)
+            } else {
+                debug!("Dynamic Lighting not detected; using legacy hidraw fallback");
+                (None, None, None)
+            }
+        };
+
         // Load saved mode, colours, brightness, power from disk; apply on reload
         let mut config = AuraConfig::load_and_update_config(prod_id);
         config.led_type = aura_type;
         let aura = Aura {
+            dynamic_global,
+            dynamic_kbd,
+            dynamic_lightbar,
             hid: device,
             backlight,
             config: Arc::new(Mutex::new(config)),

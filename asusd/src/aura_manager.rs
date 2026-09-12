@@ -7,7 +7,6 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use dmi_id::DMIID;
 use log::{debug, error, info, warn};
 use mio::{Events, Interest, Poll, Token};
 use rog_platform::error::PlatformError;
@@ -186,29 +185,6 @@ impl DeviceManager {
                         .await
                         .map_err(|e| {
                             error!("Failed to start Slash tasks: {e:?}, not adding this device")
-                        })
-                        .is_ok()
-                    {
-                        devices.push(AsusDevice {
-                            device: dev_type,
-                            dbus_path: path,
-                            hid_key: Some(hid_key.clone()),
-                        });
-                    }
-                }
-                // ANIME MATRIX DEVICE
-                if let Ok(dev_type) =
-                    DeviceHandle::maybe_anime_hid(dev.clone(), usb_id.to_str().unwrap_or_default())
-                        .await
-                    && let DeviceHandle::AniMe(anime) = dev_type.clone()
-                {
-                    let path = dbus_path_for_dev(&usb_device).unwrap_or(dbus_path_for_anime());
-                    let ctrl = AniMeZbus::new(anime);
-                    if ctrl
-                        .start_tasks(connection, path.clone())
-                        .await
-                        .map_err(|e| {
-                            error!("Failed to start AniMe tasks: {e:?}, not adding this device")
                         })
                         .is_ok()
                     {
@@ -450,7 +426,7 @@ impl DeviceManager {
             if matches!(dev.device, DeviceHandle::AniMe(_)) {
                 do_anime = false;
             }
-            if matches!(dev.device, DeviceHandle::Aura(_) | DeviceHandle::OldAura(_)) {
+            if matches!(dev.device, DeviceHandle::Aura(_)) {
                 do_kb_backlight = false;
             }
         }
@@ -505,35 +481,25 @@ impl DeviceManager {
         }
 
         if do_kb_backlight {
-            // TUF AURA LAPTOP DEVICE
-            // product_name = ASUS TUF Gaming F15 FX507ZE_FX507ZE
-            // product_family = ASUS TUF Gaming F15
-            let product_name = DMIID::new().unwrap_or_default().product_name;
-            let product_family = DMIID::new().unwrap_or_default().product_family;
-            info!(
-                "No USB keyboard aura, system is {product_name}, try using sysfs backlight control"
-            );
-            if product_name.contains("TUF") || product_family.contains("TUF") {
-                info!("TUF laptop, try using sysfs backlight control");
-                if let Ok(dev_type) = DeviceHandle::maybe_laptop_aura(None, "tuf").await
-                    && let DeviceHandle::Aura(aura) = dev_type.clone()
+            info!("No USB keyboard aura, try sysfs backlight / Dynamic Lighting");
+            if let Ok(dev_type) = DeviceHandle::maybe_laptop_aura(None, "tuf").await
+                && let DeviceHandle::Aura(aura) = dev_type.clone()
+            {
+                let path = dbus_path_for_tuf();
+                let ctrl = AuraZbus::new(aura);
+                if ctrl
+                    .start_tasks(connection, path.clone())
+                    .await
+                    .map_err(|e| {
+                        error!("Failed to start TUF Aura tasks: {e:?}, not adding this device")
+                    })
+                    .is_ok()
                 {
-                    let path = dbus_path_for_tuf();
-                    let ctrl = AuraZbus::new(aura);
-                    if ctrl
-                        .start_tasks(connection, path.clone())
-                        .await
-                        .map_err(|e| {
-                            error!("Failed to start TUF Aura tasks: {e:?}, not adding this device")
-                        })
-                        .is_ok()
-                    {
-                        devices.push(AsusDevice {
-                            device: dev_type,
-                            dbus_path: path,
-                            hid_key: None,
-                        });
-                    }
+                    devices.push(AsusDevice {
+                        device: dev_type,
+                        dbus_path: path,
+                        hid_key: None,
+                    });
                 }
             }
         }
