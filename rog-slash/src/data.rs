@@ -1,7 +1,6 @@
 use std::fmt::Display;
 use std::str::FromStr;
 
-use dmi_id::DMIID;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "dbus")]
 use zbus::zvariant::Type;
@@ -56,33 +55,13 @@ impl SlashType {
         }
     }
 
-    pub fn from_dmi() -> Self {
-        let board_name = DMIID::new().unwrap_or_default().board_name.to_uppercase();
-        if board_name.contains("G614F") {
-            SlashType::G614_2025
-        } else if [
-            "GA403W", "GA403UH", "GA403UM", "GA403UP", "GA403GM",
-        ]
-        .iter()
-        .any(|s| board_name.contains(s))
-        {
-            SlashType::GA403_2025
-        } else if board_name.contains("GA403") {
-            SlashType::GA403_2024
-        } else if board_name.contains("GA605K") {
-            SlashType::GA605_2025
-        } else if board_name.contains("GA605") {
-            SlashType::GA605_2024
-        } else if board_name.contains("GU405") {
-            SlashType::GU405_2026
-        } else if board_name.contains("GU606") {
-            SlashType::GU606_2026
-        } else if board_name.contains("GU605C") {
-            SlashType::GU605_2025
-        } else if board_name.contains("GU605") {
-            SlashType::GU605_2024
-        } else {
-            SlashType::Unsupported
+    /// Select hidraw packet layout from the USB product id.
+    /// Report 0x5e vs 0x5d is a device capability, not a DMI board name.
+    pub fn from_usb_product(id: &str) -> Self {
+        match id.trim_start_matches("0x").to_ascii_uppercase().as_str() {
+            PROD_ID1_STR => SlashType::GA403_2024,
+            PROD_ID2_STR => SlashType::GA403_2025,
+            _ => SlashType::Unsupported,
         }
     }
 }

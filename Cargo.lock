@@ -4795,7 +4795,6 @@ dependencies = [
 name = "rog_scsi"
 version = "6.5.0"
 dependencies = [
- "libc",
  "ron",
  "serde",
  "thiserror 2.0.20",
@@ -4816,7 +4815,6 @@ dependencies = [
 name = "rog_slash"
 version = "6.5.0"
 dependencies = [
- "dmi_id",
  "serde",
  "thiserror 2.0.20",
  "zbus",

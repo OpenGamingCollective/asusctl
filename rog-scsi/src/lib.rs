@@ -1,12 +1,9 @@
 mod builtin_modes;
 mod error;
-mod scsi;
-pub mod sg;
 
 pub use builtin_modes::*;
 pub use error::*;
 use serde::{Deserialize, Serialize};
-pub use sg::{Device, Task};
 
 pub const PROD_SCSI_ARION: &str = "1932";
 
@@ -42,8 +39,4 @@ impl From<ScsiType> for &str {
             ScsiType::Unsupported => "Unsupported",
         }
     }
-}
-
-pub fn open_device(path: &str) -> Result<Device, std::io::Error> {
-    Device::open(path)
 }

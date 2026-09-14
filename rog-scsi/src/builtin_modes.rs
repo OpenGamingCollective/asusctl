@@ -6,8 +6,6 @@ use serde::{Deserialize, Serialize};
 use zbus::zvariant::{OwnedValue, Type, Value};
 
 use crate::error::Error;
-use crate::scsi::{apply_task, dir_task, mode_task, rgb_task, save_task, speed_task};
-use crate::sg::Task;
 
 #[cfg_attr(feature = "dbus", derive(Type, Value, OwnedValue))]
 #[derive(Debug, Clone, PartialEq, Eq, Copy, Deserialize, Serialize)]
@@ -356,41 +354,5 @@ impl Display for AuraEffect {
         writeln!(f, "  colour3: {:?}", self.colour3)?;
         writeln!(f, "  colour4: {:?}", self.colour4)?;
         writeln!(f, "}}")
-    }
-}
-
-impl From<&AuraEffect> for Vec<Task> {
-    fn from(effect: &AuraEffect) -> Self {
-        let mut tasks = Vec::new();
-
-        tasks.append(&mut vec![
-            mode_task(effect.mode as u8),
-            rgb_task(0, &effect.colour1.into()),
-            rgb_task(1, &effect.colour2.into()),
-            rgb_task(2, &effect.colour3.into()),
-            rgb_task(3, &effect.colour4.into()),
-        ]);
-
-        if !matches!(effect.mode, AuraMode::Static | AuraMode::Off) {
-            tasks.push(speed_task(effect.speed as u8));
-        }
-        if matches!(
-            effect.mode,
-            AuraMode::RainbowWave
-                | AuraMode::ChaseFade
-                | AuraMode::RainbowCycleChaseFade
-                | AuraMode::Chase
-                | AuraMode::RainbowCycleChase
-                | AuraMode::RainbowCycleWave
-                | AuraMode::RainbowPulseChase
-        ) {
-            tasks.push(dir_task(effect.direction as u8));
-        }
-
-        tasks.append(&mut vec![
-            apply_task(),
-            save_task(),
-        ]);
-        tasks
     }
 }

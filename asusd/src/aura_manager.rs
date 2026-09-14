@@ -4,12 +4,12 @@
 // - Add it to Zbus server
 // - If udev sees device removed then remove the zbus path
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::sync::Arc;
 
-use dmi_id::DMIID;
 use log::{debug, error, info, warn};
 use mio::{Events, Interest, Poll, Token};
+use rog_aura::AuraDeviceType;
 use rog_platform::error::PlatformError;
 use rog_platform::hid_raw::HidRaw;
 use tokio::sync::Mutex;
@@ -32,24 +32,24 @@ const MOD_NAME: &str = "aura";
 pub fn filename_partial(parent: &Device) -> Option<OwnedObjectPath> {
     if let Some(id_product) = parent.attribute_value("idProduct") {
         let id_product = id_product.to_string_lossy();
-        let mut path = if let Some(devnum) = parent.attribute_value("devnum") {
-            let devnum = devnum.to_string_lossy();
-            if let Some(devpath) = parent.attribute_value("devpath") {
-                let devpath = devpath.to_string_lossy();
-                format!("{id_product}_{devnum}_{devpath}")
-            } else {
-                format!("{id_product}_{devnum}")
-            }
+        let identity = if let Some(serial) = parent.attribute_value("serial") {
+            serial.to_string_lossy()
+        } else if let Some(devpath) = parent.attribute_value("devpath") {
+            devpath.to_string_lossy()
         } else {
-            format!("{id_product}")
+            parent.sysname().to_string_lossy()
         };
-        if path.contains('.') {
-            warn!("dbus path for {id_product} contains `.`, removing");
-            path.replace('.', "").clone_into(&mut path);
-        }
+        let path = sanitize_path_component(&format!("{id_product}_{identity}"));
         return Some(ObjectPath::from_str_unchecked(&path).into());
     }
     None
+}
+
+fn sanitize_path_component(value: &str) -> String {
+    value
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .collect()
 }
 
 fn dbus_path_for_dev(parent: &Device) -> Option<OwnedObjectPath> {
@@ -97,7 +97,6 @@ pub struct AsusDevice {
 
 pub struct DeviceManager {
     _dbus_connection: Connection,
-    _hid_handles: Arc<Mutex<HashMap<String, Arc<Mutex<HidRaw>>>>>,
 }
 
 /// Returns true if this hidraw device is a non-Aura interface on the
@@ -132,30 +131,9 @@ fn is_non_aura_1ce6_interface(device: &Device) -> bool {
 }
 
 impl DeviceManager {
-    #[allow(clippy::type_complexity)]
-    async fn get_or_create_hid_handle(
-        handles: &Arc<Mutex<HashMap<String, Arc<Mutex<HidRaw>>>>>,
-        endpoint: &Device,
-    ) -> Result<(Arc<Mutex<HidRaw>>, String), RogError> {
-        let dev_node = endpoint
-            .devnode()
-            .ok_or_else(|| RogError::MissingFunction("hidraw devnode missing".to_string()))?;
-        let key = dev_node.to_string_lossy().to_string();
-
-        if let Some(existing) = handles.lock().await.get(&key).cloned() {
-            return Ok((existing, key));
-        }
-
-        let hidraw = HidRaw::from_device(endpoint.clone())?;
-        let handle = Arc::new(Mutex::new(hidraw));
-        handles.lock().await.insert(key.clone(), handle.clone());
-        Ok((handle, key))
-    }
-
     async fn init_hid_devices(
         connection: &Connection,
         device: Device,
-        handles: Arc<Mutex<HashMap<String, Arc<Mutex<HidRaw>>>>>,
     ) -> Result<Vec<AsusDevice>, RogError> {
         let mut devices = Vec::new();
         if let Some(usb_device) = device.parent_with_subsystem_devtype("usb", "usb_device")?
@@ -170,59 +148,26 @@ impl DeviceManager {
             // So let's see what we have and:
             // 1. Generate an interface path
             // 2. Create the device
-            // Use the top-level endpoint, not the parent
-            if let Ok((dev, hid_key)) = Self::get_or_create_hid_handle(&handles, &device).await {
-                debug!("Testing device {usb_id:?}");
-                // SLASH DEVICE
-                if let Ok(dev_type) =
-                    DeviceHandle::new_slash_hid(dev.clone(), usb_id.to_str().unwrap_or_default())
-                        .await
-                    && let DeviceHandle::Slash(slash) = dev_type.clone()
-                {
-                    let path = dbus_path_for_dev(&usb_device).unwrap_or(dbus_path_for_slash());
-                    let ctrl = SlashZbus::new(slash);
-                    if ctrl
-                        .start_tasks(connection, path.clone())
-                        .await
-                        .map_err(|e| {
-                            error!("Failed to start Slash tasks: {e:?}, not adding this device")
-                        })
-                        .is_ok()
-                    {
-                        devices.push(AsusDevice {
-                            device: dev_type,
-                            dbus_path: path,
-                            hid_key: Some(hid_key.clone()),
-                        });
-                    }
-                }
-                // ANIME MATRIX DEVICE
-                if let Ok(dev_type) =
-                    DeviceHandle::maybe_anime_hid(dev.clone(), usb_id.to_str().unwrap_or_default())
-                        .await
-                    && let DeviceHandle::AniMe(anime) = dev_type.clone()
-                {
-                    let path = dbus_path_for_dev(&usb_device).unwrap_or(dbus_path_for_anime());
-                    let ctrl = AniMeZbus::new(anime);
-                    if ctrl
-                        .start_tasks(connection, path.clone())
-                        .await
-                        .map_err(|e| {
-                            error!("Failed to start AniMe tasks: {e:?}, not adding this device")
-                        })
-                        .is_ok()
-                    {
-                        devices.push(AsusDevice {
-                            device: dev_type,
-                            dbus_path: path,
-                            hid_key: Some(hid_key.clone()),
-                        });
-                    }
-                }
-                // AURA LAPTOP DEVICE
-                if let Ok(dev_type) =
-                    DeviceHandle::maybe_laptop_aura(Some(dev), usb_id.to_str().unwrap_or_default())
-                        .await
+            let usb_id_str = usb_id.to_str().unwrap_or_default();
+            let aura_type = AuraDeviceType::from(usb_id_str);
+            if matches!(
+                aura_type,
+                AuraDeviceType::LaptopKeyboard2021
+                    | AuraDeviceType::LaptopKeyboardPre2021
+                    | AuraDeviceType::LaptopKeyboardTuf
+                    | AuraDeviceType::Ally
+            ) {
+                let hid_key = device
+                    .devnode()
+                    .map(|path| path.to_string_lossy().into_owned());
+                let hid = if HidRaw::supports_output_report(&device, 0x5d) {
+                    HidRaw::from_device(device)
+                        .map(|hid| Arc::new(Mutex::new(hid)))
+                        .ok()
+                } else {
+                    None
+                };
+                if let Ok(dev_type) = DeviceHandle::maybe_laptop_aura(hid, usb_id_str).await
                     && let DeviceHandle::Aura(aura) = dev_type.clone()
                 {
                     let path = dbus_path_for_dev(&usb_device).unwrap_or(dbus_path_for_tuf());
@@ -238,26 +183,23 @@ impl DeviceManager {
                         devices.push(AsusDevice {
                             device: dev_type,
                             dbus_path: path,
-                            hid_key: Some(hid_key),
+                            hid_key,
                         });
                     }
                 }
-            } else {
-                warn!("Failed to initialise shared hid handle for {usb_id:?}");
+                return Ok(devices);
             }
         }
         Ok(devices)
     }
 
     /// To be called on daemon startup
-    async fn init_all_hid(
-        connection: &Connection,
-        handles: Arc<Mutex<HashMap<String, Arc<Mutex<HidRaw>>>>>,
-    ) -> Result<Vec<AsusDevice>, RogError> {
+    async fn init_all_hid(connection: &Connection) -> Result<Vec<AsusDevice>, RogError> {
         // Ensure we only process one hidraw interface per physical USB device.
-        // A USB device can expose multiple HID interfaces (and thus multiple hidraw nodes).
-        // Processing more than one causes duplicate device initialisation which can
-        // interfere with the kernel's own HID driver and trigger a USB reset loop.
+        // A USB device can expose multiple HID interfaces (and thus multiple hidraw
+        // nodes). Processing more than one causes duplicate device
+        // initialisation which can interfere with the kernel's own HID driver
+        // and trigger a USB reset loop.
         let mut seen_usb_parents: HashSet<String> = HashSet::new();
         let mut devices: Vec<AsusDevice> = Vec::new();
 
@@ -281,44 +223,29 @@ impl DeviceManager {
                 continue;
             }
 
-            if let Ok(Some(usb_parent)) = device.parent_with_subsystem_devtype("usb", "usb_device")
+            let parent_path = if let Ok(Some(usb_parent)) =
+                device.parent_with_subsystem_devtype("usb", "usb_device")
             {
                 let parent_path = usb_parent.syspath().to_string_lossy().to_string();
-                if !seen_usb_parents.insert(parent_path) {
+                if seen_usb_parents.contains(&parent_path) {
                     debug!("Skipping duplicate ASUS hidraw for USB parent already processed");
                     continue;
                 }
-            }
+                Some(parent_path)
+            } else {
+                None
+            };
 
-            devices.append(&mut Self::init_hid_devices(connection, device, handles.clone()).await?);
+            let mut found = Self::init_hid_devices(connection, device).await?;
+            if !found.is_empty() {
+                if let Some(parent_path) = parent_path {
+                    seen_usb_parents.insert(parent_path);
+                }
+                devices.append(&mut found);
+            }
         }
 
         Ok(devices)
-    }
-
-    /// Resolve the `/dev/sgN` (scsi_generic) node backing a block device.
-    ///
-    /// Walks up from the block device to its owning scsi_device and reads the
-    /// `scsi_generic/sgN` child. Works for whole-disk (`/dev/sda`) and
-    /// partition (`/dev/sda1`) nodes alike, since the scsi_device is a common
-    /// ancestor. Returns None if no sg node exists (e.g. the `sg` module is
-    /// not loaded).
-    fn sg_node_for_block(device: &Device) -> Option<String> {
-        let mut current = device.parent();
-        while let Some(d) = current {
-            if let Ok(entries) = std::fs::read_dir(d.syspath().join("scsi_generic")) {
-                for entry in entries.flatten() {
-                    if let Some(name) = entry.file_name().to_str() {
-                        let node = format!("/dev/{name}");
-                        if std::path::Path::new(&node).exists() {
-                            return Some(node);
-                        }
-                    }
-                }
-            }
-            current = d.parent();
-        }
-        None
     }
 
     async fn init_scsi(
@@ -335,40 +262,9 @@ impl DeviceManager {
                 .property_value("ID_MODEL_ID")
                 .unwrap_or_default()
                 .to_string_lossy();
-            // SG_IO with vendor commands on the block node (/dev/sdX)
-            // requires CAP_SYS_RAWIO, which the hardened asusd unit drops
-            // (every ioctl EPERMs and is silently swallowed by write_effect).
-            // The scsi_generic /dev/sgN node gates access at open() via
-            // file permissions instead, so it works with no capabilities,
-            // the same path sg3_utils / OpenRGB use.
-            //
-            // On hotplug the sg node can appear just after the block node,
-            // so retry briefly before falling back to the block device
-            // (which would EPERM). At startup the node already exists, so
-            // the first attempt succeeds with no delay.
-            let mut sg_node = None;
-            for attempt in 0..8u8 {
-                if let Some(sg) = Self::sg_node_for_block(device) {
-                    sg_node = Some(sg);
-                    break;
-                }
-                if attempt < 7 {
-                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-                }
-            }
-            let dev_str = match sg_node {
-                Some(sg) => Some(sg),
-                None => {
-                    warn!(
-                        "No /dev/sgN for SCSI device after retries; falling back to block \
-                             node {:?} (SG_IO will EPERM unless asusd has CAP_SYS_RAWIO)",
-                        dev_node
-                    );
-                    dev_node.as_os_str().to_str().map(|s| s.to_string())
-                }
-            };
-            if let Some(dev_str) = dev_str
-                && let Ok(dev_type) = DeviceHandle::maybe_scsi(&dev_str, &prod_id).await
+
+            let dev_str = dev_node.to_string_lossy();
+            if let Ok(dev_type) = DeviceHandle::maybe_scsi(&dev_str, &prod_id).await
                 && let DeviceHandle::Scsi(scsi) = dev_type.clone()
             {
                 let ctrl = ScsiZbus::new(scsi);
@@ -388,6 +284,7 @@ impl DeviceManager {
                 }
             }
         }
+
         None
     }
 
@@ -430,13 +327,10 @@ impl DeviceManager {
         Ok(devices)
     }
 
-    pub async fn find_all_devices(
-        connection: &Connection,
-        handles: Arc<Mutex<HashMap<String, Arc<Mutex<HidRaw>>>>>,
-    ) -> Vec<AsusDevice> {
+    pub async fn find_all_devices(connection: &Connection) -> Vec<AsusDevice> {
         let mut devices: Vec<AsusDevice> = Vec::new();
         // HID first, always
-        if let Ok(devs) = &mut Self::init_all_hid(connection, handles.clone()).await {
+        if let Ok(devs) = &mut Self::init_all_hid(connection).await {
             devices.append(devs);
         }
         // USB after, need to check if HID picked something up and if so, skip it
@@ -450,13 +344,13 @@ impl DeviceManager {
             if matches!(dev.device, DeviceHandle::AniMe(_)) {
                 do_anime = false;
             }
-            if matches!(dev.device, DeviceHandle::Aura(_) | DeviceHandle::OldAura(_)) {
+            if matches!(dev.device, DeviceHandle::Aura(_)) {
                 do_kb_backlight = false;
             }
         }
 
         if do_slash {
-            if let Ok(dev_type) = DeviceHandle::new_slash_usb().await {
+            if let Ok(dev_type) = DeviceHandle::maybe_slash().await {
                 if let DeviceHandle::Slash(slash) = dev_type.clone() {
                     let path = dbus_path_for_slash();
                     let ctrl = SlashZbus::new(slash);
@@ -505,35 +399,25 @@ impl DeviceManager {
         }
 
         if do_kb_backlight {
-            // TUF AURA LAPTOP DEVICE
-            // product_name = ASUS TUF Gaming F15 FX507ZE_FX507ZE
-            // product_family = ASUS TUF Gaming F15
-            let product_name = DMIID::new().unwrap_or_default().product_name;
-            let product_family = DMIID::new().unwrap_or_default().product_family;
-            info!(
-                "No USB keyboard aura, system is {product_name}, try using sysfs backlight control"
-            );
-            if product_name.contains("TUF") || product_family.contains("TUF") {
-                info!("TUF laptop, try using sysfs backlight control");
-                if let Ok(dev_type) = DeviceHandle::maybe_laptop_aura(None, "tuf").await
-                    && let DeviceHandle::Aura(aura) = dev_type.clone()
+            info!("No USB keyboard aura, try sysfs backlight / Dynamic Lighting");
+            if let Ok(dev_type) = DeviceHandle::maybe_laptop_aura(None, "tuf").await
+                && let DeviceHandle::Aura(aura) = dev_type.clone()
+            {
+                let path = dbus_path_for_tuf();
+                let ctrl = AuraZbus::new(aura);
+                if ctrl
+                    .start_tasks(connection, path.clone())
+                    .await
+                    .map_err(|e| {
+                        error!("Failed to start TUF Aura tasks: {e:?}, not adding this device")
+                    })
+                    .is_ok()
                 {
-                    let path = dbus_path_for_tuf();
-                    let ctrl = AuraZbus::new(aura);
-                    if ctrl
-                        .start_tasks(connection, path.clone())
-                        .await
-                        .map_err(|e| {
-                            error!("Failed to start TUF Aura tasks: {e:?}, not adding this device")
-                        })
-                        .is_ok()
-                    {
-                        devices.push(AsusDevice {
-                            device: dev_type,
-                            dbus_path: path,
-                            hid_key: None,
-                        });
-                    }
+                    devices.push(AsusDevice {
+                        device: dev_type,
+                        dbus_path: path,
+                        hid_key: None,
+                    });
                 }
             }
         }
@@ -547,19 +431,16 @@ impl DeviceManager {
 
     pub async fn new(connection: Connection) -> Result<Self, RogError> {
         let conn_copy = connection.clone();
-        let hid_handles = Arc::new(Mutex::new(HashMap::new()));
-        let devices = Self::find_all_devices(&conn_copy, hid_handles.clone()).await;
+        let devices = Self::find_all_devices(&conn_copy).await;
         info!("Found {} valid devices on startup", devices.len());
         let devices = Arc::new(Mutex::new(devices));
         let manager = Self {
             _dbus_connection: connection,
-            _hid_handles: hid_handles.clone(),
         };
 
         // TODO: The /sysfs/ LEDs don't cause events, so they need to be manually
         // checked for and added
 
-        let hid_handles_thread = hid_handles.clone();
         std::thread::spawn(move || {
             let mut monitor = MonitorBuilder::new()?.listen()?;
             let mut poll = Poll::new()?;
@@ -588,7 +469,6 @@ impl DeviceManager {
 
                     let devices = devices.clone();
                     let conn_copy = conn_copy.clone();
-                    let hid_handles = hid_handles_thread.clone();
                     rt.block_on(async move {
                         // SCSCI devs
                         if subsys == "block" {
@@ -628,6 +508,12 @@ impl DeviceManager {
                                 if let Some(serial) = evdev.property_value("ID_SERIAL_SHORT") {
                                     let serial = serial.to_string_lossy().to_string();
                                     let path = dbus_path_for_scsi(&serial);
+                                    if devices.lock().await.iter().any(|d| d.dbus_path == path) {
+                                        debug!(
+                                            "SCSI hotplug add: device {path:?} already registered"
+                                        );
+                                        return Ok(());
+                                    }
                                     if let Some(new_devs) =
                                         Self::init_scsi(&conn_copy, &evdev, path).await
                                     {
@@ -706,11 +592,6 @@ impl DeviceManager {
                                         };
                                         info!("AuraManager removed: {path:?}, {res}");
                                     }
-                                    // Always drop the shared handle for this node, even if no
-                                    // AsusDevice referenced it, so the fd (and minor) is freed.
-                                    if hid_handles.lock().await.remove(&removed_node).is_some() {
-                                        info!("Dropped hid handle for {removed_node}");
-                                    }
                                 }
                             } else if action == "add"
                                 && let Some(parent) =
@@ -733,10 +614,9 @@ impl DeviceManager {
                                 if is_non_aura_1ce6_interface(&evdev) {
                                     return Ok(());
                                 }
-                                if let Ok(mut new_devs) =
-                                    Self::init_hid_devices(&conn_copy, evdev, hid_handles.clone())
-                                        .await
-                                        .map_err(|e| error!("Couldn't add new device: {e:?}"))
+                                if let Ok(mut new_devs) = Self::init_hid_devices(&conn_copy, evdev)
+                                    .await
+                                    .map_err(|e| error!("Couldn't add new device: {e:?}"))
                                 {
                                     devices.lock().await.append(&mut new_devs);
                                 }
@@ -753,5 +633,15 @@ impl DeviceManager {
             Ok::<(), RogError>(())
         });
         Ok(manager)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sanitize_path_component;
+
+    #[test]
+    fn physical_identity_is_a_valid_stable_object_component() {
+        assert_eq!(sanitize_path_component("19b6_1-3.2:1.0"), "19b6_1_3_2_1_0");
     }
 }
