@@ -668,23 +668,39 @@ fn handle_led_power_1_do_1866(
     power: &LedPowerCommand1,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut states = Vec::new();
-    if power.keyboard {
-        states.push(AuraPowerState {
-            zone: PowerZones::Keyboard,
-            boot: power.boot.unwrap_or_default(),
-            awake: power.awake.unwrap_or_default(),
-            sleep: power.sleep.unwrap_or_default(),
-            shutdown: false,
-        });
-    }
-    if power.lightbar {
-        states.push(AuraPowerState {
-            zone: PowerZones::Lightbar,
-            boot: power.boot.unwrap_or_default(),
-            awake: power.awake.unwrap_or_default(),
-            sleep: power.sleep.unwrap_or_default(),
-            shutdown: false,
-        });
+    let is_tuf = aura.device_type()?.is_tuf_laptop();
+
+    // TUF laptops have only a keyboard zone; lightbar does not exist.
+    if is_tuf {
+        if power.keyboard || power.lightbar {
+            states.push(AuraPowerState {
+                zone: PowerZones::Keyboard,
+                boot: power.boot.unwrap_or_default(),
+                awake: power.awake.unwrap_or_default(),
+                sleep: power.sleep.unwrap_or_default(),
+                shutdown: false,
+            });
+        }
+    } else {
+        // Pre-2021 0x1866 keyboards may have separate keyboard and lightbar zones.
+        if power.keyboard {
+            states.push(AuraPowerState {
+                zone: PowerZones::Keyboard,
+                boot: power.boot.unwrap_or_default(),
+                awake: power.awake.unwrap_or_default(),
+                sleep: power.sleep.unwrap_or_default(),
+                shutdown: false,
+            });
+        }
+        if power.lightbar {
+            states.push(AuraPowerState {
+                zone: PowerZones::Lightbar,
+                boot: power.boot.unwrap_or_default(),
+                awake: power.awake.unwrap_or_default(),
+                sleep: power.sleep.unwrap_or_default(),
+                shutdown: false,
+            });
+        }
     }
 
     let states = LaptopAuraPower { states };
