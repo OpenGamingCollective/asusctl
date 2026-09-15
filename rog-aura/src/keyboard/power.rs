@@ -14,7 +14,7 @@ use crate::{AuraDeviceType, PowerZones};
 /// Meaning of this struct depends on the laptop generation.
 /// - 2021+, the struct is a single zone with 4 states
 /// - pre-2021, the struct is 1 or 2 zones and 3 states
-/// - Tuf, the struct is 1 zone and 3 states
+/// - Tuf, the struct is 1 zone and 4 states
 #[cfg_attr(feature = "dbus", derive(Type, Value, OwnedValue))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AuraPowerState {
@@ -22,7 +22,7 @@ pub struct AuraPowerState {
     pub boot: bool,
     pub awake: bool,
     pub sleep: bool,
-    /// Ignored for pre-2021 and Tuf
+    /// Ignored for pre-2021
     pub shutdown: bool,
 }
 
