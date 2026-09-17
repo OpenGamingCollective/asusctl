@@ -101,6 +101,16 @@ fn notify_mode(status: GfxPower) -> DgpuMode {
     }
 }
 
+/// Whether moving from `previous` to `current` deserves a notification.
+///
+/// `previous` is `None` for the monitor's first reading, which is a baseline
+/// rather than a change and so never notifies. After that only a change of
+/// [`DgpuMode`] qualifies, which keeps routine runtime power transitions off
+/// the desktop while still reporting availability changes.
+fn should_notify(previous: Option<GfxPower>, current: GfxPower) -> bool {
+    previous.is_some_and(|previous| notify_mode(previous) != notify_mode(current))
+}
+
 // `unknown_lints` is silenced first so older toolchains (rustc 1.85) don't
 // reject the newer lint names while newer ones still honor them.
 #[allow(unknown_lints, clippy::manual_is_multiple_of)]
@@ -159,8 +169,7 @@ fn start_dgpu_status_mon(config: Arc<Mutex<Config>>, gpu_status_tx: watch::Sende
                 debug!("dGPU status changed: {:?}", status);
                 // The tray tracks every transition; only notifications are filtered.
                 gpu_status_tx.send_replace(status);
-                // The first reading is not a change, so it never notifies.
-                if last_status.is_some_and(|prev| notify_mode(prev) != notify_mode(status)) {
+                if should_notify(last_status, status) {
                     let notify = enabled_notifications_copy.lock().is_ok_and(|config| {
                         config.notifications.enabled
                             && config.notifications.receive_notify_gfx_status
@@ -327,6 +336,36 @@ mod tests {
             notify_mode(GfxPower::Active),
             notify_mode(GfxPower::Suspended)
         );
+    }
+
+    #[test]
+    fn the_baseline_reading_never_notifies() {
+        assert!(!should_notify(None, GfxPower::Suspended));
+        assert!(!should_notify(None, GfxPower::Active));
+        assert!(!should_notify(None, GfxPower::AsusDisabled));
+    }
+
+    #[test]
+    fn runtime_power_transitions_do_not_notify() {
+        assert!(!should_notify(Some(GfxPower::Suspended), GfxPower::Active));
+        assert!(!should_notify(Some(GfxPower::Active), GfxPower::Suspended));
+    }
+
+    #[test]
+    fn availability_transitions_notify() {
+        assert!(should_notify(
+            Some(GfxPower::Suspended),
+            GfxPower::AsusDisabled
+        ));
+        assert!(should_notify(
+            Some(GfxPower::AsusDisabled),
+            GfxPower::Active
+        ));
+        assert!(should_notify(
+            Some(GfxPower::Active),
+            GfxPower::AsusMuxDiscreet
+        ));
+        assert!(should_notify(Some(GfxPower::Active), GfxPower::Unknown));
     }
 
     #[test]
