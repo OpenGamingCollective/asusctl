@@ -71,6 +71,36 @@ fn dgpu_status_for_tick(
     }
 }
 
+/// The dGPU availability mode a status represents, used to decide whether a
+/// change is worth interrupting the user for.
+///
+/// `Active` and `Suspended` collapse into one mode on purpose: the kernel
+/// suspending an idle dGPU and waking it for the next piece of work is routine
+/// runtime power management, and on a hybrid machine it happens many times a
+/// day. The tray icon already tracks that live, so a popup per transition is
+/// noise. A change of *mode* — disabled, MUX-discreet, gone from the bus — is
+/// something the user or a reboot caused, and is worth saying out loud.
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+enum DgpuMode {
+    /// On the bus and runtime-PM managed.
+    Present,
+    /// Switched off via the ASUS `dgpu_disable` attribute.
+    Disabled,
+    /// MUX is set to discreet, so the dGPU drives the panel directly.
+    MuxDiscreet,
+    /// Not on the bus, and not MUX-discreet either.
+    Absent,
+}
+
+fn notify_mode(status: GfxPower) -> DgpuMode {
+    match status {
+        GfxPower::Active | GfxPower::Suspended => DgpuMode::Present,
+        GfxPower::AsusDisabled => DgpuMode::Disabled,
+        GfxPower::AsusMuxDiscreet => DgpuMode::MuxDiscreet,
+        GfxPower::Unknown => DgpuMode::Absent,
+    }
+}
+
 // `unknown_lints` is silenced first so older toolchains (rustc 1.85) don't
 // reject the newer lint names while newer ones still honor them.
 #[allow(unknown_lints, clippy::manual_is_multiple_of)]
@@ -96,7 +126,7 @@ fn start_dgpu_status_mon(config: Arc<Mutex<Config>>, gpu_status_tx: watch::Sende
             None => warn!("Did not find a dGPU on this system, will keep watching for one"),
         }
 
-        let mut last_status = GfxPower::Unknown;
+        let mut last_status: Option<GfxPower> = None;
         let mut ticks: u32 = 0;
         loop {
             std::thread::sleep(Duration::from_millis(1500));
@@ -125,19 +155,24 @@ fn start_dgpu_status_mon(config: Arc<Mutex<Config>>, gpu_status_tx: watch::Sende
                 continue;
             };
 
-            if status != last_status {
+            if Some(status) != last_status {
                 debug!("dGPU status changed: {:?}", status);
+                // The tray tracks every transition; only notifications are filtered.
                 gpu_status_tx.send_replace(status);
-                let notify = enabled_notifications_copy.lock().is_ok_and(|config| {
-                    config.notifications.enabled && config.notifications.receive_notify_gfx_status
-                });
-                if notify
-                    && let Err(e) = do_gpu_status_notif("dGPU status changed:", &status).show()
-                {
-                    warn!("Could not show dGPU status notification: {e}");
+                // The first reading is not a change, so it never notifies.
+                if last_status.is_some_and(|prev| notify_mode(prev) != notify_mode(status)) {
+                    let notify = enabled_notifications_copy.lock().is_ok_and(|config| {
+                        config.notifications.enabled
+                            && config.notifications.receive_notify_gfx_status
+                    });
+                    if notify
+                        && let Err(e) = do_gpu_status_notif("dGPU status changed:", &status).show()
+                    {
+                        warn!("Could not show dGPU status notification: {e}");
+                    }
                 }
             }
-            last_status = status;
+            last_status = Some(status);
         }
     });
 }
@@ -283,6 +318,34 @@ mod tests {
         assert_eq!(
             dgpu_status_for_tick(false, None, false),
             Some(GfxPower::Unknown)
+        );
+    }
+
+    #[test]
+    fn runtime_power_transitions_are_not_a_mode_change() {
+        assert_eq!(
+            notify_mode(GfxPower::Active),
+            notify_mode(GfxPower::Suspended)
+        );
+    }
+
+    #[test]
+    fn availability_changes_are_distinct_modes() {
+        assert_ne!(
+            notify_mode(GfxPower::Suspended),
+            notify_mode(GfxPower::AsusDisabled)
+        );
+        assert_ne!(
+            notify_mode(GfxPower::Suspended),
+            notify_mode(GfxPower::AsusMuxDiscreet)
+        );
+        assert_ne!(
+            notify_mode(GfxPower::AsusDisabled),
+            notify_mode(GfxPower::AsusMuxDiscreet)
+        );
+        assert_ne!(
+            notify_mode(GfxPower::Active),
+            notify_mode(GfxPower::Unknown)
         );
     }
 }
