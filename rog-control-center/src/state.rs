@@ -2,7 +2,7 @@
 
 use crate::{
     AttrMinMax,
-    helpers::types::{BatteryInfo, SystemTelemetry},
+    helpers::types::{BatteryInfo, SystemInfoData, SystemTelemetry},
 };
 use rog_platform::asus_armoury::FirmwareAttribute;
 #[derive(Debug, Clone)]
@@ -11,6 +11,7 @@ pub enum Event {
     BatteryUpdated(BatteryInfo),
     TelemetryUpdated(SystemTelemetry),
     DmiLoaded(String),
+    SystemInfoLoaded(SystemInfoData),
 
     // Dbus signals
     PlatformProfileSignalled(i32),
@@ -54,6 +55,7 @@ pub enum UiUpdate {
     Telemetry(SystemTelemetry),
     Battery(BatteryInfo),
     ProductName(String),
+    SystemInfo(SystemInfoData),
     PlatformProfile(i32),
     ShowToast {
         message: String,
@@ -116,6 +118,9 @@ impl AppState {
             Event::DmiLoaded(new_product_name) => {
                 self.product_name = new_product_name.clone();
                 ui_updates.push(UiUpdate::ProductName(new_product_name));
+            }
+            Event::SystemInfoLoaded(new_system_info) => {
+                ui_updates.push(UiUpdate::SystemInfo(new_system_info));
             }
             Event::PlatformProfileSignalled(new_profile) => {
                 if self.active_profile != new_profile {

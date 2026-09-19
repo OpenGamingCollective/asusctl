@@ -86,12 +86,32 @@ pub fn apply_ui_update(ui: &MainWindow, update: UiUpdate) {
             sys_data.set_cpu_temp_val(t.cpu.temp);
             sys_data.set_cpu_freq_mhz(t.cpu.freq_mhz);
             sys_data.set_cpu_usage_val(t.cpu.usage_pct);
+            // dGPU
+            sys_data.set_gpu_temp_val(t.dgpu.temp);
+            sys_data.set_gpu_freq_mhz(t.dgpu.freq_mhz);
+            sys_data.set_gpu_usage_val(t.dgpu.usage_pct);
+            sys_data.set_dgpu_suspended(t.dgpu.suspended);
+            // iGPU
+            sys_data.set_igpu_temp_val(t.igpu_temp);
+            sys_data.set_igpu_usage_val(t.igpu_usage);
             // RAM
             sys_data.set_ram_usage_val(t.ram_usage_pct);
+            // Fans (-1 rpm = sensor absent)
+            sys_data.set_cpu_fan_rpm(t.fan_rpms.cpu);
+            sys_data.set_gpu_fan_rpm(t.fan_rpms.gpu);
+            sys_data.set_mid_fan_rpm(t.fan_rpms.mid.unwrap_or(-1));
         }
         UiUpdate::ProductName(n) => {
             let sys_data = ui.global::<SystemInfo>();
             sys_data.set_product_name(SharedString::from(n));
+        }
+        UiUpdate::SystemInfo(d) => {
+            let sys_data = ui.global::<SystemInfo>();
+            sys_data.set_cpu_name(SharedString::from(d.cpu_name));
+            sys_data.set_igpu_name(SharedString::from(d.igpu_name));
+            sys_data.set_dgpu_name(SharedString::from(d.dgpu_name));
+            sys_data.set_has_igpu(d.has_igpu);
+            sys_data.set_has_dgpu(d.has_dgpu);
         }
         UiUpdate::PlatformProfile(p) => {
             let sys_data = ui.global::<PowerData>();

@@ -50,3 +50,12 @@ pub struct FanTelemetry {
     // Some laptops does not have the mid fan
     pub mid: Option<i32>,
 }
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct SystemInfoData {
+    pub cpu_name: String,
+    pub igpu_name: String,
+    pub dgpu_name: String,
+    pub has_igpu: bool,
+    pub has_dgpu: bool,
+}

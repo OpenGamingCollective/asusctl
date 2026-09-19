@@ -2,21 +2,21 @@
 
 use crate::{
     helpers::{
-        hardware::get_cpu_telemetry,
-        types::{BatteryInfo, FanTelemetry, GpuTelemetry, SystemTelemetry},
+        hardware::get_system_telemetry,
+        types::BatteryInfo,
         zbus_proxies::{AsusdInterface, get_min_max_current},
     },
     state::Event,
 };
 use futures_util::{Stream, StreamExt, stream::SelectAll};
 use rog_dbus::asus_armoury::AsusArmouryProxy;
-use rog_platform::{
-    asus_armoury::FirmwareAttribute,
-    cpu::{CpuTicks, get_ram_usage_pct},
-};
+use rog_platform::{asus_armoury::FirmwareAttribute, cpu::CpuTicks};
 use std::{
     collections::HashMap,
-    sync::{Arc, OnceLock},
+    sync::{
+        Arc, OnceLock,
+        atomic::{AtomicBool, Ordering},
+    },
     time::Duration,
 };
 use tokio::sync::mpsc::UnboundedSender;
@@ -37,24 +37,16 @@ pub async fn subscribe_battery(tx: UnboundedSender<Event>) {
 }
 
 /// Loop that retrieve system telemetry every 1 sec
-pub async fn subscribe_telemetry(tx: UnboundedSender<Event>) {
+pub async fn subscribe_telemetry(tx: UnboundedSender<Event>, window_visible: Arc<AtomicBool>) {
     let mut prev_tick: Option<CpuTicks> = None;
     loop {
-        // CPU
-        let cpu_res = get_cpu_telemetry(prev_tick);
-        let cpu = cpu_res.0;
-        prev_tick = cpu_res.1;
+        if !window_visible.load(Ordering::Relaxed) {
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            continue;
+        }
 
-        let ram = get_ram_usage_pct();
-
-        let telemetry = SystemTelemetry {
-            cpu,
-            dgpu: GpuTelemetry::default(),
-            igpu_temp: 0.0,
-            igpu_usage: 0.0,
-            ram_usage_pct: ram,
-            fan_rpms: FanTelemetry::default(),
-        };
+        let (telemetry, tick) = get_system_telemetry(prev_tick);
+        prev_tick = tick;
 
         if tx.send(Event::TelemetryUpdated(telemetry)).is_err() {
             return;

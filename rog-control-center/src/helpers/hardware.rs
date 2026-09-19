@@ -1,8 +1,12 @@
 use std::{fs, io, path::Path};
 
-use crate::helpers::types::{BatteryInfo, CpuTelemetry};
+use crate::helpers::types::{
+    BatteryInfo, CpuTelemetry, FanTelemetry, GpuTelemetry, SystemInfoData, SystemTelemetry,
+};
 use anyhow::Result;
-use rog_platform::cpu::CpuTicks;
+use rog_platform::cpu::{CpuTicks, get_cpu_model, get_ram_usage_pct};
+use rog_platform::gpu_pci::{Device, GfxPower, get_gpu_names};
+use rog_platform::platform::get_fan_rpms;
 
 pub fn get_dmi_product_name() -> io::Result<String> {
     let path = Path::new("/sys/class/dmi/id/product_name");
@@ -66,4 +70,78 @@ pub fn get_cpu_telemetry(prev_tick: Option<CpuTicks>) -> (CpuTelemetry, Option<C
         },
         current_cpu_tick,
     )
+}
+
+/// Collect the full system telemetry
+pub fn get_system_telemetry(prev_tick: Option<CpuTicks>) -> (SystemTelemetry, Option<CpuTicks>) {
+    let (cpu, tick) = get_cpu_telemetry(prev_tick);
+    let (cpu_fan, gpu_fan, mid_fan) = get_fan_rpms();
+
+    let mut dgpu = GpuTelemetry {
+        temp: -1.0,
+        freq_mhz: -1.0,
+        usage_pct: -1.0,
+        suspended: false,
+    };
+    let mut igpu_temp = -1.0;
+    let mut igpu_usage = -1.0;
+
+    if let Ok(devices) = Device::find() {
+        for device in &devices {
+            if device.is_dgpu() {
+                match device.get_runtime_status() {
+                    Ok(GfxPower::Suspended) => dgpu.suspended = true,
+                    Ok(GfxPower::Active) => {
+                        dgpu.temp = device.get_temp().unwrap_or(-1.0);
+                        dgpu.freq_mhz = device.get_freq_mhz().unwrap_or(-1.0);
+                        dgpu.usage_pct = device.get_usage_pct().unwrap_or(-1.0);
+                    }
+                    _ => {}
+                }
+            } else {
+                igpu_temp = device.get_temp().unwrap_or(-1.0);
+                igpu_usage = device.get_usage_pct().unwrap_or(-1.0);
+            }
+        }
+    }
+
+    let telemetry = SystemTelemetry {
+        cpu,
+        dgpu,
+        igpu_temp,
+        igpu_usage,
+        ram_usage_pct: get_ram_usage_pct(),
+        fan_rpms: FanTelemetry {
+            cpu: cpu_fan,
+            gpu: gpu_fan,
+            // The hwmon read returns 0 when the fan is missing
+            mid: (mid_fan > 0).then_some(mid_fan),
+        },
+    };
+
+    (telemetry, tick)
+}
+
+pub fn get_system_info() -> SystemInfoData {
+    let (igpu_name, dgpu_name) = get_gpu_names();
+
+    let mut has_igpu = false;
+    let mut has_dgpu = false;
+    if let Ok(devices) = Device::find() {
+        for device in &devices {
+            if device.is_dgpu() {
+                has_dgpu = true;
+            } else {
+                has_igpu = true;
+            }
+        }
+    }
+
+    SystemInfoData {
+        cpu_name: get_cpu_model(),
+        igpu_name,
+        dgpu_name,
+        has_igpu,
+        has_dgpu,
+    }
 }

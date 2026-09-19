@@ -1,4 +1,5 @@
 use std::env;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
 use config_traits::{StdConfig, StdConfigLoad1};
@@ -11,6 +12,7 @@ use rog_control_center::config::Config;
 use rog_control_center::print_versions;
 use rog_control_center::tray::setup_tray;
 
+use rog_control_center::helpers::hardware::get_system_info;
 use rog_control_center::helpers::startup::populate_slint_properties;
 use rog_control_center::helpers::zbus_proxies::AsusdInterface;
 use rog_control_center::state::Event;
@@ -115,6 +117,9 @@ fn main() -> Result<()> {
     // Send the dmi product name to the UI
     let _ = event_tx.send(Event::DmiLoaded(dmi.product_name.clone()));
 
+    // Send the system info to the UI
+    let _ = event_tx.send(Event::SystemInfoLoaded(get_system_info()));
+
     // Bind UI Inputs to the Channel
     rog_control_center::ui::callbacks::bind_ui_events(&ui, event_tx.clone());
 
@@ -142,8 +147,14 @@ fn main() -> Result<()> {
         }
     });
 
+    // Used for telemetry, so it only runs if the window is visible
+    let window_visible = Arc::new(AtomicBool::new(false));
+
     // Start Hardware Subscriptions
-    rt.spawn(subscribe_telemetry(event_tx.clone()));
+    rt.spawn(subscribe_telemetry(
+        event_tx.clone(),
+        window_visible.clone(),
+    ));
     rt.spawn(subscribe_ppd(event_tx.clone(), asusd.clone()));
     rt.spawn(subscribe_armoury(event_tx.clone(), asusd.clone()));
 
@@ -156,6 +167,7 @@ fn main() -> Result<()> {
     if !background_startup && let Err(e) = ui.window().show() {
         warn!("Couldn't show main window: {e:?}");
     }
+    window_visible.store(!background_startup, Ordering::Relaxed);
 
     let mut action_handler = ActionHandler {
         config: config.clone(),
@@ -164,11 +176,23 @@ fn main() -> Result<()> {
     };
     // Start Event Loop
     let ui_weak = ui.as_weak();
+    let visibility = window_visible.clone();
     rt.spawn(async move {
         let mut state = rog_control_center::state::AppState::new();
         // Get the current values from asusd
         populate_slint_properties(ui_weak.clone(), asusd.clone()).await;
         while let Some(event) = event_rx.recv().await {
+            // Update visibility
+            match &event {
+                Event::ShowWindow => visibility.store(true, Ordering::Relaxed),
+                Event::HideWindow => visibility.store(false, Ordering::Relaxed),
+                Event::ToggleWindow => {
+                    let visible = !visibility.load(Ordering::Relaxed);
+                    visibility.store(visible, Ordering::Relaxed);
+                }
+                _ => {}
+            }
+
             action_handler.handle(&event).await;
             let ui_updates = state.update(event);
 
