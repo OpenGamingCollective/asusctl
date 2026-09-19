@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::OnceLock;
 
-use log::{info, trace, warn};
+use log::{trace, warn};
 use serde::{Deserialize, Serialize};
 use zbus::zvariant::{OwnedValue, Type, Value};
 
@@ -469,11 +469,6 @@ impl Device {
                         }
                     }
 
-                    if dgpu {
-                        info!("Found dgpu {id} at {:?}", device.sysname());
-                    } else {
-                        info!("Found igpu {id} at {:?}", device.sysname());
-                    }
                     devices.push(Self {
                         dev_path: PathBuf::from(device.syspath()),
                         is_dgpu: dgpu,

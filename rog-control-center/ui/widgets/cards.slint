@@ -1,0 +1,242 @@
+// UI Cards
+// Contains large visual components like the product info card and effect buttons.
+import { Theme } from "../globals.slint";
+
+// — Product card: product image/placeholder + model (25px 900) + spec lines —
+export component RogProductCard inherits Rectangle {
+    in property <image> product-image;
+    in property <string> name;
+    in property <[string]> details;
+    background: Theme.bg-card;
+    border-radius: 4px;
+    drop-shadow-blur: 18px;
+    drop-shadow-color: #00000073;
+    drop-shadow-offset-y: 4px;
+    clip: true;
+    VerticalLayout {
+        // Image area: stretches (grows with card height to keep the square ratio)
+        Rectangle {
+            vertical-stretch: 1;
+            min-height: 160px;
+            // Hero panel: dark purple-red in dark mode, soft lavender in light.
+            background: Theme.dark ? #15101e : #ECEAF2;
+
+            if root.product-image.width > 0: Image {
+                source: root.product-image;
+                width: 75%;
+                height: 85%;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                image-fit: contain;
+            }
+            if root.product-image.width == 0: Image {
+                source: Theme.dark ? @image-url("../images/laptop-placeholder.svg")
+                    : @image-url("../images/laptop-placeholder-light.svg");
+                width: 94%;
+                height: 94%;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                image-fit: contain;
+            }
+        }
+        // Text info area
+        VerticalLayout {
+            padding-top: 16px;
+            padding-bottom: 18px;
+            padding-left: 20px;
+            padding-right: 20px;
+            spacing: 4px;
+            Text {
+                text: root.name;
+                color: Theme.text-primary;
+                font-size: 22px;
+                font-weight: 900;
+                letter-spacing: 0.5px;
+                horizontal-alignment: center;
+                // Long model names wrap instead of being clipped at the edge.
+                wrap: word-wrap;
+            }
+
+            for d in root.details: Text {
+                text: d;
+                color: Theme.text-secondary;
+                font-size: 11.5px;
+                horizontal-alignment: center;
+                wrap: word-wrap;
+            }
+        }
+    }
+}
+
+
+// —— Display mode card for GPU page (icon + title + description) ——
+export component RogDisplayModeCard inherits Rectangle {
+    in property <image> icon;
+    in property <string> title;
+    in property <string> description;
+    in property <bool> selected: false;
+    in property <bool> enabled: true;
+    callback clicked();
+    background: Theme.bg-card;
+    border-radius: 4px;
+    border-width: 1px;
+    border-color: root.selected ? Theme.rog-red : (root.enabled ? transparent : Theme.line);
+    animate border-color { duration: 150ms; }
+    clip: true;
+
+    VerticalLayout {
+        padding: 20px;
+        spacing: 12px;
+        alignment: center;
+
+        Image {
+            source: root.icon;
+            colorize: root.selected ? Theme.rog-red : (root.enabled ? Theme.text-dim : Theme.fg-disabled);
+            // Full-width box with contain: the SVG scales to 56px tall and
+            // centers horizontally, regardless of card width.
+            height: 56px;
+            image-fit: contain;
+            opacity: root.enabled ? 1.0 : 0.4;
+        }
+
+        Text {
+            text: root.title;
+            color: root.selected ? Theme.text-primary : (root.enabled ? Theme.text-secondary : Theme.fg-disabled);
+            font-size: 15px;
+            font-weight: 600;
+            horizontal-alignment: center;
+        }
+
+        Text {
+            text: root.description;
+            color: root.enabled ? Theme.text-dim : Theme.fg-disabled;
+            font-size: 11px;
+            horizontal-alignment: center;
+            wrap: word-wrap;
+            opacity: root.enabled ? 1.0 : 0.5;
+        }
+    }
+
+    ta := TouchArea {
+        enabled: root.enabled;
+        clicked => { root.clicked(); }
+    }
+
+    accessible-role: button;
+    accessible-label: root.title;
+    accessible-action-default => {
+        if (root.enabled) { root.clicked(); }
+    }
+    FocusScope {
+        enabled: root.enabled;
+        key-pressed(event) => {
+            if (event.text == Key.Return || event.text == Key.Space) {
+                root.clicked();
+                return accept;
+            }
+            reject
+        }
+        if self.has-focus: Rectangle {
+            border-radius: 4px;
+            border-width: 2px;
+            border-color: Theme.rog-red;
+            background: transparent;
+        }
+    }
+}
+
+
+
+// —— Effect icon button for lighting page (large circular icon, radio-style single-select) ——
+// IMPORTANT: parent manages 'selected' state — this component only signals clicked()
+export component RogEffectButton inherits Rectangle {
+    in property <image> icon;
+    in property <string> label;
+    in property <bool> selected: false;  // read-only from parent, do NOT self-assign
+    in property <bool> enabled: true;
+    callback clicked();
+    width: 92px;
+    height: 104px;
+    opacity: root.enabled ? 1.0 : 0.35;
+
+    // Circle background, horizontally centred in the cell (absolute x, not a
+    // layout child, so a fixed-width circle never drifts to the left).
+    outer := Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: 4px;
+        width: 72px;
+        height: 72px;
+        border-radius: 36px;
+        background: root.selected ? Theme.mode-selected : Theme.bg-app;
+        border-width: root.selected ? 2px : 1px;
+        border-color: root.selected ? Theme.rog-red : Theme.line-soft;
+
+        Image {
+            source: root.icon;
+            colorize: root.selected ? Theme.rog-red : Theme.text-secondary;
+            width: 32px;
+            height: 32px;
+            image-fit: contain;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+
+    // Label spans the full cell width so its centre lines up with the circle.
+    Text {
+        text: root.label;
+        color: root.selected ? Theme.text-primary : Theme.text-secondary;
+        font-size: 12px;
+        font-weight: root.selected ? 600 : 400;
+        x: 0;
+        y: 82px;
+        width: 100%;
+        horizontal-alignment: center;
+        overflow: elide;
+    }
+
+    ta := TouchArea {
+        width: 100%;
+        height: 100%;
+        enabled: root.enabled;
+        clicked => { root.clicked(); }
+    }
+
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-action-default => {
+        if (root.enabled) { root.clicked(); }
+    }
+    FocusScope {
+        enabled: root.enabled;
+        key-pressed(event) => {
+            if (event.text == Key.Return || event.text == Key.Space) {
+                root.clicked();
+                return accept;
+            }
+            reject
+        }
+        if self.has-focus: Rectangle {
+            x: 2px;
+            y: 2px;
+            width: parent.width - 4px;
+            height: parent.height - 4px;
+            border-radius: 4px;
+            border-width: 2px;
+            border-color: Theme.rog-red;
+            background: transparent;
+        }
+    }
+}
+
+
+// — Card: dark fill + radius 8 + deep shadow, no bright border (matches AC cards) —
+export component RogCard inherits Rectangle {
+    in property <length> radius: Theme.radius-card;
+    background: Theme.bg-card;
+    border-radius: root.radius;
+    drop-shadow-blur: 18px;
+    drop-shadow-color: #00000070;
+    drop-shadow-offset-y: 4px;
+    clip: true;
+}

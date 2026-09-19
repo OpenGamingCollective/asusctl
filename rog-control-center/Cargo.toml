@@ -18,7 +18,6 @@ rog_ally = []
 [dependencies]
 console-subscriber = { workspace = true, optional = true }
 
-ksni.workspace = true
 image.workspace = true
 ashpd.workspace = true
 

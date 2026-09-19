@@ -1,0 +1,173 @@
+//! This file contain all slint callbacks, it is ordered by rog_dbus interface when possible
+
+import { AttrMinMax, AttrBool } from "types.slint";
+
+// Per-profile power limits edited in the Home "Advanced" overlay (G-Helper
+// style). One instance per configurable profile (Quiet / Balanced /
+// Performance); LowPower is deliberately not configurable.
+export struct ProfileLimits {
+    ppt_pl1_spl: AttrMinMax,
+    ppt_pl2_sppt: AttrMinMax,
+    ppt_pl3_fppt: AttrMinMax,
+    ppt_fppt: AttrMinMax,
+    ppt_apu_sppt: AttrMinMax,
+    ppt_platform_sppt: AttrMinMax,
+    nv_tgp: AttrMinMax,
+    nv_dynamic_boost: AttrMinMax,
+    nv_temp_target: AttrMinMax,
+}
+
+export global SystemInfo {
+    in-out property <bool> has_dgpu: true;
+    in-out property <bool> has_igpu: true;
+    // Set from Rust: false when the asusd daemon is unreachable (all daemon
+    // facing controls are greyed out and actions are no-ops).
+    in-out property <bool> asusd_running: true;
+    in-out property <string> cpu_name: "";
+    in-out property <string> igpu_name: "";
+    in-out property <string> dgpu_name: "";
+    in-out property <string> product_name: "";
+}
+
+export global TelemetryData {
+    in-out property <float> cpu_temp_val: -1.0;
+    in-out property <float> gpu_temp_val: -1.0;
+    in-out property <float> igpu_temp_val: -1.0;
+
+    in-out property <float> cpu_usage_val: -1.0;
+    in-out property <float> gpu_usage_val: -1.0;
+    in-out property <float> igpu_usage_val: -1.0;
+    in-out property <float> ram_usage_val: -1.0;
+
+    in-out property <float> cpu_freq_mhz: -1.0;
+    in-out property <float> gpu_freq_mhz: -1.0;
+
+    in-out property <int> cpu_fan_rpm: -1;
+    in-out property <int> gpu_fan_rpm: -1;
+    in-out property <int> mid_fan_rpm: -1;
+
+    in-out property <bool> dgpu_suspended: false;
+}
+
+export global PowerData {
+    callback cb_set_epp(int);
+
+    in-out property <int> platform_profile: 0;
+    in-out property <[string]> platform_profile_choices: [@tr("LowPower"), @tr("Quiet"), @tr("Balanced"), @tr("Performance")];
+    in-out property <[int]> platform_profile_indexes: [3, 2, 0, 1];
+    callback cb_platform_profile(int);
+
+    in-out property <[string]> energy_performance_choices: [
+        @tr("Default"),
+        @tr("Performance"),
+        @tr("BalancePerformance"),
+        @tr("BalancePower"),
+        @tr("Power")
+    ];
+    in-out property <int> profile_custom_epp: 0;
+    callback cb_profile_custom_epp(int);
+    in-out property <bool> platform_profile_linked_epp: true;
+    callback cb_platform_profile_linked_epp(bool);
+
+    in-out property <int> platform_profile_on_ac: 0;
+    callback cb_platform_profile_on_ac(int);
+    in-out property <bool> change_platform_profile_on_ac: true;
+    callback cb_change_platform_profile_on_ac(bool);
+
+    in-out property <int> platform_profile_on_battery: 0;
+    callback cb_platform_profile_on_battery(int);
+    in-out property <bool> change_platform_profile_on_battery: true;
+    callback cb_change_platform_profile_on_battery(bool);
+}
+
+export global AsusArmouryData {
+    in-out property <bool> asus_armoury_loaded: false;
+
+    in-out property <AttrBool> ppt_enabled;
+    callback cb_ppt_enabled(AttrBool);
+
+    // Asus Armoury attributes
+    in-out property <AttrMinMax> apu_mem;
+    callback cb_apu_mem(AttrMinMax);
+
+    in-out property <AttrMinMax> cores_performance;
+    callback cb_cores_performance(AttrMinMax);
+
+    in-out property <AttrMinMax> cores_efficiency;
+    callback cb_cores_efficiency(AttrMinMax);
+
+    in-out property <AttrMinMax> ppt_pl1_spl;
+    callback cb_ppt_pl1_spl(AttrMinMax);
+    callback cb_reset_ppt_pl1_spl();
+
+    in-out property <AttrMinMax> ppt_pl2_sppt;
+    callback cb_ppt_pl2_sppt(AttrMinMax);
+    callback cb_reset_ppt_pl2_sppt();
+
+    in-out property <AttrMinMax> ppt_pl3_fppt;
+    callback cb_ppt_pl3_fppt(AttrMinMax);
+    callback cb_reset_ppt_pl3_fppt();
+
+    in-out property <AttrMinMax> ppt_fppt;
+    callback cb_ppt_fppt(AttrMinMax);
+    callback cb_reset_ppt_fppt();
+
+    in-out property <AttrMinMax> ppt_apu_sppt;
+    callback cb_ppt_apu_sppt(AttrMinMax);
+    callback cb_reset_ppt_apu_sppt();
+
+    in-out property <AttrMinMax> ppt_platform_sppt;
+    callback cb_ppt_platform_sppt(AttrMinMax);
+    callback cb_reset_ppt_platform_sppt();
+
+    in-out property <AttrMinMax> nv_dynamic_boost;
+    callback cb_nv_dynamic_boost(AttrMinMax);
+    callback cb_reset_nv_dynamic_boost();
+
+    in-out property <AttrMinMax> nv_temp_target;
+    callback cb_nv_temp_target(AttrMinMax);
+    callback cb_reset_nv_temp_target();
+
+    in-out property <AttrMinMax> dgpu_base_tgp;
+    callback cb_dgpu_base_tgp(AttrMinMax);
+
+    in-out property <AttrMinMax> dgpu_tgp;
+    callback cb_dgpu_tgp(AttrMinMax);
+    callback cb_reset_dgpu_tgp();
+
+    in-out property <AttrMinMax> charge_mode;
+    callback cb_charge_mode(AttrMinMax);
+
+    in-out property <AttrBool> boot_sound;
+    callback cb_boot_sound(AttrBool);
+
+    in-out property <AttrBool> mcu_powersave;
+    callback cb_mcu_powersave(AttrBool);
+
+    in-out property <AttrBool> panel_overdrive;
+    callback cb_panel_overdrive(AttrBool);
+
+    in-out property <AttrMinMax> panel_hd_mode;
+    callback cb_panel_hd_mode(AttrMinMax);
+
+    in-out property <AttrBool> egpu_connected;
+    callback cb_egpu_connected(AttrBool);
+
+    in-out property <AttrBool> egpu_enable;
+    callback cb_egpu_enable(AttrBool);
+
+    in-out property <AttrBool> dgpu_disable;
+    callback cb_dgpu_disable(AttrBool);
+
+    in-out property <AttrBool> gpu_mux_mode;
+    callback cb_gpu_mux_mode(AttrBool);
+
+    in-out property <AttrMinMax> mini_led_mode;
+    callback cb_mini_led_mode(AttrMinMax);
+
+    in-out property <AttrBool> pending_reboot;
+    callback cb_pending_reboot(AttrBool);
+
+    in-out property <AttrBool> screen_auto_brightness;
+    callback cb_screen_auto_brightness(AttrBool);
+}

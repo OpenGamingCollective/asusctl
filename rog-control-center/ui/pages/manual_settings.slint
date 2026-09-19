@@ -1,0 +1,542 @@
+// "Advanced" Manual (Custom)
+import { RogSlashMark } from "../widgets/layout.slint";
+import { RogSlider } from "../widgets/controls.slint";
+import { ScrollView } from "std-widgets.slint";
+import { Theme } from "../globals.slint";
+import { PowerData, ProfileLimits, AsusArmouryData } from "../callbacks.slint";
+
+component RogMiniToggle inherits Rectangle {
+    in property <bool> checked: false;
+    callback toggled(bool);
+    width: 40px;
+    height: 22px;
+    border-radius: 11px;
+    background: root.checked ? Theme.rog-red : Theme.toggle-off;
+    Rectangle {
+        x: root.checked ? 21px : 3px;
+        y: 3px;
+        width: 16px;
+        height: 16px;
+        border-radius: 8px;
+        background: #FFFFFF;
+        drop-shadow-blur: 3px;
+        drop-shadow-color: #00000040;
+    }
+
+    ta := TouchArea {
+        width: 100%;
+        height: 100%;
+        mouse-cursor: pointer;
+        clicked => { root.toggled(!root.checked); }
+    }
+
+    accessible-role: switch;
+    accessible-checked: root.checked;
+}
+
+component ChoicePills inherits Rectangle {
+    in property <[string]> choices: [];
+    in property <int> current: -1;
+    callback chosen(int);
+    HorizontalLayout {
+        spacing: 8px;
+        for c[i] in root.choices: Rectangle {
+            horizontal-stretch: 1;
+            min-height: 30px;
+            border-radius: Theme.radius-item;
+            background: i == root.current ? Theme.mode-selected : Theme.bg-elevated;
+            border-width: 1px;
+            border-color: i == root.current ? Theme.rog-red : transparent;
+            Text {
+                text: c;
+                color: i == root.current ? Theme.text-primary : Theme.text-secondary;
+                font-size: Theme.font-sm;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+
+            ta := TouchArea {
+                width: 100%;
+                height: 100%;
+                mouse-cursor: pointer;
+                clicked => { root.chosen(i); }
+            }
+
+            accessible-role: button;
+            accessible-label: c;
+            accessible-action-default => { root.chosen(i); }
+        }
+    }
+}
+
+// — One power-limit row: slider + value + reset chip —
+component LimitRow inherits Rectangle {
+    in property <string> label;
+    in property <float> minimum;
+    in property <float> maximum;
+    in property <float> value;
+    in property <string> unit;
+    in property <bool> enabled: true;
+    callback changed(int);
+    callback reset();
+    HorizontalLayout {
+        spacing: 10px;
+        RogSlider {
+            horizontal-stretch: 1;
+            label: root.label;
+            minimum: root.minimum;
+            maximum: Math.max(root.minimum + 1.0, root.maximum);
+            value: root.value;
+            unit: root.unit;
+            enabled: root.enabled;
+            released(v) => { root.changed(Math.round(v)); }
+        }
+
+        reset-chip := Rectangle {
+            width: 52px;
+            min-height: 30px;
+            border-radius: Theme.radius-item;
+            background: ta-reset.has-hover ? Theme.bg-elevated : transparent;
+            border-width: 1px;
+            border-color: Theme.line;
+            Text {
+                text: @tr("Reset");
+                color: Theme.text-secondary;
+                font-size: Theme.font-xs;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+
+            ta-reset := TouchArea {
+                width: 100%;
+                height: 100%;
+                mouse-cursor: pointer;
+                clicked => { root.reset(); }
+            }
+
+            accessible-role: button;
+            accessible-label: @tr("Reset");
+            accessible-action-default => { root.reset(); }
+        }
+    }
+}
+
+export component ManualSettingsOverlay inherits PopupWindow {
+    // Clicking the backdrop or pressing Escape dismisses the popup. The popup
+    // covers the whole window, so "outside" is unreachable; the backdrop
+    // TouchArea below handles backdrop clicks and the swallow TouchArea in
+    // the panel blocks clicks on empty panel space.
+    close-policy: close-on-click-outside;
+    // PopupWindow has no access to its enclosing window, so the caller passes
+    // the window size in to make this popup cover it fully.
+    in property <length> window-width: 0px;
+    in property <length> window-height: 0px;
+    x: 0;
+    y: 0;
+    width: root.window-width;
+    height: root.window-height;
+
+    // Dimmed backdrop — tap to close
+    Rectangle {
+        width: 100%;
+        height: 100%;
+        background: #000000;
+        opacity: 0.55;
+        ta-backdrop := TouchArea {
+            width: 100%;
+            height: 100%;
+            clicked => { root.close(); }
+        }
+    }
+
+    // Panel
+    panel := Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: Math.max(0px, Math.min(880px, parent.width - 64px));
+        height: Math.max(0px, Math.min(700px, parent.height - 48px));
+        background: Theme.bg-card;
+        border-radius: Theme.radius-card;
+        border-width: 1px;
+        border-color: Theme.line;
+        drop-shadow-blur: 24px;
+        drop-shadow-color: #00000080;
+
+        // Swallows clicks on empty panel space so they don't fall through to
+        // the backdrop's TouchArea. Declared before the content layout so the
+        // interactive controls stay on top (later siblings win).
+        TouchArea {
+            width: 100%;
+            height: 100%;
+        }
+
+        VerticalLayout {
+            padding: 20px;
+            spacing: 12px;
+
+            // Header
+            Rectangle {
+                min-height: 34px;
+                vertical-stretch: 0;
+                HorizontalLayout {
+                    spacing: 8px;
+                    RogSlashMark { }
+
+                    Text {
+                        text: @tr("Manual mode");
+                        color: Theme.text-primary;
+                        font-size: Theme.font-lg;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                    }
+
+                    Rectangle {
+                        horizontal-stretch: 1;
+                    }
+
+                    close-box := Rectangle {
+                        min-width: 28px;
+                        min-height: 28px;
+                        border-radius: 14px;
+                        background: ta-close.has-hover ? Theme.bg-elevated : transparent;
+                        Text {
+                            text: "✕";
+                            color: Theme.text-secondary;
+                            font-size: 14px;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+
+                        ta-close := TouchArea {
+                            width: 100%;
+                            height: 100%;
+                            mouse-cursor: pointer;
+                            clicked => { root.close(); }
+                        }
+
+                        accessible-role: button;
+                        accessible-label: @tr("Close");
+                        accessible-action-default => { root.close(); }
+                    }
+                }
+            }
+
+            // EPP for the Custom profile
+            // (no fixed height on this wrapper either — see the note on ChoicePills)
+            Rectangle {
+                VerticalLayout {
+                    spacing: 6px;
+                    Text {
+                        text: @tr("Energy Performance Preference");
+                        color: Theme.text-secondary;
+                        font-size: Theme.font-sm;
+                    }
+
+                    ChoicePills {
+                        choices: PowerData.energy_performance_choices;
+                        current: PowerData.profile_custom_epp;
+                        chosen(i) => {
+                            PowerData.profile_custom_epp = i;
+                            PowerData.cb_set_epp(i);
+                        }
+                    }
+                }
+            }
+
+            // Throttle policy on AC / battery
+            Rectangle {
+                VerticalLayout {
+                    spacing: 6px;
+                    Text {
+                        text: @tr("Throttle policy");
+                        color: Theme.text-secondary;
+                        font-size: Theme.font-sm;
+                    }
+
+                    HorizontalLayout {
+                        Text {
+                            text: @tr("On AC use");
+                            color: Theme.text-secondary;
+                            font-size: Theme.font-sm;
+                            vertical-alignment: center;
+                        }
+
+                        Rectangle {
+                            horizontal-stretch: 1;
+                        }
+
+                        Text {
+                            text: @tr("Change on AC");
+                            color: Theme.text-secondary;
+                            font-size: Theme.font-sm;
+                            vertical-alignment: center;
+                        }
+
+                        RogMiniToggle {
+                            checked: PowerData.change_platform_profile_on_ac;
+                            toggled(v) => { PowerData.cb_change_platform_profile_on_ac(v); }
+                        }
+                    }
+
+                    ChoicePills {
+                        choices: PowerData.platform_profile_choices;
+                        current: PowerData.platform_profile_on_ac;
+                        chosen(i) => {
+                            PowerData.platform_profile_on_ac = i;
+                            PowerData.cb_platform_profile_on_ac(i);
+                        }
+                    }
+
+                    HorizontalLayout {
+                        Text {
+                            text: @tr("On battery use");
+                            color: Theme.text-secondary;
+                            font-size: Theme.font-sm;
+                            vertical-alignment: center;
+                        }
+
+                        Rectangle {
+                            horizontal-stretch: 1;
+                        }
+
+                        Text {
+                            text: @tr("Change on battery");
+                            color: Theme.text-secondary;
+                            font-size: Theme.font-sm;
+                            vertical-alignment: center;
+                        }
+
+                        RogMiniToggle {
+                            checked: PowerData.change_platform_profile_on_battery;
+                            toggled(v) => { PowerData.cb_change_platform_profile_on_battery(v); }
+                        }
+                    }
+
+                    ChoicePills {
+                        choices: PowerData.platform_profile_choices;
+                        current: PowerData.platform_profile_on_battery;
+                        chosen(i) => {
+                            PowerData.platform_profile_on_battery = i;
+                            PowerData.cb_platform_profile_on_battery(i);
+                        }
+                    }
+                }
+            }
+
+            // Manual enable gate
+            HorizontalLayout {
+                Text {
+                    text: @tr("Custom PPT enabled");
+                    color: Theme.text-secondary;
+                    font-size: Theme.font-sm;
+                    vertical-alignment: center;
+                }
+
+                Rectangle {
+                    horizontal-stretch: 1;
+                }
+
+                RogMiniToggle {
+                    checked: AsusArmouryData.ppt_enabled.current;
+                    toggled(v) => {
+                        AsusArmouryData.cb_ppt_enabled({ current: v, supported: AsusArmouryData.ppt_enabled.supported });
+                    }
+                }
+            }
+
+            // Limits — scrolls if the window is short
+            ScrollView {
+                vertical-stretch: 1;
+                VerticalLayout {
+                    alignment: start;
+                    spacing: 8px;
+                    Text {
+                        text: @tr("CPU Power Limits");
+                        color: Theme.text-primary;
+                        font-size: Theme.font-md;
+                        font-weight: 600;
+                    }
+
+                    if AsusArmouryData.ppt_pl1_spl.supported: ppt_pl1_row := LimitRow {
+                        label: @tr("CPU Sustained Power Limit");
+                        minimum: AsusArmouryData.ppt_pl1_spl.min;
+                        maximum: AsusArmouryData.ppt_pl1_spl.max;
+                        value: AsusArmouryData.ppt_pl1_spl.current;
+                        unit: "W";
+                        enabled: AsusArmouryData.ppt_enabled.current;
+                        changed(v) => {
+                            AsusArmouryData.ppt_pl1_spl.current = v;
+                            AsusArmouryData.cb_ppt_pl1_spl({
+                                min: AsusArmouryData.ppt_pl1_spl.min,
+                                max: AsusArmouryData.ppt_pl1_spl.max,
+                                current: v,
+                                supported: AsusArmouryData.ppt_pl1_spl.supported
+                            });
+                        }
+                        reset() => { AsusArmouryData.cb_reset_ppt_pl1_spl(); }
+                    }
+
+                    if AsusArmouryData.ppt_pl2_sppt.supported: ppt_pl2_row := LimitRow {
+                        label: @tr("CPU Turbo Power Limit");
+                        minimum: AsusArmouryData.ppt_pl2_sppt.min;
+                        maximum: AsusArmouryData.ppt_pl2_sppt.max;
+                        value: AsusArmouryData.ppt_pl2_sppt.current;
+                        unit: "W";
+                        enabled: AsusArmouryData.ppt_enabled.current;
+                        changed(v) => {
+                            AsusArmouryData.ppt_pl2_sppt.current = v;
+                            AsusArmouryData.cb_ppt_pl2_sppt({
+                                min: AsusArmouryData.ppt_pl2_sppt.min,
+                                max: AsusArmouryData.ppt_pl2_sppt.max,
+                                current: v,
+                                supported: AsusArmouryData.ppt_pl2_sppt.supported
+                            });
+                        }
+                        reset() => { AsusArmouryData.cb_reset_ppt_pl2_sppt(); }
+                    }
+
+                    if AsusArmouryData.ppt_pl3_fppt.supported: ppt_pl3_row := LimitRow {
+                        label: @tr("CPU Fast Burst Power Limit");
+                        minimum: AsusArmouryData.ppt_pl3_fppt.min;
+                        maximum: AsusArmouryData.ppt_pl3_fppt.max;
+                        value: AsusArmouryData.ppt_pl3_fppt.current;
+                        unit: "W";
+                        enabled: AsusArmouryData.ppt_enabled.current;
+                        changed(v) => {
+                            AsusArmouryData.ppt_pl3_fppt.current = v;
+                            AsusArmouryData.cb_ppt_pl3_fppt({
+                                min: AsusArmouryData.ppt_pl3_fppt.min,
+                                max: AsusArmouryData.ppt_pl3_fppt.max,
+                                current: v,
+                                supported: AsusArmouryData.ppt_pl3_fppt.supported
+                            });
+                        }
+                        reset() => { AsusArmouryData.cb_reset_ppt_pl3_fppt(); }
+                    }
+
+                    if AsusArmouryData.ppt_fppt.supported: ppt_fppt_row := LimitRow {
+                        label: @tr("Package Fast Power Limit");
+                        minimum: AsusArmouryData.ppt_fppt.min;
+                        maximum: AsusArmouryData.ppt_fppt.max;
+                        value: AsusArmouryData.ppt_fppt.current;
+                        unit: "W";
+                        enabled: AsusArmouryData.ppt_enabled.current;
+                        changed(v) => {
+                            AsusArmouryData.ppt_fppt.current = v;
+                            AsusArmouryData.cb_ppt_fppt({
+                                min: AsusArmouryData.ppt_fppt.min,
+                                max: AsusArmouryData.ppt_fppt.max,
+                                current: v,
+                                supported: AsusArmouryData.ppt_fppt.supported
+                            });
+                        }
+                        reset() => { AsusArmouryData.cb_reset_ppt_fppt(); }
+                    }
+
+                    if AsusArmouryData.ppt_apu_sppt.supported: ppt_apu_row := LimitRow {
+                        label: @tr("APU Sustained Power Limit");
+                        minimum: AsusArmouryData.ppt_apu_sppt.min;
+                        maximum: AsusArmouryData.ppt_apu_sppt.max;
+                        value: AsusArmouryData.ppt_apu_sppt.current;
+                        unit: "W";
+                        enabled: AsusArmouryData.ppt_enabled.current;
+                        changed(v) => {
+                            AsusArmouryData.ppt_apu_sppt.current = v;
+                            AsusArmouryData.cb_ppt_apu_sppt({
+                                min: AsusArmouryData.ppt_apu_sppt.min,
+                                max: AsusArmouryData.ppt_apu_sppt.max,
+                                current: v,
+                                supported: AsusArmouryData.ppt_apu_sppt.supported
+                            });
+                        }
+                        reset() => { AsusArmouryData.cb_reset_ppt_apu_sppt(); }
+                    }
+
+                    if AsusArmouryData.ppt_platform_sppt.supported: ppt_plat_row := LimitRow {
+                        label: @tr("Platform Sustained Power Limit");
+                        minimum: AsusArmouryData.ppt_platform_sppt.min;
+                        maximum: AsusArmouryData.ppt_platform_sppt.max;
+                        value: AsusArmouryData.ppt_platform_sppt.current;
+                        unit: "W";
+                        enabled: AsusArmouryData.ppt_enabled.current;
+                        changed(v) => {
+                            AsusArmouryData.ppt_platform_sppt.current = v;
+                            AsusArmouryData.cb_ppt_platform_sppt({
+                                min: AsusArmouryData.ppt_platform_sppt.min,
+                                max: AsusArmouryData.ppt_platform_sppt.max,
+                                current: v,
+                                supported: AsusArmouryData.ppt_platform_sppt.supported
+                            });
+                        }
+                        reset() => { AsusArmouryData.cb_reset_ppt_platform_sppt(); }
+                    }
+
+                    if AsusArmouryData.dgpu_tgp.supported ||AsusArmouryData.nv_dynamic_boost.supported||AsusArmouryData.nv_temp_target.supported: nv_text := Text {
+                        text: @tr("GPU");
+                        color: Theme.text-primary;
+                        font-size: Theme.font-md;
+                        font-weight: 600;
+                    }
+
+                    if AsusArmouryData.dgpu_tgp.supported: dgpu_tgp_row := LimitRow {
+                        label: @tr("GPU TGP");
+                        minimum: AsusArmouryData.dgpu_tgp.min;
+                        maximum: AsusArmouryData.dgpu_tgp.max;
+                        value: AsusArmouryData.dgpu_tgp.current;
+                        unit: "W";
+                        enabled: AsusArmouryData.ppt_enabled.current;
+                        changed(v) => {
+                            AsusArmouryData.dgpu_tgp.current = v;
+                            AsusArmouryData.cb_dgpu_tgp({
+                                min: AsusArmouryData.dgpu_tgp.min,
+                                max: AsusArmouryData.dgpu_tgp.max,
+                                current: v,
+                                supported: AsusArmouryData.dgpu_tgp.supported
+                            });
+                        }
+                        reset() => { AsusArmouryData.cb_reset_dgpu_tgp(); }
+                    }
+
+                    if AsusArmouryData.nv_dynamic_boost.supported: nv_boost_row := LimitRow {
+                        label: @tr("GPU Dynamic Boost");
+                        minimum: AsusArmouryData.nv_dynamic_boost.min;
+                        maximum: AsusArmouryData.nv_dynamic_boost.max;
+                        value: AsusArmouryData.nv_dynamic_boost.current;
+                        unit: "W";
+                        enabled: AsusArmouryData.ppt_enabled.current;
+                        changed(v) => {
+                            AsusArmouryData.nv_dynamic_boost.current = v;
+                            AsusArmouryData.cb_nv_dynamic_boost({
+                                min: AsusArmouryData.nv_dynamic_boost.min,
+                                max: AsusArmouryData.nv_dynamic_boost.max,
+                                current: v,
+                                supported: AsusArmouryData.nv_dynamic_boost.supported
+                            });
+                        }
+                        reset() => { AsusArmouryData.cb_reset_nv_dynamic_boost(); }
+                    }
+
+                    if AsusArmouryData.nv_temp_target.supported: nv_temp_row := LimitRow {
+                        label: @tr("GPU Temperature Limit");
+                        minimum: AsusArmouryData.nv_temp_target.min;
+                        maximum: AsusArmouryData.nv_temp_target.max;
+                        value: AsusArmouryData.nv_temp_target.current;
+                        unit: "°C";
+                        enabled: AsusArmouryData.ppt_enabled.current;
+                        changed(v) => {
+                            AsusArmouryData.nv_temp_target.current = v;
+                            AsusArmouryData.cb_nv_temp_target({
+                                min: AsusArmouryData.nv_temp_target.min,
+                                max: AsusArmouryData.nv_temp_target.max,
+                                current: v,
+                                supported: AsusArmouryData.nv_temp_target.supported
+                            });
+                        }
+                        reset() => { AsusArmouryData.cb_reset_nv_temp_target(); }
+                    }
+                }
+            }
+        }
+    }
+}
