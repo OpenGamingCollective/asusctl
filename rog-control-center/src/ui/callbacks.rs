@@ -1,6 +1,9 @@
 use crate::{AsusArmouryData, MainWindow, PowerData, state::Event};
+use rog_platform::asus_armoury::FirmwareAttribute;
 use slint::ComponentHandle;
 use tokio::sync::mpsc::UnboundedSender;
+
+use crate::ui::update::armoury_attrs;
 
 /// A simple macro used to bind an user action to an event, also handle the copy of tx
 macro_rules! bind {
@@ -40,6 +43,23 @@ macro_rules! bind {
     };
 }
 
+// Create ui for each armoury attrs
+macro_rules! bind_armoury_attrs {
+    ($ui:ident, $tx:ident; $( ($variant:ident, $prop:ident, $kind:ident) ),+ $(,)?) => {
+        $(
+            concat_idents::concat_idents!(callback = on_cb_, $prop {
+                let tx_clone = $tx.clone();
+                $ui.global::<AsusArmouryData>().callback(move |val| {
+                    let _ = tx_clone.send(Event::UserRequestedAttr(
+                        FirmwareAttribute::$variant,
+                        val.current as i32,
+                    ));
+                });
+            });
+        )+
+    };
+}
+
 pub fn bind_ui_events(ui: &MainWindow, tx: UnboundedSender<Event>) {
     // Platform Profile
 
@@ -52,21 +72,7 @@ pub fn bind_ui_events(ui: &MainWindow, tx: UnboundedSender<Event>) {
     );
 
     // Home Page
-    bind!(
-        ui,
-        tx,
-        AsusArmouryData,
-        on_cb_boot_sound,
-        Event::UserRequestedBootSound
-    );
-
-    bind!(
-        ui,
-        tx,
-        AsusArmouryData,
-        on_cb_panel_overdrive,
-        Event::UserRequestedPanelOD
-    );
+    armoury_attrs!(bind_armoury_attrs(ui, tx;));
 
     // cb_ppt_enabled passes a full AttrBool, but the platform API only needs the
     // enabled flag; the supported flag is kept on the global.

@@ -17,6 +17,67 @@ fn attr_i32_into_bool(val: AttrMinMax) -> AttrBool {
     }
 }
 
+/// raw firmware attribute value for the Slint property setter
+macro_rules! firmware_attr_value {
+    (MinMax, $val:ident) => {
+        $val
+    };
+    (Bool, $val:ident) => {
+        attr_i32_into_bool($val)
+    };
+}
+
+/// List of asus-armoury firmware attributes exposed to the UI
+macro_rules! armoury_attrs {
+    ($apply:ident($($args:tt)*)) => {
+        $apply!($($args)*
+            (ApuMem, apu_mem, MinMax),
+            (CoresPerformance, cores_performance, MinMax),
+            (CoresEfficiency, cores_efficiency, MinMax),
+            (PptPl1Spl, ppt_pl1_spl, MinMax),
+            (PptPl2Sppt, ppt_pl2_sppt, MinMax),
+            (PptPl3Fppt, ppt_pl3_fppt, MinMax),
+            (PptFppt, ppt_fppt, MinMax),
+            (PptApuSppt, ppt_apu_sppt, MinMax),
+            (PptPlatformSppt, ppt_platform_sppt, MinMax),
+            (NvDynamicBoost, nv_dynamic_boost, MinMax),
+            (NvTempTarget, nv_temp_target, MinMax),
+            (DgpuBaseTgp, dgpu_base_tgp, MinMax),
+            (DgpuTgp, dgpu_tgp, MinMax),
+            (ChargeMode, charge_mode, MinMax),
+            (BootSound, boot_sound, Bool),
+            (McuPowersave, mcu_powersave, Bool),
+            (PanelOverdrive, panel_overdrive, Bool),
+            (PanelHdMode, panel_hd_mode, MinMax),
+            (EgpuConnected, egpu_connected, Bool),
+            (EgpuEnable, egpu_enable, Bool),
+            (DgpuDisable, dgpu_disable, Bool),
+            (GpuMuxMode, gpu_mux_mode, Bool),
+            (MiniLedMode, mini_led_mode, MinMax),
+            (PendingReboot, pending_reboot, Bool),
+            (ScreenAutoBrightness, screen_auto_brightness, Bool),
+        );
+    };
+}
+pub(crate) use armoury_attrs;
+
+/// Generate the `UiUpdate::FirmwareAttr` setter arms from the attribute table
+macro_rules! firmware_attr_setters {
+    ($dev_data:ident, $attr:ident, $val:ident; $( ($variant:ident, $prop:ident, $kind:ident) ),+ $(,)?) => {
+        match $attr {
+            $(
+                FirmwareAttribute::$variant => {
+                    concat_idents::concat_idents!(setter = set_, $prop {
+                        $dev_data.setter(firmware_attr_value!($kind, $val));
+                    });
+                }
+            )+
+            // Others
+            _ => {}
+        }
+    };
+}
+
 pub fn apply_ui_update(ui: &MainWindow, update: UiUpdate) {
     match update {
         UiUpdate::Telemetry(t) => {
@@ -38,44 +99,7 @@ pub fn apply_ui_update(ui: &MainWindow, update: UiUpdate) {
         }
         UiUpdate::FirmwareAttr(attr, v) => {
             let dev_data = ui.global::<AsusArmouryData>();
-            match attr {
-                FirmwareAttribute::ApuMem => dev_data.set_apu_mem(v),
-                FirmwareAttribute::CoresPerformance => dev_data.set_cores_performance(v),
-                FirmwareAttribute::CoresEfficiency => dev_data.set_cores_efficiency(v),
-                FirmwareAttribute::PptPl1Spl => dev_data.set_ppt_pl1_spl(v),
-                FirmwareAttribute::PptPl2Sppt => dev_data.set_ppt_pl2_sppt(v),
-                FirmwareAttribute::PptPl3Fppt => dev_data.set_ppt_pl3_fppt(v),
-                FirmwareAttribute::PptFppt => dev_data.set_ppt_fppt(v),
-                FirmwareAttribute::PptApuSppt => dev_data.set_ppt_apu_sppt(v),
-                FirmwareAttribute::PptPlatformSppt => dev_data.set_ppt_platform_sppt(v),
-                FirmwareAttribute::NvDynamicBoost => dev_data.set_nv_dynamic_boost(v),
-                FirmwareAttribute::NvTempTarget => dev_data.set_nv_temp_target(v),
-                FirmwareAttribute::DgpuBaseTgp => dev_data.set_dgpu_base_tgp(v),
-                FirmwareAttribute::DgpuTgp => dev_data.set_dgpu_tgp(v),
-                FirmwareAttribute::ChargeMode => dev_data.set_charge_mode(v),
-                FirmwareAttribute::BootSound => dev_data.set_boot_sound(attr_i32_into_bool(v)),
-                FirmwareAttribute::McuPowersave => {
-                    dev_data.set_mcu_powersave(attr_i32_into_bool(v))
-                }
-                FirmwareAttribute::PanelOverdrive => {
-                    dev_data.set_panel_overdrive(attr_i32_into_bool(v))
-                }
-                FirmwareAttribute::PanelHdMode => dev_data.set_panel_hd_mode(v),
-                FirmwareAttribute::EgpuConnected => {
-                    dev_data.set_egpu_connected(attr_i32_into_bool(v))
-                }
-                FirmwareAttribute::EgpuEnable => dev_data.set_egpu_enable(attr_i32_into_bool(v)),
-                FirmwareAttribute::DgpuDisable => dev_data.set_dgpu_disable(attr_i32_into_bool(v)),
-                FirmwareAttribute::GpuMuxMode => dev_data.set_gpu_mux_mode(attr_i32_into_bool(v)),
-                FirmwareAttribute::MiniLedMode => dev_data.set_mini_led_mode(v),
-                FirmwareAttribute::PendingReboot => {
-                    dev_data.set_pending_reboot(attr_i32_into_bool(v))
-                }
-                FirmwareAttribute::ScreenAutoBrightness => {
-                    dev_data.set_screen_auto_brightness(attr_i32_into_bool(v))
-                }
-                FirmwareAttribute::None => {}
-            }
+            armoury_attrs!(firmware_attr_setters(dev_data, attr, v;));
         }
         UiUpdate::PPT(b) => {
             let armoury_data = ui.global::<AsusArmouryData>();

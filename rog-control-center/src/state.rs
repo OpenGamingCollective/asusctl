@@ -1,10 +1,9 @@
 //! AppState, contains all the datas and the Events
 
 use crate::{
-    AttrBool, AttrMinMax,
+    AttrMinMax,
     helpers::types::{BatteryInfo, SystemTelemetry},
 };
-use log::info;
 use rog_platform::asus_armoury::FirmwareAttribute;
 #[derive(Debug, Clone)]
 pub enum Event {
@@ -23,10 +22,7 @@ pub enum Event {
 
     // System User Action
     UserRequestedPowerProfile(i32),
-    UserRequestedPanelOD(AttrBool),
-    UserRequestedBootSound(AttrBool),
-    UserRequestedScreenAutoBrightness(AttrBool),
-    UserRequestedMCUPowerSave(AttrBool),
+    UserRequestedAttr(FirmwareAttribute, i32),
 
     UserEnabledPpt(bool),
     UpdatedPptEnabled(bool),
@@ -44,8 +40,6 @@ pub enum Event {
     ShowWindow,
     HideWindow,
     Quit,
-    // Nothing
-    None,
 }
 
 #[derive(Debug, Clone)]
@@ -53,10 +47,7 @@ pub enum Action {
     // System/Home Page
     SetPlatformProfile(i32),
     SetPPTEnabled(bool),
-    SetPanelOD(AttrBool),
-    SetBootSound(AttrBool),
-    SetScreenAutoBrightness(AttrBool),
-    SetMCUPowerSave(AttrBool),
+    SetAttr(FirmwareAttribute, i32),
 
     SetBatteryLimit(u8),
 
@@ -101,9 +92,6 @@ pub enum UiUpdate {
     ShowWindow,
     HideWindow,
     Quit,
-
-    // Unknown attribute / no event
-    None,
 }
 
 #[derive(Default)]
@@ -174,20 +162,8 @@ impl AppState {
                 actions.push(Action::SetPlatformProfile(requested_profile));
             }
 
-            Event::UserRequestedPanelOD(b) => {
-                actions.push(Action::SetPanelOD(b));
-            }
-
-            Event::UserRequestedBootSound(b) => {
-                actions.push(Action::SetBootSound(b));
-            }
-
-            Event::UserRequestedScreenAutoBrightness(b) => {
-                actions.push(Action::SetScreenAutoBrightness(b));
-            }
-
-            Event::UserRequestedMCUPowerSave(b) => {
-                actions.push(Action::SetMCUPowerSave(b));
+            Event::UserRequestedAttr(attr, val) => {
+                actions.push(Action::SetAttr(attr, val));
             }
 
             Event::UserRequestedBatteryLimit(requested_limit) => {
@@ -212,9 +188,6 @@ impl AppState {
             Event::HideWindow => ui_updates.push(UiUpdate::HideWindow),
             Event::Quit => {
                 ui_updates.push(UiUpdate::Quit);
-            }
-            _ => {
-                info!("Event not implemented yet: {:?}", event);
             }
         }
 

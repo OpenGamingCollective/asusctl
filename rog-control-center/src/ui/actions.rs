@@ -46,21 +46,8 @@ impl ActionHandler {
                     warn!("failed to set platform profile: {}", err);
                 };
             }
-            Action::SetPanelOD(b) => {
-                self.set_attribute(FirmwareAttribute::PanelOverdrive, b.current as i32)
-                    .await;
-            }
-            Action::SetBootSound(b) => {
-                self.set_attribute(FirmwareAttribute::BootSound, b.current as i32)
-                    .await;
-            }
-            Action::SetScreenAutoBrightness(b) => {
-                self.set_attribute(FirmwareAttribute::ScreenAutoBrightness, b.current as i32)
-                    .await;
-            }
-            Action::SetMCUPowerSave(b) => {
-                self.set_attribute(FirmwareAttribute::McuPowersave, b.current as i32)
-                    .await;
+            Action::SetAttr(attr, value) => {
+                self.set_attribute(attr, value).await;
             }
             Action::SetPPTEnabled(b) => {
                 if let Some(asusd_proxy) = self.asusd.get()
