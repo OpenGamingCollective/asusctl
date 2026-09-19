@@ -2,8 +2,6 @@
 
 > A simple guide for getting Arch running on ASUS laptops
 
-Arch Linux is the preferred distro and the only one that is directly supported by asusctl maintainers.
-
 Since it can be complicated to install arch, in case you don't want even try archinstall, we also suggest trying:
 
 - EndeavourOS as it feels more like a cohesive distro rather than a collection of software to install and configure.
