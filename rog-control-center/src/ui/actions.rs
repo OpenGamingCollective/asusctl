@@ -43,7 +43,7 @@ impl ActionHandler {
                 };
             }
             Event::UserRequestedAttr(attr, value) => {
-                self.set_attribute(attr.clone(), *value).await;
+                self.set_attribute(*attr, *value).await;
             }
             Event::UserEnabledPpt(b) => {
                 if let Some(platform_proxy) = self.platform() {
