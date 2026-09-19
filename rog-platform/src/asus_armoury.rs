@@ -361,6 +361,7 @@ define_attribute_getters!(
 #[derive(
     Clone,
     Copy,
+    Debug,
     Serialize,
     Deserialize,
     Type,

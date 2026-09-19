@@ -111,7 +111,7 @@ pub async fn subscribe_armoury(tx: UnboundedSender<Event>, asusd: Arc<OnceLock<A
 
         while let Some((attr, iface)) = changes.next().await {
             if let Some(mm) = get_min_max_current(&iface).await {
-                let _ = tx.send(Event::firmware_attr_into_event(&attr, mm));
+                let _ = tx.send(Event::FirmwareAttrUpdated(attr, mm));
             }
         }
     }

@@ -28,36 +28,10 @@ pub enum Event {
     UserRequestedScreenAutoBrightness(AttrBool),
     UserRequestedMCUPowerSave(AttrBool),
 
-    UpdatedPowerProfile(i32),
-    // asus-armoury update
     UserEnabledPpt(bool),
     UpdatedPptEnabled(bool),
-    UpdatedApuMem(AttrMinMax),
-    UpdatedCorePerf(AttrMinMax),
-    UpdatedCoreEff(AttrMinMax),
-    UpdatedPptPl1Spl(AttrMinMax),
-    UpdatedPptPl2Sppt(AttrMinMax),
-    UpdatedPptPl3Fppt(AttrMinMax),
-    UpdatedPptFppt(AttrMinMax),
-    UpdatedPptApuSppt(AttrMinMax),
-    UpdatedPptPlatformSppt(AttrMinMax),
-    UpdatedNvDynamicBoost(AttrMinMax),
-    UpdatedNvTempTarget(AttrMinMax),
-    UpdatedDgpuBaseTgp(AttrMinMax),
-    UpdatedDgpuTgp(AttrMinMax),
-    UpdatedChargeMode(AttrMinMax),
-    UpdatedBootSound(AttrBool),
-    UpdatedMCUPowerSave(AttrBool),
-    UpdatedPanelOD(AttrBool),
-    UpdatedPanelHdMode(AttrMinMax),
-    UpdatedEgpuConnected(AttrBool),
-    UpdatedEgpuEnable(AttrBool),
-    UpdatedDgpuDisable(AttrBool),
-    UpdatedGpuMuxMode(AttrBool),
-    UpdatedMiniLedMode(AttrMinMax),
-    UpdatedPendingRebbot(AttrBool),
-    // 30
-    UpdatedScreenAutoBrightness(AttrBool),
+    // asus-armoury attribute update
+    FirmwareAttrUpdated(FirmwareAttribute, AttrMinMax),
 
     // System User Action Per Profile
     UserRequestedBatteryLimit(u8),
@@ -72,56 +46,6 @@ pub enum Event {
     Quit,
     // Nothing
     None,
-}
-
-impl Event {
-    /// Convert an asus-armoury firmware attribute into an event
-    pub fn firmware_attr_into_event(attr: &FirmwareAttribute, val: AttrMinMax) -> Event {
-        match attr {
-            FirmwareAttribute::ApuMem => Event::UpdatedApuMem(val),
-            FirmwareAttribute::CoresPerformance => Event::UpdatedCorePerf(val),
-            FirmwareAttribute::CoresEfficiency => Event::UpdatedCoreEff(val),
-            FirmwareAttribute::PptPl1Spl => Event::UpdatedPptPl1Spl(val),
-            FirmwareAttribute::PptPl2Sppt => Event::UpdatedPptPl2Sppt(val),
-            FirmwareAttribute::PptPl3Fppt => Event::UpdatedPptPl3Fppt(val),
-            FirmwareAttribute::PptFppt => Event::UpdatedPptFppt(val),
-            FirmwareAttribute::PptApuSppt => Event::UpdatedPptApuSppt(val),
-            FirmwareAttribute::PptPlatformSppt => Event::UpdatedPptPlatformSppt(val),
-            FirmwareAttribute::NvDynamicBoost => Event::UpdatedNvDynamicBoost(val),
-            FirmwareAttribute::NvTempTarget => Event::UpdatedNvTempTarget(val),
-            FirmwareAttribute::DgpuBaseTgp => Event::UpdatedDgpuBaseTgp(val),
-            FirmwareAttribute::DgpuTgp => Event::UpdatedDgpuTgp(val),
-            FirmwareAttribute::ChargeMode => Event::UpdatedChargeMode(val),
-            FirmwareAttribute::BootSound => Event::UpdatedBootSound(attr_i32_into_bool(val)),
-
-            FirmwareAttribute::McuPowersave => Event::UpdatedMCUPowerSave(attr_i32_into_bool(val)),
-            FirmwareAttribute::PanelOverdrive => Event::UpdatedPanelOD(attr_i32_into_bool(val)),
-
-            FirmwareAttribute::PanelHdMode => Event::UpdatedPanelHdMode(val),
-            FirmwareAttribute::EgpuConnected => {
-                Event::UpdatedEgpuConnected(attr_i32_into_bool(val))
-            }
-            FirmwareAttribute::EgpuEnable => Event::UpdatedEgpuEnable(attr_i32_into_bool(val)),
-            FirmwareAttribute::DgpuDisable => Event::UpdatedDgpuDisable(attr_i32_into_bool(val)),
-            FirmwareAttribute::GpuMuxMode => Event::UpdatedGpuMuxMode(attr_i32_into_bool(val)),
-            FirmwareAttribute::MiniLedMode => Event::UpdatedMiniLedMode(val),
-            FirmwareAttribute::PendingReboot => {
-                Event::UpdatedPendingRebbot(attr_i32_into_bool(val))
-            }
-            FirmwareAttribute::ScreenAutoBrightness => {
-                Event::UpdatedScreenAutoBrightness(attr_i32_into_bool(val))
-            }
-            // Unknown
-            FirmwareAttribute::None => Event::None,
-        }
-    }
-}
-
-pub fn attr_i32_into_bool(val: AttrMinMax) -> AttrBool {
-    AttrBool {
-        current: val.current == 1.0,
-        supported: val.supported,
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -168,33 +92,9 @@ pub enum UiUpdate {
         toast_type: ToastType,
     },
 
-    // asus-armoury update
+    // asus-armoury attribute update
     PPT(bool),
-    ApuMem(AttrMinMax),
-    CorePerf(AttrMinMax),
-    CoreEff(AttrMinMax),
-    PptPl1Spl(AttrMinMax),
-    PptPl2Sppt(AttrMinMax),
-    PptPl3Fppt(AttrMinMax),
-    PptFppt(AttrMinMax),
-    PptApuSppt(AttrMinMax),
-    PptPlatformSppt(AttrMinMax),
-    NvDynamicBoost(AttrMinMax),
-    NvTempTarget(AttrMinMax),
-    DgpuBaseTgp(AttrMinMax),
-    DgpuTgp(AttrMinMax),
-    ChargeMode(AttrMinMax),
-    BootSound(AttrBool),
-    MCUPowerSave(AttrBool),
-    PanelOD(AttrBool),
-    PanelHdMode(AttrMinMax),
-    EgpuConnected(AttrBool),
-    EgpuEnable(AttrBool),
-    DgpuDisable(AttrBool),
-    GpuMuxMode(AttrBool),
-    MiniLedMode(AttrMinMax),
-    PendingRebbot(AttrBool),
-    ScreenAutoBrightness(AttrBool),
+    FirmwareAttr(FirmwareAttribute, AttrMinMax),
 
     // Window Management
     ToggleWindow,
@@ -299,17 +199,8 @@ impl AppState {
             Event::UpdatedPptEnabled(b) => {
                 ui_updates.push(UiUpdate::PPT(b));
             }
-            Event::UpdatedBootSound(b) => {
-                ui_updates.push(UiUpdate::BootSound(b));
-            }
-            Event::UpdatedPanelOD(b) => {
-                ui_updates.push(UiUpdate::PanelOD(b));
-            }
-            Event::UpdatedPptPlatformSppt(v) => {
-                ui_updates.push(UiUpdate::PptPlatformSppt(v));
-            }
-            Event::UpdatedPptApuSppt(v) => {
-                ui_updates.push(UiUpdate::PptApuSppt(v));
+            Event::FirmwareAttrUpdated(attr, val) => {
+                ui_updates.push(UiUpdate::FirmwareAttr(attr, val));
             }
             // Config
             Event::UserToggledTray(b) => {
