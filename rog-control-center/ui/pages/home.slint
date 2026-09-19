@@ -249,6 +249,12 @@ export component PageHome inherits RogPage {
                                 value: TelemetryData.igpu_usage_val >= 0.0 ? "\{Math.round(TelemetryData.igpu_usage_val)} %" : "--";
                                 progress: TelemetryData.igpu_usage_val / 100.0;
                             }
+
+                            RogReading {
+                                label: @tr("RAM");
+                                value: TelemetryData.ram_usage_val >= 0.0 ? "\{Math.round(TelemetryData.ram_usage_val)} %" : "--";
+                                progress: TelemetryData.ram_usage_val / 100.0;
+                            }
                         }
                     }
 
