@@ -21,11 +21,6 @@ desktop-extensions/gnome*/node_modules
 desktop-extensions/gnome*/schemas/gschemas.compiled
 desktop-extensions/gnome*/*.zip
 
-# agents and reference
-CLAUDE.md
-AGENTS.md
-/reference
-
 *.log
 
 # Compiled gettext catalogs — build artifacts, generated into OUT_DIR by rog-control-center/build.rs
