@@ -3,11 +3,8 @@ use std::sync::{Arc, Mutex, OnceLock};
 use log::{debug, warn};
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::{
-    config::Config,
-    helpers::zbus_proxies::AsusdInterface,
-    state::{Action, Event},
-};
+use crate::{config::Config, helpers::zbus_proxies::AsusdInterface, state::Event};
+use rog_dbus::zbus_platform::PlatformProxy;
 use rog_platform::asus_armoury::FirmwareAttribute;
 pub struct ActionHandler {
     pub config: Arc<Mutex<Config>>,
@@ -15,11 +12,11 @@ pub struct ActionHandler {
     pub event_tx: UnboundedSender<Event>,
 }
 impl ActionHandler {
-    pub async fn handle_action(&mut self, action: Action) {
-        debug!("handling action: {:?}", action);
-        match action {
+    pub async fn handle(&mut self, event: &Event) {
+        debug!("handling event: {:?}", event);
+        match event {
             // Re-probe asusd (Retry button)
-            Action::RetryAsusd => match AsusdInterface::build().await {
+            Event::RetryAsusd => match AsusdInterface::build().await {
                 Ok(int) if int.present() => {
                     let _ = self.asusd.set(int);
                     let _ = self.event_tx.send(Event::AsusdState(true));
@@ -35,40 +32,42 @@ impl ActionHandler {
             },
             // asusd is down
             _ if self.asusd.get().is_none() => {
-                warn!("asusd unavailable, ignoring action {action:?}");
+                warn!("asusd unavailable, ignoring event {event:?}");
             }
             // System
-            Action::SetPlatformProfile(ppd) => {
-                if let Some(asusd_proxy) = self.asusd.get()
-                    && let Some(platform_proxy) = &asusd_proxy.platform
-                    && let Err(err) = platform_proxy.set_platform_profile(ppd.into()).await
+            Event::UserRequestedPowerProfile(ppd) => {
+                if let Some(platform_proxy) = self.platform()
+                    && let Err(err) = platform_proxy.set_platform_profile((*ppd).into()).await
                 {
                     warn!("failed to set platform profile: {}", err);
                 };
             }
-            Action::SetAttr(attr, value) => {
-                self.set_attribute(attr, value).await;
+            Event::UserRequestedAttr(attr, value) => {
+                self.set_attribute(attr.clone(), *value).await;
             }
-            Action::SetPPTEnabled(b) => {
-                if let Some(asusd_proxy) = self.asusd.get()
-                    && let Some(platform_proxy) = &asusd_proxy.platform
-                {
-                    match platform_proxy.set_enable_ppt_group(b).await {
+            Event::UserEnabledPpt(b) => {
+                if let Some(platform_proxy) = self.platform() {
+                    match platform_proxy.set_enable_ppt_group(*b).await {
                         Ok(()) => {
-                            let _ = self.event_tx.send(Event::UpdatedPptEnabled(b));
+                            let _ = self.event_tx.send(Event::UpdatedPptEnabled(*b));
                         }
                         Err(err) => warn!("failed to set ppt_group: {}", err),
                     };
                 }
             }
-            _ => {
-                warn!("Action not implemented: {:?}", action);
+            Event::UserRequestedBatteryLimit(_) | Event::UserToggledTray(_) => {
+                warn!("Action not implemented: {:?}", event);
             }
+            _ => {}
         }
     }
 
-    /// Write a single armory firmware attribute via D-Bus (panel OD, boot
-    /// sound, PPT, …). Skips with a warning when the attribute is unsupported.
+    fn platform(&self) -> Option<&PlatformProxy<'static>> {
+        self.asusd.get().and_then(|i| i.platform.as_ref())
+    }
+
+    /// Write a single armory firmware attribute via D-Bus
+    // Skips with a warning when the attribute is unsupported.
     async fn set_attribute(&self, attr: FirmwareAttribute, value: i32) {
         let proxy = self.asusd.get().and_then(|i| i.attribute(attr));
         match proxy {

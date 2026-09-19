@@ -42,22 +42,6 @@ pub enum Event {
     Quit,
 }
 
-#[derive(Debug, Clone)]
-pub enum Action {
-    // System/Home Page
-    SetPlatformProfile(i32),
-    SetPPTEnabled(bool),
-    SetAttr(FirmwareAttribute, i32),
-
-    SetBatteryLimit(u8),
-
-    // Re-probe asusd
-    RetryAsusd,
-
-    // Settings
-    SetTray(bool),
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ToastType {
     Info = 0,
@@ -112,8 +96,7 @@ impl AppState {
     }
 
     /// Takes an event, update the state if needed and return what should happen
-    pub fn update(&mut self, event: Event) -> (Vec<Action>, Vec<UiUpdate>) {
-        let mut actions: Vec<Action> = Vec::new();
+    pub fn update(&mut self, event: Event) -> Vec<UiUpdate> {
         let mut ui_updates: Vec<UiUpdate> = Vec::new();
 
         match event {
@@ -153,34 +136,18 @@ impl AppState {
                     }
                 }
             }
-            Event::RetryAsusd => {
-                actions.push(Action::RetryAsusd);
-            }
-
-            // System User Action
-            Event::UserRequestedPowerProfile(requested_profile) => {
-                actions.push(Action::SetPlatformProfile(requested_profile));
-            }
-
-            Event::UserRequestedAttr(attr, val) => {
-                actions.push(Action::SetAttr(attr, val));
-            }
-
-            Event::UserRequestedBatteryLimit(requested_limit) => {
-                actions.push(Action::SetBatteryLimit(requested_limit));
-            }
-            Event::UserEnabledPpt(b) => {
-                actions.push(Action::SetPPTEnabled(b));
-            }
+            // These are handled by the action handler, they do not update the UI
+            Event::RetryAsusd
+            | Event::UserRequestedPowerProfile(_)
+            | Event::UserRequestedAttr(_, _)
+            | Event::UserRequestedBatteryLimit(_)
+            | Event::UserEnabledPpt(_)
+            | Event::UserToggledTray(_) => {}
             Event::UpdatedPptEnabled(b) => {
                 ui_updates.push(UiUpdate::PPT(b));
             }
             Event::FirmwareAttrUpdated(attr, val) => {
                 ui_updates.push(UiUpdate::FirmwareAttr(attr, val));
-            }
-            // Config
-            Event::UserToggledTray(b) => {
-                actions.push(Action::SetTray(b));
             }
             // Window Management
             Event::ToggleWindow => ui_updates.push(UiUpdate::ToggleWindow),
@@ -191,6 +158,6 @@ impl AppState {
             }
         }
 
-        (actions, ui_updates)
+        ui_updates
     }
 }

@@ -169,13 +169,8 @@ fn main() -> Result<()> {
         // Get the current values from asusd
         populate_slint_properties(ui_weak.clone(), asusd.clone()).await;
         while let Some(event) = event_rx.recv().await {
-            let (actions, ui_updates) = state.update(event);
-
-            if !actions.is_empty() {
-                for action in actions {
-                    action_handler.handle_action(action).await;
-                }
-            }
+            action_handler.handle(&event).await;
+            let ui_updates = state.update(event);
 
             // Apply UI updates
             if !ui_updates.is_empty() {
