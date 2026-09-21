@@ -65,8 +65,6 @@ impl std::str::FromStr for CurveData {
     fn from_str(input: &str) -> Result<Self, Self::Err> {
         let mut temp = [0u8; 8];
         let mut pwm = [0u8; 8];
-        let mut temp_prev = 0;
-        let mut pwm_prev = 0;
         let mut percentages = false;
 
         if input.split(',').count() < 8 {
@@ -82,12 +80,6 @@ impl std::str::FromStr for CurveData {
                 let r = r.parse::<u8>().map_err(ProfileError::ParseFanCurveDigit)?;
 
                 if select == 0 {
-                    if temp_prev > r {
-                        return Err(ProfileError::ParseFanCurvePrevHigher(
-                            "temperature", temp_prev, r,
-                        ));
-                    }
-                    temp_prev = r;
                     temp[index] = r;
                 } else {
                     let mut p = r;
@@ -97,12 +89,6 @@ impl std::str::FromStr for CurveData {
                         }
                         p = (p as f32 * 2.55).round() as u8;
                     }
-                    if pwm_prev > p {
-                        return Err(ProfileError::ParseFanCurvePrevHigher(
-                            "percentage", pwm_prev, p,
-                        ));
-                    }
-                    pwm_prev = p;
                     pwm[index] = p;
                 }
             }
@@ -119,6 +105,25 @@ impl std::str::FromStr for CurveData {
 impl CurveData {
     pub fn set_fan(&mut self, fan: FanCurvePU) {
         self.fan = fan;
+    }
+
+    /// Check that both temperature and fan power ascend across the eight
+    /// points. Equal adjacent values are allowed so that flat sections of a
+    /// curve remain valid.
+    pub fn validate(&self) -> Result<(), ProfileError> {
+        for (label, points) in [
+            ("temperature", &self.temp),
+            ("percentage", &self.pwm),
+        ] {
+            for pair in points.windows(2) {
+                if pair[0] > pair[1] {
+                    return Err(ProfileError::ParseFanCurvePrevHigher(
+                        label, pair[0], pair[1],
+                    ));
+                }
+            }
+        }
+        Ok(())
     }
 
     fn set_val_from_attr(tmp: &str, device: &Device, buf: &mut [u8; 8]) {
@@ -244,14 +249,33 @@ mod tests {
     }
 
     #[test]
-    fn curve_data_from_str_invalid_pwm() {
+    fn validate_invalid_pwm() -> Result<(), Box<dyn std::error::Error>> {
         let curve =
-            CurveData::from_str("30c:4%,49c:2%,59c:3%,69c:4%,79c:31%,89c:49%,99c:56%,109c:58%");
-        assert!(&curve.is_err());
+            CurveData::from_str("30c:4%,49c:2%,59c:3%,69c:4%,79c:31%,89c:49%,99c:56%,109c:58%")?;
         assert!(matches!(
-            curve,
-            Err(ProfileError::ParseFanCurvePrevHigher(_, _, _))
+            curve.validate(),
+            Err(ProfileError::ParseFanCurvePrevHigher("percentage", _, _))
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn validate_invalid_temp() -> Result<(), Box<dyn std::error::Error>> {
+        let curve =
+            CurveData::from_str("100c:1%,50c:2%,59c:3%,69c:4%,79c:31%,89c:49%,99c:56%,109c:58%")?;
+        assert!(matches!(
+            curve.validate(),
+            Err(ProfileError::ParseFanCurvePrevHigher("temperature", _, _))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn validate_accepts_flat_sections() -> Result<(), Box<dyn std::error::Error>> {
+        let curve =
+            CurveData::from_str("30c:1%,30c:1%,59c:3%,69c:4%,79c:31%,89c:49%,99c:56%,109c:58%")?;
+        assert!(curve.validate().is_ok());
+        Ok(())
     }
 
     #[test]

@@ -221,6 +221,7 @@ impl CtrlFanCurveZbus {
         profile: PlatformProfile,
         curve: CurveData,
     ) -> zbus::fdo::Result<()> {
+        curve.validate()?;
         self.config
             .lock()
             .await

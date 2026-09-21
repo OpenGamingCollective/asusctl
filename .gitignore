@@ -28,3 +28,6 @@ desktop-extensions/gnome*/*.zip
 
 # Mdbook
 /book/
+
+.envrc
+.direnv/

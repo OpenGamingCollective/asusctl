@@ -1,5 +1,27 @@
 # Changelog
 
+## 6.5.0
+
+- Fix issue where MUX writes fail in certain cases
+- Improve AniMe matrix PNG decoding.
+- Add fan curve validation to D-Bus path.
+- Fix some crashes during startup: Thanks @scardracs
+- Add Aura support for ROG Strix G16 G614PP: Thanks @deminearchiver
+- Upgraded rust edition to 2024: Thanks @luytan
+- Fixes to XDG global shortcuts: Thanks @voidvore
+- Firmware attribute writes validation improved: Thanks again @scardracs
+- Some cleanup of unused crates: Thanks @scardracs
+- Add Aura support for G615LM: @scardracs again!
+- Fix GPU wake-up by telemetry: @scardracs thanks again
+- Fix redundant polling loops: Thanks again @scardracs
+- Fan curves now written after every platform profile write: Thanks @ElXreno
+- Add Aura logo power zone for G615LR: Thanks @Airzh1124
+- Add Aura support for G614PW: Thanks @mrDoctorWho
+- Fix issue with aura power state restoration: Thanks @olivkauwu
+- Add Aura support for G615LW. Thanks @Pelochus
+- Add Aura support for ROG Strix G16 G614FP: Thanks @MsN-12
+- Fix Aura entries for some G615 models: Thanks again @Pelochus
+
 ## 6.4.0
 
 - Add new profile tuning get/set to asusctl cli

@@ -1,5 +1,5 @@
 [workspace.package]
-version = "6.4.0"
+version = "6.5.0"
 rust-version = "1.93"
 license = "MPL-2.0"
 readme = "README.md"
@@ -39,7 +39,7 @@ argh = "^0.1.19"
 ashpd = { version = "=0.13.13", default-features = false, features = ["tokio", "global_shortcuts"] }
 concat-idents = "^1.1.5"
 console-subscriber = "^0.5.0"
-dirs = "^6.0.0"
+dirs = "^7.0.0"
 env_logger = { version = "^0.11.11", default-features = false, features = ["auto-color"] }
 
 futures-util = "^0.3.34"
@@ -54,7 +54,7 @@ logind-zbus = { version = "^5.3.2" }
 mio = "^1.2.2"
 # z = ["zbus", "serde", "async"]
 notify-rust = { version = "=4.18.0", default-features = false, features = ["z"] }
-nvml-wrapper = "^0.12.1"
+nvml-wrapper = "^0.13.0"
 pix = "=1.0.1"
 png = "^0.18.1"
 png_pong = "=0.12.0"
