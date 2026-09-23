@@ -14,7 +14,7 @@ use crate::{AuraDeviceType, PowerZones};
 /// Meaning of this struct depends on the laptop generation.
 /// - 2021+, the struct is a single zone with 4 states
 /// - pre-2021, the struct is 1 or 2 zones and 3 states
-/// - Tuf, the struct is 1 zone and 3 states
+/// - Tuf, the struct is 1 zone and 4 states
 #[cfg_attr(feature = "dbus", derive(Type, Value, OwnedValue))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AuraPowerState {
@@ -22,7 +22,7 @@ pub struct AuraPowerState {
     pub boot: bool,
     pub awake: bool,
     pub sleep: bool,
-    /// Ignored for pre-2021 and Tuf
+    /// Ignored for pre-2021
     pub shutdown: bool,
 }
 
@@ -51,9 +51,9 @@ impl AuraPowerState {
     }
 
     fn tuf_to_bytes(&self) -> Vec<u8> {
-        // &cmd, &boot, &awake, &sleep, &keyboard
+        // &cmd, &boot, &awake, &sleep, &shutdown
         vec![
-            1, self.boot as u8, self.awake as u8, self.sleep as u8, 1,
+            1, self.boot as u8, self.awake as u8, self.sleep as u8, self.shutdown as u8,
         ]
     }
 
@@ -689,5 +689,48 @@ mod test {
             ],
         });
         assert_eq!(byte1, "11111111, 00011110, 00001111, 00001111");
+    }
+
+    #[test]
+    fn check_tuf_control_bytes() {
+        // TUF keyboard interface: cmd, boot, awake, sleep, shutdown.
+        // The last byte (bit 7 of the state flags) gates the keyboard LED
+        // during the S5/power-off phase and must follow the configured
+        // `shutdown` state instead of being hardcoded to on.
+        let power = LaptopAuraPower {
+            states: vec![
+                AuraPowerState {
+                    zone: PowerZones::Keyboard,
+                    boot: false,
+                    awake: true,
+                    sleep: false,
+                    shutdown: false,
+                },
+            ],
+        };
+        assert_eq!(
+            power.to_bytes(AuraDeviceType::LaptopKeyboardTuf),
+            [
+                1, 0, 1, 0, 0
+            ]
+        );
+
+        let power = LaptopAuraPower {
+            states: vec![
+                AuraPowerState {
+                    zone: PowerZones::Keyboard,
+                    boot: false,
+                    awake: true,
+                    sleep: false,
+                    shutdown: true,
+                },
+            ],
+        };
+        assert_eq!(
+            power.to_bytes(AuraDeviceType::LaptopKeyboardTuf),
+            [
+                1, 0, 1, 0, 1
+            ]
+        );
     }
 }
