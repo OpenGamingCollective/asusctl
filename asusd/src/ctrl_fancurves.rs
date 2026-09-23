@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use config_traits::{StdConfig, StdConfigLoad};
-use log::info;
+use log::{info, warn};
 use rog_platform::platform::{PlatformProfile, RogPlatform};
 use rog_profiles::error::ProfileError;
 use rog_profiles::fan_curve_set::CurveData;
@@ -105,7 +105,7 @@ impl CtrlFanCurveZbus {
             let mut config = FanCurveConfig::new().load();
             let mut fan_curves = FanCurveProfiles::default();
 
-            // Only do defaults if the config doesn't already exist\
+            // No usable config: fetch the defaults for every profile
             if config.profiles.balanced.is_empty() || !config.file_path().exists() {
                 info!("Fetching default fan curves");
 
@@ -130,6 +130,7 @@ impl CtrlFanCurveZbus {
             } else {
                 info!("Fan curves previously stored, loading...");
                 config = config.load();
+                fetch_missing_default_curves(&platform, &mut config);
             }
 
             config.current = platform.get_platform_profile()?.into();
@@ -143,6 +144,66 @@ impl CtrlFanCurveZbus {
         }
 
         Err(ProfileError::NotSupported.into())
+    }
+}
+
+/// Fetch the default curves for offered profiles that have none stored, such
+/// as a profile the kernel started offering after the config was made (Quiet
+/// on Intel Panther Lake). Best effort: a profile that fails is logged and
+/// left empty, so it is tried again on the next start.
+fn fetch_missing_default_curves(platform: &RogPlatform, config: &mut FanCurveConfig) {
+    let missing: Vec<PlatformProfile> = match platform.get_platform_profile_choices() {
+        Ok(choices) => choices
+            .into_iter()
+            .filter(|p| config.profiles.get_fan_curves_for(*p).is_empty())
+            .collect(),
+        Err(err) => {
+            warn!("Could not read platform profile choices: {err}");
+            return;
+        }
+    };
+    if missing.is_empty() {
+        return;
+    }
+    let current = match platform.get_platform_profile() {
+        Ok(current) => current,
+        Err(err) => {
+            warn!("Could not read the platform profile, not fetching {missing:?}: {err}");
+            return;
+        }
+    };
+    // Custom can't be set, fall back to Balanced
+    let restore = match current.parse() {
+        Ok(PlatformProfile::Custom) => PlatformProfile::Balanced.into(),
+        _ => current.as_str(),
+    };
+
+    info!("Fetching default fan curves for {missing:?}");
+    let mut fetched = false;
+    for this in missing {
+        // The defaults can only be read for the active profile
+        if let Err(err) = platform.set_platform_profile(this.into()) {
+            warn!("Could not switch to {this:?} to read its default fan curves: {err}");
+            continue;
+        }
+        let read = find_fan_curve_node()
+            .and_then(|mut dev| config.profiles.set_active_curve_to_defaults(this, &mut dev));
+        if let Err(err) = read {
+            warn!("Could not read the default fan curves for {this:?}: {err}");
+            continue;
+        }
+        fetched = true;
+        info!("{this:?}:");
+        for curve in config.profiles.get_fan_curves_for(this) {
+            info!("{}", String::from(curve));
+        }
+    }
+
+    if let Err(err) = platform.set_platform_profile(restore) {
+        warn!("Could not restore platform profile {restore}: {err}");
+    }
+    if fetched {
+        config.write();
     }
 }
 
