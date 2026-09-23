@@ -164,17 +164,16 @@ pub enum PlatformProfile {
 }
 
 impl PlatformProfile {
+    /// The profile after `current` in the kernel's `choices`, wrapping
+    /// around. The kernel lists them from low to high power, and only
+    /// profiles it offers are picked, so cycling can't get stuck on one it
+    /// rejects. From `Custom` or a profile not offered, go to `Balanced`.
     pub fn next(current: Self, choices: &[Self]) -> Self {
-        match current {
-            Self::Balanced => Self::Performance,
-            Self::Performance => {
-                if choices.contains(&Self::LowPower) {
-                    Self::LowPower
-                } else {
-                    Self::Quiet
-                }
-            }
-            Self::Quiet | Self::LowPower | Self::Custom => Self::Balanced,
+        match choices.iter().position(|p| *p == current) {
+            Some(i) => choices[(i + 1) % choices.len()],
+            // Custom, or not offered by the kernel
+            None if choices.contains(&Self::Balanced) => Self::Balanced,
+            None => choices.first().copied().unwrap_or_default(),
         }
     }
 
@@ -413,6 +412,48 @@ mod tests {
                 PlatformProfile::Balanced,
                 PlatformProfile::Performance,
             ]
+        );
+    }
+
+    #[test]
+    fn next_cycles_through_kernel_choices() {
+        assert_eq!(
+            PlatformProfile::next(PlatformProfile::Quiet, ASUS_WMI),
+            PlatformProfile::Balanced
+        );
+        assert_eq!(
+            PlatformProfile::next(PlatformProfile::Balanced, ASUS_WMI),
+            PlatformProfile::Performance
+        );
+        assert_eq!(
+            PlatformProfile::next(PlatformProfile::Performance, ASUS_WMI),
+            PlatformProfile::Quiet
+        );
+        assert_eq!(
+            PlatformProfile::next(PlatformProfile::Performance, AMD_PMF),
+            PlatformProfile::LowPower
+        );
+    }
+
+    #[test]
+    fn next_skips_profiles_the_kernel_does_not_offer() {
+        // Intel Panther Lake without the kernel fix (#387)
+        let choices = [
+            PlatformProfile::Balanced,
+            PlatformProfile::Performance,
+        ];
+        // Used to be Quiet, which failed to set and left cycling stuck
+        assert_eq!(
+            PlatformProfile::next(PlatformProfile::Performance, &choices),
+            PlatformProfile::Balanced
+        );
+        assert_eq!(
+            PlatformProfile::next(PlatformProfile::Custom, &choices),
+            PlatformProfile::Balanced
+        );
+        assert_eq!(
+            PlatformProfile::next(PlatformProfile::Custom, &[]),
+            PlatformProfile::Balanced
         );
     }
 }
