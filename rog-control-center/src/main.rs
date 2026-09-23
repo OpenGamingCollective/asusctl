@@ -301,8 +301,14 @@ fn main() -> Result<()> {
                     .as_ref()
                     .is_some_and(|s| s.status().keeps_alive(config.enable_global_shortcut));
                 if !config.run_in_background && !shortcut_alive {
-                    window.request(WindowCommand::Quit);
-                    break;
+                    // Started in background but nothing can keep the app
+                    // alive: show the window instead of exiting unseen
+                    if state == AppState::StartingUp {
+                        window.request(WindowCommand::Show);
+                    } else {
+                        window.request(WindowCommand::Quit);
+                        break;
+                    }
                 }
             }
         }
