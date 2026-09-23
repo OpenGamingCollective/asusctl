@@ -508,13 +508,14 @@ impl CtrlPlatform {
         let policy = PlatformProfile::next(policy, &choices);
 
         if self.platform.has_platform_profile() {
-            let change_epp = self.config.lock().await.platform_profile_linked_epp;
-            let epp = self.get_config_epp_for_throttle(policy).await;
-            self.check_and_set_epp(epp, change_epp);
             self.write_platform_profile(policy).await.map_err(|err| {
                 warn!("platform_profile {}", err);
                 FdoErr::Failed(format!("RogPlatform: platform_profile: {err}"))
             })?;
+            // Only after the kernel took the profile, so EPP can't desync from it
+            let change_epp = self.config.lock().await.platform_profile_linked_epp;
+            let epp = self.get_config_epp_for_throttle(policy).await;
+            self.check_and_set_epp(epp, change_epp);
             self.enable_ppt_group_changed(&ctxt).await?;
             Ok(self.platform_profile_changed(&ctxt).await?)
         } else {
@@ -543,12 +544,6 @@ impl CtrlPlatform {
     ) -> Result<(), FdoErr> {
         // TODO: watch for external changes
         if self.platform.has_platform_profile() {
-            let change_epp = self.config.lock().await.platform_profile_linked_epp;
-            let epp = self.get_config_epp_for_throttle(policy).await;
-            self.check_and_set_epp(epp, change_epp);
-
-            self.config.lock().await.write();
-
             let choices = self.platform.get_platform_profile_choices()?;
             let policy = policy.resolve_alias(&choices);
             if !choices.contains(&policy) {
@@ -562,6 +557,14 @@ impl CtrlPlatform {
                 warn!("platform_profile {}", err);
                 FdoErr::Failed(format!("RogPlatform: platform_profile: {err}"))
             })?;
+
+            // Only after the kernel took the profile, so EPP can't desync from it
+            let change_epp = self.config.lock().await.platform_profile_linked_epp;
+            let epp = self.get_config_epp_for_throttle(policy).await;
+            self.check_and_set_epp(epp, change_epp);
+
+            self.config.lock().await.write();
+
             self.enable_ppt_group_changed(&ctxt).await?;
             Ok(())
         } else {
@@ -600,8 +603,9 @@ impl CtrlPlatform {
             chosen = chosen.resolve_alias(&choices);
         }
 
-        self.config.lock().await.platform_profile_on_battery = chosen;
+        // Only store it once the kernel took it
         self.set_platform_profile(ctxt, chosen).await?;
+        self.config.lock().await.platform_profile_on_battery = chosen;
         self.config.lock().await.write();
         Ok(())
     }
@@ -635,8 +639,9 @@ impl CtrlPlatform {
             chosen = chosen.resolve_alias(&choices);
         }
 
-        self.config.lock().await.platform_profile_on_ac = chosen;
+        // Only store it once the kernel took it
         self.set_platform_profile(ctxt, chosen).await?;
+        self.config.lock().await.platform_profile_on_ac = chosen;
         self.config.lock().await.write();
         Ok(())
     }
