@@ -76,6 +76,16 @@ impl Default for RogPlatform {
     }
 }
 
+/// Parse a kernel choices list, skipping names `PlatformProfile` can't
+/// represent (such as `cool` or `balanced-performance`) instead of turning
+/// them into `Balanced`
+pub(crate) fn parse_profile_choices(choices: &str) -> Vec<PlatformProfile> {
+    choices
+        .split_whitespace()
+        .filter_map(|name| name.parse().ok())
+        .collect()
+}
+
 #[repr(u8)]
 #[derive(
     Serialize, Deserialize, Default, Type, Value, OwnedValue, Debug, PartialEq, Eq, Clone, Copy,
@@ -325,7 +335,7 @@ pub fn get_fan_rpms() -> (i32, i32, i32) {
 
 #[cfg(test)]
 mod tests {
-    use crate::platform::PlatformProfile;
+    use crate::platform::{PlatformProfile, parse_profile_choices};
 
     // asus-wmi only ever exposes these
     const ASUS_WMI: &[PlatformProfile] = &[
@@ -389,6 +399,20 @@ mod tests {
         assert_eq!(
             PlatformProfile::LowPower.resolve_alias(&no_quiet),
             PlatformProfile::LowPower
+        );
+    }
+
+    #[test]
+    fn choices_skip_names_without_a_profile() {
+        let choices = "low-power cool quiet balanced balanced-performance performance\n";
+        assert_eq!(
+            parse_profile_choices(choices),
+            [
+                PlatformProfile::LowPower,
+                PlatformProfile::Quiet,
+                PlatformProfile::Balanced,
+                PlatformProfile::Performance,
+            ]
         );
     }
 }

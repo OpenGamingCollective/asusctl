@@ -124,12 +124,7 @@ pub fn write_attr_string(device: &mut Device, attr: &str, value: &str) -> Result
 
 pub fn read_attr_string_array(device: &Device, attr_name: &str) -> Result<Vec<PlatformProfile>> {
     if let Some(value) = device.attribute_value(attr_name) {
-        let tmp: Vec<PlatformProfile> = value
-            .to_string_lossy()
-            .split(' ')
-            .map(PlatformProfile::from)
-            .collect();
-        return Ok(tmp);
+        return Ok(platform::parse_profile_choices(&value.to_string_lossy()));
     }
     Err(PlatformError::AttrNotFound(attr_name.to_owned()))
 }
