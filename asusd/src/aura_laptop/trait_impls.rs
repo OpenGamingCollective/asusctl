@@ -27,7 +27,6 @@ impl AuraZbus {
     pub async fn start_tasks(
         mut self,
         connection: &Connection,
-        // _signal_ctx: SignalEmitter<'static>,
         path: OwnedObjectPath,
     ) -> Result<(), RogError> {
         // let task = zbus.clone();
@@ -35,14 +34,20 @@ impl AuraZbus {
         self.reload()
             .await
             .unwrap_or_else(|err| warn!("Controller error: {}", err));
+        let task = self.clone();
         connection
             .object_server()
             .at(path.clone(), self)
             .await
             .map_err(|e| error!("Couldn't add server at path: {path}, {e:?}"))
             .ok();
-        // TODO: skip this until we keep handles to tasks so they can be killed
-        // task.create_tasks(signal_ctx).await
+        // Subscribe to logind sleep/shutdown events. Without this call the
+        // Aura interface is available, but the keyboard controller never
+        // receives on_prepare_for_sleep notifications.
+        let signal_ctx = SignalEmitter::new(connection, AURA_ZBUS_PATH)?;
+        info!("Starting CtrlKbdLedTask system-event subscription");
+        task.create_tasks(signal_ctx).await?;
+        info!("Started CtrlKbdLedTask system-event subscription");
         Ok(())
     }
 }
@@ -241,6 +246,7 @@ impl CtrlTask for AuraZbus {
     }
 
     async fn create_tasks(&self, _: SignalEmitter<'static>) -> Result<(), RogError> {
+        info!("Creating Aura system-event callbacks");
         let inner1 = self.0.clone();
         let inner3 = self.0.clone();
         self.create_sys_event_tasks(
@@ -248,37 +254,54 @@ impl CtrlTask for AuraZbus {
                 let inner1 = inner1.clone();
                 // unwrap as we want to bomb out of the task
                 async move {
-                    if !sleeping {
+                    info!("CtrlKbdLedTask received prepare_for_sleep({sleeping})");
+                    if sleeping {
+                        let (sleep_enabled, led_type, user_brightness) = {
+                            let config = inner1.config.lock().await;
+                            (
+                                config.enabled.states.iter()
+                                    .any(|s| s.zone == rog_aura::PowerZones::Keyboard && s.sleep),
+                                config.led_type,
+                                u8::from(config.brightness),
+                            )
+                        };
+
+                        let config = inner1.config.lock().await;
+                        if let Err(e) = inner1.set_power_states(&config).await {
+                            error!("CtrlKbdLedTask sleep power state write: {e}");
+                        }
+
+                        if sleep_enabled && led_type.is_tuf_laptop() {
+                            info!("CtrlKbdLedTask sleep: TUF sleep strobe requires non-zero brightness");
+                            if let Some(backlight) = &inner1.backlight {
+                                let target_brightness: u8 = if user_brightness == 0 { 3 } else { user_brightness };
+                                if let Err(e) = backlight.lock().await.set_brightness(target_brightness) {
+                                    error!("CtrlKbdLedTask sleep brightness: {e}");
+                                }
+                            }
+                        }
+                    } else {
                         info!("CtrlKbdLedTask reloading brightness and modes");
+                        let (brightness, led_type) = {
+                            let config = inner1.config.lock().await;
+                            (config.brightness.into(), config.led_type)
+                        };
                         if let Some(backlight) = &inner1.backlight {
-                            backlight
-                                .lock()
-                                .await
-                                .set_brightness(inner1.config.lock().await.brightness.into())
-                                .map_err(|e| {
-                                    error!("CtrlKbdLedTask: {e}");
-                                    e
-                                })
-                                .unwrap();
+                            if let Err(e) = backlight.lock().await.set_brightness(brightness) {
+                                error!("CtrlKbdLedTask wake brightness: {e}");
+                                return;
+                            }
                         }
                         let mut config = inner1.config.lock().await;
-                        inner1
-                            .write_current_config_mode(&mut config)
-                            .await
-                            .map_err(|e| {
-                                error!("CtrlKbdLedTask: {e}");
-                                e
-                            })
-                            .unwrap();
-                    } else if sleeping {
-                        inner1
-                            .update_config()
-                            .await
-                            .map_err(|e| {
-                                error!("CtrlKbdLedTask: {e}");
-                                e
-                            })
-                            .unwrap();
+                        if let Err(e) = inner1.write_current_config_mode(&mut config).await {
+                            error!("CtrlKbdLedTask wake mode: {e}");
+                            return;
+                        }
+                        if led_type.is_tuf_laptop()
+                            && let Err(e) = inner1.set_power_states(&config).await
+                        {
+                            error!("CtrlKbdLedTask wake power state: {e}");
+                        }
                     }
                 }
             },
@@ -286,17 +309,11 @@ impl CtrlTask for AuraZbus {
                 let inner3 = inner3.clone();
                 async move {
                     info!("CtrlKbdLedTask reloading brightness and modes");
+                    let brightness = inner3.config.lock().await.brightness.into();
                     if let Some(backlight) = &inner3.backlight {
-                        // unwrap as we want to bomb out of the task
-                        backlight
-                            .lock()
-                            .await
-                            .set_brightness(inner3.config.lock().await.brightness.into())
-                            .map_err(|e| {
-                                error!("CtrlKbdLedTask: {e}");
-                                e
-                            })
-                            .unwrap();
+                        if let Err(e) = backlight.lock().await.set_brightness(brightness) {
+                            error!("CtrlKbdLedTask: {e}");
+                        }
                     }
                 }
             },
