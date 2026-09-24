@@ -304,7 +304,7 @@ fn main() -> Result<()> {
                     // Started in background but nothing can keep the app
                     // alive: show the window instead of exiting unseen
                     if state == AppState::StartingUp {
-                        window.request(WindowCommand::Show);
+                        window.request(WindowCommand::ShowIfStartingUp);
                     } else {
                         window.request(WindowCommand::Quit);
                         break;
