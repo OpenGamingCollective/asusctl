@@ -22,6 +22,8 @@ thread_local! {
 #[derive(Debug, Clone, Copy)]
 pub enum WindowCommand {
     Show,
+    /// Show only if the window has never been shown yet
+    ShowIfStartingUp,
     Toggle,
     Quit,
 }
@@ -88,6 +90,18 @@ impl WindowController {
 
             match command {
                 WindowCommand::Show => self.show(state),
+                WindowCommand::ShowIfStartingUp => {
+                    // Checked here rather than when queued: the window may
+                    // have been shown and closed since, and must stay closed
+                    if self
+                        .0
+                        .app_state
+                        .lock()
+                        .is_ok_and(|s| *s == AppState::StartingUp)
+                    {
+                        self.show(state);
+                    }
+                }
                 WindowCommand::Toggle => {
                     if state.ui.as_ref().is_some_and(|ui| ui.window().is_visible()) {
                         self.hide(state);
