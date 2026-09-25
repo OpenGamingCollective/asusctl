@@ -173,11 +173,11 @@ fn read_drm_busy(dir: &Path) -> Option<f32> {
         .ok()
 }
 
-/// The process-wide NVML handle, initialised on first successful use.
-///
-/// `Nvml::init` dlopens libnvidia-ml and costs milliseconds, so it is not
-/// repeated per telemetry read. A failed init is not cached: the driver may
-/// simply not be up yet, so the next call retries.
+/// Process-wide NVML handle. `Nvml::init` dlopens libnvidia-ml, so it is not
+/// repeated per poll. On the NVIDIA open kernel module, init and drop every
+/// telemetry poll reset the runtime-PM idle timer and the dGPU never suspends
+/// while the UI is open. A handle kept for the process lifetime does not.
+/// A failed init is not cached: the driver may not be loaded yet.
 fn nvml() -> Option<&'static nvml_wrapper::Nvml> {
     static NVML: OnceLock<nvml_wrapper::Nvml> = OnceLock::new();
     if let Some(nvml) = NVML.get() {
@@ -267,18 +267,26 @@ impl Device {
         }
     }
 
+    /// True when hwmon, DRM, or NVML access could resume this GPU.
+    ///
+    /// Any card that is not runtime-active stays untouched. A firmware-disabled
+    /// dGPU stays untouched even when the MUX leaves its runtime status active.
+    fn must_stay_asleep(&self) -> bool {
+        self.get_runtime_status().unwrap_or_default() != GfxPower::Active
+            || (self.is_dgpu && asus_dgpu_disabled().unwrap_or(false))
+    }
+
     /// Probe this device's hwmon directories with `read`, falling back to
     /// `nvml` on NVIDIA hardware whose proprietary driver registers no hwmon.
     ///
-    /// If this is a discrete GPU and it is not in the `Active` power state,
-    /// this immediately returns `None` without accessing hwmon or NVML to prevent
-    /// waking the PCIe device from runtime PM sleep.
+    /// Returns `None` immediately when [`Self::must_stay_asleep`] is set, without
+    /// accessing hwmon or NVML.
     fn probe_hwmon(
         &self,
         read: fn(&Path) -> Option<f32>,
         nvml: fn() -> Option<f32>,
     ) -> Option<f32> {
-        if self.is_dgpu && self.get_runtime_status().unwrap_or_default() != GfxPower::Active {
+        if self.must_stay_asleep() {
             return None;
         }
 
@@ -325,11 +333,10 @@ impl Device {
     /// Probe this device's DRM directories for usage percentage, falling back to
     /// `nvml` on NVIDIA hardware whose proprietary driver registers no DRM usage node.
     ///
-    /// If this is a discrete GPU and it is not in the `Active` power state,
-    /// this immediately returns `None` without accessing DRM sysfs or NVML to prevent
-    /// waking the PCIe device from runtime PM sleep.
+    /// Returns `None` immediately when [`Self::must_stay_asleep`] is set, without
+    /// accessing DRM sysfs or NVML.
     fn probe_usage(&self, nvml: fn() -> Option<f32>) -> Option<f32> {
-        if self.is_dgpu && self.get_runtime_status().unwrap_or_default() != GfxPower::Active {
+        if self.must_stay_asleep() {
             return None;
         }
 
@@ -376,9 +383,7 @@ impl Device {
 
     /// Read the GPU utilization percentage (0.0 - 100.0) from sysfs DRM nodes with NVML fallback.
     ///
-    /// If this is a discrete GPU and it is not in the `Active` power state,
-    /// this immediately returns `None` without accessing DRM sysfs or NVML to prevent
-    /// waking the PCIe device from runtime PM sleep.
+    /// Returns `None` when [`Self::must_stay_asleep`] is set.
     pub fn get_usage_pct(&self) -> Option<f32> {
         self.probe_usage(read_nvml_usage)
     }
