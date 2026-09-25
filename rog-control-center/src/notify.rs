@@ -11,7 +11,7 @@ use std::time::Duration;
 
 use log::{debug, error, info, warn};
 use notify_rust::{Hint, Notification, Timeout};
-use rog_platform::gpu_pci::GfxPower;
+use rog_platform::gpu_pci::{Device, GfxPower, firmware_gpu};
 use rog_platform::power::AsusPower;
 use serde::{Deserialize, Serialize};
 use tokio::runtime::Runtime;
@@ -41,28 +41,28 @@ impl Default for EnabledNotifications {
     }
 }
 
-/// Decide what to report for one poll tick of the dGPU status monitor, or
-/// `None` to skip the tick.
+/// Decide what to report for one poll tick of the firmware GPU status monitor,
+/// or `None` to skip the tick.
 ///
 /// Writing dgpu_disable=1 does not remove the device from the PCI bus, so the
-/// attribute must win over the runtime status of a still-enumerated dGPU.
+/// attribute must win over the runtime status of a still-enumerated GPU.
 ///
 /// An unknown status from a present device is transitional (runtime PM cycles
 /// through "suspending"/"resuming", which parse as unknown) and is skipped.
 /// Unknown with no device on the bus is real information — reported, so that
 /// listeners fall back instead of keeping a stale state.
-fn dgpu_status_for_tick(
-    dgpu_disabled: bool,
+fn gpu_status_for_tick(
+    firmware_disabled: bool,
     runtime_status: Option<GfxPower>,
     mux_discreet: bool,
 ) -> Option<GfxPower> {
-    if dgpu_disabled {
+    if firmware_disabled {
         return Some(GfxPower::AsusDisabled);
     }
     match runtime_status {
         Some(GfxPower::Unknown) => None,
         Some(status) => Some(status),
-        // No dGPU on the bus: report the ASUS mux state instead
+        // No firmware GPU on the bus: report the ASUS mux state instead
         None => Some(if mux_discreet {
             GfxPower::AsusMuxDiscreet
         } else {
@@ -74,26 +74,27 @@ fn dgpu_status_for_tick(
 // `unknown_lints` is silenced first so older toolchains (rustc 1.85) don't
 // reject the newer lint names while newer ones still honor them.
 #[allow(unknown_lints, clippy::manual_is_multiple_of)]
-fn start_dgpu_status_mon(config: Arc<Mutex<Config>>, gpu_status_tx: watch::Sender<GfxPower>) {
-    use rog_platform::gpu_pci::{Device, asus_dgpu_disabled, asus_gpu_mux_discreet};
+fn start_gpu_status_mon(config: Arc<Mutex<Config>>, gpu_status_tx: watch::Sender<GfxPower>) {
+    use rog_platform::gpu_pci::{asus_dgpu_disabled, asus_gpu_mux_discreet};
 
-    let find_dgpu = || {
-        Device::find()
-            .unwrap_or_default()
-            .into_iter()
-            .find(|d| d.is_dgpu())
+    let find_firmware_gpu = || match Device::find() {
+        Ok(devices) => firmware_gpu(&devices).cloned(),
+        Err(err) => {
+            warn!("GPU enumeration failed: {err}");
+            None
+        }
     };
 
     let enabled_notifications_copy = config.clone();
     // Plain old thread is perfectly fine since most of this is potentially blocking
     std::thread::spawn(move || {
-        let mut dgpu = find_dgpu();
-        match &dgpu {
+        let mut gpu = find_firmware_gpu();
+        match &gpu {
             Some(dev) => info!(
-                "Found dGPU: {}, starting status notifications",
+                "Found firmware GPU: {}, starting status notifications",
                 dev.pci_id()
             ),
-            None => warn!("Did not find a dGPU on this system, will keep watching for one"),
+            None => warn!("Did not find a firmware GPU on this system, will keep watching for one"),
         }
 
         let mut last_status = GfxPower::Unknown;
@@ -106,19 +107,19 @@ fn start_dgpu_status_mon(config: Arc<Mutex<Config>>, gpu_status_tx: watch::Sende
             if !disabled {
                 // Drop the cached device if it vanished (e.g. unbound/removed
                 // from the PCI bus)
-                if dgpu.as_ref().is_some_and(|d| !d.dev_path().exists()) {
-                    info!("dGPU device is gone, re-detecting");
-                    dgpu = None;
+                if gpu.as_ref().is_some_and(|d| !d.dev_path().exists()) {
+                    info!("firmware GPU device is gone, re-detecting");
+                    gpu = None;
                 }
-                // Re-detection is a full udev scan, so do it sparingly
-                if dgpu.is_none() && ticks % 4 == 0 {
-                    dgpu = find_dgpu();
+                // Re-detection is a full sysfs scan, so do it sparingly
+                if gpu.is_none() && ticks % 4 == 0 {
+                    gpu = find_firmware_gpu();
                 }
             }
 
-            let Some(status) = dgpu_status_for_tick(
+            let Some(status) = gpu_status_for_tick(
                 disabled,
-                dgpu.as_ref()
+                gpu.as_ref()
                     .map(|dev| dev.get_runtime_status().unwrap_or(GfxPower::Unknown)),
                 asus_gpu_mux_discreet().unwrap_or(false),
             ) else {
@@ -126,7 +127,7 @@ fn start_dgpu_status_mon(config: Arc<Mutex<Config>>, gpu_status_tx: watch::Sende
             };
 
             if status != last_status {
-                debug!("dGPU status changed: {:?}", status);
+                debug!("GPU status changed: {:?}", status);
                 gpu_status_tx.send_replace(status);
                 let notify = enabled_notifications_copy.lock().is_ok_and(|config| {
                     config.notifications.enabled && config.notifications.receive_notify_gfx_status
@@ -199,8 +200,8 @@ pub fn start_notifications(
         }
     });
 
-    info!("Attempting to start plain dgpu status monitor");
-    start_dgpu_status_mon(config.clone(), gpu_status_tx);
+    info!("Attempting to start firmware GPU status monitor");
+    start_gpu_status_mon(config.clone(), gpu_status_tx);
 
     Ok(vec![blocking])
 }
@@ -235,53 +236,53 @@ mod tests {
     use super::*;
 
     #[test]
-    fn dgpu_disable_wins_over_an_enumerated_dgpu() {
+    fn dgpu_disable_wins_over_an_enumerated_gpu() {
         assert_eq!(
-            dgpu_status_for_tick(true, Some(GfxPower::Active), false),
+            gpu_status_for_tick(true, Some(GfxPower::Active), false),
             Some(GfxPower::AsusDisabled)
         );
         assert_eq!(
-            dgpu_status_for_tick(true, None, true),
+            gpu_status_for_tick(true, None, true),
             Some(GfxPower::AsusDisabled)
         );
     }
 
     #[test]
-    fn runtime_status_reported_when_a_dgpu_is_present() {
+    fn runtime_status_reported_when_a_firmware_gpu_is_present() {
         assert_eq!(
-            dgpu_status_for_tick(false, Some(GfxPower::Suspended), false),
+            gpu_status_for_tick(false, Some(GfxPower::Suspended), false),
             Some(GfxPower::Suspended)
         );
         assert_eq!(
-            dgpu_status_for_tick(false, Some(GfxPower::Active), false),
+            gpu_status_for_tick(false, Some(GfxPower::Active), false),
             Some(GfxPower::Active)
         );
     }
 
     #[test]
-    fn mux_state_reported_when_no_dgpu_is_on_the_bus() {
+    fn mux_state_reported_when_no_firmware_gpu_is_on_the_bus() {
         assert_eq!(
-            dgpu_status_for_tick(false, None, true),
+            gpu_status_for_tick(false, None, true),
             Some(GfxPower::AsusMuxDiscreet)
         );
     }
 
     #[test]
-    fn transitional_unknown_from_a_present_dgpu_is_skipped() {
+    fn transitional_unknown_from_a_present_gpu_is_skipped() {
         assert_eq!(
-            dgpu_status_for_tick(false, Some(GfxPower::Unknown), false),
+            gpu_status_for_tick(false, Some(GfxPower::Unknown), false),
             None
         );
         assert_eq!(
-            dgpu_status_for_tick(false, Some(GfxPower::Unknown), true),
+            gpu_status_for_tick(false, Some(GfxPower::Unknown), true),
             None
         );
     }
 
     #[test]
-    fn persistent_unknown_with_no_dgpu_is_reported() {
+    fn persistent_unknown_with_no_firmware_gpu_is_reported() {
         assert_eq!(
-            dgpu_status_for_tick(false, None, false),
+            gpu_status_for_tick(false, None, false),
             Some(GfxPower::Unknown)
         );
     }
