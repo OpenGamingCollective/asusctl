@@ -24,6 +24,7 @@
 # Usage
 
 - [asusctl](usage/asusctl.md)
+- [Dynamic Lighting and legacy fallback](usage/dynamic-lighting.md)
 
 # FAQ
 

@@ -9,12 +9,12 @@ use std::thread::sleep;
 
 use config_traits::StdConfig;
 use log::{debug, error, info, warn};
+use rog_anime::error::AnimeError;
 use rog_anime::usb::{
     Brightness, pkt_flush, pkt_set_brightness, pkt_set_enable_display,
     pkt_set_enable_powersave_anim, pkts_for_init,
 };
 use rog_anime::{ActionData, AnimeDataBuffer, AnimePacketType};
-use rog_platform::hid_raw::HidRaw;
 use rog_platform::usb_raw::USBRaw;
 use tokio::sync::Mutex;
 
@@ -23,7 +23,6 @@ use crate::error::RogError;
 
 #[derive(Debug, Clone)]
 pub struct AniMe {
-    hid: Option<Arc<Mutex<HidRaw>>>,
     usb: Option<Arc<Mutex<USBRaw>>>,
     config: Arc<Mutex<AniMeConfig>>,
     cache: AniMeConfigCached,
@@ -34,13 +33,8 @@ pub struct AniMe {
 }
 
 impl AniMe {
-    pub fn new(
-        hid: Option<Arc<Mutex<HidRaw>>>,
-        usb: Option<Arc<Mutex<USBRaw>>>,
-        config: Arc<Mutex<AniMeConfig>>,
-    ) -> Self {
+    pub fn new(usb: Option<Arc<Mutex<USBRaw>>>, config: Arc<Mutex<AniMeConfig>>) -> Self {
         Self {
-            hid,
             usb,
             config,
             cache: AniMeConfigCached::default(),
@@ -78,11 +72,10 @@ impl AniMe {
     }
 
     pub async fn write_bytes(&self, message: &[u8]) -> Result<(), RogError> {
-        if let Some(hid) = &self.hid {
-            hid.lock().await.write_bytes(message)?;
-        } else if let Some(usb) = &self.usb {
-            usb.lock().await.write_bytes(message)?;
-        }
+        let Some(usb) = &self.usb else {
+            return Err(RogError::Anime(AnimeError::NoDevice));
+        };
+        usb.lock().await.write_bytes(message)?;
         Ok(())
     }
 
