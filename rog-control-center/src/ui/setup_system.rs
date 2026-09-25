@@ -12,7 +12,7 @@ use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 use super::show_toast;
 use crate::config::Config;
 use crate::zbus_proxies::{AppState, find_iface_async};
-use crate::{AttrMinMax, MainWindow, SystemPageData, set_ui_callbacks};
+use crate::{AttrMinMax, GpuPowerState, GpuStatus, MainWindow, SystemPageData, set_ui_callbacks};
 
 const MINMAX: AttrMinMax = AttrMinMax {
     min: 0,
@@ -68,24 +68,23 @@ pub fn setup_system_page(
     ui.global::<SystemPageData>()
         .set_ppt_enabled_available(false);
 
-    let has_dgpu = {
-        let devices = rog_platform::gpu_pci::Device::find().unwrap_or_default();
-        devices.iter().any(|d| d.is_dgpu())
-            || rog_platform::gpu_pci::asus_dgpu_disable_exists()
-            || rog_platform::gpu_pci::asus_gpu_mux_exists()
+    let devices = match rog_platform::gpu_pci::Device::find() {
+        Ok(devices) => devices,
+        Err(err) => {
+            error!("GPU enumeration failed: {err}");
+            Vec::new()
+        }
     };
-    ui.global::<SystemPageData>().set_has_dgpu(has_dgpu);
+    let show_gpu_fan = devices.len() > 1
+        || rog_platform::gpu_pci::asus_dgpu_disable_exists()
+        || rog_platform::gpu_pci::asus_gpu_mux_exists();
+    ui.global::<SystemPageData>().set_show_gpu_fan(show_gpu_fan);
+    ui.global::<SystemPageData>()
+        .set_gpus(ModelRc::new(VecModel::<GpuStatus>::from(Vec::new())));
 
     let cpu_model = rog_platform::cpu::get_cpu_model();
-    let (igpu_model, dgpu_model) = rog_platform::gpu_pci::get_gpu_names();
-    let has_igpu = igpu_model != "Integrated GPU" && !igpu_model.is_empty();
 
     ui.global::<SystemPageData>().set_cpu_name(cpu_model.into());
-    ui.global::<SystemPageData>()
-        .set_igpu_name(igpu_model.into());
-    ui.global::<SystemPageData>()
-        .set_dgpu_name(dgpu_model.into());
-    ui.global::<SystemPageData>().set_has_igpu(has_igpu);
 
     if let Ok(sys_props) = platform
         .supported_properties()
@@ -143,15 +142,10 @@ pub fn setup_system_page(
             };
 
             let cpu_temp = rog_platform::cpu::get_cpu_temp();
-            let gpu_telemetry = rog_platform::gpu_pci::get_gpu_telemetry();
-            let gpu_temp = gpu_telemetry.dgpu_temp;
-            let igpu_temp = gpu_telemetry.igpu_temp;
-            let dgpu_suspended = gpu_telemetry.dgpu_suspended;
+            let gpu_readings = rog_platform::gpu_pci::get_gpu_readings();
             let (cpu_fan, gpu_fan, mid_fan) = rog_platform::platform::get_fan_rpms();
             let cpu_freq = rog_platform::cpu::get_cpu_frequency_mhz();
             let ram_usage = rog_platform::cpu::get_ram_usage_pct();
-            let gpu_usage = gpu_telemetry.dgpu_usage;
-            let igpu_usage = gpu_telemetry.igpu_usage;
 
             let curr_ticks = rog_platform::cpu::read_cpu_ticks();
             let cpu_usage = if let (Some(p), Some(c)) = (&prev_ticks, &curr_ticks) {
@@ -178,17 +172,31 @@ pub fn setup_system_page(
                     data.set_battery_health(-1);
                 }
                 data.set_cpu_temp_val(cpu_temp);
-                data.set_gpu_temp_val(gpu_temp);
-                data.set_igpu_temp_val(igpu_temp);
-                data.set_dgpu_suspended(dgpu_suspended);
                 data.set_cpu_usage_val(cpu_usage);
-                data.set_gpu_usage_val(gpu_usage);
-                data.set_igpu_usage_val(igpu_usage);
                 data.set_ram_usage_val(ram_usage);
                 data.set_cpu_freq_mhz(cpu_freq);
                 data.set_cpu_fan_rpm(cpu_fan);
                 data.set_gpu_fan_rpm(gpu_fan);
                 data.set_mid_fan_rpm(mid_fan);
+                data.set_gpus(ModelRc::new(VecModel::from(
+                    gpu_readings
+                        .into_iter()
+                        .map(|reading| GpuStatus {
+                            name: reading.name.into(),
+                            temp: reading.temp,
+                            usage: reading.usage,
+                            power_state: match reading.power {
+                                rog_platform::gpu_pci::GfxPower::AsusDisabled => {
+                                    GpuPowerState::Disabled
+                                }
+                                rog_platform::gpu_pci::GfxPower::Suspended => {
+                                    GpuPowerState::Suspended
+                                }
+                                _ => GpuPowerState::Metrics,
+                            },
+                        })
+                        .collect::<Vec<_>>(),
+                )));
             });
 
             if success.is_err() {

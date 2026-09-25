@@ -301,11 +301,6 @@ impl Device {
         &self.pci_id
     }
 
-    /// Firmware-controlled GPU. Kept until callers switch to [`firmware_gpu`].
-    pub fn is_dgpu(&self) -> bool {
-        self.firmware_controlled
-    }
-
     /// Read a file underneath the sys object.
     fn read_file(path: PathBuf) -> Result<String> {
         fs::read_to_string(&path)
@@ -654,69 +649,6 @@ pub fn get_gpu_readings() -> Vec<GpuReading> {
             }
         })
         .collect()
-}
-
-/// iGPU/dGPU pair used by the System page until it lists [`GpuReading`]s.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct GpuTelemetry {
-    pub igpu_temp: f32,
-    pub igpu_usage: f32,
-    pub dgpu_temp: f32,
-    pub dgpu_usage: f32,
-    pub dgpu_suspended: bool,
-    pub dgpu_freq_mhz: f32,
-}
-
-impl Default for GpuTelemetry {
-    fn default() -> Self {
-        Self {
-            igpu_temp: -1.0,
-            igpu_usage: -1.0,
-            dgpu_temp: -1.0,
-            dgpu_usage: -1.0,
-            dgpu_suspended: false,
-            dgpu_freq_mhz: -1.0,
-        }
-    }
-}
-
-/// `(integrated name, firmware-controlled name)` for the old System page slots.
-pub fn get_gpu_names() -> (String, String) {
-    let devices = find_devices();
-    let firmware = firmware_gpu(&devices).map(|gpu| gpu.dev_path.clone());
-    let mut igpu = "Integrated GPU".to_string();
-    let mut dgpu = "Discrete GPU".to_string();
-    for device in devices {
-        let name = gpu_model_name(device.dev_path(), device.pci_id());
-        if firmware.as_ref() == Some(device.dev_path()) {
-            dgpu = name;
-        } else {
-            igpu = name;
-        }
-    }
-    (igpu, dgpu)
-}
-
-/// Old two-slot telemetry. The firmware-controlled GPU fills the dGPU fields.
-pub fn get_gpu_telemetry() -> GpuTelemetry {
-    let mut telemetry = GpuTelemetry::default();
-    let devices = find_devices();
-    let firmware = firmware_gpu(&devices).map(|gpu| gpu.dev_path.clone());
-    for device in devices {
-        if firmware.as_ref() == Some(device.dev_path()) {
-            let power = device.get_runtime_status().unwrap_or_default();
-            telemetry.dgpu_suspended = power == GfxPower::Suspended;
-            if power == GfxPower::Active {
-                telemetry.dgpu_temp = device.get_temp().unwrap_or(-1.0);
-                telemetry.dgpu_usage = device.get_usage_pct().unwrap_or(-1.0);
-                telemetry.dgpu_freq_mhz = device.get_freq_mhz().unwrap_or(-1.0);
-            }
-        } else {
-            telemetry.igpu_temp = device.get_temp().unwrap_or(-1.0);
-            telemetry.igpu_usage = device.get_usage_pct().unwrap_or(-1.0);
-        }
-    }
-    telemetry
 }
 
 #[cfg(test)]
