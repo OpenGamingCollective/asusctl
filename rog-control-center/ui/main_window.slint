@@ -1,6 +1,6 @@
 import { Palette, Button, VerticalBox } from "std-widgets.slint";
 import { AppSize } from "globals.slint";
-import { PageSystem, SystemPageData, AttrMinMax } from "pages/system.slint";
+import { PageSystem, SystemPageData, AttrMinMax, GpuStatus, GpuPowerState } from "pages/system.slint";
 import { SideBar } from "widgets/sidebar.slint";
 import { PageAbout } from "pages/about.slint";
 import { PageFans } from "pages/fans.slint";
@@ -18,7 +18,7 @@ import { AuraPageData, AuraDevType, LaptopAuraPower, AuraPowerState, PowerZones,
 export { AuraPageData, AuraDevType, LaptopAuraPower, AuraPowerState, PowerZones, AuraEffect }
 import { PageAppSettings, AppSettingsPageData, GlobalShortcutStatus } from "pages/app_settings.slint";
 
-export { AppSize, AttrMinMax, SystemPageData, AnimePageData, SlashPageData, AppSettingsPageData, GlobalShortcutStatus, GPUPageData }
+export { AppSize, AttrMinMax, GpuStatus, GpuPowerState, SystemPageData, AnimePageData, SlashPageData, AppSettingsPageData, GlobalShortcutStatus, GPUPageData }
 
 export component MainWindow inherits Window {
     title: "ROG Control";

@@ -2,6 +2,19 @@ import { SystemSlider, SystemDropdown, SystemToggle, SystemToggleInt, RogItem } 
 import { Palette, HorizontalBox , VerticalBox, ScrollView, Slider, Button, Switch, ComboBox, GroupBox, StandardButton} from "std-widgets.slint";
 import { FanPageData } from "../types/fan_types.slint";
 
+export enum GpuPowerState {
+    Metrics,
+    Suspended,
+    Disabled,
+}
+
+export struct GpuStatus {
+    name: string,
+    temp: float,
+    usage: float,
+    power_state: GpuPowerState,
+}
+
 export struct AttrMinMax {
   min: int,
   max: int,
@@ -158,22 +171,15 @@ export global SystemPageData {
     in-out property <string> battery_status: "Unknown";
     in-out property <string> battery_time_estimate: "";
     in-out property <float> cpu_temp_val: -1.0;
-    in-out property <float> gpu_temp_val: -1.0;
     in-out property <float> cpu_usage_val: -1.0;
-    in-out property <float> gpu_usage_val: -1.0;
     in-out property <float> ram_usage_val: -1.0;
     in-out property <float> cpu_freq_mhz: -1.0;
     in-out property <int> cpu_fan_rpm: -1;
     in-out property <int> gpu_fan_rpm: -1;
     in-out property <int> mid_fan_rpm: -1;
-    in-out property <bool> has_dgpu: true;
+    in-out property <bool> show_gpu_fan: false;
     in-out property <string> cpu_name: "";
-    in-out property <string> igpu_name: "";
-    in-out property <string> dgpu_name: "";
-    in-out property <float> igpu_temp_val: -1.0;
-    in-out property <float> igpu_usage_val: -1.0;
-    in-out property <bool> has_igpu: false;
-    in-out property <bool> dgpu_suspended: false;
+    in-out property <[GpuStatus]> gpus: [];
 }
 
 export component PageSystem inherits Rectangle {
@@ -291,41 +297,6 @@ export component PageSystem inherits Rectangle {
                                 }
                             }
 
-                            if SystemPageData.has_igpu: Rectangle { height: 4px; } // divider spacer
-
-                            if SystemPageData.has_igpu: Text {
-                                text: SystemPageData.igpu_name != "" ? (@tr("iGPU Status") + " | " + SystemPageData.igpu_name) : @tr("iGPU Status");
-                                font-weight: 700;
-                                color: Palette.control-foreground;
-                                font-size: 12px;
-                            }
-                            
-                            if SystemPageData.has_igpu: HorizontalLayout {
-                                alignment: LayoutAlignment.space-between;
-                                Text {
-                                    text: @tr("Temperature:");
-                                    color: Palette.control-foreground;
-                                }
-                                Text {
-                                    text: SystemPageData.igpu_temp_val > 0.0 ? (Math.round(SystemPageData.igpu_temp_val) + " °C") : @tr("N/A");
-                                    font-weight: 700;
-                                    color: SystemPageData.igpu_temp_val > 80 ? #ef4444 : (SystemPageData.igpu_temp_val > 65 ? #eab308 : (SystemPageData.igpu_temp_val > 0.0 ? #22c55e : Palette.control-foreground));
-                                }
-                            }
-                            
-                            if SystemPageData.has_igpu: HorizontalLayout {
-                                alignment: LayoutAlignment.space-between;
-                                Text {
-                                    text: @tr("Usage:");
-                                    color: Palette.control-foreground;
-                                }
-                                Text {
-                                    text: SystemPageData.igpu_usage_val >= 0.0 ? (Math.round(SystemPageData.igpu_usage_val) + "%") : @tr("N/A");
-                                    font-weight: 700;
-                                    color: Palette.control-foreground;
-                                }
-                            }
-
                             Rectangle { height: 4px; } // divider spacer
 
                             Text {
@@ -351,45 +322,50 @@ export component PageSystem inherits Rectangle {
                             Rectangle {}
                         }
 
-                        // Right Column: GPU & Fans
+                        // Right Column: GPUs & Fans
                         VerticalLayout {
                             width: 50%;
                             spacing: 8px;
-                            
-                            if SystemPageData.has_dgpu: Text {
-                                text: SystemPageData.dgpu_name != "" ? (@tr("dGPU Status") + " | " + SystemPageData.dgpu_name) : @tr("dGPU Status");
-                                font-weight: 700;
-                                color: Palette.control-foreground;
-                                font-size: 12px;
-                            }
-                            
-                            if SystemPageData.has_dgpu: HorizontalLayout {
-                                alignment: LayoutAlignment.space-between;
+
+                            for gpu in SystemPageData.gpus: VerticalLayout {
+                                spacing: 8px;
+                                property <string> power_label: gpu.power_state == GpuPowerState.Disabled ? @tr("Disabled") : (gpu.power_state == GpuPowerState.Suspended ? @tr("Suspended") : "");
+
                                 Text {
-                                    text: @tr("Temperature:");
-                                    color: Palette.control-foreground;
-                                }
-                                Text {
-                                    text: SystemPageData.dgpu_suspended ? @tr("Suspended") : (SystemPageData.gpu_temp_val >= 0.0 ? (Math.round(SystemPageData.gpu_temp_val) + " °C") : @tr("N/A"));
-                                    font-weight: 700;
-                                    color: SystemPageData.dgpu_suspended ? Palette.control-foreground : (SystemPageData.gpu_temp_val > 80 ? #ef4444 : (SystemPageData.gpu_temp_val > 65 ? #eab308 : (SystemPageData.gpu_temp_val >= 0.0 ? #22c55e : Palette.control-foreground)));
-                                }
-                            }
-                            
-                            if SystemPageData.has_dgpu: HorizontalLayout {
-                                alignment: LayoutAlignment.space-between;
-                                Text {
-                                    text: @tr("Usage:");
-                                    color: Palette.control-foreground;
-                                }
-                                Text {
-                                    text: SystemPageData.dgpu_suspended ? @tr("Suspended") : (SystemPageData.gpu_usage_val >= 0.0 ? (Math.round(SystemPageData.gpu_usage_val) + "%") : @tr("N/A"));
+                                    text: gpu.name != "" ? (@tr("GPU Status") + " | " + gpu.name) : @tr("GPU Status");
                                     font-weight: 700;
                                     color: Palette.control-foreground;
+                                    font-size: 12px;
+                                }
+
+                                HorizontalLayout {
+                                    alignment: LayoutAlignment.space-between;
+                                    Text {
+                                        text: @tr("Temperature:");
+                                        color: Palette.control-foreground;
+                                    }
+                                    Text {
+                                        text: power_label != "" ? power_label : (gpu.temp >= 0.0 ? (Math.round(gpu.temp) + " °C") : @tr("N/A"));
+                                        font-weight: 700;
+                                        color: power_label != "" ? Palette.control-foreground : (gpu.temp > 80 ? #ef4444 : (gpu.temp > 65 ? #eab308 : (gpu.temp >= 0.0 ? #22c55e : Palette.control-foreground)));
+                                    }
+                                }
+
+                                HorizontalLayout {
+                                    alignment: LayoutAlignment.space-between;
+                                    Text {
+                                        text: @tr("Usage:");
+                                        color: Palette.control-foreground;
+                                    }
+                                    Text {
+                                        text: power_label != "" ? power_label : (gpu.usage >= 0.0 ? (Math.round(gpu.usage) + "%") : @tr("N/A"));
+                                        font-weight: 700;
+                                        color: Palette.control-foreground;
+                                    }
                                 }
                             }
 
-                            if SystemPageData.has_dgpu: Rectangle { height: 4px; } // divider spacer
+                            if SystemPageData.gpus.length > 0: Rectangle { height: 4px; } // divider spacer
 
                             Text {
                                 text: @tr("Fan Speeds");
@@ -411,7 +387,7 @@ export component PageSystem inherits Rectangle {
                                 }
                             }
                             
-                            if SystemPageData.has_dgpu: HorizontalLayout {
+                            if SystemPageData.show_gpu_fan: HorizontalLayout {
                                 alignment: LayoutAlignment.space-between;
                                 Text {
                                     text: @tr("GPU Fan:");
