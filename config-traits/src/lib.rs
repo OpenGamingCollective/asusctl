@@ -83,15 +83,35 @@ where
 
     /// Directly open the config file for read and write. If the config file
     /// does not exist it is created, including the directories the file
-    /// resides in.
-    fn file_open(&self) -> File {
-        OpenOptions::new()
+    /// resides in. Returns the open file and whether it was opened writable.
+    ///
+    /// If the file exists but is not writable (e.g. a symlink into a read-only
+    /// store, which reports either `PermissionDenied` or `ReadOnlyFilesystem`)
+    /// it is opened read-only and `false` is returned, so callers can avoid
+    /// writing over the managed file.
+    fn file_open(&self) -> (File, bool) {
+        let path = self.file_path();
+        match OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
             .truncate(false)
-            .open(self.file_path())
-            .unwrap_or_else(|e| panic!("Could not open {:?} {e}", self.file_path()))
+            .open(&path)
+        {
+            Ok(file) => (file, true),
+            Err(e)
+                if matches!(
+                    e.kind(),
+                    std::io::ErrorKind::PermissionDenied | std::io::ErrorKind::ReadOnlyFilesystem
+                ) && path.exists() =>
+            {
+                warn!("Config {path:?} is not writable, opening read-only: {e}");
+                let file =
+                    File::open(&path).unwrap_or_else(|e| panic!("Could not open {:?} {e}", path));
+                (file, false)
+            }
+            Err(e) => panic!("Could not open {:?} {e}", path),
+        }
     }
 
     /// Open and parse the config file to self from ron format
@@ -219,7 +239,7 @@ macro_rules! std_config_load {
             $($generic: DeserializeOwned + Into<Self>),*
         {
             fn load(mut self) -> Self {
-                let mut file = self.file_open();
+                let (mut file, writable) = self.file_open();
                 let mut buf = String::new();
                 if let Ok(read_len) = file.read_to_string(&mut buf) {
                     if read_len != 0 {
@@ -237,7 +257,12 @@ macro_rules! std_config_load {
                         error!("Config file {} zero read length", self.file_name());
                     }
                 }
-                self.write();
+                // Skip the load-time write-back when the file was opened
+                // read-only, otherwise it would clobber the read-only file or
+                // replace a managed symlink. Explicit writes are unaffected.
+                if writable {
+                    self.write();
+                }
                 self
             }
         }
@@ -253,6 +278,111 @@ std_config_load!(StdConfigLoad4: T1, T2, T3, T4);
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
+
+    #[test]
+    fn load_read_only_config() {
+        use crate::{StdConfig, StdConfigLoad};
+
+        #[derive(serde::Deserialize, serde::Serialize, Debug)]
+        struct Test {
+            value: u32,
+        }
+
+        impl crate::StdConfig for Test {
+            fn new() -> Self {
+                Self { value: 0 }
+            }
+
+            fn file_name(&self) -> String {
+                "read_only_test.ron".to_owned()
+            }
+
+            fn config_dir() -> PathBuf {
+                std::env::temp_dir().join(format!(
+                    "config_traits_read_only_test_{}",
+                    std::process::id()
+                ))
+            }
+        }
+
+        impl crate::StdConfigLoad for Test {}
+
+        let dir = Test::config_dir();
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("read_only_test.ron");
+        std::fs::write(&path, "(value: 7)").unwrap();
+        let mut perms = std::fs::metadata(&path).unwrap().permissions();
+        perms.set_readonly(true);
+        std::fs::set_permissions(&path, perms).unwrap();
+
+        // Only meaningful when the writable open really fails; a root process
+        // or ACL could otherwise open it writable and pass without the fallback.
+        if std::fs::OpenOptions::new().write(true).open(&path).is_ok() {
+            let _ = std::fs::remove_dir_all(&dir);
+            return;
+        }
+
+        let cfg = Test::new().load();
+        assert_eq!(cfg.value, 7);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn read_only_symlink_is_preserved() {
+        use crate::{StdConfig, StdConfigLoad};
+
+        #[derive(serde::Deserialize, serde::Serialize, Debug)]
+        struct Test {
+            value: u32,
+        }
+
+        impl crate::StdConfig for Test {
+            fn new() -> Self {
+                Self { value: 0 }
+            }
+
+            fn file_name(&self) -> String {
+                "symlink_test.ron".to_owned()
+            }
+
+            fn config_dir() -> PathBuf {
+                std::env::temp_dir()
+                    .join(format!("config_traits_symlink_test_{}", std::process::id()))
+            }
+        }
+
+        impl crate::StdConfigLoad for Test {}
+
+        let dir = Test::config_dir();
+        std::fs::create_dir_all(&dir).unwrap();
+
+        // A managed, read-only target reached through a symlink at the config path.
+        let target = dir.join("managed.ron");
+        std::fs::write(&target, "(value: 7)").unwrap();
+        let mut perms = std::fs::metadata(&target).unwrap().permissions();
+        perms.set_readonly(true);
+        std::fs::set_permissions(&target, perms).unwrap();
+
+        let link = dir.join("symlink_test.ron");
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+
+        if std::fs::OpenOptions::new().write(true).open(&link).is_ok() {
+            let _ = std::fs::remove_dir_all(&dir);
+            return;
+        }
+
+        let cfg = Test::new().load();
+        assert_eq!(cfg.value, 7);
+        // load() must not have replaced the managed symlink with a plain file.
+        assert!(std::fs::symlink_metadata(&link)
+            .unwrap()
+            .file_type()
+            .is_symlink());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn check_macro_from_1() {
