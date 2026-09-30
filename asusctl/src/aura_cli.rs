@@ -35,6 +35,12 @@ pub struct LedPowerCommand1 {
 
     #[argh(option, description = "control suspend animations <true/false>")]
     pub sleep: Option<bool>,
+
+    #[argh(
+        option,
+        description = "control if LEDs enabled while shutting down <true/false>"
+    )]
+    pub shutdown: Option<bool>,
 }
 
 #[derive(FromArgs, Debug, Clone)]

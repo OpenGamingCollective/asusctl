@@ -142,7 +142,6 @@ impl Aura {
     pub async fn set_power_states(&self, config: &AuraConfig) -> Result<(), RogError> {
         if matches!(config.led_type, rog_aura::AuraDeviceType::LaptopKeyboardTuf) {
             if let Some(backlight) = &self.backlight {
-                // TODO: tuf bool array
                 let buf = config.enabled.to_bytes(config.led_type);
                 backlight.lock().await.set_kbd_rgb_state(&buf)?;
             }

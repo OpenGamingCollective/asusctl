@@ -258,6 +258,7 @@ For older ROG and TUF laptops (product ID 0x1866):
 asusctl aura power-tuf --awake true --boot false
 asusctl aura power-tuf --awake false --keyboard
 asusctl aura power-tuf --boot true --lightbar
+asusctl aura power-tuf --awake true --shutdown false
 ```
 
 | Option | Description |
@@ -265,8 +266,12 @@ asusctl aura power-tuf --boot true --lightbar
 | `--awake <true\|false>` | Whether the LEDs are enabled while awake |
 | `--boot <true\|false>` | Whether the boot animation is enabled |
 | `--sleep <true\|false>` | Whether the suspend animation is enabled |
-| `--keyboard` | Apply the state to the keyboard zone |
-| `--lightbar` | Apply the state to the lightbar zone |
+| `--shutdown <true\|false>` | Whether the LEDs are enabled while shutting down |
+| `--keyboard` | Apply the state to the keyboard zone (pre-2021 ROG only) |
+| `--lightbar` | Apply the state to the lightbar zone (pre-2021 ROG only) |
+
+TUF keyboards have a single keyboard zone: the power options, including
+`--shutdown`, apply to it directly and no zone switch is required.
 
 ## anime
 

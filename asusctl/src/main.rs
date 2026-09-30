@@ -646,6 +646,7 @@ fn handle_led_power1(power: &LedPowerCommand1) -> Result<(), Box<dyn std::error:
         if power.awake.is_none()
             && power.sleep.is_none()
             && power.boot.is_none()
+            && power.shutdown.is_none()
             && !power.keyboard
             && !power.lightbar
         {
@@ -653,7 +654,11 @@ fn handle_led_power1(power: &LedPowerCommand1) -> Result<(), Box<dyn std::error:
             return Ok(());
         }
 
-        if dev_type.is_old_laptop() || dev_type.is_tuf_laptop() {
+        if dev_type.is_tuf_laptop() {
+            handle_led_power_1_do_tuf(&aura, power)?;
+            return Ok(());
+        }
+        if dev_type.is_old_laptop() {
             handle_led_power_1_do_1866(&aura, power)?;
             return Ok(());
         }
@@ -674,7 +679,7 @@ fn handle_led_power_1_do_1866(
             boot: power.boot.unwrap_or_default(),
             awake: power.awake.unwrap_or_default(),
             sleep: power.sleep.unwrap_or_default(),
-            shutdown: false,
+            shutdown: power.shutdown.unwrap_or_default(),
         });
     }
     if power.lightbar {
@@ -683,11 +688,32 @@ fn handle_led_power_1_do_1866(
             boot: power.boot.unwrap_or_default(),
             awake: power.awake.unwrap_or_default(),
             sleep: power.sleep.unwrap_or_default(),
-            shutdown: false,
+            shutdown: power.shutdown.unwrap_or_default(),
         });
     }
 
     let states = LaptopAuraPower { states };
+    aura.set_led_power(states)?;
+    Ok(())
+}
+
+/// TUF keyboards expose a single `Keyboard` power zone, so the power
+/// options apply to it directly without a zone switch.
+fn handle_led_power_1_do_tuf(
+    aura: &AuraProxyBlocking,
+    power: &LedPowerCommand1,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let states = LaptopAuraPower {
+        states: vec![
+            AuraPowerState {
+                zone: PowerZones::Keyboard,
+                boot: power.boot.unwrap_or_default(),
+                awake: power.awake.unwrap_or_default(),
+                sleep: power.sleep.unwrap_or_default(),
+                shutdown: power.shutdown.unwrap_or_default(),
+            },
+        ],
+    };
     aura.set_led_power(states)?;
     Ok(())
 }
