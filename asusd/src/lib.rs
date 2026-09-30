@@ -435,14 +435,21 @@ pub trait CtrlTask {
             tokio::spawn({
                 let logind_manager = logind_manager.clone();
                 async move {
-                    if let Ok(mut notif) = logind_manager.receive_prepare_for_sleep().await {
-                        while let Some(event) = notif.next().await {
-                            // blocks thread :|
-                            if let Ok(args) = event.args() {
-                                debug!("Doing on_prepare_for_sleep({})", args.start);
-                                on_prepare_for_sleep(args.start).await;
+                    match logind_manager.receive_prepare_for_sleep().await {
+                        Ok(mut notif) => {
+                            info!("Subscribed to logind PrepareForSleep");
+                            while let Some(event) = notif.next().await {
+                                // blocks thread :|
+                                if let Ok(args) = event.args() {
+                                    debug!("Doing on_prepare_for_sleep({})", args.start);
+                                    on_prepare_for_sleep(args.start).await;
+                                } else {
+                                    warn!("Failed to decode logind PrepareForSleep signal");
+                                }
                             }
+                            warn!("logind PrepareForSleep stream ended");
                         }
+                        Err(err) => warn!("Could not subscribe to logind PrepareForSleep: {err}"),
                     }
                 }
             });
