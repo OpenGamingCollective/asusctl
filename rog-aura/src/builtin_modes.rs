@@ -40,6 +40,46 @@ impl LedBrightness {
             Self::High => Self::Med,
         }
     }
+
+    /// Map the 4-step UI level onto a sysfs brightness value.
+    ///
+    /// When `max_brightness <= 3` the legacy 0..=3 mapping is kept. Otherwise
+    /// levels are scaled across `0..=max_brightness` (Off=0, High=max).
+    pub const fn to_scaled(self, max_brightness: u8) -> u8 {
+        if max_brightness <= 3 {
+            return self as u8;
+        }
+        match self {
+            Self::Off => 0,
+            Self::Low => max_brightness / 3,
+            Self::Med => ((2u16 * max_brightness as u16) / 3) as u8,
+            Self::High => max_brightness,
+        }
+    }
+
+    /// Inverse of [`Self::to_scaled`].
+    pub const fn from_scaled(value: u8, max_brightness: u8) -> Self {
+        if max_brightness <= 3 {
+            return match value {
+                0 => Self::Off,
+                1 => Self::Low,
+                3 => Self::High,
+                _ => Self::Med,
+            };
+        }
+        if value == 0 {
+            return Self::Off;
+        }
+        let low = max_brightness / 3;
+        let med = ((2u16 * max_brightness as u16) / 3) as u8;
+        if value <= low {
+            Self::Low
+        } else if value <= med {
+            Self::Med
+        } else {
+            Self::High
+        }
+    }
 }
 
 impl From<u8> for LedBrightness {
@@ -199,6 +239,16 @@ impl From<Speed> for u8 {
         }
     }
 }
+
+impl Speed {
+    pub const fn to_dynamic_speed(&self) -> u32 {
+        match self {
+            Self::Low => 0,
+            Self::Med => 1,
+            Self::High => 2,
+        }
+    }
+}
 /// Used for Rainbow mode.
 ///
 /// Enum corresponds to the required integer value
@@ -248,6 +298,17 @@ impl From<Direction> for i32 {
     }
 }
 
+impl Direction {
+    pub const fn to_dynamic_direction_str(&self) -> &'static str {
+        match self {
+            Self::Right => "right",
+            Self::Left => "left",
+            Self::Up => "up",
+            Self::Down => "down",
+        }
+    }
+}
+
 /// Enum of modes that convert to the actual number required by a USB HID packet
 #[cfg_attr(
     feature = "dbus",
@@ -271,6 +332,8 @@ pub enum AuraModeNum {
     Pulse = 10,
     Comet = 11,
     Flash = 12,
+    /// Kernel `direct` effect: per-key frames go through `direct_buffer`.
+    Direct = 13,
 }
 
 impl Display for AuraModeNum {
@@ -300,6 +363,7 @@ impl From<&AuraModeNum> for &str {
             AuraModeNum::Pulse => "Pulse",
             AuraModeNum::Comet => "Comet",
             AuraModeNum::Flash => "Flash",
+            AuraModeNum::Direct => "Direct",
         }
     }
 }
@@ -317,6 +381,7 @@ impl From<&str> for AuraModeNum {
             "Pulse" => AuraModeNum::Pulse,
             "Comet" => AuraModeNum::Comet,
             "Flash" => AuraModeNum::Flash,
+            "Direct" => AuraModeNum::Direct,
             _ => AuraModeNum::Static,
         }
     }
@@ -336,6 +401,7 @@ impl From<u8> for AuraModeNum {
             10 => AuraModeNum::Pulse,
             11 => AuraModeNum::Comet,
             12 => AuraModeNum::Flash,
+            13 => AuraModeNum::Direct,
             _ => AuraModeNum::Static,
         }
     }
@@ -356,6 +422,42 @@ impl From<AuraModeNum> for i32 {
 impl From<AuraEffect> for AuraModeNum {
     fn from(value: AuraEffect) -> Self {
         value.mode
+    }
+}
+
+impl AuraModeNum {
+    /// Every mode the UI can offer. Index 9 is unused and is not included.
+    pub const fn all() -> [Self; 13] {
+        [
+            Self::Static,
+            Self::Breathe,
+            Self::RainbowCycle,
+            Self::RainbowWave,
+            Self::Star,
+            Self::Rain,
+            Self::Highlight,
+            Self::Laser,
+            Self::Ripple,
+            Self::Pulse,
+            Self::Comet,
+            Self::Flash,
+            Self::Direct,
+        ]
+    }
+
+    /// Dynamic Lighting `effect` name for this mode.
+    ///
+    /// Matches the current kernel `effect_index`: `static`, `breathe`,
+    /// `rainbow_cycle`, `rainbow_wave`, `direct`.
+    pub const fn to_dynamic_effect_str(&self) -> Option<&'static str> {
+        match self {
+            Self::Static => Some("static"),
+            Self::Breathe => Some("breathe"),
+            Self::RainbowCycle => Some("rainbow_cycle"),
+            Self::RainbowWave => Some("rainbow_wave"),
+            Self::Direct => Some("direct"),
+            _ => None,
+        }
     }
 }
 
@@ -404,7 +506,7 @@ impl FromStr for AuraZone {
             "3" | "three" => Ok(AuraZone::Key3),
             "4" | "four" => Ok(AuraZone::Key4),
             "5" | "logo" => Ok(AuraZone::Logo),
-            "6" | "lightbar-left" => Ok(AuraZone::BarLeft),
+            "6" | "lightbar-left" | "lightbar" | "bar" => Ok(AuraZone::BarLeft),
             "7" | "lightbar-right" => Ok(AuraZone::BarRight),
             _ => Err(Error::ParseSpeed),
         }
@@ -468,6 +570,16 @@ impl AuraEffect {
 
     pub fn zone(&self) -> AuraZone {
         self.zone
+    }
+
+    /// Convert the effect colours to an array of RGB tuples for Dynamic Lighting palette.
+    pub fn to_dynamic_palette(&self) -> Vec<(u8, u8, u8)> {
+        let mut p = Vec::with_capacity(2);
+        p.push((self.colour1.r, self.colour1.g, self.colour1.b));
+        if self.colour2.r != 0 || self.colour2.g != 0 || self.colour2.b != 0 {
+            p.push((self.colour2.r, self.colour2.g, self.colour2.b));
+        }
+        p
     }
 }
 
@@ -539,8 +651,27 @@ impl From<&AuraEffect> for Vec<u8> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        AURA_LAPTOP_LED_MSG_LEN, AuraEffect, AuraModeNum, AuraZone, Colour, Direction, Speed,
+        AURA_LAPTOP_LED_MSG_LEN, AuraEffect, AuraModeNum, AuraZone, Colour, Direction,
+        LedBrightness, Speed,
     };
+
+    #[test]
+    fn led_brightness_scales_for_dynamic_lighting() {
+        assert_eq!(LedBrightness::Off.to_scaled(255), 0);
+        assert_eq!(LedBrightness::Low.to_scaled(255), 85);
+        assert_eq!(LedBrightness::Med.to_scaled(255), 170);
+        assert_eq!(LedBrightness::High.to_scaled(255), 255);
+
+        assert_eq!(LedBrightness::from_scaled(0, 255), LedBrightness::Off);
+        assert_eq!(LedBrightness::from_scaled(85, 255), LedBrightness::Low);
+        assert_eq!(LedBrightness::from_scaled(170, 255), LedBrightness::Med);
+        assert_eq!(LedBrightness::from_scaled(255, 255), LedBrightness::High);
+
+        // Legacy 0..=3 path when max_brightness is small.
+        assert_eq!(LedBrightness::Med.to_scaled(3), 2);
+        assert_eq!(LedBrightness::from_scaled(2, 3), LedBrightness::Med);
+        assert_eq!(LedBrightness::High.to_scaled(3), 3);
+    }
 
     #[test]
     fn check_led_static_packet() {
@@ -687,6 +818,58 @@ mod tests {
         assert_eq!(
             <[u8; AURA_LAPTOP_LED_MSG_LEN]>::from(&st)[..9],
             capture[..9]
+        );
+    }
+
+    #[test]
+    fn test_dynamic_lighting_conversions() {
+        assert_eq!(AuraModeNum::Static.to_dynamic_effect_str(), Some("static"));
+        assert_eq!(
+            AuraModeNum::Breathe.to_dynamic_effect_str(),
+            Some("breathe")
+        );
+        assert_eq!(
+            AuraModeNum::RainbowCycle.to_dynamic_effect_str(),
+            Some("rainbow_cycle")
+        );
+        assert_eq!(
+            AuraModeNum::RainbowWave.to_dynamic_effect_str(),
+            Some("rainbow_wave")
+        );
+        assert_eq!(AuraModeNum::Pulse.to_dynamic_effect_str(), None);
+        assert_eq!(AuraModeNum::Flash.to_dynamic_effect_str(), None);
+        assert_eq!(AuraModeNum::Star.to_dynamic_effect_str(), None);
+        assert_eq!(AuraModeNum::Direct.to_dynamic_effect_str(), Some("direct"));
+
+        assert_eq!(Speed::Low.to_dynamic_speed(), 0);
+        assert_eq!(Speed::Med.to_dynamic_speed(), 1);
+        assert_eq!(Speed::High.to_dynamic_speed(), 2);
+
+        assert_eq!(Direction::Right.to_dynamic_direction_str(), "right");
+        assert_eq!(Direction::Left.to_dynamic_direction_str(), "left");
+        assert_eq!(Direction::Up.to_dynamic_direction_str(), "up");
+        assert_eq!(Direction::Down.to_dynamic_direction_str(), "down");
+
+        let effect = AuraEffect {
+            colour1: Colour {
+                r: 0xff,
+                g: 0x10,
+                b: 0x20,
+            },
+            colour2: Colour {
+                r: 0x00,
+                g: 0x30,
+                b: 0x40,
+            },
+            ..Default::default()
+        };
+        let palette = effect.to_dynamic_palette();
+        assert_eq!(
+            palette,
+            vec![
+                (0xff, 0x10, 0x20),
+                (0x00, 0x30, 0x40)
+            ]
         );
     }
 }
