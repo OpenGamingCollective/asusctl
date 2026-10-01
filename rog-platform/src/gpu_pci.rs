@@ -1,4 +1,5 @@
-//! Enumerate PCI display GPUs from sysfs and identify the firmware-controlled card.
+//! Enumerate PCI display GPUs and read each card's name, temperature, usage,
+//! and runtime power from sysfs.
 
 use std::fmt::Display;
 use std::fs::{self, OpenOptions};
@@ -483,6 +484,8 @@ impl Device {
             });
         }
 
+        // Stable order for the two-slot legacy helpers when firmware_gpu is None.
+        found.sort_by_key(|device| pci_bdf(&device.dev_path).unwrap_or_default().to_owned());
         let controlled = firmware_gpu(&found).map(|gpu| gpu.dev_path.clone());
         for device in &mut found {
             device.firmware_controlled = controlled.as_ref() == Some(&device.dev_path);
@@ -590,7 +593,72 @@ fn lookup_amdgpu_name(device_id: &str, revision: &str) -> Option<String> {
     None
 }
 
-/// Telemetry metrics for both integrated and discrete GPUs.
+fn gpu_model_name(dev_path: &Path, pci_id: &str) -> String {
+    let device_id = pci_id.split_once(':').map_or("", |(_, device)| device);
+
+    if pci_vendor_id(pci_id) == Some(AMD_VENDOR_ID) && !device_id.is_empty() {
+        let revision = fs::read_to_string(dev_path.join("revision"))
+            .unwrap_or_default()
+            .trim()
+            .trim_start_matches("0x")
+            .to_lowercase();
+        if let Some(name) = lookup_amdgpu_name(device_id, &revision) {
+            return name;
+        }
+    }
+
+    if let Ok(device) = udev::Device::from_syspath(dev_path)
+        && let Some(model) = device.property_value("ID_MODEL_FROM_DATABASE")
+    {
+        let name = model.to_string_lossy();
+        if !name.is_empty() {
+            return name.into_owned();
+        }
+    }
+
+    if pci_id.is_empty() {
+        "Unknown GPU".to_string()
+    } else {
+        pci_id.to_string()
+    }
+}
+
+/// Telemetry for one enumerated display GPU.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GpuReading {
+    pub name: String,
+    pub temp: f32,
+    pub usage: f32,
+    pub freq_mhz: f32,
+    pub power: GfxPower,
+}
+
+/// Retrieve telemetry metrics for all detected GPUs in a single sysfs scan.
+pub fn get_gpu_readings() -> Vec<GpuReading> {
+    let devices = find_devices();
+    let firmware_disabled = asus_dgpu_disabled().unwrap_or(false);
+    let firmware = firmware_gpu(&devices).map(|gpu| gpu.dev_path.clone());
+
+    devices
+        .iter()
+        .map(|device| {
+            let power = if firmware_disabled && firmware.as_ref() == Some(&device.dev_path) {
+                GfxPower::AsusDisabled
+            } else {
+                device.get_runtime_status().unwrap_or_default()
+            };
+            GpuReading {
+                name: gpu_model_name(device.dev_path(), device.pci_id()),
+                temp: device.get_temp().unwrap_or(-1.0),
+                usage: device.get_usage_pct().unwrap_or(-1.0),
+                freq_mhz: device.get_freq_mhz().unwrap_or(-1.0),
+                power,
+            }
+        })
+        .collect()
+}
+
+/// iGPU/dGPU pair used by the System page until it lists [`GpuReading`]s.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct GpuTelemetry {
     pub igpu_temp: f32,
@@ -614,78 +682,37 @@ impl Default for GpuTelemetry {
     }
 }
 
+/// `(integrated name, firmware-controlled name)` for the old System page slots.
 pub fn get_gpu_names() -> (String, String) {
-    let mut igpu = None;
-    let mut dgpu = None;
+    gpu_names_from(&find_devices())
+}
 
-    if let Ok(mut enumerator) = udev::Enumerator::new()
-        && enumerator.match_subsystem("pci").is_ok()
-        && let Ok(devices) = enumerator.scan_devices()
-    {
-        for device in devices {
-            if let Some(class) = device.property_value("PCI_CLASS") {
-                let class_str = class.to_string_lossy();
-                if class_str.starts_with("03") || class_str.starts_with("3") {
-                    let id_val = device
-                        .property_value("PCI_ID")
-                        .map(|s| s.to_string_lossy().into_owned())
-                        .unwrap_or_default();
-
-                    let mut parts = id_val.split(':');
-                    let vendor = parts.next().unwrap_or("").to_lowercase();
-                    let device_id = parts.next().unwrap_or("").to_lowercase();
-
-                    let mut model_name = String::new();
-                    if vendor.eq_ignore_ascii_case("1002") && !device_id.is_empty() {
-                        let revision_path = device.syspath().join("revision");
-                        let revision = std::fs::read_to_string(revision_path)
-                            .unwrap_or_default()
-                            .trim()
-                            .trim_start_matches("0x")
-                            .to_lowercase();
-                        if let Some(amd_name) = lookup_amdgpu_name(&device_id, &revision) {
-                            model_name = amd_name;
-                        }
-                    }
-
-                    if model_name.is_empty()
-                        && let Some(model) = device.property_value("ID_MODEL_FROM_DATABASE")
-                    {
-                        model_name = model.to_string_lossy().into_owned();
-                    }
-                    if model_name.is_empty() {
-                        model_name = id_val.clone();
-                    }
-                    if model_name.is_empty() {
-                        model_name = "Unknown GPU".to_string();
-                    }
-
-                    let is_dgpu = vendor.eq_ignore_ascii_case("10de")
-                        || model_name.contains("GeForce")
-                        || model_name.contains("Radeon RX")
-                        || model_name.contains("Discrete");
-
-                    if is_dgpu {
-                        dgpu = Some(model_name);
-                    } else {
-                        igpu = Some(model_name);
-                    }
-                }
-            }
+fn gpu_names_from(devices: &[Device]) -> (String, String) {
+    let firmware = firmware_gpu(devices).map(|gpu| gpu.dev_path.clone());
+    let mut igpu_set = false;
+    let mut igpu = "Integrated GPU".to_string();
+    let mut dgpu = "Discrete GPU".to_string();
+    for device in devices {
+        let name = gpu_model_name(device.dev_path(), device.pci_id());
+        if firmware.as_ref() == Some(device.dev_path()) {
+            dgpu = name;
+        } else if !igpu_set {
+            igpu = name;
+            igpu_set = true;
         }
     }
-
-    (
-        igpu.unwrap_or_else(|| "Integrated GPU".to_string()),
-        dgpu.unwrap_or_else(|| "Discrete GPU".to_string()),
-    )
+    (igpu, dgpu)
 }
 
 /// Old two-slot telemetry. The firmware-controlled GPU fills the dGPU fields.
 pub fn get_gpu_telemetry() -> GpuTelemetry {
+    gpu_telemetry_from(&find_devices())
+}
+
+fn gpu_telemetry_from(devices: &[Device]) -> GpuTelemetry {
     let mut telemetry = GpuTelemetry::default();
-    let devices = find_devices();
-    let firmware = firmware_gpu(&devices).map(|gpu| gpu.dev_path.clone());
+    let firmware = firmware_gpu(devices).map(|gpu| gpu.dev_path.clone());
+    let mut igpu_set = false;
     for device in devices {
         if firmware.as_ref() == Some(device.dev_path()) {
             let power = device.get_runtime_status().unwrap_or_default();
@@ -695,9 +722,10 @@ pub fn get_gpu_telemetry() -> GpuTelemetry {
                 telemetry.dgpu_usage = device.get_usage_pct().unwrap_or(-1.0);
                 telemetry.dgpu_freq_mhz = device.get_freq_mhz().unwrap_or(-1.0);
             }
-        } else {
+        } else if !igpu_set {
             telemetry.igpu_temp = device.get_temp().unwrap_or(-1.0);
             telemetry.igpu_usage = device.get_usage_pct().unwrap_or(-1.0);
+            igpu_set = true;
         }
     }
     telemetry
@@ -788,6 +816,21 @@ mod tests {
         assert!(!is_gpu_vendor("10EC:8168"));
         assert!(!is_gpu_vendor(""));
         assert!(!is_gpu_vendor("not-a-pci-id"));
+    }
+
+    #[test]
+    fn gpu_reading_unavailable_metrics_use_sentinel() {
+        let reading = GpuReading {
+            name: "GPU".to_string(),
+            temp: -1.0,
+            usage: -1.0,
+            freq_mhz: -1.0,
+            power: GfxPower::Unknown,
+        };
+        assert_eq!(reading.temp, -1.0);
+        assert_eq!(reading.usage, -1.0);
+        assert_eq!(reading.freq_mhz, -1.0);
+        assert_eq!(reading.power, GfxPower::Unknown);
     }
 
     #[test]
@@ -1217,6 +1260,77 @@ mod tests {
     }
 
     #[test]
+    fn enumerate_sorts_display_gpus_by_bdf() -> std::result::Result<(), Box<dyn std::error::Error>>
+    {
+        let dir = TestDir::new("asusctl_enum_bdf_order");
+        write_pci_gpu(&dir.0, "0000:05:00.0", "0x1002", "0x1681", "0x030000", None)?;
+        write_pci_gpu(&dir.0, "0000:01:00.0", "0x1002", "0x73df", "0x030000", None)?;
+        let devices = Device::enumerate(&dir.0)?;
+        let bdfs: Vec<&str> = devices
+            .iter()
+            .map(|device| pci_bdf(device.dev_path()).expect("bdf"))
+            .collect();
+        assert_eq!(
+            bdfs,
+            [
+                "0000:01:00.0", "0000:05:00.0"
+            ]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn legacy_slots_keep_first_non_firmware_gpu() {
+        let first = Device {
+            boot_vga: None,
+            firmware_controlled: false,
+            pci_id: "1002:AAAA".to_string(),
+            dev_path: PathBuf::from("/sys/devices/pci0000:00/0000:01:00.0"),
+        };
+        let second = Device {
+            boot_vga: None,
+            firmware_controlled: false,
+            pci_id: "1002:BBBB".to_string(),
+            dev_path: PathBuf::from("/sys/devices/pci0000:00/0000:05:00.0"),
+        };
+        let (igpu, dgpu) = gpu_names_from(&[
+            first.clone(),
+            second.clone(),
+        ]);
+        assert_eq!(igpu, "1002:AAAA");
+        assert_eq!(dgpu, "Discrete GPU");
+
+        let (igpu, dgpu) = gpu_names_from(&[
+            second.clone(),
+            first.clone(),
+        ]);
+        assert_eq!(igpu, "1002:BBBB");
+        assert_eq!(dgpu, "Discrete GPU");
+
+        let firmware = Device {
+            boot_vga: Some(false),
+            firmware_controlled: true,
+            pci_id: "1002:CCCC".to_string(),
+            dev_path: PathBuf::from("/sys/devices/pci0000:00/0000:03:00.0"),
+        };
+        let extra = Device {
+            boot_vga: Some(true),
+            firmware_controlled: false,
+            pci_id: "1002:DDDD".to_string(),
+            dev_path: PathBuf::from("/sys/devices/pci0000:00/0000:07:00.0"),
+        };
+        let (igpu, dgpu) = gpu_names_from(&[
+            first, firmware, extra,
+        ]);
+        assert_eq!(igpu, "1002:AAAA");
+        assert_eq!(dgpu, "1002:CCCC");
+
+        let telemetry = gpu_telemetry_from(&[second]);
+        assert!(!telemetry.dgpu_suspended);
+        assert_eq!(telemetry.dgpu_freq_mhz, -1.0);
+    }
+
+    #[test]
     fn firmware_gpu_prefers_internal_nvidia_over_thunderbolt_egpu() {
         let devices = [
             Device {
@@ -1257,6 +1371,9 @@ mod tests {
                 dev.get_runtime_status()?
             );
         }
+        let readings = get_gpu_readings();
+        println!("Readings: {readings:?}");
+
         if let Some(gpu) = firmware_gpu(&devices) {
             assert!(is_gpu_vendor(gpu.pci_id()));
         }
