@@ -1,5 +1,4 @@
-use std::cell::RefCell;
-use std::fs::{File, OpenOptions};
+use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
 
@@ -16,8 +15,6 @@ pub struct HidRaw {
     /// The product ID. The vendor ID is not kept
     prod_id: String,
     _device_bcd: u32,
-    /// Retaining a handle to the file for the duration of `HidRaw`
-    file: RefCell<File>,
 }
 
 impl HidRaw {
@@ -54,8 +51,8 @@ impl HidRaw {
                         dev_node
                     );
                 }
+                OpenOptions::new().write(true).open(dev_node)?;
                 return Ok(Self {
-                    file: RefCell::new(OpenOptions::new().write(true).open(dev_node)?),
                     devfs_path: dev_node.to_owned(),
                     prod_id: this_id_product.to_string_lossy().into(),
                     _device_bcd: usb_device
@@ -83,8 +80,8 @@ impl HidRaw {
             && let Some(dev_node) = endpoint.devnode()
             && let Some(id_product) = parent.attribute_value("idProduct")
         {
+            OpenOptions::new().write(true).open(dev_node)?;
             return Ok(Self {
-                file: RefCell::new(OpenOptions::new().write(true).open(dev_node)?),
                 devfs_path: dev_node.to_owned(),
                 prod_id: id_product.to_string_lossy().into(),
                 _device_bcd: endpoint
@@ -104,14 +101,16 @@ impl HidRaw {
         &self.prod_id
     }
 
-    /// Write an array of raw bytes to the device using the hidraw interface
+    /// Write an array of raw bytes to the device using the hidraw interface.
+    /// The node is opened per write: an open hidraw node keeps the USB device
+    /// out of runtime suspend.
     pub fn write_bytes(&self, message: &[u8]) -> Result<()> {
-        if let Ok(mut file) = self.file.try_borrow_mut() {
-            // TODO: re-get the file if error?
-            file.write_all(message).map_err(|e| {
-                PlatformError::IoPath(self.devfs_path.to_string_lossy().to_string(), e)
-            })?;
-        }
+        let io_err = |e| PlatformError::IoPath(self.devfs_path.to_string_lossy().to_string(), e);
+        let mut file = OpenOptions::new()
+            .write(true)
+            .open(&self.devfs_path)
+            .map_err(io_err)?;
+        file.write_all(message).map_err(io_err)?;
         Ok(())
     }
 }
