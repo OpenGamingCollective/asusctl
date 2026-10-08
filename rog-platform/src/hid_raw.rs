@@ -15,6 +15,8 @@ pub struct HidRaw {
     /// The product ID. The vendor ID is not kept
     prod_id: String,
     _device_bcd: u32,
+    /// Set when the device node was removed; a reused node may belong to another device
+    removed: bool,
 }
 
 impl HidRaw {
@@ -61,6 +63,7 @@ impl HidRaw {
                         .to_string_lossy()
                         .parse()
                         .unwrap_or_default(),
+                    removed: false,
                 });
             }
         }
@@ -90,6 +93,7 @@ impl HidRaw {
                     .to_string_lossy()
                     .parse()
                     .unwrap_or_default(),
+                removed: false,
             });
         }
         Err(PlatformError::MissingFunction(
@@ -101,10 +105,21 @@ impl HidRaw {
         &self.prod_id
     }
 
+    /// Reject further writes, e.g. after the hidraw node was removed.
+    pub fn invalidate(&mut self) {
+        self.removed = true;
+    }
+
     /// Write an array of raw bytes to the device using the hidraw interface.
     /// The node is opened per write: an open hidraw node keeps the USB device
     /// out of runtime suspend.
     pub fn write_bytes(&self, message: &[u8]) -> Result<()> {
+        if self.removed {
+            return Err(PlatformError::MissingFunction(format!(
+                "hidraw dev {} removed",
+                self.devfs_path.to_string_lossy()
+            )));
+        }
         let io_err = |e| PlatformError::IoPath(self.devfs_path.to_string_lossy().to_string(), e);
         let mut file = OpenOptions::new()
             .write(true)
