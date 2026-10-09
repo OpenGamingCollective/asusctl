@@ -1,12 +1,92 @@
 use std::cell::RefCell;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
+use std::os::unix::fs::OpenOptionsExt;
+use std::os::unix::io::AsRawFd;
 use std::path::PathBuf;
 
-use log::{info, warn};
+use log::{error, info, warn};
 use udev::Device;
 
 use crate::error::{PlatformError, Result};
+
+/// Matches the kernel `struct hidraw_devinfo` (8 bytes total).
+#[repr(C)]
+pub struct HidrawDevinfo {
+    pub bustype: u32,
+    pub vendor: i16,
+    pub product: i16,
+}
+
+// rustix custom Ioctl trait implementations
+struct GetRawInfo {
+    info: HidrawDevinfo,
+}
+
+unsafe impl rustix::ioctl::Ioctl for GetRawInfo {
+    type Output = HidrawDevinfo;
+    fn opcode(&self) -> rustix::ioctl::Opcode {
+        0x80084803
+    }
+    const IS_MUTATING: bool = true;
+
+    fn as_ptr(&mut self) -> *mut std::ffi::c_void {
+        &mut self.info as *mut HidrawDevinfo as *mut std::ffi::c_void
+    }
+
+    unsafe fn output_from_ptr(
+        _out: rustix::ioctl::IoctlOutput,
+        extract_output: *mut std::ffi::c_void,
+    ) -> rustix::io::Result<Self::Output> {
+        Ok(unsafe { std::ptr::read(extract_output as *const HidrawDevinfo) })
+    }
+}
+
+struct SetFeatureReport<const N: usize> {
+    payload: [u8; N],
+}
+
+unsafe impl<const N: usize> rustix::ioctl::Ioctl for SetFeatureReport<N> {
+    type Output = ();
+    fn opcode(&self) -> rustix::ioctl::Opcode {
+        0xC0004806 | ((N as u32) << 16)
+    }
+    const IS_MUTATING: bool = false;
+
+    fn as_ptr(&mut self) -> *mut std::ffi::c_void {
+        self.payload.as_mut_ptr() as *mut std::ffi::c_void
+    }
+
+    unsafe fn output_from_ptr(
+        _out: rustix::ioctl::IoctlOutput,
+        _extract_output: *mut std::ffi::c_void,
+    ) -> rustix::io::Result<Self::Output> {
+        Ok(())
+    }
+}
+
+struct GetFeatureReport<const N: usize> {
+    buf: [u8; N],
+}
+
+unsafe impl<const N: usize> rustix::ioctl::Ioctl for GetFeatureReport<N> {
+    type Output = [u8; N];
+    fn opcode(&self) -> rustix::ioctl::Opcode {
+        0xC0004807 | ((N as u32) << 16)
+    }
+    const IS_MUTATING: bool = true;
+
+    fn as_ptr(&mut self) -> *mut std::ffi::c_void {
+        self.buf.as_mut_ptr() as *mut std::ffi::c_void
+    }
+
+    unsafe fn output_from_ptr(
+        _out: rustix::ioctl::IoctlOutput,
+        extract_output: *mut std::ffi::c_void,
+    ) -> rustix::io::Result<Self::Output> {
+        Ok(unsafe { std::ptr::read(extract_output as *const [u8; N]) })
+    }
+}
 
 /// A USB device that utilizes hidraw for I/O
 #[derive(Debug)]
@@ -16,6 +96,7 @@ pub struct HidRaw {
     /// The product ID. The vendor ID is not kept
     prod_id: String,
     _device_bcd: u32,
+    syspath: PathBuf,
     /// Retaining a handle to the file for the duration of `HidRaw`
     file: RefCell<File>,
 }
@@ -57,6 +138,7 @@ impl HidRaw {
                 return Ok(Self {
                     file: RefCell::new(OpenOptions::new().write(true).open(dev_node)?),
                     devfs_path: dev_node.to_owned(),
+                    syspath: endpoint.syspath().to_path_buf(),
                     prod_id: this_id_product.to_string_lossy().into(),
                     _device_bcd: usb_device
                         .attribute_value("bcdDevice")
@@ -86,6 +168,7 @@ impl HidRaw {
             return Ok(Self {
                 file: RefCell::new(OpenOptions::new().write(true).open(dev_node)?),
                 devfs_path: dev_node.to_owned(),
+                syspath: endpoint.syspath().to_path_buf(),
                 prod_id: id_product.to_string_lossy().into(),
                 _device_bcd: endpoint
                     .attribute_value("bcdDevice")
@@ -100,8 +183,42 @@ impl HidRaw {
         ))
     }
 
+    /// Build a `HidRaw` from an I2C-HID hidraw endpoint. Opens R/W so that we
+    /// can use HIDIOCGFEATURE / HIDIOCSFEATURE on LampArray devices.
+    pub fn from_i2c_device(endpoint: Device, prod_id: &str) -> Result<Self> {
+        let descriptor = std::fs::read(endpoint.syspath().join("device/report_descriptor"))?;
+        if !descriptor.windows(2).any(|pair| {
+            pair == [
+                0x05, 0x59,
+            ]
+        }) {
+            return Err(PlatformError::MissingFunction(
+                "Not a HID LampArray device".into(),
+            ));
+        }
+        let node = endpoint
+            .devnode()
+            .ok_or_else(|| PlatformError::MissingFunction("LampArray devnode missing".into()))?;
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .custom_flags(rustix::fs::OFlags::NONBLOCK.bits() as i32)
+            .open(node)?;
+        Ok(Self {
+            file: RefCell::new(file),
+            devfs_path: node.to_owned(),
+            prod_id: prod_id.into(),
+            syspath: endpoint.syspath().to_path_buf(),
+            _device_bcd: 0,
+        })
+    }
+
     pub fn prod_id(&self) -> &str {
         &self.prod_id
+    }
+
+    pub fn devfs_path(&self) -> &PathBuf {
+        &self.devfs_path
     }
 
     /// Write an array of raw bytes to the device using the hidraw interface
@@ -113,5 +230,147 @@ impl HidRaw {
             })?;
         }
         Ok(())
+    }
+
+    /// Write to `use_leds_uapi` sysfs attribute of the HID device if present,
+    /// enabling or disabling the kernel-managed multicolor LED classdev.
+    pub fn set_use_leds_uapi(&self, enable: bool) -> Result<()> {
+        let mut dev = Device::from_syspath(&self.syspath)?;
+        if crate::has_attr(&dev, "use_leds_uapi") {
+            crate::write_attr_bool(&mut dev, "use_leds_uapi", enable)?;
+        }
+        Ok(())
+    }
+
+    /// HIDIOCGRAWINFO -> kernel hidraw_devinfo (bustype, vendor, product).
+    pub fn raw_info(&self) -> Result<HidrawDevinfo> {
+        let file = self
+            .file
+            .try_borrow()
+            .map_err(|_| PlatformError::MissingFunction("hidraw file busy".into()))?;
+        let fd = file.as_raw_fd();
+        info!(
+            "HidRaw::raw_info: fd={} struct_size={}",
+            fd,
+            std::mem::size_of::<HidrawDevinfo>()
+        );
+
+        let op = GetRawInfo {
+            info: HidrawDevinfo {
+                bustype: 0,
+                vendor: 0,
+                product: 0,
+            },
+        };
+        // SAFETY: We pass a pointer to a 8-byte struct matching the kernel's
+        // hidraw_devinfo layout; the ioctl number encodes that size.
+        let info = unsafe { rustix::ioctl::ioctl(&*file, op) }.map_err(|err| {
+            let err = std::io::Error::from(err);
+            error!(
+                "HidRaw::raw_info: ioctl HIDIOCGRAWINFO failed on {:?}: {}",
+                self.devfs_path, err
+            );
+            PlatformError::IoPath(self.devfs_path.to_string_lossy().to_string(), err)
+        })?;
+
+        info!(
+            "HidRaw::raw_info: ok bus={:#x} vendor={:#06x} product={:#06x}",
+            info.bustype, info.vendor as u16, info.product as u16
+        );
+        Ok(info)
+    }
+
+    /// HIDIOCSFEATURE(len) - send a feature report.
+    pub fn set_feature_report(&self, payload: &[u8]) -> Result<()> {
+        let file = self
+            .file
+            .try_borrow()
+            .map_err(|_| PlatformError::MissingFunction("hidraw file busy".into()))?;
+        // This ITE5570 controller requires the maximum feature-report length,
+        // including for the two-byte autonomous-mode report (as in G-Helper).
+        if !matches!(payload.len(), 2 | 10 | 51) {
+            return Err(PlatformError::MissingFunction(
+                "Unsupported LampArray report length".into(),
+            ));
+        }
+        let data = padded_lamparray_report(payload);
+        let op = SetFeatureReport { payload: data };
+        // SAFETY: data has the 51 bytes encoded by the ioctl opcode.
+        unsafe { rustix::ioctl::ioctl(&*file, op) }.map_err(|err| {
+            PlatformError::IoPath(
+                self.devfs_path.to_string_lossy().to_string(),
+                std::io::Error::from(err),
+            )
+        })?;
+
+        Ok(())
+    }
+
+    /// HIDIOCGFEATURE(len) - read a feature report. Buffer[0] must hold the
+    /// report ID before the call.
+    pub fn get_feature_report(&self, buf: &mut [u8]) -> Result<usize> {
+        let file = self
+            .file
+            .try_borrow()
+            .map_err(|_| PlatformError::MissingFunction("hidraw file busy".into()))?;
+        let len = buf.len();
+        match len {
+            23 => {
+                let mut data = [0u8; 23];
+                data.copy_from_slice(buf);
+                let op = GetFeatureReport { buf: data };
+                let res = unsafe {
+                    rustix::ioctl::ioctl(&*file, op)
+                }.map_err(|err| {
+                    let err = std::io::Error::from(err);
+                    error!(
+                        "HidRaw::get_feature_report: ioctl HIDIOCGFEATURE(len=23) failed on {:?}: {}",
+                        self.devfs_path,
+                        err
+                    );
+                    PlatformError::IoPath(
+                        self.devfs_path.to_string_lossy().to_string(),
+                        err,
+                    )
+                })?;
+                buf.copy_from_slice(&res);
+                Ok(23)
+            }
+            _ => Err(PlatformError::MissingFunction(format!(
+                "Unsupported get_feature_report buffer length: {}",
+                len
+            ))),
+        }
+    }
+}
+
+fn padded_lamparray_report(payload: &[u8]) -> [u8; 51] {
+    let mut data = [0u8; 51];
+    data[..payload.len()].copy_from_slice(payload);
+    data
+}
+
+#[cfg(test)]
+mod lamparray_tests {
+    use super::*;
+
+    #[test]
+    fn lamparray_control_uses_full_feature_report() {
+        let control = padded_lamparray_report(&[
+            0x46, 0x00,
+        ]);
+        assert_eq!(control.len(), 51);
+        assert_eq!(control[0], 0x46);
+        assert!(control[1..].iter().all(|byte| *byte == 0));
+        let autonomous = padded_lamparray_report(&[
+            0x46, 0x01,
+        ]);
+        assert_eq!(
+            &autonomous[..2],
+            &[
+                0x46, 0x01
+            ]
+        );
+        assert!(autonomous[2..].iter().all(|byte| *byte == 0));
     }
 }
