@@ -607,7 +607,7 @@
         product_id: "",
         layout_name: "g733pz-per-key",
         basic_modes: [Static, Breathe, RainbowCycle, RainbowWave, Star, Rain, Highlight, Laser, Ripple, Pulse, Comet, Flash],
-        basic_zones: [],
+        basic_zones: [Key1, Key2, Key3, Key4],
         advanced_type: PerKey,
         power_zones: [Keyboard, Lightbar],
     ),
