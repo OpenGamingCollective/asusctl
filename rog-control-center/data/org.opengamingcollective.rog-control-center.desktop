@@ -4,6 +4,7 @@ Type=Application
 Name=ROG Control Center
 Comment=Make your ASUS ROG Laptop go Brrrrr!
 Categories=Settings
+Keywords=asus;asusctl;
 
 Icon=rog-control-center
 Exec=rog-control-center
