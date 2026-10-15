@@ -95,11 +95,10 @@ impl Aura {
     ) -> Result<(), RogError> {
         if matches!(dev_type, AuraDeviceType::LaptopKeyboardTuf) {
             if let Some(platform) = &self.backlight {
-                let buf = [
-                    1, mode.mode as u8, mode.colour1.r, mode.colour1.g, mode.colour1.b,
-                    mode.speed as u8,
-                ];
-                platform.lock().await.set_kbd_rgb_mode(&buf)?;
+                platform
+                    .lock()
+                    .await
+                    .set_kbd_rgb_mode(&tuf_kbd_rgb_mode_bytes(mode))?;
             }
         } else if let Some(hid_raw) = &self.hid {
             // Some keyboard controllers (e.g. G533QS firmware) silently drop
@@ -237,4 +236,21 @@ impl Aura {
         }
         Ok(())
     }
+}
+
+/// Build the `cmd mode r g b speed` values for the asus-wmi `kbd_rgb_mode`
+/// sysfs attribute used by TUF laptops.
+///
+/// The kernel expects a speed index (0, 1, 2) and translates it to the
+/// firmware values `0xe1`, `0xeb`, `0xf5` itself. Any other value falls back
+/// to medium, so the raw `Speed` discriminant must not be written here.
+fn tuf_kbd_rgb_mode_bytes(mode: &AuraEffect) -> [u8; 6] {
+    [
+        1,
+        mode.mode as u8,
+        mode.colour1.r,
+        mode.colour1.g,
+        mode.colour1.b,
+        mode.speed.into(),
+    ]
 }
