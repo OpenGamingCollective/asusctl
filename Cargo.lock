@@ -4712,12 +4712,10 @@ dependencies = [
  "rog_profiles",
  "rog_slash",
  "serde",
- "serde_json",
  "slint",
  "slint-build",
  "thiserror 2.0.21",
  "tokio",
- "udev",
  "zbus",
 ]
 
@@ -4759,7 +4757,6 @@ dependencies = [
  "rog_platform",
  "rog_profiles",
  "rog_scsi",
- "rog_slash",
  "zbus",
 ]
 
@@ -4806,7 +4803,6 @@ dependencies = [
 name = "rog_simulators"
 version = "6.5.0"
 dependencies = [
- "log",
  "rog_anime",
  "sdl2",
  "uhid-virt",

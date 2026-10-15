@@ -12,7 +12,6 @@ description = "dbus interface methods for asusctl"
 [dependencies]
 asusd = { path = "../asusd" }
 rog_anime = { path = "../rog-anime", features = ["dbus"] }
-rog_slash = { path = "../rog-slash", features = ["dbus"] }
 rog_scsi = { path = "../rog-scsi", features = ["dbus"] }
 rog_aura = { path = "../rog-aura" }
 rog_profiles = { path = "../rog-profiles" }

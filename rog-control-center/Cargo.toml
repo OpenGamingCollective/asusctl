@@ -44,8 +44,6 @@ notify-rust.workspace = true
 concat-idents.workspace = true
 futures-util.workspace = true
 thiserror.workspace = true
-udev.workspace = true
-serde_json.workspace = true
 
 slint.workspace = true
 
