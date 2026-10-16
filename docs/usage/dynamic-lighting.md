@@ -23,6 +23,15 @@ hid-asus registers independent chassis zones:
 | `asus::lightbar` | Chassis lightbar when present |
 | `asus::slash` | Slash LED when present |
 | `asus::anime` | AniMe Matrix when present |
+| `asus::kbd_backlight` | TUF WMI keyboard when asus-wmi exposes the DL ABI |
+
+asusd prefers `asus::keyboard`, then falls back to a Dynamic Lighting-capable
+`asus::kbd_backlight`. Brightness-only `asus::kbd_backlight` (no
+`effect`/`effect_index`/`zone_type`/`led_count`) is not Dynamic Lighting: it
+remains the legacy TUF/`KeyboardBacklight` path for intensity and
+`kbd_rgb_mode` / `kbd_rgb_state` when no DL keyboard node is present. When DL
+owns `asus::kbd_backlight`, the legacy platform handle is not kept on that
+node.
 
 There is no `asus::global` aggregate and no userspace `aura_mode` selector.
 Each node accepts its own effect, palette, and direct RGB writes. Whole-device

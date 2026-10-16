@@ -160,33 +160,48 @@ impl DeviceHandle {
         }
         info!("Found laptop aura type {prod_id:?}");
 
-        let backlight = KeyboardBacklight::new()
-            .map_err(|e| error!("Keyboard backlight error: {e:?}"))
-            .map_or(None, |k| {
-                info!("Found sysfs backlight control");
-                Some(Arc::new(Mutex::new(k)))
-            });
-
-        // Check for Dynamic Lighting interface (keyboard / lightbar only).
-        let (dynamic_kbd, dynamic_lightbar) = {
+        // Prefer asus::keyboard; on TUF, asus-wmi may register the same DL ABI
+        // on asus::kbd_backlight when ASUS_WMI_DEVID_TUF_RGB_MODE* is present.
+        let (dynamic_kbd, dynamic_lightbar, dl_owns_kbd_backlight) = {
             let kbd = DynamicLed::find("asus::keyboard")
-                .map(|k| {
-                    info!("Dynamic Lighting keyboard detected: asus::keyboard");
-                    Arc::new(Mutex::new(k))
-                })
+                .or_else(|_| DynamicLed::find("asus::kbd_backlight"))
                 .ok();
+            let dl_owns_kbd_backlight = kbd
+                .as_ref()
+                .is_some_and(|k| k.name().contains("kbd_backlight"));
+            let kbd = kbd.map(|k| {
+                info!("Dynamic Lighting keyboard detected: {}", k.name());
+                Arc::new(Mutex::new(k))
+            });
             let lb = DynamicLed::find("asus::lightbar")
                 .map(|l| {
-                    info!("Dynamic Lighting lightbar detected: asus::lightbar");
+                    info!("Dynamic Lighting lightbar detected: {}", l.name());
                     Arc::new(Mutex::new(l))
                 })
                 .ok();
             if kbd.is_some() || lb.is_some() {
-                (kbd, lb)
+                (kbd, lb, dl_owns_kbd_backlight)
             } else {
-                debug!("Dynamic Lighting not detected; using legacy hidraw fallback");
-                (None, None)
+                debug!(
+                    "Dynamic Lighting not detected; using legacy hidraw / TUF platform fallback"
+                );
+                (None, None, false)
             }
+        };
+
+        // Brightness-only asus::kbd_backlight (or ally gamepad) stays available
+        // alongside asus::* DL nodes. If DL already owns that same LED name,
+        // do not keep a second KeyboardBacklight handle on it.
+        let backlight = if dl_owns_kbd_backlight {
+            debug!("Skipping legacy KeyboardBacklight; Dynamic Lighting owns kbd_backlight");
+            None
+        } else {
+            KeyboardBacklight::new()
+                .map_err(|e| error!("Keyboard backlight error: {e:?}"))
+                .map_or(None, |k| {
+                    info!("Found sysfs backlight control");
+                    Some(Arc::new(Mutex::new(k)))
+                })
         };
 
         // One owner: when DL validates, drop hidraw so two paths never fight.
