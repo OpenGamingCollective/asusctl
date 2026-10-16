@@ -32,6 +32,20 @@ impl AuraZbus {
         self.reload()
             .await
             .unwrap_or_else(|err| warn!("Controller error: {}", err));
+
+        // Wire logind sleep/resume (and related) handlers. Without this, Aura never
+        // re-applies power states / effects after s2idle and keyboard LEDs stay off.
+        match SignalEmitter::new(connection, path.as_ref()).map(|s| s.to_owned()) {
+            Ok(signal) => {
+                if let Err(e) = self.create_tasks(signal).await {
+                    warn!("Aura CtrlTask (sleep/resume) setup failed: {e}");
+                }
+            }
+            Err(e) => {
+                warn!("Aura could not create SignalEmitter for CtrlTask: {e}");
+            }
+        }
+
         connection
             .object_server()
             .at(path.clone(), self)
@@ -280,27 +294,22 @@ impl CtrlTask for AuraZbus {
         self.create_sys_event_tasks(
             move |sleeping| {
                 let inner1 = inner1.clone();
-                // unwrap as we want to bomb out of the task
                 async move {
-                    if !sleeping {
-                        info!("CtrlKbdLedTask reloading brightness and modes");
-                        let brightness = inner1.config.lock().await.brightness;
-                        if let Err(e) = inner1.set_brightness(brightness).await {
-                            error!("CtrlKbdLedTask: {e}");
+                    if sleeping {
+                        if let Err(e) = inner1.update_config().await {
+                            error!("CtrlKbdLedTask: persist config before sleep: {e}");
                         }
-                        let mut config = inner1.config.lock().await;
-                        if let Err(e) = inner1.write_current_config_mode(&mut config).await {
-                            error!("CtrlKbdLedTask: {e}");
-                        }
-                    } else if let Err(e) = inner1.update_config().await {
-                        error!("CtrlKbdLedTask: {e}");
+                        return;
                     }
+
+                    // Dynamic Lighting / HID nodes can lag behind s2idle resume.
+                    restore_aura_after_resume(&inner1).await;
                 }
             },
             move |_shutting_down| {
                 let inner3 = inner3.clone();
                 async move {
-                    info!("CtrlKbdLedTask reloading brightness and modes");
+                    info!("CtrlKbdLedTask restoring brightness on shutdown path");
                     let brightness = inner3.config.lock().await.brightness;
                     if let Err(e) = inner3.set_brightness(brightness).await {
                         error!("CtrlKbdLedTask: {e}");
@@ -319,6 +328,37 @@ impl CtrlTask for AuraZbus {
         .await;
 
         Ok(())
+    }
+}
+
+/// Re-apply power states, brightness, and the current effect after resume.
+///
+/// Matches [`Reloadable::reload`] ordering, with a short settle delay and one
+/// retry so Dynamic Lighting sysfs is ready after s2idle.
+async fn restore_aura_after_resume(ctrl: &Aura) {
+    info!("CtrlKbdLedTask restoring Aura after resume");
+    const SETTLE_MS: u64 = 500;
+    for attempt in 1..=2u8 {
+        tokio::time::sleep(std::time::Duration::from_millis(SETTLE_MS)).await;
+
+        let mut config = ctrl.config.lock().await;
+        if let Err(e) = ctrl.set_power_states(&config).await {
+            // Missing power_states on DL is expected; still try brightness/mode.
+            warn!("CtrlKbdLedTask: restore power states (attempt {attempt}): {e}");
+        }
+        let brightness = config.brightness;
+        if let Err(e) = ctrl.set_brightness(brightness).await {
+            warn!("CtrlKbdLedTask: restore brightness (attempt {attempt}): {e}");
+        }
+        match ctrl.write_current_config_mode(&mut config).await {
+            Ok(()) => {
+                info!("CtrlKbdLedTask: Aura restored after resume");
+                return;
+            }
+            Err(e) => {
+                error!("CtrlKbdLedTask: restore mode (attempt {attempt}): {e}");
+            }
+        }
     }
 }
 
