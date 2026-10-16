@@ -19,6 +19,7 @@ use zbus::zvariant::{ObjectPath, OwnedObjectPath};
 
 use crate::ASUS_ZBUS_PATH;
 use crate::aura_anime::trait_impls::AniMeZbus;
+use crate::aura_lamparray::trait_impls::LampArrayZbus;
 use crate::aura_laptop::trait_impls::AuraZbus;
 use crate::aura_scsi::trait_impls::ScsiZbus;
 use crate::aura_slash::trait_impls::SlashZbus;
@@ -246,10 +247,70 @@ impl DeviceManager {
                 warn!("Failed to initialise shared hid handle for {usb_id:?}");
             }
         }
+        if devices.is_empty() {
+            match Self::init_i2c_hid_device(connection, &device, handles).await {
+                Ok(mut found) => devices.append(&mut found),
+                Err(e) => warn!("LampArray discovery failed: {e}"),
+            }
+        }
         Ok(devices)
     }
 
-    /// To be called on daemon startup
+    async fn init_i2c_hid_device(
+        connection: &Connection,
+        endpoint: &Device,
+        handles: Arc<Mutex<HashMap<String, Arc<Mutex<HidRaw>>>>>,
+    ) -> Result<Vec<AsusDevice>, RogError> {
+        let mut parent = endpoint.parent();
+        let mut matched = false;
+        while let Some(device) = parent {
+            if let Some(id) = device.property_value("HID_ID").and_then(|id| id.to_str()) {
+                let parts: Vec<_> = id.split(':').collect();
+                matched = parts.len() == 3
+                    && u32::from_str_radix(parts[0], 16) == Ok(0x18)
+                    && u32::from_str_radix(parts[1], 16) == Ok(0x0b05)
+                    && u32::from_str_radix(parts[2], 16) == Ok(0x19b6);
+                break;
+            }
+            parent = device.parent();
+        }
+        if !matched {
+            return Ok(Vec::new());
+        }
+        let node = endpoint
+            .devnode()
+            .ok_or_else(|| RogError::MissingFunction("LampArray devnode missing".into()))?;
+        let key = node.to_string_lossy().to_string();
+        let cached = handles.lock().await.get(&key).cloned();
+        let handle = if let Some(handle) = cached {
+            handle
+        } else {
+            let handle = Arc::new(Mutex::new(HidRaw::from_i2c_device(
+                endpoint.clone(),
+                "19b6",
+            )?));
+            handles.lock().await.insert(key.clone(), handle.clone());
+            handle
+        };
+        let device = DeviceHandle::maybe_lamparray(handle, "19b6").await?;
+        let DeviceHandle::LampArray(lamparray) = device.clone() else {
+            return Ok(Vec::new());
+        };
+        let path: OwnedObjectPath =
+            ObjectPath::from_str_unchecked(&format!("{ASUS_ZBUS_PATH}/{MOD_NAME}/lamparray_19b6"))
+                .into();
+        LampArrayZbus::new(lamparray)
+            .start_tasks(connection, path.clone())
+            .await?;
+        Ok(vec![
+            AsusDevice {
+                device,
+                dbus_path: path,
+                hid_key: Some(key),
+            },
+        ])
+    }
+
     async fn init_all_hid(
         connection: &Connection,
         handles: Arc<Mutex<HashMap<String, Arc<Mutex<HidRaw>>>>>,
@@ -450,7 +511,10 @@ impl DeviceManager {
             if matches!(dev.device, DeviceHandle::AniMe(_)) {
                 do_anime = false;
             }
-            if matches!(dev.device, DeviceHandle::Aura(_) | DeviceHandle::OldAura(_)) {
+            if matches!(
+                dev.device,
+                DeviceHandle::Aura(_) | DeviceHandle::OldAura(_) | DeviceHandle::LampArray(_)
+            ) {
                 do_kb_backlight = false;
             }
         }
@@ -680,6 +744,12 @@ impl DeviceManager {
                                                 conn_copy
                                                     .object_server()
                                                     .remove::<AuraZbus, _>(&path)
+                                                    .await?
+                                            }
+                                            DeviceHandle::LampArray(_) => {
+                                                conn_copy
+                                                    .object_server()
+                                                    .remove::<LampArrayZbus, _>(&path)
                                                     .await?
                                             }
                                             DeviceHandle::Slash(_) => {

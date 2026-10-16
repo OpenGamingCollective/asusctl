@@ -23,6 +23,22 @@ The daemon isn't running, check the logs with sudo `journalctl -b -u asusd` and 
 
 Please ensure you are using a recent kernel. Please use at least 6.19 so that you get all the most recent patches and fixes for ASUS laptops.
 
+### FA608WV RGB commands succeed but the keyboard stays dark
+
+The TUF Gaming A16 FA608WV uses an ITE5570 I2C-HID LampArray controller
+(`0018:0B05:19B6`), rather than the older USB Aura or WMI lighting path.
+The single-zone LampArray backend exposes static, breathing, color cycle,
+and pulse effects through the existing Aura interface and ROG Control Center.
+
+On tested hardware, short feature reports returned success without changing
+any LEDs. The working sequence toggles autonomous mode on then off using
+51-byte padded reports and sends a 51-byte LampMultiUpdate report. Brightness
+is carried in the intensity byte of the RGB update. A successful HID write
+alone does not establish that the LEDs changed; verify the lighting physically.
+
+This backend is limited to the matching I2C-HID controller with a LampArray
+report descriptor and one lamp. It does not enable per-key lighting.
+
 ### It's not working!
 
 Check the logs with `sudo journalctl -b -u asusd` and look for errors.
