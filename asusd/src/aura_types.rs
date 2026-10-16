@@ -1,17 +1,18 @@
 use std::sync::Arc;
 
 use config_traits::{StdConfig, StdConfigLoad};
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use rog_anime::AnimeType;
 use rog_anime::error::AnimeError;
 use rog_anime::usb::get_anime_type;
 use rog_aura::AuraDeviceType;
+use rog_platform::DynamicLed;
+use rog_platform::SlashLed;
 use rog_platform::hid_raw::HidRaw;
 use rog_platform::keyboard_led::KeyboardBacklight;
 use rog_platform::usb_raw::USBRaw;
 use rog_scsi::{ScsiType, open_device};
 use rog_slash::SlashType;
-use rog_slash::error::SlashError;
 use tokio::sync::Mutex;
 
 use crate::aura_anime::AniMe;
@@ -27,7 +28,6 @@ use crate::error::RogError;
 pub enum _DeviceHandle {
     /// The AniMe devices require USBRaw as they are not HID devices
     Usb(USBRaw),
-    HidRaw(HidRaw),
     LedClass(KeyboardBacklight),
     /// TODO
     MulticolourLed,
@@ -41,91 +41,27 @@ pub enum DeviceHandle {
     /// The AniMe devices require USBRaw as they are not HID devices
     AniMe(AniMe),
     Scsi(ScsiAura),
-    Ally(Arc<Mutex<HidRaw>>),
-    OldAura(Arc<Mutex<HidRaw>>),
-    /// TUF laptops have an aditional set of attributes added to the LED /sysfs/
-    TufLedClass(Arc<Mutex<HidRaw>>),
     /// TODO
     MulticolourLed,
     None,
 }
 
 impl DeviceHandle {
-    /// Try Slash HID. If one exists it is initialsed and returned.
-    pub async fn new_slash_hid(
-        device: Arc<Mutex<HidRaw>>,
-        prod_id: &str,
-    ) -> Result<Self, RogError> {
-        debug!("Testing for HIDRAW Slash");
-        let slash_type = SlashType::from_dmi();
-        if matches!(slash_type, SlashType::Unsupported)
-            || slash_type
-                .prod_id_str()
-                .to_lowercase()
-                .trim_start_matches("0x")
-                != prod_id
-        {
-            log::info!("Unknown or invalid slash: {prod_id:?}, skipping");
-            return Err(RogError::NotFound("No slash device".to_string()));
-        }
-        info!("Found slash type {slash_type:?}: {prod_id}");
+    /// Try Slash sysfs LED. Presence of `asus::slash` is the capability gate;
+    /// board DMI lists are not used.
+    pub async fn maybe_slash() -> Result<Self, RogError> {
+        debug!("Testing for Slash");
+        let led = SlashLed::new().map_err(|e| {
+            warn!("No Slash sysfs LED found: {e}");
+            RogError::NotFound("No slash device found".to_string())
+        })?;
 
+        info!("Found Slash sysfs LED at {:?}", led.path());
         let mut config = SlashConfig::new().load();
-        config.slash_type = slash_type;
-        let slash = Slash::new(Some(device), None, Arc::new(Mutex::new(config)));
+        config.slash_type = SlashType::Unsupported;
+        let slash = Slash::new(led, Arc::new(Mutex::new(config)));
         slash.do_initialization().await?;
         Ok(Self::Slash(slash))
-    }
-
-    /// Try Slash USB. If one exists it is initialsed and returned.
-    pub async fn new_slash_usb() -> Result<Self, RogError> {
-        debug!("Testing for USB Slash");
-        let slash_type = SlashType::from_dmi();
-        if matches!(slash_type, SlashType::Unsupported) {
-            return Err(RogError::Slash(SlashError::NoDevice));
-        }
-
-        if let Ok(usb) = USBRaw::new(slash_type.prod_id()) {
-            info!("Found Slash USB {slash_type:?}");
-
-            let mut config = SlashConfig::new().load();
-            config.slash_type = slash_type;
-            let slash = Slash::new(
-                None,
-                Some(Arc::new(Mutex::new(usb))),
-                Arc::new(Mutex::new(config)),
-            );
-            slash.do_initialization().await?;
-            Ok(Self::Slash(slash))
-        } else {
-            Err(RogError::NotFound("No slash device found".to_string()))
-        }
-    }
-
-    /// Try AniMe Matrix HID. If one exists it is initialsed and returned.
-    pub async fn maybe_anime_hid(
-        _device: Arc<Mutex<HidRaw>>,
-        _prod_id: &str,
-    ) -> Result<Self, RogError> {
-        // TODO: can't use HIDRAW for anime at the moment
-        Err(RogError::NotFound(
-            "Can't use anime over hidraw yet. Skip.".to_string(),
-        ))
-
-        // debug!("Testing for HIDRAW AniMe");
-        // let anime_type = AnimeType::from_dmi();
-        // dbg!(prod_id);
-        // if matches!(anime_type, AnimeType::Unsupported) || prod_id != "193b"
-        // {     log::info!("Unknown or invalid AniMe: {prod_id:?},
-        // skipping");     return Err(RogError::NotFound("No
-        // anime-matrix device".to_string())); }
-        // info!("Found AniMe Matrix HIDRAW {anime_type:?}: {prod_id}");
-
-        // let mut config = AniMeConfig::new().load();
-        // config.anime_type = anime_type;
-        // let mut anime = AniMe::new(Some(device), None,
-        // Arc::new(Mutex::new(config))); anime.do_initialization().
-        // await?; Ok(Self::AniMe(anime))
     }
 
     pub async fn maybe_anime_usb() -> Result<Self, RogError> {
@@ -142,7 +78,6 @@ impl DeviceHandle {
             let mut config = AniMeConfig::new().load();
             config.anime_type = anime_type;
             let mut anime = AniMe::new(
-                None,
                 Some(Arc::new(Mutex::new(usb))),
                 Arc::new(Mutex::new(config)),
             );
@@ -190,18 +125,64 @@ impl DeviceHandle {
         }
         info!("Found laptop aura type {prod_id:?}");
 
-        let backlight = KeyboardBacklight::new()
-            .map_err(|e| error!("Keyboard backlight error: {e:?}"))
-            .map_or(None, |k| {
-                info!("Found sysfs backlight control");
-                Some(Arc::new(Mutex::new(k)))
+        // Prefer aura:keyboard; on TUF, asus-wmi may register the same DL ABI
+        // on asus::kbd_backlight when ASUS_WMI_DEVID_TUF_RGB_MODE* is present.
+        let (dynamic_kbd, dynamic_lightbar, dl_owns_kbd_backlight) = {
+            let kbd = DynamicLed::find("aura:keyboard")
+                .or_else(|_| DynamicLed::find("asus::kbd_backlight"))
+                .ok();
+            let dl_owns_kbd_backlight = kbd
+                .as_ref()
+                .is_some_and(|k| k.name().contains("kbd_backlight"));
+            let kbd = kbd.map(|k| {
+                info!("Dynamic Lighting keyboard detected: {}", k.name());
+                Arc::new(Mutex::new(k))
             });
+            let lb = DynamicLed::find("aura:lightbar")
+                .map(|l| {
+                    info!("Dynamic Lighting lightbar detected: {}", l.name());
+                    Arc::new(Mutex::new(l))
+                })
+                .ok();
+            if kbd.is_some() || lb.is_some() {
+                (kbd, lb, dl_owns_kbd_backlight)
+            } else {
+                debug!(
+                    "Dynamic Lighting not detected; using legacy hidraw / TUF platform fallback"
+                );
+                (None, None, false)
+            }
+        };
+
+        // Brightness-only asus::kbd_backlight (or ally gamepad) stays available
+        // alongside aura:* DL nodes. If DL already owns that same LED name,
+        // do not keep a second KeyboardBacklight handle on it.
+        let backlight = if dl_owns_kbd_backlight {
+            debug!("Skipping legacy KeyboardBacklight; Dynamic Lighting owns kbd_backlight");
+            None
+        } else {
+            KeyboardBacklight::new()
+                .map_err(|e| error!("Keyboard backlight error: {e:?}"))
+                .map_or(None, |k| {
+                    info!("Found sysfs backlight control");
+                    Some(Arc::new(Mutex::new(k)))
+                })
+        };
+
+        // One owner: when DL validates, drop hidraw so two paths never fight.
+        let hid = if dynamic_kbd.is_some() || dynamic_lightbar.is_some() {
+            None
+        } else {
+            device
+        };
 
         // Load saved mode, colours, brightness, power from disk; apply on reload
         let mut config = AuraConfig::load_and_update_config(prod_id);
         config.led_type = aura_type;
         let aura = Aura {
-            hid: device,
+            dynamic_kbd,
+            dynamic_lightbar,
+            hid,
             backlight,
             config: Arc::new(Mutex::new(config)),
         };
