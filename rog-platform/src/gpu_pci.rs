@@ -1,8 +1,10 @@
 //! GPU PCI device detection and power status monitoring.
 //!
-//! This module provides functionality to detect discrete GPUs via udev/PCI
-//! and read their runtime power status from sysfs. It is used by
-//! rog-control-center to color the tray icon and send status notifications.
+//! This module enumerates PCI display devices with udev, classifies each as
+//! the integrated or the discrete GPU, and reads their runtime power status
+//! from sysfs. The classification uses the vendor-specific rules fastfetch
+//! uses, not display connector state. It is used by rog-control-center to
+//! color the tray icon and send status notifications.
 
 use std::fmt::Display;
 use std::fs::{self, OpenOptions};
@@ -153,6 +155,114 @@ pub fn is_gpu_vendor(pci_id: &str) -> bool {
 /// `30000` for a VGA controller and `30200` for a 3D controller.
 pub fn is_display_class(pci_class: &str) -> bool {
     u32::from_str_radix(pci_class, 16).is_ok_and(|class| class >> 16 == 0x03)
+}
+
+/// Parse a PCI sysname such as `0000:01:00.0` (or `01:00.0` when the domain is
+/// omitted) into domain, bus, device and function.
+fn parse_pci_address(sysname: &str) -> Option<(u16, u8, u8, u8)> {
+    let (prefix, function) = sysname.rsplit_once('.')?;
+    let mut parts = prefix.split(':');
+    let first = parts.next()?;
+    let second = parts.next()?;
+    let (domain, bus, device) = match parts.next() {
+        Some(device) => (first, second, device),
+        None => ("0", first, second),
+    };
+    if parts.next().is_some() {
+        return None;
+    }
+    Some((
+        u16::from_str_radix(domain, 16).ok()?,
+        u8::from_str_radix(bus, 16).ok()?,
+        u8::from_str_radix(device, 16).ok()?,
+        u8::from_str_radix(function, 16).ok()?,
+    ))
+}
+
+/// True if this is an auxiliary display controller rather than a GPU: a
+/// function above 0 with the `other display` subclass (`0x80`).
+///
+/// fastfetch skips these so one GPU is not counted twice.
+fn is_auxiliary_display(sysname: &str, pci_class: &str) -> bool {
+    let function = parse_pci_address(sysname).map(|(_, _, _, function)| function);
+    let subclass = u32::from_str_radix(pci_class, 16)
+        .ok()
+        .map(|class| ((class >> 8) & 0xff) as u8);
+    matches!((function, subclass), (Some(function), Some(0x80)) if function > 0)
+}
+
+/// Probe the device's hwmon directory for the APU-only `in1_input` node.
+///
+/// The amdgpu driver registers that northbridge voltage sensor only on APUs,
+/// which is how fastfetch tells an AMD APU from a discrete card when
+/// `AMDGPU_IDS_FLAGS_FUSION` cannot be queried through libdrm (this crate does
+/// not link libdrm, so this is the sysfs fallback it uses).
+///
+/// `Some(true)` is an APU and `Some(false)` is a readable hwmon directory with
+/// at least one entry but no APU sensor (a discrete card). `None` means the
+/// directory could not be read or held no hwmon entry, so the probe is
+/// inconclusive and the caller uses the model name.
+fn amd_apu_hwmon(dev_path: &Path) -> Option<bool> {
+    let entries = fs::read_dir(dev_path.join("hwmon")).ok()?;
+    let mut inspected_entry = false;
+    for entry in entries.flatten() {
+        inspected_entry = true;
+        if entry.path().join("in1_input").exists() {
+            return Some(true);
+        }
+    }
+    // An empty directory is not evidence of a discrete card
+    inspected_entry.then_some(false)
+}
+
+/// The vendor half of a udev `PCI_ID` (`vendor:device`).
+fn pci_vendor(pci_id: &str) -> &str {
+    pci_id.split_once(':').map_or(pci_id, |(vendor, _)| vendor)
+}
+
+/// Classify a display device as discrete (`Some(true)`) or integrated
+/// (`Some(false)`) from vendor-specific facts, mirroring fastfetch's Linux
+/// detection. `None` means the vendor rules cannot decide, and the caller
+/// falls back to the model name.
+///
+/// * AMD: an APU-only `in1_input` hwmon node means integrated; a readable
+///   hwmon directory without it, with amdgpu bound, is a discrete card. Other
+///   drivers (radeon) and an unreadable hwmon directory are not guessed at,
+///   so fastfetch's fallback applies there too.
+/// * NVIDIA: every NVIDIA display device on an x86 laptop is a dGPU, so the
+///   vendor decides. fastfetch uses the NVML brand with a
+///   GeForce/Quadro/Tesla name fallback; the vendor rule is the equivalent
+///   for a boolean result, and it also covers names such as `RTX A1000` that
+///   an NVML-less name check would miss.
+fn classify_by_vendor(vendor: &str, driver: Option<&str>, apu_hwmon: Option<bool>) -> Option<bool> {
+    match vendor {
+        AMD_PCI_VENDOR => match apu_hwmon {
+            Some(true) => Some(false),
+            Some(false) if driver == Some("amdgpu") => Some(true),
+            _ => None,
+        },
+        NVIDIA_PCI_VENDOR => Some(true),
+        _ => None,
+    }
+}
+
+/// Classify a whole udev `PCI_ID` (`vendor:device`), which is the value
+/// [`Device::find`] actually has at hand.
+fn classify_pci_id(pci_id: &str, driver: Option<&str>, apu_hwmon: Option<bool>) -> Option<bool> {
+    classify_by_vendor(pci_vendor(pci_id), driver, apu_hwmon)
+}
+
+/// Collect the facts [`classify_pci_id`] needs from udev and sysfs.
+fn detect_gpu_type(device: &udev::Device, pci_id: &str) -> Option<bool> {
+    let driver = device.driver().map(|d| d.to_string_lossy().into_owned());
+    // The APU sensor is only meaningful for AMD, so skip the sysfs read for
+    // other vendors.
+    let apu_hwmon = if pci_vendor(pci_id) == AMD_PCI_VENDOR {
+        amd_apu_hwmon(device.syspath())
+    } else {
+        None
+    };
+    classify_pci_id(pci_id, driver.as_deref(), apu_hwmon)
 }
 
 fn read_hwmon_temp(dir: &Path) -> Option<f32> {
@@ -414,65 +524,34 @@ impl Device {
             {
                 let id = id.to_string_lossy();
                 let class = class.to_string_lossy();
-                // Match only Nvidia or AMD display devices
+                // Match only display devices of a vendor we can classify
                 if is_gpu_vendor(&id) && is_display_class(&class) {
-                    let mut dgpu = false;
-                    // Check connected displays to distinguish dGPU from iGPU.
-                    // eDP-1 is the internal panel, always on iGPU.
-                    let displays = find_connected_displays(device.syspath()).unwrap_or_default();
-                    if !displays.iter().any(|d| d == "eDP-1") {
-                        trace!(
-                            "Matched dGPU {id} at {:?} by checking display connections",
-                            device.sysname()
-                        );
-                        dgpu = true;
-                    } else {
-                        trace!(
-                            "Device {id} at {:?} appears to be the iGPU",
-                            device.sysname()
-                        );
+                    // An "other display" controller above function 0 is an
+                    // auxiliary node of a GPU, not a second GPU.
+                    if is_auxiliary_display(&sysname, &class) {
+                        trace!("Skipping auxiliary display controller {id} at {sysname:?}");
+                        continue;
                     }
-                    if !dgpu && id.starts_with(AMD_PCI_VENDOR) {
-                        trace!(
-                            "Found dGPU Device {id} without boot_vga attribute at {:?}",
-                            device.sysname()
-                        );
-                        // Fallback: check hwmon for AMD iGPU detection
-                        let mut dev_path = PathBuf::from(device.syspath());
-                        dev_path.push("hwmon");
 
-                        let hwmon_n_opt = match dev_path.read_dir() {
-                            Ok(mut entries) => entries.next(),
-                            Err(e) => {
-                                trace!("Error reading hwmon directory: {}", e);
-                                None
-                            }
-                        };
+                    let model = device
+                        .property_value("ID_MODEL_FROM_DATABASE")
+                        .or_else(|| device.property_value("ID_MODEL"))
+                        .map(|model| model.to_string_lossy());
 
-                        if let Some(Ok(hwmon_n)) = hwmon_n_opt {
-                            let mut hwmon_path = hwmon_n.path();
-                            hwmon_path.push("in1_input");
-                            dgpu = !hwmon_path.exists();
-                        }
-                    }
-                    if !dgpu {
-                        if let Some(label) = device.property_value("ID_MODEL_FROM_DATABASE") {
-                            trace!(
-                                "Found ID_MODEL_FROM_DATABASE property {id} at {:?} : {label:?}",
-                                device.sysname()
-                            );
-                            dgpu = lspci_dgpu_check(&label.to_string_lossy());
-                        } else if let Some(model) = device.property_value("ID_MODEL") {
-                            dgpu = lspci_dgpu_check(&model.to_string_lossy());
-                        } else if id.starts_with(NVIDIA_PCI_VENDOR) {
-                            dgpu = true;
-                        }
-                    }
+                    // Classify from vendor-specific facts, exactly like
+                    // fastfetch: never from which connector a panel is on, as
+                    // a mux switch puts the internal panel on the dGPU.
+                    let dgpu = match detect_gpu_type(&device, &id) {
+                        Some(is_dgpu) => is_dgpu,
+                        // Only an AMD card on a driver we cannot interrogate
+                        // (e.g. radeon) reaches this: use the model name.
+                        None => model.as_deref().is_some_and(lspci_dgpu_check),
+                    };
 
                     if dgpu {
-                        info!("Found dgpu {id} at {:?}", device.sysname());
+                        info!("Found dgpu {id} at {sysname:?}");
                     } else {
-                        info!("Found igpu {id} at {:?}", device.sysname());
+                        info!("Found igpu {id} at {sysname:?}");
                     }
                     devices.push(Self {
                         dev_path: PathBuf::from(device.syspath()),
@@ -499,38 +578,6 @@ pub fn lspci_dgpu_check(label: &str) -> bool {
         }
     }
     false
-}
-
-/// Find connected displays for a GPU by scanning its DRM card directory.
-pub fn find_connected_displays(gpu_path: &Path) -> Result<Vec<String>> {
-    let drm_path = gpu_path.join("drm");
-
-    let card_dir = drm_path
-        .read_dir()
-        .map_err(|e| PlatformError::Read(drm_path.to_string_lossy().to_string(), e))?
-        .flatten()
-        .find(|entry| entry.file_name().to_string_lossy().starts_with("card"))
-        .map(|entry| entry.path())
-        .ok_or(PlatformError::NotSupported)?;
-
-    let displays = card_dir
-        .read_dir()
-        .map_err(|e| PlatformError::Read(card_dir.to_string_lossy().to_string(), e))?
-        .flatten()
-        .filter_map(|entry| {
-            let name = entry.file_name().into_string().ok()?;
-            let (_, display) = name.split_once('-')?;
-            if fs::read_to_string(entry.path().join("status"))
-                .is_ok_and(|status| status.trim() == "connected")
-            {
-                Some(display.to_string())
-            } else {
-                None
-            }
-        })
-        .collect();
-
-    Ok(displays)
 }
 
 /// Get the current GPU power status, using all available detection methods.
@@ -789,6 +836,123 @@ mod tests {
         assert!(!is_display_class("3")); // base class alone is not a class code
         assert!(!is_display_class(""));
         assert!(!is_display_class("not-hex"));
+    }
+
+    #[test]
+    fn pci_address_parsing() {
+        assert_eq!(parse_pci_address("0000:01:00.0"), Some((0, 1, 0, 0)));
+        assert_eq!(parse_pci_address("0000:00:02.0"), Some((0, 0, 2, 0)));
+        assert_eq!(parse_pci_address("0001:03:1f.7"), Some((1, 3, 0x1f, 7)));
+        // a sysname without a domain
+        assert_eq!(parse_pci_address("00:02.0"), Some((0, 0, 2, 0)));
+        assert_eq!(parse_pci_address("card0"), None);
+        assert_eq!(parse_pci_address("0000:00:02"), None);
+        assert_eq!(parse_pci_address("0000:00:02.0.1"), None);
+        assert_eq!(parse_pci_address("not-hex:00:02.0"), None);
+    }
+
+    #[test]
+    fn auxiliary_display_function_is_skipped() {
+        // A second function with the "other display" subclass is not a GPU
+        assert!(is_auxiliary_display("0000:01:00.1", "38000"));
+        // function 0 is the GPU itself
+        assert!(!is_auxiliary_display("0000:01:00.0", "38000"));
+        // a VGA or 3D controller function is a GPU
+        assert!(!is_auxiliary_display("0000:01:00.1", "30000"));
+        assert!(!is_auxiliary_display("0000:01:00.1", "30200"));
+        assert!(!is_auxiliary_display("garbage", "38000"));
+    }
+
+    #[test]
+    fn vendor_classification_follows_fastfetch() {
+        // AMD APU: the APU-only in1_input hwmon node decides
+        assert_eq!(
+            classify_by_vendor(AMD_PCI_VENDOR, Some("amdgpu"), Some(true)),
+            Some(false)
+        );
+        // AMD discrete card: a readable hwmon directory without the APU sensor
+        assert_eq!(
+            classify_by_vendor(AMD_PCI_VENDOR, Some("amdgpu"), Some(false)),
+            Some(true)
+        );
+        // A driver we cannot interrogate is not guessed at
+        assert_eq!(
+            classify_by_vendor(AMD_PCI_VENDOR, Some("radeon"), Some(false)),
+            None
+        );
+        assert_eq!(classify_by_vendor(AMD_PCI_VENDOR, None, Some(false)), None);
+        // An unreadable hwmon directory is not evidence of a discrete card
+        assert_eq!(
+            classify_by_vendor(AMD_PCI_VENDOR, Some("amdgpu"), None),
+            None
+        );
+
+        // Every NVIDIA display device on an x86 laptop is a dGPU
+        assert_eq!(
+            classify_by_vendor(NVIDIA_PCI_VENDOR, Some("nvidia"), None),
+            Some(true)
+        );
+        assert_eq!(
+            classify_by_vendor(NVIDIA_PCI_VENDOR, Some("nouveau"), None),
+            Some(true)
+        );
+    }
+
+    #[test]
+    fn full_pci_id_is_classified() {
+        // Device::find() passes the udev PCI_ID (`vendor:device`), not a bare
+        // vendor ID; this is the path that the vendor rules must see.
+        assert_eq!(
+            classify_pci_id("1002:1114", Some("amdgpu"), Some(true)),
+            Some(false),
+            "an AMD APU must be integrated on the real call path"
+        );
+        assert_eq!(
+            classify_pci_id("1002:73ff", Some("amdgpu"), Some(false)),
+            Some(true)
+        );
+        assert_eq!(
+            classify_pci_id("10DE:28b8", Some("nvidia"), None),
+            Some(true)
+        );
+        // A bare vendor ID still works (PCI_ID without a device part)
+        assert_eq!(
+            classify_pci_id(AMD_PCI_VENDOR, Some("amdgpu"), Some(true)),
+            Some(false)
+        );
+        // Intel is not handled at all
+        assert_eq!(
+            classify_pci_id("8086:a7a0", Some("i915"), Some(false)),
+            None
+        );
+        // An unreadable AMD hwmon directory must stay undecided so that
+        // Device::find() can fall back to the model name
+        assert_eq!(
+            classify_pci_id("1002:1114", Some("amdgpu"), None),
+            None,
+            "an unreadable hwmon directory is not a dGPU verdict"
+        );
+    }
+
+    #[test]
+    fn amd_apu_hwmon_detection() -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let dir = TestDir::new("amd_apu_hwmon");
+        assert_eq!(amd_apu_hwmon(&dir.0), None);
+
+        // An empty hwmon directory is inconclusive, not a dGPU verdict
+        fs::create_dir_all(dir.join("hwmon"))?;
+        assert_eq!(amd_apu_hwmon(&dir.0), None);
+
+        // A discrete card exposes temperature and clock sensors only
+        fs::create_dir_all(dir.join("hwmon/hwmon0"))?;
+        fs::write(dir.join("hwmon/hwmon0/temp1_input"), "40000\n")?;
+        fs::write(dir.join("hwmon/hwmon0/freq1_input"), "0\n")?;
+        assert_eq!(amd_apu_hwmon(&dir.0), Some(false));
+
+        // The northbridge voltage node only exists on APUs
+        fs::write(dir.join("hwmon/hwmon0/in1_input"), "850\n")?;
+        assert_eq!(amd_apu_hwmon(&dir.0), Some(true));
+        Ok(())
     }
 
     #[test]
