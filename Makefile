@@ -142,6 +142,7 @@ uninstall:
 	rm -f "$(DESTDIR)$(bindir)/$(BIN_C)"
 	rm -f "$(DESTDIR)$(bindir)/$(BIN_D)"
 	rm -f "$(DESTDIR)$(bindir)/$(BIN_S)"
+	rm -f "$(DESTDIR)$(bindir)/asusd-user"
 	rm -f "$(DESTDIR)$(libdir)/udev/rules.d/99-$(BIN_D).rules"
 	rm -f "$(DESTDIR)$(datarootdir)/asusd/$(LEDCFG)"
 	rm -f "$(DESTDIR)$(datarootdir)/dbus-1/system.d/$(BIN_D).conf"
