@@ -64,25 +64,22 @@ impl AsusArmouryAttribute {
         String::from(self.attr.name())
     }
 
-    /// Mirror the in-memory GPU queue into `asusd.ron` so a partial shutdown
-    /// apply (MUX flip succeeds, `dgpu_disable` stays `-EBUSY`) survives reboot.
-    async fn sync_pending_gpu(&self) {
-        let snapshot = self.queued_gpu.lock().await.clone();
-        let mut config = self.config.lock().await;
-        if config.pending_gpu != snapshot {
-            config.pending_gpu = snapshot;
+    /// Persist `pending_gpu` while the caller already holds the queue lock.
+    /// Lock order is always queue → config to avoid stale overwrites.
+    fn write_pending_gpu(config: &mut Config, queue: &HashMap<FirmwareAttribute, i32>) {
+        if config.pending_gpu != *queue {
+            config.pending_gpu = queue.clone();
             config.write();
         }
     }
 
     async fn clear_queued_if_matches(&self, name: FirmwareAttribute, value: i32) {
-        {
-            let mut queue = self.queued_gpu.lock().await;
-            if queue.get(&name).copied() == Some(value) {
-                queue.remove(&name);
-            }
+        let mut queue = self.queued_gpu.lock().await;
+        if queue.get(&name).copied() == Some(value) {
+            queue.remove(&name);
         }
-        self.sync_pending_gpu().await;
+        let mut config = self.config.lock().await;
+        Self::write_pending_gpu(&mut config, &queue);
     }
 
     fn resolve_i32_value(refreshed: Option<i32>, cached: &AttrValue) -> i32 {
@@ -486,15 +483,18 @@ impl AsusArmouryAttribute {
                 (AttrValue::Integer(value), Some((profile, power_plugged)))
             }
             FirmwareAttributeType::Gpu => {
-                if self.attr.current_value().ok() == Some(AttrValue::Integer(value)) {
+                let already_active =
+                    self.attr.current_value().ok() == Some(AttrValue::Integer(value));
+                let mut queue = self.queued_gpu.lock().await;
+                if already_active {
                     info!("GPU attribute {name} is already {value}, clearing any deferred queue");
-                    self.queued_gpu.lock().await.remove(&self.name());
-                    self.sync_pending_gpu().await;
-                    return Ok(());
+                    queue.remove(&self.name());
+                } else {
+                    debug!("Queueing GPU attribute {name} = {value} for delayed apply");
+                    queue.insert(self.name(), value);
                 }
-                debug!("Queueing GPU attribute {name} = {value} for delayed apply");
-                self.queued_gpu.lock().await.insert(self.name(), value);
-                self.sync_pending_gpu().await;
+                let mut config = self.config.lock().await;
+                Self::write_pending_gpu(&mut config, &queue);
                 return Ok(());
             }
             FirmwareAttributeType::Norestore => {
