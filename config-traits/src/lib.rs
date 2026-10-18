@@ -308,6 +308,7 @@ mod tests {
         impl crate::StdConfigLoad for Test {}
 
         let dir = Test::config_dir();
+        let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("read_only_test.ron");
         std::fs::write(&path, "(value: 7)").unwrap();
@@ -356,6 +357,7 @@ mod tests {
         impl crate::StdConfigLoad for Test {}
 
         let dir = Test::config_dir();
+        let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
 
         // A managed, read-only target reached through a symlink at the config path.
