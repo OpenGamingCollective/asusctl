@@ -64,6 +64,27 @@ impl AsusArmouryAttribute {
         String::from(self.attr.name())
     }
 
+    /// Mirror the in-memory GPU queue into `asusd.ron` so a partial shutdown
+    /// apply (MUX flip succeeds, `dgpu_disable` stays `-EBUSY`) survives reboot.
+    async fn sync_pending_gpu(&self) {
+        let snapshot = self.queued_gpu.lock().await.clone();
+        let mut config = self.config.lock().await;
+        if config.pending_gpu != snapshot {
+            config.pending_gpu = snapshot;
+            config.write();
+        }
+    }
+
+    async fn clear_queued_if_matches(&self, name: FirmwareAttribute, value: i32) {
+        {
+            let mut queue = self.queued_gpu.lock().await;
+            if queue.get(&name).copied() == Some(value) {
+                queue.remove(&name);
+            }
+        }
+        self.sync_pending_gpu().await;
+    }
+
     fn resolve_i32_value(refreshed: Option<i32>, cached: &AttrValue) -> i32 {
         refreshed
             .or(match cached {
@@ -415,16 +436,8 @@ impl AsusArmouryAttribute {
             ));
         }
 
-        /*
-        // This code would override the current_value with queued GPU value if present
-        // but I don't want to do that for now because it would cause confusion where
-        // current_value doesn't reflect actual firmware state until apply_queued_gpu_value is called. Instead, queued GPU values are only visible through the queued_gpu_value property and are applied on shutdown without affecting current_value.
-        if self.name().property_type() == FirmwareAttributeType::Gpu {
-            if let Some(saved_value) = self.queued_gpu.lock().await.get(&self.name()) {
-                return Ok(*saved_value);
-            }
-        }
-        */
+        // Queued GPU values stay on `queued_gpu_value` / `pending_gpu` so
+        // `current_value` always mirrors firmware until shutdown apply.
 
         if let Ok(value) = self.attr.current_value() {
             self.logged_read_error.store(false, Ordering::Relaxed);
@@ -476,10 +489,12 @@ impl AsusArmouryAttribute {
                 if self.attr.current_value().ok() == Some(AttrValue::Integer(value)) {
                     info!("GPU attribute {name} is already {value}, clearing any deferred queue");
                     self.queued_gpu.lock().await.remove(&self.name());
+                    self.sync_pending_gpu().await;
                     return Ok(());
                 }
                 debug!("Queueing GPU attribute {name} = {value} for delayed apply");
                 self.queued_gpu.lock().await.insert(self.name(), value);
+                self.sync_pending_gpu().await;
                 return Ok(());
             }
             FirmwareAttributeType::Norestore => {
@@ -565,10 +580,7 @@ impl AsusArmouryAttribute {
                 "Queued GPU attribute {} = {value} is already active, skipping redundant write",
                 <&str>::from(name)
             );
-            let mut queue = self.queued_gpu.lock().await;
-            if queue.get(&name).copied() == Some(value) {
-                queue.remove(&name);
-            }
+            self.clear_queued_if_matches(name, value).await;
             return Ok(true);
         }
 
@@ -587,13 +599,9 @@ impl AsusArmouryAttribute {
             <&str>::from(name)
         );
 
-        // Remove only after successful firmware write, and only if the queued
-        // value was not updated concurrently by another call.
-        let mut queue = self.queued_gpu.lock().await;
-        if queue.get(&name).copied() == Some(value) {
-            queue.remove(&name);
-        }
-
+        // Keep the value queued (and persisted) on failure so the next reboot
+        // can finish a partial Ultimate→Hybrid apply.
+        self.clear_queued_if_matches(name, value).await;
         Ok(true)
     }
 }
@@ -606,7 +614,17 @@ pub async fn start_attributes_zbus(
     config: Arc<Mutex<Config>>,
 ) -> Result<ArmouryAttributeRegistry, RogError> {
     let mut registry = ArmouryAttributeRegistry::default();
-    let queued_gpu = Arc::new(Mutex::new(HashMap::new()));
+    let pending = {
+        let config = config.lock().await;
+        config.pending_gpu.clone()
+    };
+    if !pending.is_empty() {
+        info!(
+            "Restored {} deferred GPU attribute(s) from config for shutdown apply",
+            pending.len()
+        );
+    }
+    let queued_gpu = Arc::new(Mutex::new(pending));
     for attr in attributes.attributes() {
         let mut attr = AsusArmouryAttribute::new(
             attr.clone(),
@@ -715,11 +733,11 @@ pub async fn set_config_or_default(
                 }
             }
             FirmwareAttributeType::Gpu => {
-                // Clean stale persisted queue from older versions. GPU deferred
-                // writes are now in-memory and are applied only on shutdown.
+                // Older builds stored GPU targets in armoury_settings; live
+                // deferred writes use pending_gpu and are applied on shutdown.
                 if config.armoury_settings.remove(&name).is_some() {
                     info!(
-                        "Removed stale persisted GPU attribute {} from config",
+                        "Removed stale GPU attribute {} from armoury_settings",
                         <&str>::from(name)
                     );
                     changed = true;
