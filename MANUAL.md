@@ -8,8 +8,8 @@ but can also be used with non-asus laptops with reduced features.
 ## Programs Available
 
 - `asusd`: The main system daemon. It is autostarted by a udev rule and systemd unit.
-- `asusd-user`: The user level daemon. Currently will run an anime sequence, with RGB keyboard sequences soon.
 - `asusctl`: The CLI for interacting with the system daemon
+- `rog-control-center`: Optional GUI for `asusd`
 
 ## `asusd`
 
@@ -32,15 +32,39 @@ Controller for the fancy AniMe matrix display on the lid of some machines. This 
 
 #### Config options
 
-If you have an AniMe device a few system-level config options are enabled for you in `/etc/asusd/anime.conf`;
+If you have an AniMe device, system-level options live in `/etc/asusd/anime.ron`:
 
-1. `"system": [],`: currently unused, is intended to be a default continuous sequence in future versions
-2. `"boot": [],`: a sequence that plays on system boot (when asusd is loaded)
-3. `"wake": [],`: a sequence that plays when waking from suspend
-4. `"shutdown": [],`: a sequence that plays when shutdown begins
-5. `"brightness": <FLOAT>`: global brightness control, where `<FLOAT> is 0.0-1.0
+1. `system: []`: continuous playlist while its loop is running (replaces the old `asusd-user` session daemon). Start it with the D-Bus method `RunMainLoop(true)` on `xyz.ljones.Anime`, and call it again after restarting `asusd` or resuming from suspend.
+2. `boot: []`: sequence that plays on system boot (when asusd is loaded)
+3. `wake: []`: sequence that plays when waking from suspend
+4. `shutdown: []`: sequence that plays when shutdown begins
+5. Display / builtin animation toggles and brightness (see the generated defaults on first run)
 
-Some default examples are provided but are minimal. The full range of configuration options will be covered in another section of this manual.
+Each list entry is an `ActionLoader` from `rog-anime` (AsusAnimation, AsusImage, ImageAnimation, Image, Pause). Paths must be absolute.
+
+### Migrating from `asusd-user` (removed)
+
+`asusd-user` and `~/.config/rog/` user playlists are removed. To keep a continuous AniMe sequence:
+
+1. Ensure your account can talk to `asusd` on the system bus. The caller of `RunMainLoop` must be `root` or a member of `adm`, `sudo`, `users`, or `wheel` (see `data/asusd.conf`). Package installation does not add you to those groups. Check with `groups`; if none match, add one that exists on your distro (for example `users` or `wheel`) and re-login:
+
+```
+sudo usermod -aG users "$USER"
+```
+
+2. Open the old user file (for example `~/.config/rog/anime-default.ron`) and copy the `anime: [...]` array into `/etc/asusd/anime.ron` as `system: [...]` (same `ActionLoader` shape). Paths must stay absolute. Editing `/etc/asusd/` needs root (`sudoedit /etc/asusd/anime.ron`).
+
+3. If you want only the custom playlist, disable firmware builtins, restart `asusd` so it reloads the cached `system` playlist, then start the loop:
+
+```
+asusctl anime --enable-powersave-anim false
+sudo systemctl restart asusd
+busctl --system call xyz.ljones.Asusd /xyz/ljones/aura/anime xyz.ljones.Anime RunMainLoop b true
+```
+
+Call `RunMainLoop` again after every `asusd` restart or resume from suspend. There is no `asusctl` subcommand for that method yet; use `busctl` (or any D-Bus client) as above.
+
+Per-key / zoned Aura effect loops that lived under `asusd-user` are not stored in `aura_*.ron`. Use `asusctl` examples that call `direct_addressing_raw`, or drive that D-Bus method yourself. `/etc/asusd/asusd_user_ledmodes.ron` is unrelated — it remains the optional LED-mode override for `asusd`.
 
 ### Led keyboard control
 
@@ -118,292 +142,22 @@ The config file is located at `/etc/asusd/profile.conf` and is self-descriptive.
 
 There is one more controller; the support controller. The sole pupose of this controller is to querie all the other controllers for information about their support level for the host laptop. Returns a json string.
 
-## asusd-user
+## Sequence format reference (AniMe)
 
-`asusd-user` is a usermode daemon. The intended purpose is to provide a method for users to run there own custom per-key keyboard effects and modes, AniMe sequences, and possibly their own profiles - all without overwriting the _base_ system config. As such some parts of the system daemon will migrate to the user daemon over time with the expectation that the Linux system runs both.
+Entries in `system`, `boot`, `wake`, and `shutdown` share the same `ActionLoader` variants.
+The examples below use JSON-like shape for readability; on disk the config is RON.
 
-As of now only AniMe is active in this with configuration in `~/.config/rog/`. On first run defaults are created that are intended to work as examples.
+### Action types
 
-The main config is `~/.config/rog/rog-user.cfg`
+1. AsusAnimation — ASUS-style gifs under `/usr/share/asusd/anime/asus/`
+2. AsusImage — slanted PNG templates (for example `diagonal-template.png`)
+3. ImageAnimation — arbitrary GIF with scale / angle / translation
+4. Image — still image with the same transform fields
+5. Pause — hold for a duration
 
-#### Config options: Aura, per-key and zoned
+File paths must be absolute. Brightness is typically `0.0`–`1.0` and combines with the daemon global brightness. Time may be a duration, a loop count, `Infinite`, or a `Fade` with `fade_in` / `show_for` / `fade_out`.
 
-I'm unsure of how many laptops this works on, so please try it.
-
-`led_type: Key` works only on actual per-key RGB keyboards.
-
-`led_type: Zone` works on zoned laptops.
-
-`led_type: Zone` set to `None` works on zoned ROG laptops, unzoned ROG laptops, and TUF laptops (and yes this does mean an audio EQ can be done now).
-
-`~/.config/rog/rog-user.cfg` contains a setting `"active_aura": "<FILENAME>"` where `<FILENAME>` is the name of the Aura config to use, located in the same directory and without the file postfix, e.g, `"active_anime": "aura-default"`
-
-An Aura config itself is a file with contents:
-
-```ron
-(
-    name: "aura-default",
-    aura: (
-        effects: [
-            Breathe((
-                led: W,
-                start_colour1: (255, 0, 20),
-                start_colour2: (20, 255, 0),
-                speed: Low,
-            )),
-            Breathe((
-                led: A,
-                start_colour1: (255, 0, 20),
-                start_colour2: (20, 255, 0),
-                speed: Low,
-            )),
-            Breathe((
-                led: S,
-                start_colour1: (255, 0, 20),
-                start_colour2: (20, 255, 0),
-                speed: Low,
-            )),
-            Breathe((
-                led: D,
-                start_colour1: (255, 0, 20),
-                start_colour2: (20, 255, 0),
-                speed: Low,
-            )),
-            Breathe((
-                led: F,
-                start_colour1: (255, 0, 0),
-                start_colour2: (255, 0, 0),
-                speed: High,
-            )),
-            Static((
-                led: RCtrl,
-                colour: (0, 0, 255),
-            )),
-            Static((
-                led: LCtrl,
-                colour: (0, 0, 255),
-            )),
-            Static((
-                led: Esc,
-                colour: (0, 0, 255),
-            )),
-            DoomFlicker((
-                led: N9,
-                start_colour: (0, 0, 255),
-                max_percentage: 80,
-                min_percentage: 40,
-            )),
-        ],
-        zoned: false,
-    ),
-)
-```
-
-If your laptop supports multizone, `"led"` can also be `"Zone": <one of the following>`
-
-- `SingleZone` // Keyboards with only one zone
-- `ZonedKbLeft` // keyboard left
-- `ZonedKbLeftMid` // keyboard left-middle
-- `ZonedKbRightMid` // etc
-- `ZonedKbRight`
-- `LightbarRight`
-- `LightbarRightCorner`
-- `LightbarRightBottom`
-- `LightbarLeftBottom`
-- `LightbarLeftCorner`
-- `LightbarLeft`
-
-Single zone example:
-
-```ron
-(
-    name: "aura-default",
-    aura: (
-        effects: [
-            DoomFlicker((
-                led: SingleZone,
-                start_colour: (200, 40, 5),
-                max_percentage: 80,
-                min_percentage: 40,
-            )),
-        ],
-        zoned: true,
-    ),
-)
-```
-
-At the moment there are only three effects available as shown in the example. More will come in the future
-but this may take me some time.
-
-#### Config options: AniMe
-
-`~/.config/rog/rog-user.cfg` contains a setting `"active_anime": "<FILENAME>"` where `<FILENAME>` is the name of the AniMe config to use, located in the same directory and without the file postfix, e.g, `"active_anime": "anime-doom"`
-
-An AniMe config itself is a file with contents:
-
-```json
-{
-  "name": "<FILENAME>",
-  "anime": []
-}
-```
-
-`<FILENAME>` is used as a reference internally. `"anime": []` is an array of sequences (WIP).
-
-##### "anime" array options
-
-Each object in the array can be one of:
-
-1. AsusAnimation
-2. ImageAnimation
-3. Image
-4. Pause
-
-##### AsusAnimation
-
-`AsusAnimation` is specifically for running the gif files that Armory Crate comes with. `asusctl` includes all of these in `/usr/share/asusd/anime/asus/`
-
-```json
-      "AsusAnimation": {
-        "file": "<FILE_PATH>",
-        "time": <TIME>,
-        "brightness": <FLOAT>
-      }
-```
-
-##### AsusImage
-
-Virtually the same as `AsusAnimation` but for png files, typically created in the same "slanted" style using a template (`diagonal-template.png`) as the ASUS gifs for pixel perfection.
-
-```json
-      "AsusImage": {
-        "file": "<FILE_PATH>",
-        "time": <TIME>,
-        "brightness": <FLOAT>
-      }
-```
-
-##### ImageAnimation
-
-`ImageAnimation` can play _any_ gif of any size.
-
-```json
-      "ImageAnimation": {
-        "file": "<FILE_PATH>",
-        "scale": <FLOAT>,
-        "angle": <FLOAT>,
-        "translation": [
-          <FLOAT>,
-          <FLOAT>
-        ],
-        "time": <TIME>,
-        "brightness": <FLOAT>
-      }
-    },
-```
-
-##### Image
-
-`Image` currently requires 8bit greyscale png. It will be able to use most in future.
-
-```json
-    {
-      "Image": {
-        "file": "<FILE_PATH>",
-        "scale": <FLOAT>,
-        "angle": <FLOAT>,
-        "translation": [
-          <FLOAT>,
-          <FLOAT>
-        ],
-        "time": <TIME>,
-        "brightness": <FLOAT>
-      }
-    },
-```
-
-##### Pause
-
-A `Pause` is handy for after an `Image` to hold the `Image` on the AniMe for a period.
-
-```json
-    {
-      "Pause": {
-        "secs": <INT>,
-        "nanos": <INT>
-      }
-    },
-```
-
-##### Options for objects
-
-**<FILE_PATH>**
-
-Must be full path: `"/usr/share/asusd/anime/asus/gaming/Controller.gif"` or `/home/luke/Downloads/random.gif`.
-
-**<FLOAT>**
-
-A number from 0.0-1.0.
-
-- `brightness`: If it is brightness it is combined with the system daemon global brightness
-- `scale`: 1.0 is the original size with lower number shrinking, larger growing
-- `angle`: Rotation angle in radians
-- `translation`: Shift the image X -/+, and y -/+
-
-**<TIME>**
-
-Time is the length of time to run the gif for:
-
-```json
-        "time": {
-          "Time": {
-            "secs": 5,
-            "nanos": 0
-          }
-        },
-```
-
-A cycle is how many gif loops to run:
-
-```json
-        "time": {
-          "Cycles": 2
-        },
-```
-
-`Infinite` means that this gif will never end:
-
-```json
-        "time": "Infinite",
-```
-
-`Fade` allows an image or gif to fade in and out, and remain at max brightness to n time:
-
-```json
-        "time": {
-          "Fade": {
-            "fade_in": {
-              "secs": 2,
-              "nanos": 0
-            },
-            "show_for": {
-              "secs": 1,
-              "nanos": 0
-            },
-            "fade_out": {
-              "secs": 2,
-              "nanos": 0
-            }
-          }
-        },
-```
-
-`show_for` can be `null`, if it is `null` then the `show_for` becomes `gif_time_length - fade_in - fade_out`.
-This is period for which the gif or image will be max brightness (as set).
-
-**<INT>**
-
-A plain non-float integer.
+See `rog-anime` and the defaults written into `/etc/asusd/anime.ron` on first run for concrete RON examples.
 
 ## asusctl
 
