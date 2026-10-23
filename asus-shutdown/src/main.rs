@@ -225,6 +225,18 @@ fn apply_rank(action: &PendingAction) -> u8 {
     }
 }
 
+/// Writing `dgpu_disable=1` while NVIDIA is still bound hangs shutdown (`nvidia_drm`
+/// / ACPI power-off). Leave it queued for the next reboot instead.
+fn should_defer_dgpu_disable(name: &str, value: i32, nvidia_loaded: bool) -> bool {
+    name == ATTR_DGPU_DISABLE && value != 0 && nvidia_loaded
+}
+
+fn nvidia_modules_loaded() -> bool {
+    NVIDIA_MODULE_PATHS
+        .iter()
+        .any(|path| Path::new(path).exists())
+}
+
 async fn apply_shutdown_settings() -> Result<(), Box<dyn std::error::Error>> {
     info!("[phase 1/6] Checking for deferred GPU settings queued in asusd...");
     let queued = fetch_pending_actions().await?;
@@ -247,39 +259,61 @@ async fn apply_shutdown_settings() -> Result<(), Box<dyn std::error::Error>> {
     wait_for_discrete_gpu_idle().await;
 
     info!("[phase 4/6] Preparing NVIDIA stack safety gates before firmware writes...");
-    prepare_nvidia_for_gpu_firmware_writes().await;
+    let nvidia_ready = prepare_nvidia_for_gpu_firmware_writes().await;
 
     info!("[phase 5/6] Proceeding with applying deferred GPU settings");
 
     let conn = Connection::system().await?;
     for action in queued {
-        let proxy = AsusArmouryProxy::builder(&conn)
+        if should_defer_dgpu_disable(&action.name, action.value, !nvidia_ready) {
+            warn!(
+                "Deferring {}={} because NVIDIA modules are still loaded; left queued for next shutdown",
+                action.name, action.value
+            );
+            continue;
+        }
+
+        let proxy = match AsusArmouryProxy::builder(&conn)
             .path(action.path.as_str())?
             .destination(ASUSD_BUS_NAME)?
             .build()
-            .await?;
+            .await
+        {
+            Ok(proxy) => proxy,
+            Err(err) => {
+                warn!(
+                    "Failed to connect to {} for {}: {err}; left queued",
+                    action.path, action.name
+                );
+                continue;
+            }
+        };
 
         info!(
             "Applying deferred GPU attribute {} = {}",
             action.name, action.value
         );
-        let applied = proxy.apply_queued_gpu_value().await?;
-        if !applied {
-            warn!("No queued value remained for {}", action.name);
+        // Do not abort the loop on one failure: Ultimate→Hybrid needs MUX to
+        // succeed even when `dgpu_disable` returns -EBUSY until after reboot.
+        match proxy.apply_queued_gpu_value().await {
+            Ok(true) => {}
+            Ok(false) => warn!("No queued value remained for {}", action.name),
+            Err(err) => warn!(
+                "Failed to apply {}={}: {err}; left queued for next shutdown",
+                action.name, action.value
+            ),
         }
     }
 
     Ok(())
 }
 
-async fn prepare_nvidia_for_gpu_firmware_writes() {
-    let has_nvidia_modules = NVIDIA_MODULE_PATHS
-        .iter()
-        .any(|path| Path::new(path).exists());
-
-    if !has_nvidia_modules {
+/// Stop NVIDIA userspace and unload modules. Returns `true` when no NVIDIA
+/// module sysfs nodes remain (safe to write `dgpu_disable=1`).
+async fn prepare_nvidia_for_gpu_firmware_writes() -> bool {
+    if !nvidia_modules_loaded() {
         info!("No NVIDIA modules detected, skipping NVIDIA-specific shutdown preparation");
-        return;
+        return true;
     }
 
     for unit in NVIDIA_SERVICES {
@@ -293,7 +327,6 @@ async fn prepare_nvidia_for_gpu_firmware_writes() {
     }
 
     info!("Preparing NVIDIA driver stack for firmware attribute apply");
-    let mut success = false;
     for attempt in 1..=5 {
         let output = Command::new("modprobe")
             .args([
@@ -306,7 +339,6 @@ async fn prepare_nvidia_for_gpu_firmware_writes() {
                 info!(
                     "Successfully unloaded NVIDIA modules before firmware attribute apply (attempt {attempt})"
                 );
-                success = true;
                 break;
             }
             Ok(out) => {
@@ -329,9 +361,13 @@ async fn prepare_nvidia_for_gpu_firmware_writes() {
         sleep(Duration::from_millis(500)).await;
     }
 
-    if !success {
-        warn!("Failed to unload NVIDIA modules after 5 attempts before firmware attribute apply");
+    let ready = !nvidia_modules_loaded();
+    if !ready {
+        warn!(
+            "NVIDIA modules still loaded after unload attempts; unsafe dgpu_disable writes will be deferred"
+        );
     }
+    ready
 }
 
 async fn wait_for_unit_to_exit(unit_name: &str, timeout: Duration) -> bool {
@@ -717,5 +753,13 @@ mod tests {
                 "egpu_enable", "gpu_mux_mode"
             ]
         );
+    }
+
+    #[test]
+    fn dgpu_disable_is_deferred_while_nvidia_is_loaded() {
+        assert!(should_defer_dgpu_disable(ATTR_DGPU_DISABLE, 1, true));
+        assert!(!should_defer_dgpu_disable(ATTR_DGPU_DISABLE, 1, false));
+        assert!(!should_defer_dgpu_disable(ATTR_DGPU_DISABLE, 0, true));
+        assert!(!should_defer_dgpu_disable("gpu_mux_mode", 1, true));
     }
 }
