@@ -80,6 +80,8 @@ impl Aura {
                     .await?;
             }
         }
+        // Back in a builtin mode, so per-key mode needs its init message again
+        config.per_key_mode_active = false;
 
         Ok(())
     }

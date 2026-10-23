@@ -178,6 +178,8 @@ impl AuraZbus {
         self.0
             .write_effect_and_apply(config.led_type, &effect)
             .await?;
+        // Back in a builtin mode, so per-key mode needs its init message again
+        config.per_key_mode_active = false;
         if config.brightness == LedBrightness::Off {
             config.brightness = LedBrightness::Med;
         }
