@@ -36,13 +36,9 @@ impl Aura {
     /// this in scope then a deadlock can occur.
     pub async fn update_config(&self) -> Result<(), RogError> {
         let mut config = self.config.lock().await;
-        let bright = if let Some(bl) = self.backlight.as_ref() {
-            bl.lock().await.get_brightness().unwrap_or_default()
-        } else {
-            config.brightness.into()
-        };
+        let bright = config.brightness;
         config.read();
-        config.brightness = bright.into();
+        config.brightness = bright;
         config.write();
         Ok(())
     }
