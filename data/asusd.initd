@@ -1,0 +1,17 @@
+#!/sbin/openrc-run
+
+# shellcheck disable=SC2034
+description="ASUS control daemon"
+
+command=/usr/bin/asusd
+command_background=yes
+pidfile=/run/asusd.pid
+
+output_log=/var/log/asusd.log
+error_log=/var/log/asusd.err
+
+export IS_SERVICE=1
+
+depend() {
+    need dbus
+}
