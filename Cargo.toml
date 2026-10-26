@@ -80,7 +80,7 @@ tokio = { version = "^1.53.1", default-features = false, features = [
 ] }
 udev = { version = "^0.9.3", features = ["mio"] }
 uhid-virt = "^0.0.8"
-zbus = "^5.19.0"
+zbus = "^6.0.0"
 
 [profile.release]
 lto = "thin"
