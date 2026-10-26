@@ -2,10 +2,12 @@ use std::sync::Arc;
 
 use config::AuraConfig;
 use config_traits::StdConfig;
-use log::info;
-use rog_aura::keyboard::{AuraLaptopUsbPackets, LedUsbPackets};
+use log::{debug, info};
+use rog_aura::keyboard::{AuraLaptopUsbPackets, AuraPowerState, LedUsbPackets};
 use rog_aura::usb::{AURA_LAPTOP_LED_APPLY, AURA_LAPTOP_LED_SET};
 use rog_aura::{AURA_LAPTOP_LED_MSG_LEN, AuraDeviceType, AuraEffect, LedBrightness, PowerZones};
+use rog_platform::DynamicLed;
+use rog_platform::error::PlatformError;
 use rog_platform::hid_raw::HidRaw;
 use rog_platform::keyboard_led::KeyboardBacklight;
 use tokio::sync::{Mutex, MutexGuard};
@@ -17,12 +19,55 @@ pub mod trait_impls;
 
 #[derive(Debug, Clone)]
 pub struct Aura {
+    pub dynamic_kbd: Option<Arc<Mutex<DynamicLed>>>,
+    pub dynamic_lightbar: Option<Arc<Mutex<DynamicLed>>>,
     pub hid: Option<Arc<Mutex<HidRaw>>>,
     pub backlight: Option<Arc<Mutex<KeyboardBacklight>>>,
     pub config: Arc<Mutex<AuraConfig>>,
 }
 
 impl Aura {
+    #[must_use]
+    pub fn has_dynamic_lighting(&self) -> bool {
+        self.dynamic_kbd.is_some() || self.dynamic_lightbar.is_some()
+    }
+
+    /// Keyboard then lightbar. Each node is independently writable.
+    fn dynamic_nodes(&self) -> [Option<&Arc<Mutex<DynamicLed>>>; 2] {
+        [
+            self.dynamic_kbd.as_ref(),
+            self.dynamic_lightbar.as_ref(),
+        ]
+    }
+
+    /// Map a D-Bus / config power zone onto the matching Dynamic Lighting nodes.
+    fn dynamic_nodes_for_power_zone(&self, zone: PowerZones) -> Vec<&Arc<Mutex<DynamicLed>>> {
+        match zone {
+            PowerZones::Lightbar => self.dynamic_lightbar.iter().collect(),
+            PowerZones::KeyboardAndLightbar | PowerZones::None => {
+                self.dynamic_nodes().into_iter().flatten().collect()
+            }
+            // Logo tracks keyboard power in hid-asus; other chassis zones map
+            // to the keyboard DL node when present.
+            PowerZones::Keyboard
+            | PowerZones::Logo
+            | PowerZones::Lid
+            | PowerZones::RearGlow
+            | PowerZones::Ally => self.dynamic_kbd.iter().collect(),
+        }
+    }
+
+    /// Prefer the keyboard `effect_index`; fall back to lightbar.
+    pub(crate) async fn effect_source(&self) -> Option<MutexGuard<'_, DynamicLed>> {
+        if let Some(kbd) = &self.dynamic_kbd {
+            Some(kbd.lock().await)
+        } else if let Some(lb) = &self.dynamic_lightbar {
+            Some(lb.lock().await)
+        } else {
+            None
+        }
+    }
+
     /// Initialise the device if required.
     pub async fn do_initialization(&self) -> Result<(), RogError> {
         Ok(())
@@ -35,14 +80,11 @@ impl Aura {
     /// Will lock the internal config and update. If anything else has locked
     /// this in scope then a deadlock can occur.
     pub async fn update_config(&self) -> Result<(), RogError> {
+        let bright = self.get_brightness().await;
         let mut config = self.config.lock().await;
-        let bright = if let Some(bl) = self.backlight.as_ref() {
-            bl.lock().await.get_brightness().unwrap_or_default()
-        } else {
-            config.brightness.into()
-        };
+        let bright = bright.unwrap_or(config.brightness);
         config.read();
-        config.brightness = bright.into();
+        config.brightness = bright;
         config.write();
         Ok(())
     }
@@ -93,80 +135,261 @@ impl Aura {
         dev_type: AuraDeviceType,
         mode: &AuraEffect,
     ) -> Result<(), RogError> {
-        if matches!(dev_type, AuraDeviceType::LaptopKeyboardTuf) {
-            if let Some(platform) = &self.backlight {
-                platform
-                    .lock()
-                    .await
-                    .set_kbd_rgb_mode(&tuf_kbd_rgb_mode_bytes(mode))?;
+        // Priority: Dynamic Lighting sysfs interface.
+        // Key1–4 map to the whole keyboard node; BarLeft/BarRight to lightbar.
+        // Legacy Logo / other zones remain unsupported under DL.
+        if self.has_dynamic_lighting() && !supports_dynamic_zone(mode.zone) {
+            return Err(RogError::MissingFunction(
+                "Dynamic Lighting exposes keyboard/lightbar topology, not legacy Aura subzones"
+                    .into(),
+            ));
+        }
+        if self.has_dynamic_lighting()
+            && let Some(eff_str) = mode.mode.to_dynamic_effect_str()
+        {
+            let speed = mode.speed.to_dynamic_speed();
+            let dir_str = mode.direction.to_dynamic_direction_str();
+            let palette = mode.to_dynamic_palette();
+
+            let apply_to_led = |led: &DynamicLed| -> Result<bool, RogError> {
+                if !led.supports_effect(eff_str)? {
+                    return Ok(false);
+                }
+                // Firmware effects do not commit while lighting is off.
+                if led.has_enabled() && map_dl_result(led.set_lighting_enabled(true))?.is_none() {
+                    return Ok(false);
+                }
+                if led.has_speed() && map_dl_result(led.set_supported_speed(speed))?.is_none() {
+                    return Ok(false);
+                }
+                if led.has_direction()
+                    && map_dl_result(led.set_supported_direction(dir_str))?.is_none()
+                {
+                    return Ok(false);
+                }
+                if led.has_effects_palette()
+                    && !palette.is_empty()
+                    && map_dl_result(led.set_palette_colors(&palette))?.is_none()
+                {
+                    return Ok(false);
+                }
+                Ok(map_dl_result(led.set_effect(eff_str))?.is_some())
+            };
+
+            match mode.zone {
+                rog_aura::AuraZone::BarLeft | rog_aura::AuraZone::BarRight => {
+                    if let Some(lb) = &self.dynamic_lightbar {
+                        let led = lb.lock().await;
+                        if apply_to_led(&led)? {
+                            return Ok(());
+                        }
+                    }
+                }
+                rog_aura::AuraZone::None => {
+                    // Fan out to every chassis zone so both get the same effect.
+                    let mut any = false;
+                    if let Some(kbd) = &self.dynamic_kbd {
+                        let kbd_led = kbd.lock().await;
+                        any |= apply_to_led(&kbd_led)?;
+                    }
+                    if let Some(lb) = &self.dynamic_lightbar {
+                        let lb_led = lb.lock().await;
+                        any |= apply_to_led(&lb_led)?;
+                    }
+                    if any {
+                        return Ok(());
+                    }
+                }
+                // Key1–4: whole keyboard node under DL (no legacy 4-zone split).
+                _ => {
+                    if let Some(kbd) = &self.dynamic_kbd {
+                        let kbd_led = kbd.lock().await;
+                        if apply_to_led(&kbd_led)? {
+                            return Ok(());
+                        }
+                    }
+                }
             }
-        } else if let Some(hid_raw) = &self.hid {
-            // Some keyboard controllers (e.g. G533QS firmware) silently drop
-            // short HID writes and only honour packets matching the OUTPUT
-            // report size declared in the HID descriptor (64 bytes for the
-            // 0x5d report). Pad effect/SET/APPLY here so we keep working on
-            // newer Strix/Zephyrus models without regressing older laptops.
-            const PADDED_LEN: usize = 64;
-            let bytes: [u8; AURA_LAPTOP_LED_MSG_LEN] = mode.into();
-            let mut effect_padded = [0u8; PADDED_LEN];
-            effect_padded[..AURA_LAPTOP_LED_MSG_LEN].copy_from_slice(&bytes);
-            let mut set_padded = [0u8; PADDED_LEN];
-            set_padded[..AURA_LAPTOP_LED_MSG_LEN].copy_from_slice(&AURA_LAPTOP_LED_SET);
-            let mut apply_padded = [0u8; PADDED_LEN];
-            apply_padded[..AURA_LAPTOP_LED_MSG_LEN].copy_from_slice(&AURA_LAPTOP_LED_APPLY);
-            let hid_raw = hid_raw.lock().await;
-            hid_raw.write_bytes(&effect_padded)?;
-            hid_raw.write_bytes(&set_padded)?;
-            // Changes won't persist unless apply is set
-            hid_raw.write_bytes(&apply_padded)?;
-        } else {
-            return Err(RogError::NoAuraKeyboard);
         }
 
-        Ok(())
+        // When Dynamic Lighting is active, do not fall back to raw hidraw or TUF
+        // platform
+        if self.has_dynamic_lighting() {
+            return Err(RogError::MissingFunction(
+                "Dynamic lighting mode or zone not supported by kernel".to_string(),
+            ));
+        }
+
+        // Fallback is selected only when no valid Dynamic Lighting node exists.
+        if matches!(dev_type, AuraDeviceType::LaptopKeyboardTuf)
+            && let Some(platform) = &self.backlight
+        {
+            platform
+                .lock()
+                .await
+                .set_kbd_rgb_mode(&tuf_kbd_rgb_mode_bytes(mode))?;
+            return Ok(());
+        } else if let Some(hid_raw) = &self.hid {
+            let bytes: [u8; AURA_LAPTOP_LED_MSG_LEN] = mode.into();
+            let hid_raw = hid_raw.lock().await;
+            hid_raw.write_bytes(&pad_hid_report(&bytes))?;
+            hid_raw.write_bytes(&pad_hid_report(&AURA_LAPTOP_LED_SET))?;
+            hid_raw.write_bytes(&pad_hid_report(&AURA_LAPTOP_LED_APPLY))?;
+            return Ok(());
+        }
+
+        Err(RogError::NoAuraKeyboard)
     }
 
-    pub async fn set_brightness(&self, value: u8) -> Result<(), RogError> {
+    /// Read the current brightness as a 4-step [`LedBrightness`] level.
+    ///
+    /// Prefer the keyboard node. `enabled=false` is lighting-off and maps to
+    /// [`LedBrightness::Off`]; `brightness` alone is intensity and must not be
+    /// treated as off. Dynamic Lighting nodes may advertise `max_brightness > 3`
+    /// and are scaled back to Off/Low/Med/High.
+    pub async fn get_brightness(&self) -> Result<LedBrightness, RogError> {
+        for slot in self.dynamic_nodes().into_iter().flatten() {
+            let led = slot.lock().await;
+            if led.has_enabled() {
+                let Some(on) = map_dl_result(led.is_lighting_enabled())? else {
+                    continue;
+                };
+                if !on {
+                    return Ok(LedBrightness::Off);
+                }
+            }
+            let Some(max) = map_dl_result(led.get_max_brightness())? else {
+                continue;
+            };
+            let Some(value) = map_dl_result(led.get_brightness())? else {
+                continue;
+            };
+            return Ok(LedBrightness::from_scaled(value, max));
+        }
         if let Some(backlight) = &self.backlight {
-            backlight.lock().await.set_brightness(value)?;
-            return Ok(());
+            let value = backlight.lock().await.get_brightness()?;
+            return Ok(value.into());
         }
         Err(RogError::MissingFunction(
             "No LED backlight control available".to_string(),
         ))
     }
 
+    /// Set keyboard/Aura brightness from a 4-step [`LedBrightness`] level.
+    ///
+    /// [`LedBrightness::Off`] uses `enabled=false` when the node advertises it.
+    /// Other levels enable the lighting engine and scale intensity to each
+    /// node's `max_brightness`. The legacy `KeyboardBacklight` (0..=3) is also
+    /// updated when present.
+    pub async fn set_brightness(&self, brightness: LedBrightness) -> Result<(), RogError> {
+        let mut applied = false;
+        let off = brightness == LedBrightness::Off;
+        for led in self.dynamic_nodes().into_iter().flatten() {
+            let led = led.lock().await;
+            if led.has_enabled() {
+                if map_dl_result(led.set_lighting_enabled(!off))?.is_some() {
+                    applied = true;
+                }
+                if off {
+                    continue;
+                }
+            }
+            let max = led.get_max_brightness()?;
+            if map_dl_result(led.set_brightness(brightness.to_scaled(max)))?.is_some() {
+                applied = true;
+            }
+        }
+
+        if let Some(backlight) = &self.backlight {
+            match backlight.lock().await.set_brightness(brightness.into()) {
+                Ok(()) => applied = true,
+                Err(e) if applied => {
+                    debug!("WMI kbd backlight brightness sync failed: {e}");
+                }
+                Err(e) => return Err(e.into()),
+            }
+        }
+
+        if applied {
+            Ok(())
+        } else {
+            Err(RogError::MissingFunction(
+                "No LED backlight control available".to_string(),
+            ))
+        }
+    }
+
     /// Set combination state for boot animation/sleep animation/all leds/keys
     /// leds/side leds LED active
     pub async fn set_power_states(&self, config: &AuraConfig) -> Result<(), RogError> {
-        if matches!(config.led_type, rog_aura::AuraDeviceType::LaptopKeyboardTuf) {
-            if let Some(backlight) = &self.backlight {
-                let buf = config.enabled.to_bytes(config.led_type);
-                backlight.lock().await.set_kbd_rgb_state(&buf)?;
+        if self.has_dynamic_lighting() {
+            let mut applied = false;
+            let mut saw_power_states = false;
+            let mut unsupported_request = false;
+            // Apply each configured zone to its matching DL node(s). Do not OR
+            // every zone into one string shared by keyboard and lightbar.
+            for state in &config.enabled.states {
+                let requested = power_flags_for_state(state);
+                for led in self.dynamic_nodes_for_power_zone(state.zone) {
+                    let led = led.lock().await;
+                    if !led.has_power_states() {
+                        continue;
+                    }
+                    saw_power_states = true;
+                    let states = filter_power_states(&requested, &led.get_power_states_index()?);
+                    if states.is_empty() && !requested.is_empty() {
+                        unsupported_request = true;
+                        continue;
+                    }
+                    if map_dl_result(led.set_power_states(&states.join(" ")))?.is_some() {
+                        applied = true;
+                    }
+                }
             }
+            if applied {
+                return Ok(());
+            }
+            if !saw_power_states {
+                return Err(RogError::MissingFunction(
+                    "Dynamic Lighting node does not expose power_states".into(),
+                ));
+            }
+            if unsupported_request {
+                return Err(RogError::MissingFunction(
+                    "No requested power state is supported by this Dynamic Lighting node".into(),
+                ));
+            }
+            return Err(RogError::MissingFunction(
+                "No active Dynamic Lighting node accepted power_states".into(),
+            ));
+        }
+
+        if matches!(config.led_type, rog_aura::AuraDeviceType::LaptopKeyboardTuf)
+            && let Some(backlight) = &self.backlight
+        {
+            // TODO: tuf bool array
+            let buf = config.enabled.to_bytes(config.led_type);
+            backlight.lock().await.set_kbd_rgb_state(&buf)?;
         } else if let Some(hid_raw) = &self.hid {
             let hid_raw = hid_raw.lock().await;
             if let Some(p) = config.enabled.states.first()
                 && p.zone == PowerZones::Ally
             {
-                let msg = [
+                hid_raw.write_bytes(&[
                     0x5d,
                     0xd1,
                     0x09,
                     0x01,
                     p.new_to_byte() as u8,
-                    0x0,
-                    0x0,
-                ];
-                hid_raw.write_bytes(&msg)?;
+                    0,
+                    0,
+                ])?;
                 return Ok(());
             }
-
             let bytes = config.enabled.to_bytes(config.led_type);
-            let msg = [
+            hid_raw.write_bytes(&[
                 0x5d, 0xbd, 0x01, bytes[0], bytes[1], bytes[2], bytes[3],
-            ];
-            hid_raw.write_bytes(&msg)?;
+            ])?;
         }
         Ok(())
     }
@@ -184,58 +407,170 @@ impl Aura {
             config.write();
         }
 
-        let pkt_type = effect[0][1];
-        const PER_KEY_TYPE: u8 = 0xbc;
-
-        if let Some(hid_raw) = &self.hid {
-            let hid_raw = hid_raw.lock().await;
-            if pkt_type != PER_KEY_TYPE {
-                config.per_key_mode_active = false;
-                hid_raw.write_bytes(&effect[0])?;
-                hid_raw.write_bytes(&AURA_LAPTOP_LED_SET)?;
-                // hid_raw.write_bytes(&LED_APPLY)?;
-            } else {
-                if !config.per_key_mode_active {
-                    let init = LedUsbPackets::get_init_msg();
-                    hid_raw.write_bytes(&init)?;
-                    config.per_key_mode_active = true;
-                }
-                for row in effect.iter() {
-                    hid_raw.write_bytes(row)?;
-                }
-            }
-        } else if matches!(config.led_type, rog_aura::AuraDeviceType::LaptopKeyboardTuf)
+        if matches!(config.led_type, rog_aura::AuraDeviceType::LaptopKeyboardTuf)
+            && !self.has_dynamic_lighting()
             && let Some(tuf) = &self.backlight
         {
             for row in effect.iter() {
-                let r = row[9];
-                let g = row[10];
-                let b = row[11];
+                let rgb = row.get(9..12).ok_or(PlatformError::InvalidValue)?;
+                let [r, g, b] = rgb else {
+                    return Err(PlatformError::InvalidValue.into());
+                };
                 tuf.lock().await.set_kbd_rgb_mode(&[
-                    0, 0, r, g, b, 0,
+                    0, 0, *r, *g, *b, 0,
                 ])?;
             }
+            return Ok(());
         }
-        Ok(())
+
+        for maybe_led in self.dynamic_nodes().into_iter().flatten() {
+            let dynamic = maybe_led.lock().await;
+            let led_count = dynamic.get_led_count()? as usize;
+            let rgb_buf = direct_rgb_payload(effect, led_count)?;
+            if rgb_buf.is_empty() {
+                continue;
+            }
+            // Kernel direct_buffer is meaningful only while effect=direct and
+            // the zone is enabled; otherwise firmware effects keep owning the
+            // controller and frames are ignored or overwritten.
+            if map_dl_result(prepare_direct_streaming(&dynamic))?.is_none() {
+                debug!(
+                    "Dynamic lighting node '{}' busy preparing direct (-EBUSY), trying alternate",
+                    dynamic.name()
+                );
+                continue;
+            }
+            if map_dl_result(dynamic.write_direct(&rgb_buf))?.is_none() {
+                debug!(
+                    "Dynamic lighting node '{}' busy (-EBUSY), trying alternate",
+                    dynamic.name()
+                );
+                continue;
+            }
+            config.per_key_mode_active = true;
+            return Ok(());
+        }
+        if self.has_dynamic_lighting() {
+            return Err(RogError::MissingFunction(
+                "No active Dynamic Lighting node accepted the direct frame".into(),
+            ));
+        }
+
+        if let Some(hid_raw) = &self.hid {
+            let first = effect.first().ok_or(PlatformError::InvalidValue)?;
+            let packet_type = *first.get(1).ok_or(PlatformError::InvalidValue)?;
+            if effect.iter().any(|row| {
+                row.first() != Some(&0x5d)
+                    || row.len() > 64
+                    || (packet_type == 0xbc && row.len() != 64)
+            }) {
+                return Err(PlatformError::InvalidValue.into());
+            }
+            let hid_raw = hid_raw.lock().await;
+            if packet_type != 0xbc {
+                config.per_key_mode_active = false;
+                hid_raw.write_bytes(first)?;
+                hid_raw.write_bytes(&AURA_LAPTOP_LED_SET)?;
+            } else {
+                if !config.per_key_mode_active {
+                    hid_raw.write_bytes(&LedUsbPackets::get_init_msg())?;
+                    config.per_key_mode_active = true;
+                }
+                for row in effect {
+                    hid_raw.write_bytes(row)?;
+                }
+            }
+            return Ok(());
+        }
+
+        Err(RogError::NoAuraKeyboard)
     }
 
     pub async fn fix_ally_power(&mut self) -> Result<(), RogError> {
-        if self.config.lock().await.led_type == AuraDeviceType::Ally
-            && let Some(hid_raw) = &self.hid
-        {
+        let needs_fix = {
+            let config = self.config.lock().await;
+            config.led_type == AuraDeviceType::Ally && config.ally_fix.is_none()
+        };
+        if needs_fix && let Some(hid_raw) = &self.hid {
+            hid_raw.lock().await.write_bytes(&[
+                0x5d, 0xbd, 0x01, 0xff, 0xff, 0xff, 0xff,
+            ])?;
             let mut config = self.config.lock().await;
-            if config.ally_fix.is_none() {
-                let msg = [
-                    0x5d, 0xbd, 0x01, 0xff, 0xff, 0xff, 0xff,
-                ];
-                hid_raw.lock().await.write_bytes(&msg)?;
-                info!("Reset Ally power settings to base");
-                config.ally_fix = Some(true);
-            }
+            config.ally_fix = Some(true);
             config.write();
         }
         Ok(())
     }
+}
+
+fn direct_rgb_payload(
+    packets: &AuraLaptopUsbPackets,
+    led_count: usize,
+) -> Result<Vec<u8>, PlatformError> {
+    let expected = led_count
+        .checked_mul(3)
+        .ok_or(PlatformError::InvalidValue)?;
+    let first = packets.first().ok_or(PlatformError::InvalidValue)?;
+    let mut rgb = Vec::with_capacity(expected);
+    if packets.len() == 1 && led_count == 4 {
+        rgb.extend_from_slice(first.get(9..21).ok_or(PlatformError::InvalidValue)?);
+    } else {
+        for packet in packets {
+            if packet.get(1).copied() != Some(0xbc) {
+                return Err(PlatformError::InvalidValue);
+            }
+            let count = *packet.get(7).ok_or(PlatformError::InvalidValue)? as usize;
+            let payload_len = count.checked_mul(3).ok_or(PlatformError::InvalidValue)?;
+            let end = 9usize
+                .checked_add(payload_len)
+                .ok_or(PlatformError::InvalidValue)?;
+            rgb.extend_from_slice(packet.get(9..end).ok_or(PlatformError::InvalidValue)?);
+        }
+    }
+    if rgb.len() != expected {
+        return Err(PlatformError::InvalidValue);
+    }
+    Ok(rgb)
+}
+
+pub(super) fn supports_dynamic_zone(zone: rog_aura::AuraZone) -> bool {
+    matches!(
+        zone,
+        rog_aura::AuraZone::None
+            | rog_aura::AuraZone::Key1
+            | rog_aura::AuraZone::Key2
+            | rog_aura::AuraZone::Key3
+            | rog_aura::AuraZone::Key4
+            | rog_aura::AuraZone::BarLeft
+            | rog_aura::AuraZone::BarRight
+    )
+}
+
+/// `Ok(None)` when the node is inactive (`-EBUSY`). Other errors propagate.
+fn map_dl_result<T>(result: Result<T, PlatformError>) -> Result<Option<T>, RogError> {
+    match result {
+        Ok(value) => Ok(Some(value)),
+        Err(err) => {
+            let err = RogError::from(err);
+            if is_dl_node_inactive(&err) {
+                Ok(None)
+            } else {
+                Err(err)
+            }
+        }
+    }
+}
+
+/// Kernel may return `-EBUSY` when a Dynamic Lighting node briefly rejects a
+/// write (for example while another zone owns a shared controller path).
+fn is_dl_node_inactive(err: &RogError) -> bool {
+    let io = match err {
+        RogError::Platform(PlatformError::IoPath(_, e)) => Some(e),
+        RogError::Platform(PlatformError::Io(e)) => Some(e),
+        RogError::Write(_, e) | RogError::Path(_, e) | RogError::Io(e) => Some(e),
+        _ => None,
+    };
+    io.is_some_and(|e| e.kind() == std::io::ErrorKind::ResourceBusy || e.raw_os_error() == Some(16))
 }
 
 /// Build the `cmd mode r g b speed` values for the asus-wmi `kbd_rgb_mode`
@@ -253,4 +588,142 @@ fn tuf_kbd_rgb_mode_bytes(mode: &AuraEffect) -> [u8; 6] {
         mode.colour1.b,
         mode.speed.into(),
     ]
+}
+
+fn pad_hid_report(bytes: &[u8]) -> [u8; 64] {
+    let mut padded = [0u8; 64];
+    if let Some(slot) = padded.get_mut(..bytes.len()) {
+        slot.copy_from_slice(bytes);
+    }
+    padded
+}
+
+fn filter_power_states<'a>(requested: &[&'a str], supported: &str) -> Vec<&'a str> {
+    let supported: std::collections::HashSet<_> = supported.split_whitespace().collect();
+    requested
+        .iter()
+        .copied()
+        .filter(|state| supported.contains(state))
+        .collect()
+}
+
+fn power_flags_for_state(state: &AuraPowerState) -> Vec<&'static str> {
+    let mut requested = Vec::new();
+    if state.boot {
+        requested.push("boot");
+    }
+    if state.awake {
+        requested.push("awake");
+    }
+    if state.sleep {
+        requested.push("sleep");
+    }
+    if state.shutdown {
+        requested.push("shutdown");
+    }
+    requested
+}
+
+/// Enable the zone and select kernel `direct` before streaming RGB frames.
+fn prepare_direct_streaming(led: &DynamicLed) -> Result<(), PlatformError> {
+    if led.has_enabled() {
+        led.set_lighting_enabled(true)?;
+    }
+    if led.supports_effect("direct")?
+        && led.get_effect().ok().as_deref().map(str::trim) != Some("direct")
+    {
+        led.set_effect("direct")?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::{Error, ErrorKind};
+
+    use rog_aura::keyboard::AuraPowerState;
+    use rog_aura::{AuraZone, PowerZones};
+    use rog_platform::error::PlatformError;
+
+    use super::{
+        direct_rgb_payload, filter_power_states, is_dl_node_inactive, power_flags_for_state,
+        supports_dynamic_zone,
+    };
+    use crate::error::RogError;
+
+    #[test]
+    fn direct_payload_requires_exact_size() {
+        let mut packet = vec![0; 15];
+        packet[1] = 0xbc;
+        packet[7] = 2;
+        packet[9..15].copy_from_slice(&[
+            1, 2, 3, 4, 5, 6,
+        ]);
+        assert_eq!(
+            direct_rgb_payload(&vec![packet.clone()], 2).unwrap().len(),
+            6
+        );
+        assert!(direct_rgb_payload(&vec![packet], 3).is_err());
+        assert!(direct_rgb_payload(&Vec::new(), 1).is_err());
+    }
+
+    #[test]
+    fn power_states_are_intersected_with_capabilities() {
+        assert_eq!(
+            filter_power_states(
+                &[
+                    "boot", "awake", "shutdown"
+                ],
+                "awake sleep"
+            ),
+            ["awake"]
+        );
+    }
+
+    #[test]
+    fn power_flags_follow_individual_zone_state() {
+        let kbd = AuraPowerState {
+            zone: PowerZones::Keyboard,
+            boot: true,
+            awake: false,
+            sleep: false,
+            shutdown: false,
+        };
+        let lb = AuraPowerState {
+            zone: PowerZones::Lightbar,
+            boot: false,
+            awake: true,
+            sleep: true,
+            shutdown: false,
+        };
+        assert_eq!(power_flags_for_state(&kbd), ["boot"]);
+        assert_eq!(
+            power_flags_for_state(&lb),
+            [
+                "awake", "sleep"
+            ]
+        );
+    }
+
+    #[test]
+    fn dynamic_topology_allows_keyboard_and_lightbar_proxies() {
+        assert!(supports_dynamic_zone(AuraZone::None));
+        assert!(supports_dynamic_zone(AuraZone::Key1));
+        assert!(supports_dynamic_zone(AuraZone::BarLeft));
+        assert!(!supports_dynamic_zone(AuraZone::Logo));
+    }
+
+    #[test]
+    fn inactive_dl_node_detects_ebusy() {
+        let err = RogError::Platform(PlatformError::IoPath(
+            "asus::keyboard/brightness".into(),
+            Error::new(ErrorKind::ResourceBusy, "Device or resource busy"),
+        ));
+        assert!(is_dl_node_inactive(&err));
+        let errno = RogError::Platform(PlatformError::IoPath(
+            "asus::keyboard/direct_buffer".into(),
+            Error::from_raw_os_error(16),
+        ));
+        assert!(is_dl_node_inactive(&errno));
+    }
 }

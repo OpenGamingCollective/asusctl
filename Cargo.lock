@@ -4812,7 +4812,6 @@ dependencies = [
 name = "rog_slash"
 version = "6.5.0"
 dependencies = [
- "dmi_id",
  "serde",
  "thiserror 2.0.21",
  "zbus",
