@@ -99,6 +99,7 @@ Pre-built binary packages are available in several Linux distribution repositori
 | **Arch Linux** | [OGC Arch Repository](https://github.com/OpenGamingCollective/ogc-arch-packaging) | Refer to OGC Arch Guide | Maintained via OGC Arch pacman repository |
 | **Nix / NixOS** | Nixpkgs | `nix-env -iA nixpkgs.asusctl` | Package name: `asusctl` |
 | **Solus** | Official Repositories | `sudo eopkg install asusctl` | Direct package installation |
+| **Vylen Linux** | [Official Repositories](https://vylen.gitlab.io/packages/#asusctl) | `emerald install asusctl` | Package name: `asusctl` |
 
 #### Service management
 
