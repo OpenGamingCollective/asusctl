@@ -783,6 +783,15 @@
         power_zones: [Keyboard, Lightbar],
     ),
     (
+        device_name: "G814PP",
+        product_id: "19b6",
+        layout_name: "g634j-per-key",
+        basic_modes: [Static, Breathe, RainbowCycle, RainbowWave, Pulse, Star, Rain, Highlight, Laser, Ripple, Comet, Flash],
+        basic_zones: [],
+        advanced_type: PerKey,
+        power_zones: [Keyboard, Lightbar],
+    ), 
+    (
         device_name: "G815L",
         product_id: "",
         layout_name: "g814ji-per-key",
