@@ -786,7 +786,7 @@
         device_name: "G814PP",
         product_id: "19b6",
         layout_name: "g814ji-per-key",
-        basic_modes: [Static, Breathe, RainbowCycle, RainbowWave, Pulse, Star, Rain, Highlight, Laser, Ripple, Comet, Flash],
+        basic_modes: [Static, Breathe, RainbowCycle, RainbowWave, Star, Rain, Highlight, Laser, Ripple, Pulse, Comet, Flash],
         basic_zones: [],
         advanced_type: PerKey,
         power_zones: [Keyboard, Lightbar],
