@@ -131,6 +131,9 @@ install-data-asusd:
 
 	cd rog-anime/data && find "./anime" -type f -exec $(INSTALL_DATA) "{}" "$(DESTDIR_REALPATH)$(datarootdir)/asusd/{}" \;
 
+install-data-asusd_user:
+	$(INSTALL_DATA) "./data/$(BIN_U).service" "$(DESTDIR)$(libdir)/systemd/user/$(BIN_U).service"
+
 .PHONY: install-data-asusd install-data-asusd_user
 
 install-data: install-data-asusd install-data-asusd_user install-data-rog_gui
