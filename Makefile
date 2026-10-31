@@ -61,20 +61,8 @@ clean:
 distclean:
 	rm -rf .cargo vendor vendor.tar.xz
 
-target/$(TARGET)/$(BIN_D): $(SRC)
-	$(MAKE) build
-
-target/$(TARGET)/$(BIN_S): $(SRC)
-	$(MAKE) build
-
-target/$(TARGET)/$(BIN_C): $(SRC)
-	$(MAKE) build
-
-target/$(TARGET)/$(BIN_U): $(SRC)
-	$(MAKE) build
-
-target/$(TARGET)/$(BIN_ROG): $(SRC)
-	$(MAKE) build
+# Install copies files only. Build first as your user with `make`.
+# Then install with `sudo make install`. Root has no cargo.
 
 install-asusd: target/$(TARGET)/$(BIN_D)
 	$(INSTALL_PROGRAM) "./target/$(TARGET)/$(BIN_D)" "$(DESTDIR)$(bindir)/$(BIN_D)"
