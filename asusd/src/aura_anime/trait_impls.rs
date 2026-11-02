@@ -2,7 +2,7 @@ use std::sync::atomic::Ordering;
 
 use config_traits::StdConfig;
 use log::{debug, error, warn};
-use logind_zbus::manager::ManagerProxy;
+use logind_zbus::ManagerProxy;
 use rog_anime::usb::{
     Brightness, pkt_set_brightness, pkt_set_builtin_animations, pkt_set_enable_display,
     pkt_set_enable_powersave_anim,
