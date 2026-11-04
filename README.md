@@ -16,6 +16,8 @@ The project consists of three core components:
 - `rog-control-center`: Graphical user interface for `asusd`.
 - `asusctl`: Command-line client for `asusd`.
 
+Full user guides and documentation are available at [opengamingcollective.github.io/asusctl](https://opengamingcollective.github.io/asusctl/)
+
 ## Overview and goals
 
 The primary goal of `asusctl` is to provide a safe, efficient abstraction layer over hardware features using D-Bus. It manages automated system responses, such as switching performance profiles when connecting or disconnecting AC power.
@@ -65,7 +67,7 @@ Feature availability depends on upstream Linux kernel support and specific hardw
 - [x] **Battery charge thresholds:** Configure maximum charging limits (requires kernel support)
 - [x] **Custom fan curves:** Adjust fan profiles on supported hardware
 - [x] **GPU MUX toggling:** Switch GPU operational modes (G-Sync / MUX) on 2022 and newer laptops
-- [x] **Power profile management:** Control system performance profiles as detailed in [MANUAL.md](MANUAL.md)
+- [x] **Power profile management:** Control system performance profiles as detailed in the [documentation](https://opengamingcollective.github.io/asusctl/usage/asusctl.html#profile).
 
 ### Lighting and displays
 
@@ -90,12 +92,12 @@ Keyboard backlight support relies on hardware mappings defined in [`./rog-aura/d
 
 Pre-built binary packages are available in several Linux distribution repositories. Check your package manager before building from source.
 
-| Distribution | Repository Source | Installation Command | Notes |
+| Distribution | Repository Source | Installation | Notes |
 | :--- | :--- | :--- | :--- |
 | **Ultramarine / Nobara** | Official Repositories | `sudo dnf install asusctl` | Direct package installation |
 | **Fedora** | [Terra Repository](https://terrapkg.com/) | `sudo dnf install asusctl` | Requires Terra repository enabled |
 | **openSUSE** | [OBS Repository](https://download.opensuse.org/repositories/home:/luke_nukem:/asus/) | Add OBS repository | Maintained on OpenSUSE Build Service |
-| **Arch Linux** | [OGC Arch Repository](https://github.com/OpenGamingCollective/ogc-arch-packaging) | Refer to OGC Arch Guide | Maintained via OGC Arch pacman repository |
+| **Arch Linux** | [OGC Arch Repository](https://github.com/OpenGamingCollective/ogc-arch-packaging) | [OGC Arch Guide](https://opengamingcollective.github.io/asusctl/distributions/arch.html) | Maintained via OGC Arch pacman repository |
 | **Nix / NixOS** | Nixpkgs | `nix-env -iA nixpkgs.asusctl` | Package name: `asusctl` |
 | **Solus** | Official Repositories | `sudo eopkg install asusctl` | Direct package installation |
 
