@@ -6,9 +6,10 @@ import { Palette, VerticalBox } from "std-widgets.slint";
 component SideBarItem inherits Rectangle {
     in property <bool> selected;
     in property <bool> has-focus;
+    in property <length> gap-below: 2px;
     in-out property <string> text <=> label.text;
     callback clicked <=> touch.clicked;
-    min-height: self.visible ? l.preferred-height : 0px;
+    min-height: self.visible ? l.preferred-height + root.gap-below : 0px;
     // min-width: self.visible ? l.preferred-width + 10px : 0px;
     states [
         pressed when touch.pressed: {
@@ -29,12 +30,13 @@ component SideBarItem inherits Rectangle {
         opacity: 0;
         background: Palette.selection-background;
         animate opacity { duration: 150ms; }
-        height: 100%;
+        y: 0px;
+        height: max(0px, parent.height - root.gap-below);
     }
 
     l := HorizontalLayout {
         x: 4px;
-        y: (parent.height - self.height) / 2;
+        y: (max(0px, parent.height - root.gap-below) - self.height) / 2;
         padding-left: 8px;
         padding-right: 8px;
         padding-top: 6px;
@@ -48,8 +50,9 @@ component SideBarItem inherits Rectangle {
     }
 
     touch := TouchArea {
+        y: 0px;
         width: 100%;
-        height: 100%;
+        height: max(0px, parent.height - root.gap-below);
     }
 }
 
@@ -118,7 +121,7 @@ export component SideBar inherits Rectangle {
         }
 
         navigation := VerticalLayout {
-            spacing: 2px;
+            spacing: 0px;
             alignment: start;
             vertical-stretch: 0;
             for item[index] in root.model: SideBarItem {
