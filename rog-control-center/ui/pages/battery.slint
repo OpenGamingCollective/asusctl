@@ -25,19 +25,6 @@ export component PageBattery inherits Rectangle {
                 }
             }
 
-            if SystemPageData.charge_control_end_threshold != -1: SystemSlider {
-                text: @tr("Charge limit");
-                minimum: 20;
-                maximum: 100;
-                has_reset: false;
-                enabled <=> SystemPageData.charge_control_enabled;
-                value: SystemPageData.charge_control_end_threshold;
-                released => {
-                    SystemPageData.charge_control_end_threshold = self.value;
-                    SystemPageData.cb_charge_control_end_threshold(Math.round(SystemPageData.charge_control_end_threshold))
-                }
-            }
-
             if SystemPageData.battery_health != -1: Rectangle {
                 background: Palette.alternate-background;
                 border-color: Palette.border;
@@ -99,6 +86,19 @@ export component PageBattery inherits Rectangle {
                             color: Palette.control-foreground;
                         }
                     }
+                }
+            }
+
+            if SystemPageData.charge_control_end_threshold != -1: SystemSlider {
+                text: @tr("Charge limit");
+                minimum: 20;
+                maximum: 100;
+                has_reset: false;
+                enabled <=> SystemPageData.charge_control_enabled;
+                value: SystemPageData.charge_control_end_threshold;
+                released => {
+                    SystemPageData.charge_control_end_threshold = self.value;
+                    SystemPageData.cb_charge_control_end_threshold(Math.round(SystemPageData.charge_control_end_threshold))
                 }
             }
         }
