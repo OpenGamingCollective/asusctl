@@ -29,17 +29,17 @@ System configuration controls hardware-wide behaviour: platform profiles, batter
 | File | Owner | Reload behaviour |
 |---|---|---|
 | `/etc/asusd/asusd.ron` | `asusd` (root) | Watched with inotify and reloaded when the file changes. |
-| `/etc/asusd/fan_curves.ron` | `asusd` (root) | Read at startup; restart `asusd.service` after editing. |
-| `/etc/asusd/anime.ron` | `asusd` (root) | Read at startup; restart `asusd.service` after editing. |
-| `/etc/asusd/scsi.ron` | `asusd` (root) | Read at startup; restart `asusd.service` after editing. Only used on laptops with SCSI drive LEDs. |
-| `/etc/asusd/slash.ron` | `asusd` (root) | Read at startup; restart `asusd.service` after editing. Only used on laptops with a Slash LED bar. |
+| `/etc/asusd/fan_curves.ron` | `asusd` (root) | Read at startup; restart `asusd.service` and `asus-shutdown.service` after editing. |
+| `/etc/asusd/anime.ron` | `asusd` (root) | Read at startup; restart `asusd.service` and `asus-shutdown.service` after editing. |
+| `/etc/asusd/scsi.ron` | `asusd` (root) | Read at startup; restart `asusd.service` and `asus-shutdown.service` after editing. Only used on laptops with SCSI drive LEDs. |
+| `/etc/asusd/slash.ron` | `asusd` (root) | Read at startup; restart `asusd.service` and `asus-shutdown.service` after editing. Only used on laptops with a Slash LED bar. |
 | `/etc/asusd/aura_<product_id>.ron` | `asusd` (root) | Generated and rewritten by `asusd`; do not edit. |
 | `$XDG_CONFIG_HOME/rog/rog-user.ron` | `asusd-user` | Read at startup; restart `asusd-user.service` after editing. |
 | `$XDG_CONFIG_HOME/rog/<name>.ron` | `asusd-user` | Read at startup; restart `asusd-user.service` after editing. |
 
 `$XDG_CONFIG_HOME` defaults to `~/.config`. Replacing `asusd.ron` while another hard link points to the old inode leaves the watcher on the old inode; later edits can be missed. Restart `asusd.service` after such a replacement.
 
-`aura_<product_id>.ron` is generated from the support database and the detected keyboard. Do not hand-edit it; use `asusctl aura` instead. Edit the other files while the relevant service is stopped. `asusd.ron` is watched with inotify, but editing it while `asusd` is running can reset `base_charge_control_end_threshold`; stop `asusd.service` before editing. Stopping `asusd.service` also stops `asus-shutdown.service` (`PartOf=`), so deferred GPU changes are discarded; queue them again after restarting the service.
+`aura_<product_id>.ron` is generated from the support database and the detected keyboard. Do not hand-edit it; use `asusctl aura` instead. Edit the other files while the relevant service is stopped. `asusd.ron` is watched with inotify, but editing it while `asusd` is running can reset `base_charge_control_end_threshold`; stop `asusd.service` before editing. Do not unplug the charger while `asusd.service` is stopped during a one-shot charge: the daemon misses the power transition and reapplies the 100% limit on restart. Keep the charger connected during the edit, or reapply the base limit with `asusctl battery limit` after starting the service again. Stopping `asusd.service` also stops `asus-shutdown.service` (`PartOf=`), so deferred GPU changes are discarded; queue them again after starting both `asusd.service` and `asus-shutdown.service`.
 
 `asusd` creates `scsi.ron` and `slash.ron` on the first start on a machine that exposes the matching device. They are ordinary RON files you can edit by hand; see [SCSI LEDs](asusd.md#scsi-leds) and [Slash LED bar](asusd.md#slash-led-bar).
 
