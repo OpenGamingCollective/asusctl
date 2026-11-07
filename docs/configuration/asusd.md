@@ -95,7 +95,7 @@ The same variant names are used in `armoury_settings`, for example `armoury_sett
 > `asusd.ron` is deserialized as one complete struct. Omitting a required field from the current format makes the whole file invalid; if it does not match a known older format either, `asusd` renames it to `asusd.ron-old` before writing a fresh default. Only `base_charge_control_end_threshold`, `screenpad_gamma`, `screenpad_sync_primary`, and `xgm_led_enabled` may be omitted; an omitted `base_charge_control_end_threshold` defaults to `0`, not `100`. `last_power_plugged` is skipped entirely and is never part of the file.
 
 > [!WARNING]
-> Editing `asusd.ron` while a one-shot charge is active can reset `base_charge_control_end_threshold` to `0`, so the previous limit is not restored. Stop `asusd.service` before editing the file.
+> Editing `asusd.ron` while a one-shot charge is active can reset `base_charge_control_end_threshold` to `0`, so the previous limit is not restored. Stop `asusd.service` before editing the file. Keep AC connected until `asusd.service` is running again; if AC was disconnected while the service was stopped, reapply the previous limit with `asusctl battery limit`.
 
 ### Older formats
 

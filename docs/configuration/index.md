@@ -39,7 +39,7 @@ System configuration controls hardware-wide behaviour: platform profiles, batter
 
 `$XDG_CONFIG_HOME` defaults to `~/.config`. Replacing `asusd.ron` while another hard link points to the old inode leaves the watcher on the old inode; later edits can be missed. Restart `asusd.service` after such a replacement.
 
-`aura_<product_id>.ron` is generated from the support database and the detected keyboard. Do not hand-edit it; use `asusctl aura` instead. Edit the other files while the relevant service is stopped. `asusd.ron` is watched with inotify, but editing it while `asusd` is running can reset `base_charge_control_end_threshold`; stop `asusd.service` before editing.
+`aura_<product_id>.ron` is generated from the support database and the detected keyboard. Do not hand-edit it; use `asusctl aura` instead. Edit the other files while the relevant service is stopped. `asusd.ron` is watched with inotify, but editing it while `asusd` is running can reset `base_charge_control_end_threshold`; stop `asusd.service` before editing. Stopping `asusd.service` also stops `asus-shutdown.service` (`PartOf=`), so deferred GPU changes are discarded; queue them again after restarting the service.
 
 `asusd` creates `scsi.ron` and `slash.ron` on the first start on a machine that exposes the matching device. They are ordinary RON files you can edit by hand; see [SCSI LEDs](asusd.md#scsi-leds) and [Slash LED bar](asusd.md#slash-led-bar).
 
@@ -61,9 +61,9 @@ For `asusd.ron`, `asusd` rewrites the file when it saves state, so a backup is t
 
 The `config-traits` crate loads the configuration files. When a file cannot be deserialized as the current format, the loader tries the known older formats. If none match, it renames the file to `<file>-old`, writes a fresh default file, and continues with the defaults. For example, a broken `/etc/asusd/asusd.ron` becomes `/etc/asusd/asusd.ron-old` and a new `asusd.ron` is created.
 
-To recover the old values, stop the relevant service, copy the `-old` file over the generated file, and start the service again. An existing `-old` file is overwritten. If `-old` is a directory or the file is not valid UTF-8, the rename does not happen and the file is replaced with defaults. Keep a separate backup.
+To recover the old values, stop the relevant service. Repair a copy of the `-old` file first; copying it back unchanged will fail deserialization again. Copy the repaired file over the generated file. For `asusd.ron`, start `asusd.service` and `asus-shutdown.service` again so deferred GPU changes apply at shutdown. An existing `-old` file is overwritten. If `-old` is a directory or the file is not valid UTF-8, the rename does not happen and the file is replaced with defaults. Keep a separate backup.
 
-An invalid named Aura or AniMe file is reset to the `aura-default` or `anime-default` name and overwrites that default sequence file. Back up both the custom file and the corresponding default file before restarting.
+An invalid named Aura or AniMe file is reset to the `aura-default` or `anime-default` name and overwrites that default sequence file. Back up both the custom file and the corresponding default file before restarting. To recover the custom sequence, restore the repaired file under its original custom name, not over `aura-default.ron` or `anime-default.ron`.
 
 The rename and the fresh default happen when a service loads the file at startup. For `asusd.ron`, an invalid edit made while the daemon is running is logged and the previous values are kept; the inotify watcher uses `read_new`, which returns `None` on a parse failure instead of replacing the in-memory config.
 

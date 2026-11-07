@@ -97,7 +97,7 @@ A user Aura file is a `ConfigAura`:
 
 `zoned` does not enable individual zones; it changes how the generated USB packets are addressed. Use `zoned: true` with the `ZonedKb*` and `Lightbar*` codes on a zoned keyboard, and `zoned: false` with per-key codes such as `W`, `A`, or `Esc`.
 
-With `zoned: false`, `LidLogo`, `LidLeft`, `LidRight`, and the `Lightbar*` codes address row 11, but the per-key packet has only rows 0-10. Using them in that mode panics and aborts `asusd-user`; keep them for `zoned: true`.
+With `zoned: false`, `LidLogo`, `LidLeft`, `LidRight`, and the `Lightbar*` codes address row 11, but the per-key packet has only rows 0-10, so using them panics and aborts `asusd-user`. With `zoned: true`, `LidLogo`, `LidLeft`, and `LidRight` are ignored with a warning and have no effect; only the `Lightbar*` codes are valid. Do not use the lid codes in either mode.
 
 ### Effects
 

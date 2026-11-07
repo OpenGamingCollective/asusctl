@@ -103,7 +103,7 @@ time: Fade((
 | `show_for` | `Option<Duration>` | Time to hold at full brightness. `None` means no extra hold. |
 | `fade_out` | `Duration` | Time spent fading out. |
 
-With `show_for: None`, the action runs for its natural duration: the GIF's frame time, or the combined fade-in and fade-out time for a static PNG converted to an animation. Without a `Fade`, a static PNG animation is one second long. For a static PNG converted to an animation, the combined fade-in and fade-out duration must be at least 30 ms. Shorter durations produce zero frames, and playback stalls without advancing. For `AsusImage`, use `time: Infinite` when you want a plain static image rather than a faded animation.
+With `show_for: None`, the action runs for its natural duration: the GIF's frame time, or the combined fade-in and fade-out time for a static PNG converted to an animation. Without a `Fade`, a static PNG animation is one second long. For a static PNG converted to an animation, the total duration, including any hold, must be at least 30 ms. Shorter durations produce zero frames, and playback stalls without advancing. For `AsusImage`, use `time: Infinite` when you want a plain static image rather than a faded animation.
 
 `Pause` takes a bare `Duration`:
 
