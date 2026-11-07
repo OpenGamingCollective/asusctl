@@ -523,7 +523,7 @@ fn collect_commands(help: &str) -> Vec<String> {
     help.lines()
         .skip(index + 1)
         .take_while(|line| !line.trim().is_empty())
-        .filter_map(|line| line.trim().split_whitespace().next())
+        .filter_map(|line| line.split_whitespace().next())
         .map(str::to_owned)
         .collect()
 }
@@ -1019,23 +1019,21 @@ fn render_type(file: &syn::File, ty: &syn::Type) -> String {
     if let Some(resolved) = resolve_alias(file, ty) {
         return render_type(file, resolved);
     }
-    if let syn::Type::Path(path) = ty {
-        if let Some(segment) = path.path.segments.last() {
-            if matches!(segment.ident.to_string().as_str(), "HashMap" | "BTreeMap") {
-                if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
-                    let types: Vec<String> = args
-                        .args
-                        .iter()
-                        .filter_map(|arg| match arg {
-                            syn::GenericArgument::Type(inner) => Some(render_type(file, inner)),
-                            _ => None,
-                        })
-                        .collect();
-                    if types.len() == 2 {
-                        return format!("map of {} to {}", types[0], types[1]);
-                    }
-                }
-            }
+    if let syn::Type::Path(path) = ty
+        && let Some(segment) = path.path.segments.last()
+        && matches!(segment.ident.to_string().as_str(), "HashMap" | "BTreeMap")
+        && let syn::PathArguments::AngleBracketed(args) = &segment.arguments
+    {
+        let types: Vec<String> = args
+            .args
+            .iter()
+            .filter_map(|arg| match arg {
+                syn::GenericArgument::Type(inner) => Some(render_type(file, inner)),
+                _ => None,
+            })
+            .collect();
+        if types.len() == 2 {
+            return format!("map of {} to {}", types[0], types[1]);
         }
     }
     ty.to_token_stream()
