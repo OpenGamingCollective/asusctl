@@ -5,6 +5,7 @@ pub mod asus_armoury;
 pub mod backlight;
 pub mod cled;
 pub mod cpu;
+pub mod dynamic_led;
 pub mod error;
 pub mod gpu_pci;
 pub mod hid_raw;
@@ -12,13 +13,16 @@ pub mod keyboard_led;
 pub(crate) mod macros;
 pub mod platform;
 pub mod power;
+pub mod slash_led;
 pub mod usb_raw;
 
 use std::path::Path;
 
+pub use dynamic_led::DynamicLed;
 use error::{PlatformError, Result};
 use log::warn;
 use platform::PlatformProfile;
+pub use slash_led::SlashLed;
 use udev::Device;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -74,13 +78,15 @@ pub fn write_attr_num<T>(device: &mut Device, attr_name: &str, value: T) -> Resu
 where
     T: std::fmt::Display,
 {
-    if device
+    device
         .set_attribute_value(attr_name, format!("{value}"))
-        .is_err()
-    {
-        return Err(PlatformError::AttrNotFound(attr_name.to_owned()));
-    }
-    Ok(())
+        .map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                PlatformError::AttrNotFound(attr_name.to_owned())
+            } else {
+                PlatformError::IoPath(attr_name.to_owned(), e)
+            }
+        })
 }
 
 pub fn read_attr_u8_array(device: &Device, attr_name: &str) -> Result<Vec<u8>> {
