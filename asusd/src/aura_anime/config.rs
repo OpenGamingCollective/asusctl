@@ -55,19 +55,36 @@ impl AniMeConfigCached {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct AniMeConfig {
     #[serde(skip)]
+    /// Runtime-only display type detected from DMI; not written to the file.
     pub anime_type: AnimeType,
+    /// Actions played by the `run_main_loop` D-Bus method. This is the base
+    /// system sequence used by tools; it is not the boot animation.
     pub system: Vec<ActionLoader>,
+    /// Actions played while booting. `Default` is empty; a newly created file
+    /// gets one sample action.
     pub boot: Vec<ActionLoader>,
+    /// Actions played when waking from suspend. `Default` is empty; a newly
+    /// created file gets one sample action.
     pub wake: Vec<ActionLoader>,
+    /// Actions played during shutdown. `Default` is empty; a newly created
+    /// file gets one sample action.
     pub shutdown: Vec<ActionLoader>,
     // pub brightness: f32,
+    /// Enable the display.
     pub display_enabled: bool,
+    /// Global brightness: `Off`, `Low`, `Med`, or `High`.
     pub display_brightness: Brightness,
+    /// Use the built-in animations instead of the custom `boot`/`wake`/`shutdown` actions.
     pub builtin_anims_enabled: bool,
+    /// Turn the display off when external power is unplugged.
     pub off_when_unplugged: bool,
+    /// Turn the display off when the laptop suspends.
     pub off_when_suspended: bool,
+    /// Turn the display off when the lid is closed.
     pub off_when_lid_closed: bool,
+    /// Brightness used on battery power: `Off`, `Low`, `Med`, or `High`.
     pub brightness_on_battery: Brightness,
+    /// Built-in animation selection for each power state; see the table below.
     pub builtin_anims: Animations,
 }
 

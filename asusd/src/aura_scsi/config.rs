@@ -11,9 +11,13 @@ const CONFIG_FILE: &str = "scsi.ron";
 #[derive(Deserialize, Serialize, Debug)]
 pub struct ScsiConfig {
     #[serde(skip)]
+    /// Runtime-only device type; not written to the file.
     pub dev_type: AuraDeviceType,
+    /// Enable the SCSI drive LEDs.
     pub enabled: bool,
+    /// Active mode.
     pub current_mode: AuraMode,
+    /// Stored effect for each mode.
     pub modes: BTreeMap<AuraMode, AuraEffect>,
 }
 

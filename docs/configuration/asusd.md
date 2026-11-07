@@ -24,51 +24,9 @@ sudo cp -a /etc/asusd "/etc/asusd.bak.$(date +%F-%H%M%S)"
 
 The file is a single RON struct. A complete default file looks like this:
 
-```ron
-(
-    charge_control_end_threshold: 100,
-    base_charge_control_end_threshold: 100,
-    disable_nvidia_powerd_on_battery: true,
-    ac_command: "",
-    bat_command: "",
-    platform_profile_linked_epp: true,
-    platform_profile_on_battery: Quiet,
-    change_platform_profile_on_battery: true,
-    platform_profile_on_ac: Performance,
-    change_platform_profile_on_ac: true,
-    profile_quiet_epp: Power,
-    profile_balanced_epp: BalancePower,
-    profile_custom_epp: Performance,
-    profile_performance_epp: Performance,
-    ac_profile_tunings: {},
-    dc_profile_tunings: {},
-    armoury_settings: {},
-)
-```
+{{#include ../generated/asusd-default.md}}
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `charge_control_end_threshold` | `u8` | `100` | Current battery charge limit percentage. Set it with `asusctl battery limit 80` (the accepted range is 20-100). |
-| `base_charge_control_end_threshold` | `u8` | `100` | Charge limit restored after a one-shot full charge. `0` means "not set" for a config upgraded from an older version. |
-| `disable_nvidia_powerd_on_battery` | `bool` | `true` | Stop `nvidia-powerd` while on battery and start it again on AC. |
-| `ac_command` | `String` | `""` | Command run when AC power is connected. |
-| `bat_command` | `String` | `""` | Command run when AC power is disconnected. |
-| `platform_profile_linked_epp` | `bool` | `true` | Set the CPU energy-performance preference when the platform profile changes. |
-| `platform_profile_on_battery` | `PlatformProfile` | `Quiet` | Profile applied when the laptop switches to battery. |
-| `change_platform_profile_on_battery` | `bool` | `true` | Apply `platform_profile_on_battery` on the power-source change. |
-| `platform_profile_on_ac` | `PlatformProfile` | `Performance` | Profile applied when AC power is connected. |
-| `change_platform_profile_on_ac` | `bool` | `true` | Apply `platform_profile_on_ac` on the power-source change. |
-| `profile_quiet_epp` | `CPUEPP` | `Power` | EPP value used for the Quiet profile. |
-| `profile_balanced_epp` | `CPUEPP` | `BalancePower` | EPP value used for the Balanced profile. |
-| `profile_custom_epp` | `CPUEPP` | `Performance` | EPP value used for the Custom profile. |
-| `profile_performance_epp` | `CPUEPP` | `Performance` | EPP value used for the Performance profile. |
-| `ac_profile_tunings` | map of `PlatformProfile` to `Tuning` | `{}` | Per-profile PPT tuning groups used on AC power. |
-| `dc_profile_tunings` | map of `PlatformProfile` to `Tuning` | `{}` | Per-profile PPT tuning groups used on battery. |
-| `armoury_settings` | map of `FirmwareAttribute` to `i32` | `{}` | Persisted firmware-attribute values applied at startup. |
-| `screenpad_gamma` | `Option<f32>` | omitted (`None`) | ScreenPad gamma. `None` behaves as `1.0` (linear). |
-| `screenpad_sync_primary` | `Option<bool>` | omitted (`None`) | Sync ScreenPad brightness with the primary display. `None` behaves as disabled. |
-| `xgm_led_enabled` | `Option<bool>` | omitted (`None`) | Persisted XG Mobile LED state: `None` = never set, `Some(false)` = off, `Some(true)` = on. |
-| `last_power_plugged` | `u8` | not written | Runtime-only AC/battery state (`#[serde(skip)]`). Do not add it to the file. |
+{{#include ../generated/asusd-fields.md}}
 
 `PlatformProfile` values are `Balanced`, `Performance`, `Quiet`, `LowPower`, and `Custom`. Their numeric values are `Balanced = 0`, `Performance = 1`, `Quiet = 2`, `LowPower = 3`, and `Custom = 4`; the kernel string for `LowPower` is `low-power`. In RON, use the exact variant name `LowPower`; `low_power` and `low-power` are not accepted. On the command line, profile names are parsed case-insensitively and ignore punctuation, so `low-power`, `low_power`, and `LowPower` all resolve to `LowPower`. `CPUEPP` values are `Default`, `Performance`, `BalancePerformance`, `BalancePower`, and `Power`. A `Tuning` value is `(enabled: bool, group: { ... })`, where `group` maps `FirmwareAttribute` variants to `i32` values. The RON key is the variant name, not the sysfs name. The example below is a fragment; replace the two tuning fields in your existing `asusd.ron` instead of copying it as the whole file:
 
@@ -302,29 +260,11 @@ Two write-order details are handled by `asusd`:
 )
 ```
 
-| Field | Default | Description |
-|---|---|---|
-| `system` | `[]` | Actions played by the `run_main_loop` D-Bus method. This is the base system sequence used by tools; it is not the boot animation. |
-| `boot` | `[]` in `Default`; one sample action in a new file | Actions played while booting. |
-| `wake` | `[]` in `Default`; one sample action in a new file | Actions played when waking from suspend. |
-| `shutdown` | `[]` in `Default`; one sample action in a new file | Actions played during shutdown. |
-| `display_enabled` | `true` | Enable the display. |
-| `display_brightness` | `Med` | Global brightness: `Off`, `Low`, `Med`, or `High`. |
-| `builtin_anims_enabled` | `true` | Use the built-in animations instead of the custom `boot`/`wake`/`shutdown` actions. |
-| `off_when_unplugged` | `true` | Turn the display off when external power is unplugged. |
-| `off_when_suspended` | `true` | Turn the display off when the laptop suspends. |
-| `off_when_lid_closed` | `true` | Turn the display off when the lid is closed. |
-| `brightness_on_battery` | `Low` | Brightness used on battery power: `Off`, `Low`, `Med`, or `High`. |
-| `builtin_anims` | see below | Built-in animation selection for each power state. |
+{{#include ../generated/anime-config.md}}
 
 `builtin_anims` accepts:
 
-| Field | Values | Default |
-|---|---|---|
-| `boot` | `GlitchConstruction`, `StaticEmergence` | `GlitchConstruction` |
-| `awake` | `BinaryBannerScroll`, `RogLogoGlitch` | `BinaryBannerScroll` |
-| `sleep` | `BannerSwipe`, `Starfield` | `BannerSwipe` |
-| `shutdown` | `GlitchOut`, `SeeYa` | `GlitchOut` |
+{{#include ../generated/anime-builtins.md}}
 
 `AniMeConfig::default()` has empty action vectors; `create_default()`, used when the file is first created, seeds the sample actions shown above. The `anime_type` field is runtime-only (`#[serde(skip)]`), and the daemon decodes actions into `AniMeConfigCached` in memory; neither is written to the file. See [AniMe sequences](anime-sequences.md) for the action format.
 
@@ -358,41 +298,15 @@ A minimal generated file looks like this:
 )
 ```
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `config_name` | `String` | `aura_<product_id>.ron` | File name. If empty, the loader falls back to `aura.ron`. |
-| `ally_fix` | `Option<bool>` | omitted (`None`) | Daemon-managed Ally power-reset marker. The loader resets it to `None`; `fix_ally_power` sets it to `Some(true)` after the reset. Do not edit. |
-| `brightness` | `LedBrightness` | `Med` | Keyboard brightness: `Off`, `Low`, `Med`, or `High`. |
-| `current_mode` | `AuraModeNum` | `Static` | Active built-in mode. |
-| `builtins` | map of `AuraModeNum` to `AuraEffect` | seeded per supported mode | One effect per basic mode reported by the support database. |
-| `multizone` | `Option<map of AuraModeNum to Vec<AuraEffect>>` | omitted (`None`) | Per-zone effects. Omitted when the keyboard has no zones. |
-| `multizone_on` | `bool` | `false` | Whether the multizone set is active. |
-| `enabled` | `LaptopAuraPower` | one state per supported power zone | Per-zone power states. The inner `states` list holds `AuraPowerState` values. |
-| `led_type` | `AuraDeviceType` | runtime | `#[serde(skip)]`; detected from the product ID. |
-| `support_data` | `LedSupportData` | runtime | `#[serde(skip)]`; support database entry. |
-| `per_key_mode_active` | `bool` | runtime | `#[serde(skip)]`; whether direct per-key addressing is in use. |
+{{#include ../generated/aura-config.md}}
 
 An `AuraEffect` has these fields:
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `mode` | `AuraModeNum` | `Static` | Effect mode. |
-| `zone` | `AuraZone` | `None` | Target zone; `None` means the whole keyboard. |
-| `colour1` | `Colour` | `(166, 0, 0)` | Primary colour. |
-| `colour2` | `Colour` | `(0, 0, 0)` | Secondary colour for modes that use two colours. |
-| `speed` | `Speed` | `Med` | Animation speed: `Low`, `Med`, or `High`. |
-| `direction` | `Direction` | `Right` | Animation direction: `Right`, `Left`, `Up`, or `Down`. |
+{{#include ../generated/aura-effect.md}}
 
 The enum values are:
 
-| Enum | Values |
-|---|---|
-| `LedBrightness` | `Off`, `Low`, `Med` (default), `High` |
-| `AuraModeNum` | `Static` (default), `Breathe`, `RainbowCycle`, `RainbowWave`, `Star`, `Rain`, `Highlight`, `Laser`, `Ripple`, `Pulse`, `Comet`, `Flash` |
-| `AuraZone` | `None` (default), `Key1`, `Key2`, `Key3`, `Key4`, `Logo`, `BarLeft`, `BarRight` |
-| `Speed` | `Low`, `Med` (default), `High` |
-| `Direction` | `Right` (default), `Left`, `Up`, `Down` |
-| `PowerZones` | `Logo`, `Keyboard` (default), `Lightbar`, `Lid`, `RearGlow`, `KeyboardAndLightbar`, `Ally`, `None` |
+{{#include ../generated/aura-enums.md}}
 
 `AuraPowerState` has `zone`, `boot`, `awake`, `sleep`, and `shutdown`. All four boolean states default to `true` for each zone the support database reports.
 
@@ -422,26 +336,13 @@ Do not edit this file by hand. Use `asusctl aura` to change the built-in modes, 
 )
 ```
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `enabled` | `bool` | `true` | Enable the SCSI drive LEDs. |
-| `current_mode` | `AuraMode` | `Static` | Active mode. |
-| `modes` | map of `AuraMode` to `AuraEffect` | one entry per mode | Stored effect for each mode. |
-| `dev_type` | `AuraDeviceType` | runtime | `#[serde(skip)]`; detected device type. |
+{{#include ../generated/scsi-config.md}}
 
-The example above shows one entry. A freshly created `scsi.ron` contains an entry for every mode: `Off`, `Static`, `Breathe`, `Flashing`, `RainbowCycle`, `RainbowWave`, `RainbowCycleBreathe`, `ChaseFade`, `RainbowCycleChaseFade`, `Chase`, `RainbowCycleChase`, `RainbowCycleWave`, `RainbowPulseChase`, `RandomFlicker`, and `DoubleFade`.
+The example above shows one entry. A freshly created `scsi.ron` contains an entry for every mode: {{#include ../generated/scsi-modes.md}}
 
 Each `AuraEffect` has `mode`, `speed`, `direction`, and four colours:
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `mode` | `AuraMode` | `Static` | Effect mode. |
-| `speed` | `Speed` | `Med` | `Slowest`, `Slow`, `Med`, `Fast`, or `Fastest`. |
-| `direction` | `Direction` | `Forward` | `Forward` or `Reverse`. |
-| `colour1` | `Colour` | `(166, 0, 0)` | First colour. |
-| `colour2` | `Colour` | `(0, 0, 0)` | Second colour. |
-| `colour3` | `Colour` | `(166, 0, 0)` | Third colour. |
-| `colour4` | `Colour` | `(0, 0, 0)` | Fourth colour. |
+{{#include ../generated/scsi-effect.md}}
 
 Use `asusctl scsi` to change the mode, speed, direction, and colours; see [scsi](../usage/asusctl.md#scsi). The daemon writes the file when a mode is saved.
 
@@ -464,21 +365,9 @@ Use `asusctl scsi` to change the mode, speed, direction, and colours; see [scsi]
 )
 ```
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `enabled` | `bool` | `true` | Enable the Slash LED bar. |
-| `brightness` | `u8` | `255` | Brightness, `0-255`. |
-| `display_interval` | `u8` | `0` | Animation interval. The CLI documents `0-5`; the file stores a `u8`. |
-| `display_mode` | `SlashMode` | `Bounce` | Animation mode. |
-| `show_on_boot` | `bool` | `true` | Show the animation on boot. |
-| `show_on_shutdown` | `bool` | `true` | Show the animation on shutdown. |
-| `show_on_sleep` | `bool` | `true` | Show the animation on sleep. |
-| `show_on_battery` | `bool` | `true` | Show the animation on battery power. |
-| `show_battery_warning` | `bool` | `true` | Show the low-battery warning animation. |
-| `show_on_lid_closed` | `bool` | `true` | Show the animation when the lid is closed. |
-| `slash_type` | `SlashType` | runtime | `#[serde(skip)]`; detected from DMI. |
+{{#include ../generated/slash-config.md}}
 
-`SlashMode` values are `Static`, `Bounce`, `Slash`, `Loading`, `BitStream`, `Transmission`, `Flow`, `Flux`, `Phantom`, `Spectrum`, `Hazard`, `Interfacing`, `Ramp`, `GameOver`, `Start`, and `Buzzer`.
+`SlashMode` values are {{#include ../generated/slash-modes.md}}
 
 > [!NOTE]
 > `show_on_lid_closed` is stored in `slash.ron` but is not exposed by `asusctl slash set`. To change it, stop `asusd.service`, edit the field, and start `asusd.service` and `asus-shutdown.service` again. The other fields are available through `asusctl slash set`; see [slash](../usage/asusctl.md#slash).
@@ -513,34 +402,7 @@ The attribute type controls when a write takes effect:
 
 The attributes known to `asusd` are:
 
-| `asusctl` name | RON variant | Type |
-|---|---|---|
-| `apu_mem` | `ApuMem` | `Norestore` |
-| `cores_performance` | `CoresPerformance` | `Immediate` |
-| `cores_efficiency` | `CoresEfficiency` | `Immediate` |
-| `ppt_pl1_spl` | `PptPl1Spl` | `Ppt` |
-| `ppt_pl2_sppt` | `PptPl2Sppt` | `Ppt` |
-| `ppt_pl3_fppt` | `PptPl3Fppt` | `Ppt` |
-| `ppt_fppt` | `PptFppt` | `Ppt` |
-| `ppt_apu_sppt` | `PptApuSppt` | `Ppt` |
-| `ppt_platform_sppt` | `PptPlatformSppt` | `Ppt` |
-| `nv_dynamic_boost` | `NvDynamicBoost` | `Ppt` |
-| `nv_temp_target` | `NvTempTarget` | `Ppt` |
-| `nv_base_tgp` | `DgpuBaseTgp` | `ReadOnly` |
-| `nv_tgp` | `DgpuTgp` | `Ppt` |
-| `charge_mode` | `ChargeMode` | `ReadOnly` |
-| `boot_sound` | `BootSound` | `Bios` |
-| `mcu_powersave` | `McuPowersave` | `Immediate` |
-| `panel_overdrive` | `PanelOverdrive` | `Immediate` |
-| `panel_hd_mode` | `PanelHdMode` | `Immediate` |
-| `egpu_connected` | `EgpuConnected` | `Gpu` |
-| `egpu_enable` | `EgpuEnable` | `Gpu` |
-| `dgpu_disable` | `DgpuDisable` | `Gpu` |
-| `gpu_mux_mode` | `GpuMuxMode` | `Gpu` |
-| `mini_led_mode` | `MiniLedMode` | `Immediate` |
-| `screen_auto_brightness` | `ScreenAutoBrightness` | `Immediate` |
-| `pending_reboot` | `PendingReboot` | not listed |
-| `none` | `None` | sentinel for unknown names |
+{{#include ../generated/armoury-attributes.md}}
 
 `pending_reboot` is present in the enum but is skipped when the attribute list is built, so it does not appear in `asusctl armoury list`. Not every laptop exposes every attribute; use `asusctl armoury list` for the actual set.
 

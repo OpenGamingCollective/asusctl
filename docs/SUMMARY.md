@@ -31,6 +31,7 @@
 # Usage
 
 - [asusctl](usage/asusctl.md)
+- [Command Reference](usage/command-reference.md)
 - [Keybinds](usage/keybinds.md)
 
 # FAQ

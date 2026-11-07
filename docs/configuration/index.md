@@ -24,6 +24,10 @@ System configuration controls hardware-wide behaviour: platform profiles, batter
 > [!NOTE]
 > `asusd` is triggered by udev and is not meant to be enabled with `systemctl enable`. Check it with `systemctl status asusd.service` and read its logs with `sudo journalctl -b -u asusd`.
 
+The installed unit files at a glance:
+
+{{#include ../generated/services.md}}
+
 ## Configuration files
 
 | File | Owner | Reload behaviour |
