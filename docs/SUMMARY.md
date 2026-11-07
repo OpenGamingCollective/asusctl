@@ -21,13 +21,22 @@
 - [Ubuntu](distributions/ubuntu.md)
 - [PikaOS](distributions/pikaos.md)
 
+# Configuration
+
+- [Overview](configuration/index.md)
+- [asusd](configuration/asusd.md)
+- [asusd-user](configuration/asusd-user.md)
+- [AniMe Sequences](configuration/anime-sequences.md)
+
 # Usage
 
 - [asusctl](usage/asusctl.md)
+- [Keybinds](usage/keybinds.md)
 
 # FAQ
 
 - [General](faq/general.md)
+- [asusctl](faq/asusctl.md)
 - [Graphics](faq/graphics.md)
 - [GPU Switching](faq/gpu-switching.md)
 - [Keyboard](faq/keyboard.md)
