@@ -576,6 +576,15 @@
         power_zones: [Keyboard, Lightbar],
     ),
     (
+        device_name: "G712LU",
+        product_id: "",
+        layout_name: "gl503",
+        basic_modes: [Static, Breathe, RainbowCycle, RainbowWave, Pulse],
+        basic_zones: [],
+        advanced_type: r#None,
+        power_zones: [Keyboard, Lightbar],
+    ),
+    (
         device_name: "G712LV",
         product_id: "",
         layout_name: "ga401q",
