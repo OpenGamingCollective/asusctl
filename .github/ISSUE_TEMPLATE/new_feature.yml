@@ -12,7 +12,7 @@ body:
 
         This project is community-driven. Before filing, please:
         - Search existing issues to avoid duplicates.
-        - Skim the [`MANUAL.md`](https://github.com/OpenGamingCollective/asusctl/blob/main/MANUAL.md) and [`CONTRIBUTING.md`](https://github.com/OpenGamingCollective/asusctl/blob/main/CONTRIBUTING.md) to see what is already possible.
+        - Skim the [configuration documentation](https://github.com/OpenGamingCollective/asusctl/blob/main/docs/configuration/index.md) and [`CONTRIBUTING.md`](https://github.com/OpenGamingCollective/asusctl/blob/main/CONTRIBUTING.md) to see what is already possible.
 
   - type: input
     id: short-summary
