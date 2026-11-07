@@ -36,15 +36,6 @@
         power_zones: [Keyboard],
     ),
     (
-        device_name: "FA607NUG",
-        product_id: "",
-        layout_name: "fa507",
-        basic_modes: [Static, Breathe, RainbowCycle, Pulse],
-        basic_zones: [],
-        advanced_type: r#None,
-        power_zones: [Keyboard],
-    ),
-    (
         device_name: "FA608PM",
         product_id: "",
         layout_name: "fa608",
@@ -515,15 +506,6 @@
     (
         device_name: "G615JM",
         product_id: "",
-        layout_name: "g634j-per-key",
-        basic_modes: [Static, Breathe, RainbowCycle, RainbowWave, Pulse],
-        basic_zones: [Key1, Key2, Key3, Key4],
-        advanced_type: r#None,
-        power_zones: [Keyboard, Lightbar],
-    ),
-    (
-        device_name: "G615JPR",
-        product_id: "19b6",
         layout_name: "g634j-per-key",
         basic_modes: [Static, Breathe, RainbowCycle, RainbowWave, Pulse],
         basic_zones: [Key1, Key2, Key3, Key4],
