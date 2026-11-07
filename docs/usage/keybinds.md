@@ -18,7 +18,7 @@ There is no asusctl keybind daemon and no default shortcut list. The only option
 
 Run these as your normal user. `asusctl` talks to the system daemon over D-Bus; do not prefix them with `sudo`.
 
-The D-Bus policy allows the `adm`, `sudo`, `users`, and `wheel` groups. If your user is in none of them, `asusctl` fails with `AccessDenied`; add the user to `wheel` or another allowed group.
+The D-Bus policy allows the `adm`, `sudo`, `users`, and `wheel` groups. If your user is in none of them, `asusctl` fails with `AccessDenied`. On systems where `wheel` grants sudo, joining that group also grants administrative privileges; check the group policy before adding the user.
 
 `asusctl profile next` uses a fixed order: `Balanced` → `Performance` → `LowPower` if the kernel exposes it, otherwise `Quiet` → `Balanced`. It never selects `Custom`. If `Performance` is unavailable, the command can fail.
 
@@ -26,7 +26,7 @@ The D-Bus policy allows the `adm`, `sudo`, `users`, and `wheel` groups. If your 
 
 ## Fn+F5
 
-On many ASUS laptops Fn+F5 is the key used to switch platform profiles. Linux does not assign an action to it by default. Bind it in your desktop to:
+On many ASUS laptops Fn+F5 is the key used to switch platform profiles. On supported machines, `asus-wmi` handles the key and cycles profiles itself, and the event does not reach the desktop. Check whether Fn+F5 already works before binding a desktop shortcut. If it does not, bind it to:
 
 ```bash
 asusctl profile next
@@ -42,7 +42,7 @@ To control keyboard backlight brightness instead, bind a key to `asusctl leds ne
 
 `asusctl aura effect --next-mode` and `--prev-mode` cycle the built-in factory modes supported by the keyboard. The list comes from the keyboard's support data; use `asusctl info --show-supported` to see it. If the current mode is not in that list, `--next-mode` selects the first mode and `--prev-mode` selects the last.
 
-Custom Aura effects are different. They are `ConfigAura` files played by `asusd-user` (see [Aura effects](../configuration/asusd-user.md#aura-effects)). While a custom sequence is active, `asusd-user` continuously writes keyboard packets, which can override built-in mode changes. Set `active_aura: None` in `rog-user.ron` and restart `asusd-user.service` to return control to the built-in modes.
+Custom Aura effects are different. They are `ConfigAura` files played by `asusd-user` (see [Aura effects](../configuration/asusd-user.md#aura-effects)). While a custom sequence is active, `asusd-user` continuously writes keyboard packets, which can override built-in mode changes. Set `active_aura: None` in `rog-user.ron` and restart `asusd-user.service` to return control to the built-in modes. The daemon does not select a built-in mode at startup, so run a built-in mode command such as `asusctl aura effect --next-mode` afterward.
 
 ## Desktop setup
 

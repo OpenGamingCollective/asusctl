@@ -80,12 +80,6 @@ A user Aura file is a `ConfigAura`:
                 max_percentage: 80,
                 min_percentage: 40,
             )),
-            DoomLightFlash((
-                led: Esc,
-                start_colour: (r: 255, g: 0, b: 0),
-                max_percentage: 100,
-                min_percentage: 20,
-            )),
         ],
         zoned: false,
     ),
@@ -103,6 +97,8 @@ A user Aura file is a `ConfigAura`:
 
 `zoned` does not enable individual zones; it changes how the generated USB packets are addressed. Use `zoned: true` with the `ZonedKb*` and `Lightbar*` codes on a zoned keyboard, and `zoned: false` with per-key codes such as `W`, `A`, or `Esc`.
 
+With `zoned: false`, `LidLogo`, `LidLeft`, `LidRight`, and the `Lightbar*` codes address row 11, but the per-key packet has only rows 0-10. Using them in that mode panics and aborts `asusd-user`; keep them for `zoned: true`.
+
 ### Effects
 
 There are four effects:
@@ -113,6 +109,8 @@ There are four effects:
 | `Breathe` | `led`, `start_colour1`, `start_colour2`, `speed` | Fades between two colours. |
 | `DoomFlicker` | `led`, `start_colour`, `max_percentage`, `min_percentage` | Random flicker between brightness percentages. |
 | `DoomLightFlash` | `led`, `start_colour`, `max_percentage`, `min_percentage` | Flash effect between brightness percentages. |
+
+The `DoomLightFlash` effect is not usable from RON yet: its runtime fields are skipped by serde and start at zero, which underflows on the first update. Do not add it to a configuration file until the code initializes those fields.
 
 `Colour` is a named-field struct:
 
@@ -149,11 +147,11 @@ The remaining `LedCode` variants are grouped below. `RogApp` is the enum's defau
 
 | Group | Variants |
 |---|---|
-| System and media | `VolUp`, `VolDown`, `MicMute`, `RogApp`, `RogFan`, `MediaPlay`, `MediaStop`, `MediaNext`, `MediaPrev`, `PrtSc`, `Pause` |
+| System and media | `VolUp`, `VolDown`, `MicMute`, `RogApp`, `PrtSc` (the other media and fan codes are ignored; see No-op) |
 | Main keyboard | `Esc`, `F1`, `F2`, `F3`, `F4`, `F5`, `F6`, `F7`, `F8`, `F9`, `F10`, `F11`, `F12`, `Del`, `Tilde`, `N1`, `N2`, `N3`, `N4`, `N5`, `N6`, `N7`, `N8`, `N9`, `N0`, `Hyphen`, `Equals`, `Backspace`, `Backspace3_1`, `Backspace3_2`, `Backspace3_3`, `Home`, `Tab`, `Q`, `W`, `E`, `R`, `T`, `Y`, `U`, `I`, `O`, `P`, `LBracket`, `RBracket`, `BackSlash`, `PgUp`, `Caps`, `A`, `S`, `D`, `F`, `G`, `H`, `J`, `K`, `L`, `SemiColon`, `Quote`, `Return`, `Return3_1`, `Return3_2`, `Return3_3`, `PgDn`, `LShift`, `LShift3_1`, `LShift3_2`, `LShift3_3`, `Z`, `X`, `C`, `V`, `B`, `N`, `M`, `Comma`, `Period`, `FwdSlash`, `End`, `LCtrl`, `LFn`, `Meta`, `LAlt`, `Spacebar`, `Spacebar5_1`, `Spacebar5_2`, `Spacebar5_3`, `Spacebar5_4`, `Spacebar5_5`, `RAlt`, `RCtrl`, `Up`, `Down`, `Left`, `Right`, `RFn` |
-| Numpad | `Star`, `NumPadDel`, `NumPadPlus`, `NumPadEnter`, `NumPadPause`, `NumPadPrtSc`, `NumPadHome`, `NumLock`, `Rshift`, `Rshift3_1`, `Rshift3_2`, `Rshift3_3` |
+| Numpad | `Rshift`, `Rshift3_1`, `Rshift3_2`, `Rshift3_3` (the other numpad codes are ignored; see No-op) |
 | Lid and zones | `LidLogo`, `LidLeft`, `LidRight`, `SingleZone`, `ZonedKbLeft`, `ZonedKbLeftMid`, `ZonedKbRightMid`, `ZonedKbRight` |
-| No-op | `Spacing`, `Blocking` (ignored by effects) |
+| No-op | `Spacing`, `Blocking`, `Backspace`, `Spacebar`, `RogFan`, `MediaPlay`, `MediaStop`, `MediaPrev`, `MediaNext`, `Pause`, `NumLock`, `Star`, `NumPadDel`, `NumPadPlus`, `NumPadEnter`, `NumPadPause`, `NumPadPrtSc`, `NumPadHome` (ignored by effects; use `Backspace3_*` and `Spacebar5_*` for addressable LEDs) |
 
 The full enum, including the lightbar variants, is in [`rog-aura/src/keyboard/advanced.rs`](https://github.com/OpenGamingCollective/asusctl/blob/main/rog-aura/src/keyboard/advanced.rs).
 

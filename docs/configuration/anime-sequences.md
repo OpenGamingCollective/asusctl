@@ -103,7 +103,7 @@ time: Fade((
 | `show_for` | `Option<Duration>` | Time to hold at full brightness. `None` means no extra hold. |
 | `fade_out` | `Duration` | Time spent fading out. |
 
-With `show_for: None`, the action runs for its natural duration: the GIF's frame time, or the combined fade-in and fade-out time for a static PNG converted to an animation. Without a `Fade`, a static PNG animation is one second long. For `AsusImage`, use `time: Infinite` when you want a plain static image rather than a faded animation.
+With `show_for: None`, the action runs for its natural duration: the GIF's frame time, or the combined fade-in and fade-out time for a static PNG converted to an animation. Without a `Fade`, a static PNG animation is one second long. For a static PNG converted to an animation, the combined fade-in and fade-out duration must be at least 30 ms. Shorter durations produce zero frames, and playback stalls without advancing. For `AsusImage`, use `time: Infinite` when you want a plain static image rather than a faded animation.
 
 `Pause` takes a bare `Duration`:
 
@@ -132,7 +132,7 @@ PNG decoding accepts these raster formats:
 - `Gray16`, `Graya16`
 - `Rgb16`, `Rgba16`
 
-Palette PNGs are rejected. Colour PNGs are accepted: each channel is divided by 3, the three results are added to form the single brightness value the display uses, and alpha is respected. For 16-bit colour, each channel is divided by 3 and then shifted right by 8 before the results are added; 16-bit greyscale values are shifted right by 8. You do not need to convert images to greyscale first.
+Palette PNGs are rejected. Colour PNGs are accepted: each channel is divided by 3, the three results are added to form the single brightness value the display uses, and alpha is respected for `Image` and `ImageAnimation`. The `AsusImage` diagonal PNG path ignores alpha and uses only the colour channels. For 16-bit colour, each channel is divided by 3 and then shifted right by 8 before the results are added; 16-bit greyscale values are shifted right by 8. You do not need to convert images to greyscale first.
 
 ## See also
 

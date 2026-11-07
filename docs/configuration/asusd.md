@@ -10,7 +10,7 @@ sudo cp -a /etc/asusd "/etc/asusd.bak.$(date +%F-%H%M%S)"
 
 | File | Purpose | Reload behaviour |
 |---|---|---|
-| `asusd.ron` | Platform profiles, battery charging, power commands, EPP, tuning, and Armoury settings. | Watched with inotify; changes are picked up while the daemon runs. |
+| `asusd.ron` | Platform profiles, battery charging, power commands, EPP, tuning, and Armoury settings. | Watched with inotify; changes are reloaded while the daemon runs. Only the charge limit and `platform_profile_linked_epp` are applied on reload; `armoury_settings` and other hardware settings are applied at startup, so use `asusctl` or restart `asusd.service`. |
 | `fan_curves.ron` | Fan curves for the `balanced`, `performance`, `quiet`, and `custom` profiles. | Read at startup; restart `asusd.service` after editing. |
 | `anime.ron` | AniMe Matrix display state and the system/boot/wake/shutdown sequences. | Read at startup; restart `asusd.service` after editing. |
 | `scsi.ron` | SCSI drive LED state and the per-mode effects. | Read at startup; restart `asusd.service` after editing. |
@@ -67,7 +67,7 @@ The file is a single RON struct. A complete default file looks like this:
 | `xgm_led_enabled` | `Option<bool>` | omitted (`None`) | Persisted XG Mobile LED state: `None` = never set, `Some(false)` = off, `Some(true)` = on. |
 | `last_power_plugged` | `u8` | not written | Runtime-only AC/battery state (`#[serde(skip)]`). Do not add it to the file. |
 
-`PlatformProfile` values are `Balanced`, `Performance`, `Quiet`, `LowPower`, and `Custom`. Their numeric values are `Balanced = 0`, `Performance = 1`, `Quiet = 2`, `LowPower = 3`, and `Custom = 4`; the kernel string for `LowPower` is `low-power`. Profile names are parsed case-insensitively and ignore punctuation, so `low-power`, `low_power`, and `LowPower` all resolve to `LowPower`. `CPUEPP` values are `Default`, `Performance`, `BalancePerformance`, `BalancePower`, and `Power`. A `Tuning` value is `(enabled: bool, group: { ... })`, where `group` maps `FirmwareAttribute` variants to `i32` values. The RON key is the variant name, not the sysfs name. The example below is a fragment; replace the two tuning fields in your existing `asusd.ron` instead of copying it as the whole file:
+`PlatformProfile` values are `Balanced`, `Performance`, `Quiet`, `LowPower`, and `Custom`. Their numeric values are `Balanced = 0`, `Performance = 1`, `Quiet = 2`, `LowPower = 3`, and `Custom = 4`; the kernel string for `LowPower` is `low-power`. In RON, use the exact variant name `LowPower`; `low_power` and `low-power` are not accepted. On the command line, profile names are parsed case-insensitively and ignore punctuation, so `low-power`, `low_power`, and `LowPower` all resolve to `LowPower`. `CPUEPP` values are `Default`, `Performance`, `BalancePerformance`, `BalancePower`, and `Power`. A `Tuning` value is `(enabled: bool, group: { ... })`, where `group` maps `FirmwareAttribute` variants to `i32` values. The RON key is the variant name, not the sysfs name. The example below is a fragment; replace the two tuning fields in your existing `asusd.ron` instead of copying it as the whole file:
 
 ```ron
 (
@@ -93,6 +93,9 @@ The same variant names are used in `armoury_settings`, for example `armoury_sett
 
 > [!WARNING]
 > `asusd.ron` is deserialized as one complete struct. Omitting a required field from the current format makes the whole file invalid; if it does not match a known older format either, `asusd` renames it to `asusd.ron-old` before writing a fresh default. Only `base_charge_control_end_threshold`, `screenpad_gamma`, `screenpad_sync_primary`, and `xgm_led_enabled` may be omitted; an omitted `base_charge_control_end_threshold` defaults to `0`, not `100`. `last_power_plugged` is skipped entirely and is never part of the file.
+
+> [!WARNING]
+> Editing `asusd.ron` while a one-shot charge is active can reset `base_charge_control_end_threshold` to `0`, so the previous limit is not restored. Stop `asusd.service` before editing the file.
 
 ### Older formats
 
@@ -194,6 +197,8 @@ Fan curves are stored in `/etc/asusd/fan_curves.ron`. The file contains four pro
 )
 ```
 
+The example is illustrative. Keep your existing fan and profile lists, including the `balanced` list; `asusd` seeds the file from the EC only when the file is missing or `balanced` is empty.
+
 Each `CurveData` has:
 
 | Field | Description |
@@ -228,7 +233,7 @@ Two write-order details are handled by `asusd`:
 - When a profile is written to the EC, disabled curves are written first and enabled curves last. The kernel resets all curves when one is disabled, so the enabled set must be the final write.
 - After a fan-curve write, `asusd` re-applies the PPT tuning values for the active profile. The EC fan-mode reset can clear them, so the re-apply keeps the configured power limits in effect.
 
-`save_fan_curve` only replaces an existing entry for the same fan; it does not append a new fan to a profile. If a fan is missing from a profile list, setting a curve for it has no effect; use `--default` to re-seed the list from the EC.
+`save_fan_curve` only replaces an existing entry for the same fan; it does not append a new fan to a profile. If a fan is missing from a profile list, setting a curve for it has no effect. `asusctl fan-curve --default` resets the active profile, not the profile that is missing the fan; select the intended profile first. The reset replaces that profile's existing curves.
 
 > [!TIP]
 > Prefer the CLI over editing `fan_curves.ron` directly. See [fan-curve](../usage/asusctl.md#fan-curve) for the commands and options.
@@ -486,7 +491,7 @@ asusctl armoury set dgpu_disable 1
 asusctl armoury set dgpu_disable -- -1   # reset to the firmware default
 ```
 
-See [armoury](../usage/asusctl.md#armoury) for the full command reference. PPT attributes are only applied while profile tuning is enabled. If tuning is disabled, `asusd` rejects the write with an error; enable tuning first with `asusctl profile tuning true`. The value is then stored in the active AC or DC tuning group and applied immediately.
+See [armoury](../usage/asusctl.md#armoury) for the full command reference. PPT attributes are only applied while profile tuning is enabled. If tuning is disabled, `asusd` rejects the write with an error; enable tuning first with `asusctl profile tuning true`. On systems with fan-curve support, `asusctl profile tuning true` also requires an enabled custom fan curve in the active profile; otherwise `asusd` returns `Custom fan curve is required to enable profile tuning`. The value is then stored in the active AC or DC tuning group and applied immediately.
 
 Writing `nv_dynamic_boost`, `nv_temp_target`, or `nv_tgp` also runs `systemctl try-restart nvidia-powerd.service` so the daemon re-reads the new limits.
 
