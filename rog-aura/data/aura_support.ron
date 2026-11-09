@@ -1251,7 +1251,7 @@
         power_zones: [Keyboard, Lightbar],
     ),
     (
-        device_name: "GX651AR",
+        device_name: "GX651A",
         product_id: "1ce6",
         layout_name: "ga401q",
         basic_modes: [Static, Breathe, RainbowCycle, Pulse],
