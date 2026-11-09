@@ -4,3 +4,5 @@
 # to build.
 [resolver]
 incompatible-rust-versions = "fallback"
+[alias]
+xtask = "run -p xtask --"

@@ -15,20 +15,32 @@ use crate::error::RogError;
 // #[serde(default)]
 pub struct AuraConfig {
     #[serde(skip)]
+    /// Runtime-only keyboard type detected from the product ID; not written to the file.
     pub led_type: AuraDeviceType,
     #[serde(skip)]
+    /// Runtime-only support database entry; not written to the file.
     pub support_data: LedSupportData,
+    /// File name. If empty, the loader falls back to `aura.ron`.
     pub config_name: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
+    /// Daemon-managed Ally power-reset marker. The loader resets it to `None`;
+    /// `fix_ally_power` sets it to `Some(true)` after the reset. Do not edit.
     pub ally_fix: Option<bool>,
+    /// Keyboard brightness: `Off`, `Low`, `Med`, or `High`.
     pub brightness: LedBrightness,
+    /// Active built-in mode.
     pub current_mode: AuraModeNum,
+    /// One effect per basic mode reported by the support database.
     pub builtins: BTreeMap<AuraModeNum, AuraEffect>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
+    /// Per-zone effects. Omitted when the keyboard has no zones.
     pub multizone: Option<BTreeMap<AuraModeNum, Vec<AuraEffect>>>,
+    /// Whether the multizone set is active.
     pub multizone_on: bool,
+    /// Per-zone power states. The inner `states` list holds `AuraPowerState` values.
     pub enabled: LaptopAuraPower,
     #[serde(skip)]
+    /// Runtime-only flag for direct per-key addressing; not written to the file.
     pub per_key_mode_active: bool,
 }
 

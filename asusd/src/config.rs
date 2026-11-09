@@ -23,47 +23,54 @@ type Tunings = HashMap<PlatformProfile, Tuning>;
 
 #[derive(Deserialize, Serialize, PartialEq)]
 pub struct Config {
-    // The current charge limit applied
+    /// Current battery charge limit percentage. Set it with
+    /// `asusctl battery limit 80` (the accepted range is 20-100).
     pub charge_control_end_threshold: u8,
-    /// Save charge limit for restoring after one-shot full charge
+    /// Charge limit restored after a one-shot full charge. `0` means "not set"
+    /// for a config upgraded from an older version.
     #[serde(default = "default_base_charge_limit")]
     pub base_charge_control_end_threshold: u8,
+    /// Stop `nvidia-powerd` while on battery and start it again on AC.
     pub disable_nvidia_powerd_on_battery: bool,
-    /// An optional command/script to run when power is changed to AC
+    /// Command run when AC power is connected.
     pub ac_command: String,
-    /// An optional command/script to run when power is changed to battery
+    /// Command run when AC power is disconnected.
     pub bat_command: String,
-    /// Set true if energy_performance_preference should be set if the
-    /// platform profile is changed
+    /// Set the CPU energy-performance preference when the platform profile changes.
     pub platform_profile_linked_epp: bool,
-    /// Which platform profile to use on battery power
+    /// Profile applied when the laptop switches to battery.
     pub platform_profile_on_battery: PlatformProfile,
-    /// Should the throttle policy be set on bat/ac change?
+    /// Apply `platform_profile_on_battery` on the power-source change.
     pub change_platform_profile_on_battery: bool,
-    /// Which platform profile to use on AC power
+    /// Profile applied when AC power is connected.
     pub platform_profile_on_ac: PlatformProfile,
-    /// Should the platform profile be set on bat/ac change?
+    /// Apply `platform_profile_on_ac` on the power-source change.
     pub change_platform_profile_on_ac: bool,
-    /// The energy_performance_preference for this platform profile
+    /// EPP value used for the Quiet profile.
     pub profile_quiet_epp: CPUEPP,
-    /// The energy_performance_preference for this platform profile
+    /// EPP value used for the Balanced profile.
     pub profile_balanced_epp: CPUEPP,
-    /// The energy_performance_preference for this platform profile
+    /// EPP value used for the Custom profile.
     pub profile_custom_epp: CPUEPP,
-    /// The energy_performance_preference for this platform profile
+    /// EPP value used for the Performance profile.
     pub profile_performance_epp: CPUEPP,
+    /// Per-profile PPT tuning groups used on AC power.
     pub ac_profile_tunings: Tunings,
+    /// Per-profile PPT tuning groups used on battery.
     pub dc_profile_tunings: Tunings,
+    /// Persisted firmware-attribute values applied at startup.
     pub armoury_settings: HashMap<FirmwareAttribute, i32>,
+    /// ScreenPad gamma. `None` behaves as `1.0` (linear).
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub screenpad_gamma: Option<f32>,
+    /// Sync ScreenPad brightness with the primary display. `None` behaves as disabled.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub screenpad_sync_primary: Option<bool>,
-    /// Persisted XG Mobile LED state: None = never set, Some(false) = OFF,
-    /// Some(true) = ON. Re-applied when the device appears.
+    /// Persisted XG Mobile LED state: `None` = never set, `Some(false)` = off,
+    /// `Some(true)` = on. Re-applied when the device appears.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub xgm_led_enabled: Option<bool>,
-    /// Temporary state for AC/Batt
+    /// Runtime-only AC/battery state; not written to the file.
     #[serde(skip)]
     pub last_power_plugged: u8,
 }

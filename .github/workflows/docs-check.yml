@@ -1,0 +1,50 @@
+name: Docs check
+
+on:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'xtask/**'
+      - 'asusd/**'
+      - 'asusd-user/**'
+      - 'asusctl/**'
+      - 'rog-platform/**'
+      - 'rog-aura/**'
+      - 'data/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/docs-check.yml'
+  push:
+    branches: ["main"]
+    paths:
+      - 'docs/**'
+      - 'xtask/**'
+      - 'asusd/**'
+      - 'asusd-user/**'
+      - 'asusctl/**'
+      - 'rog-platform/**'
+      - 'rog-aura/**'
+      - 'data/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/docs-check.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev libusb-1.0-0-dev
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - name: Check generated docs match the code
+        run: cargo xtask docs --check

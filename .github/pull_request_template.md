@@ -5,6 +5,11 @@
 
 Fixes # (issue)
 
+## Documentation impact
+
+- [ ] User-visible behaviour changed and `docs/` was updated (config tables, enum lists, and the CLI reference are generated: run `cargo xtask docs` and commit the result)
+- [ ] No user-visible change (internal refactor; nothing to document)
+
 ## Tested Hardware & Environment
 
 - **ASUS Laptop Model:**

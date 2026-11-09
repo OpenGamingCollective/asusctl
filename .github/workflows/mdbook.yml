@@ -5,6 +5,15 @@ on:
     paths:
       - 'docs/**'
       - 'book.toml'
+      - 'xtask/**'
+      - 'asusd/**'
+      - 'asusd-user/**'
+      - 'asusctl/**'
+      - 'rog-platform/**'
+      - 'rog-aura/**'
+      - 'data/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
   workflow_dispatch:
 permissions:
   contents: read
@@ -28,6 +37,11 @@ jobs:
           curl --proto '=https' --tlsv1.2 https://sh.rustup.rs -sSf -y | sh
           rustup update
           cargo install --locked --version ${MDBOOK_VERSION} mdbook
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev libusb-1.0-0-dev
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - name: Regenerate code-derived docs
+        run: cargo xtask docs
       - name: Setup Pages
         id: pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
