@@ -708,6 +708,13 @@ impl DeviceManager {
                                     }
                                     // Always drop the shared handle for this node, even if no
                                     // AsusDevice referenced it, so the fd (and minor) is freed.
+                                    // Invalidate it first: a retained clone must not write to a
+                                    // reused devnode of another device.
+                                    let old_handle =
+                                        hid_handles.lock().await.get(&removed_node).cloned();
+                                    if let Some(old_handle) = old_handle {
+                                        old_handle.lock().await.invalidate();
+                                    }
                                     if hid_handles.lock().await.remove(&removed_node).is_some() {
                                         info!("Dropped hid handle for {removed_node}");
                                     }
