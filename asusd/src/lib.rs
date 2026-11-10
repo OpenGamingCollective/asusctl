@@ -39,6 +39,21 @@ pub static DBUS_IFACE: &str = "xyz.ljones.Asusd";
 
 const POWER_SUPPLY_PATH: &str = "/sys/class/power_supply";
 
+/// Wait until `cancel` becomes `true` (or the sender is dropped).
+///
+/// Prefer this over `Receiver::wait_for` inside `tokio::select!`: `wait_for`
+/// holds a non-`Send` borrow across the await point.
+async fn watch_cancelled(cancel: &mut tokio::sync::watch::Receiver<bool>) {
+    if *cancel.borrow() {
+        return;
+    }
+    while cancel.changed().await.is_ok() {
+        if *cancel.borrow() {
+            return;
+        }
+    }
+}
+
 /// Check if a power supply type string represents an external power source.
 fn is_external_power_type(supply_type: &str) -> bool {
     let t = supply_type.trim();
@@ -370,17 +385,26 @@ pub trait CtrlTask {
     /// Implement to set up various tasks that may be required, using the
     /// `Executor`. No blocking loops are allowed, or they must be run on a
     /// separate thread.
+    ///
+    /// `cancel` stops the logind/udev listeners when the owning device is
+    /// removed (hotplug). Daemon-lifetime controllers may forget the matching
+    /// `Sender` so these tasks never cancel.
     fn create_tasks(
         &self,
         signal: SignalEmitter<'static>,
+        cancel: tokio::sync::watch::Receiver<bool>,
     ) -> impl Future<Output = Result<(), RogError>> + Send;
 
     /// Free helper method to create tasks to run on: sleep, wake, shutdown, boot
     ///
     /// The closures can potentially block, so execution time should be the
     /// minimal possible such as save a variable.
+    ///
+    /// Each listener selects on [`watch_cancelled`] so hotplug teardown can
+    /// stop the tasks between events without aborting mid-write.
     fn create_sys_event_tasks<Fut1, Fut2, Fut3, Fut4, F1, F2, F3, F4>(
         &self,
+        cancel: tokio::sync::watch::Receiver<bool>,
         mut on_prepare_for_sleep: F1,
         mut on_prepare_for_shutdown: F2,
         mut on_lid_change: F3,
@@ -396,7 +420,7 @@ pub trait CtrlTask {
         Fut3: Future<Output = ()> + Send,
         Fut4: Future<Output = ()> + Send,
     {
-        async {
+        async move {
             let connection = match Connection::system().await {
                 Ok(conn) => conn,
                 Err(err) => {
@@ -419,13 +443,27 @@ pub trait CtrlTask {
 
             tokio::spawn({
                 let logind_manager = logind_manager.clone();
+                let mut cancel = cancel.clone();
                 async move {
-                    if let Ok(mut notif) = logind_manager.receive_prepare_for_shutdown().await {
-                        while let Some(event) = notif.next().await {
-                            // blocks thread :|
-                            if let Ok(args) = event.args() {
-                                debug!("Doing on_prepare_for_shutdown({})", args.start);
-                                on_prepare_for_shutdown(args.start).await;
+                    let Ok(mut notif) = logind_manager.receive_prepare_for_shutdown().await else {
+                        return;
+                    };
+                    loop {
+                        tokio::select! {
+                            _ = watch_cancelled(&mut cancel) => break,
+                            event = notif.next() => {
+                                match event {
+                                    Some(event) => {
+                                        if let Ok(args) = event.args() {
+                                            debug!(
+                                                "Doing on_prepare_for_shutdown({})",
+                                                args.start
+                                            );
+                                            on_prepare_for_shutdown(args.start).await;
+                                        }
+                                    }
+                                    None => break,
+                                }
                             }
                         }
                     }
@@ -434,13 +472,27 @@ pub trait CtrlTask {
 
             tokio::spawn({
                 let logind_manager = logind_manager.clone();
+                let mut cancel = cancel.clone();
                 async move {
-                    if let Ok(mut notif) = logind_manager.receive_prepare_for_sleep().await {
-                        while let Some(event) = notif.next().await {
-                            // blocks thread :|
-                            if let Ok(args) = event.args() {
-                                debug!("Doing on_prepare_for_sleep({})", args.start);
-                                on_prepare_for_sleep(args.start).await;
+                    let Ok(mut notif) = logind_manager.receive_prepare_for_sleep().await else {
+                        return;
+                    };
+                    loop {
+                        tokio::select! {
+                            _ = watch_cancelled(&mut cancel) => break,
+                            event = notif.next() => {
+                                match event {
+                                    Some(event) => {
+                                        if let Ok(args) = event.args() {
+                                            debug!(
+                                                "Doing on_prepare_for_sleep({})",
+                                                args.start
+                                            );
+                                            on_prepare_for_sleep(args.start).await;
+                                        }
+                                    }
+                                    None => break,
+                                }
                             }
                         }
                     }
@@ -449,6 +501,7 @@ pub trait CtrlTask {
 
             tokio::spawn({
                 let logind_manager = logind_manager.clone();
+                let mut cancel = cancel.clone();
                 async move {
                     // Subscribe before the initial read so a change during startup is
                     // queued rather than lost
@@ -465,18 +518,30 @@ pub trait CtrlTask {
                         }
                     };
 
-                    while let Some(change) = stream.next().await {
-                        match change.get().await {
-                            Ok(lid_closed) if last_lid != Some(lid_closed) => {
-                                last_lid = Some(lid_closed);
-                                debug!("Lid state changed: {lid_closed}");
-                                on_lid_change(lid_closed).await;
-                            }
-                            Ok(_) => {}
-                            Err(e) => {
-                                // The tracked state is now unknown, let the next signal through
-                                last_lid = None;
-                                debug!("Failed to read lid state after a logind change: {e}");
+                    loop {
+                        tokio::select! {
+                            _ = watch_cancelled(&mut cancel) => break,
+                            change = stream.next() => {
+                                match change {
+                                    Some(change) => match change.get().await {
+                                        Ok(lid_closed) if last_lid != Some(lid_closed) => {
+                                            last_lid = Some(lid_closed);
+                                            debug!("Lid state changed: {lid_closed}");
+                                            on_lid_change(lid_closed).await;
+                                        }
+                                        Ok(_) => {}
+                                        Err(e) => {
+                                            // The tracked state is now unknown, let the next
+                                            // signal through
+                                            last_lid = None;
+                                            debug!(
+                                                "Failed to read lid state after a logind \
+                                                 change: {e}"
+                                            );
+                                        }
+                                    },
+                                    None => break,
+                                }
                             }
                         }
                     }
@@ -487,14 +552,23 @@ pub trait CtrlTask {
             // only be polled. The kernel emits a udev change event for power supplies
             // instead, so watch all external supplies (Mains and USB/USB_PD).
             if let Some(mut power_state_rx) = power_state_receiver().await {
+                let mut cancel = cancel.clone();
                 tokio::spawn(async move {
                     let mut last_power = *power_state_rx.borrow_and_update();
-                    while power_state_rx.changed().await.is_ok() {
-                        let online = *power_state_rx.borrow_and_update();
-                        if online != last_power {
-                            last_power = online;
-                            debug!("External power supply state changed: {online}");
-                            on_external_power_change(online).await;
+                    loop {
+                        tokio::select! {
+                            _ = watch_cancelled(&mut cancel) => break,
+                            changed = power_state_rx.changed() => {
+                                if changed.is_err() {
+                                    break;
+                                }
+                                let online = *power_state_rx.borrow_and_update();
+                                if online != last_power {
+                                    last_power = online;
+                                    debug!("External power supply state changed: {online}");
+                                    on_external_power_change(online).await;
+                                }
+                            }
                         }
                     }
                 });
@@ -524,6 +598,30 @@ where
         .unwrap_or_else(|err| warn!("Controller error: {}", err));
     zbus.add_to_server(connection).await;
 
-    zbus_clone.create_tasks(signal_ctx).await.ok();
+    // Daemon-lifetime controllers: keep the sender alive so event tasks never cancel.
+    let (cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
+    zbus_clone.create_tasks(signal_ctx, cancel_rx).await.ok();
+    std::mem::forget(cancel_tx);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::watch_cancelled;
+
+    #[tokio::test]
+    async fn watch_cancelled_returns_when_flag_set() {
+        let (tx, mut rx) = tokio::sync::watch::channel(false);
+        let waiter = tokio::spawn(async move {
+            watch_cancelled(&mut rx).await;
+        });
+        tx.send(true).expect("cancel send");
+        waiter.await.expect("cancel waiter");
+    }
+
+    #[tokio::test]
+    async fn watch_cancelled_returns_immediately_if_already_set() {
+        let (_tx, mut rx) = tokio::sync::watch::channel(true);
+        watch_cancelled(&mut rx).await;
+    }
 }

@@ -311,12 +311,17 @@ impl crate::CtrlTask for AniMeZbus {
         "ANIME_ZBUS_PATH"
     }
 
-    async fn create_tasks(&self, _: SignalEmitter<'static>) -> Result<(), RogError> {
+    async fn create_tasks(
+        &self,
+        _: SignalEmitter<'static>,
+        cancel: tokio::sync::watch::Receiver<bool>,
+    ) -> Result<(), RogError> {
         let inner1 = self.0.clone();
         let inner2 = self.0.clone();
         let inner3 = self.0.clone();
         let inner4 = self.0.clone();
         self.create_sys_event_tasks(
+            cancel,
             move |sleeping| {
                 // on_sleep
                 let inner = inner1.clone();
