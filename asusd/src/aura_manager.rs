@@ -239,10 +239,10 @@ impl DeviceManager {
                     && let DeviceHandle::Aura(aura) = dev_type.clone()
                 {
                     let path = dbus_path_for_dev(&usb_device).unwrap_or(dbus_path_for_tuf());
-                    let (cancel_tx, _cancel_rx) = task_cancel_channel();
+                    let (cancel_tx, cancel_rx) = task_cancel_channel();
                     let ctrl = AuraZbus::new(aura);
                     if ctrl
-                        .start_tasks(connection, path.clone())
+                        .start_tasks(connection, path.clone(), cancel_rx)
                         .await
                         .map_err(|e| {
                             error!("Failed to start Aura tasks: {e:?}, not adding this device")
@@ -540,10 +540,10 @@ impl DeviceManager {
                     && let DeviceHandle::Aura(aura) = dev_type.clone()
                 {
                     let path = dbus_path_for_tuf();
-                    let (cancel_tx, _cancel_rx) = task_cancel_channel();
+                    let (cancel_tx, cancel_rx) = task_cancel_channel();
                     let ctrl = AuraZbus::new(aura);
                     if ctrl
-                        .start_tasks(connection, path.clone())
+                        .start_tasks(connection, path.clone(), cancel_rx)
                         .await
                         .map_err(|e| {
                             error!("Failed to start TUF Aura tasks: {e:?}, not adding this device")

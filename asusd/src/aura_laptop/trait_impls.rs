@@ -27,11 +27,10 @@ impl AuraZbus {
     pub async fn start_tasks(
         mut self,
         connection: &Connection,
-        // _signal_ctx: SignalEmitter<'static>,
         path: OwnedObjectPath,
+        cancel: tokio::sync::watch::Receiver<bool>,
     ) -> Result<(), RogError> {
-        // let task = zbus.clone();
-        // let signal_ctx = signal_ctx.clone();
+        let task = self.clone();
         self.reload()
             .await
             .unwrap_or_else(|err| warn!("Controller error: {}", err));
@@ -39,11 +38,12 @@ impl AuraZbus {
             .object_server()
             .at(path.clone(), self)
             .await
-            .map_err(|e| error!("Couldn't add server at path: {path}, {e:?}"))
-            .ok();
-        // TODO: skip this until we keep handles to tasks so they can be killed
-        // task.create_tasks(signal_ctx).await
-        Ok(())
+            .map_err(|e| {
+                error!("Couldn't add server at path: {path}, {e:?}");
+                e
+            })?;
+        let signal_ctx = SignalEmitter::new(connection, path)?;
+        task.create_tasks(signal_ctx, cancel).await
     }
 }
 
