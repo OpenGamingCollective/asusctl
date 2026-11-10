@@ -54,7 +54,16 @@ pub struct Config {
     pub profile_performance_epp: CPUEPP,
     pub ac_profile_tunings: Tunings,
     pub dc_profile_tunings: Tunings,
+    /// Persisted armoury attribute targets. For GPU attributes this is the
+    /// lasting desired mode (re-queued into `pending_gpu` when firmware drifts).
     pub armoury_settings: HashMap<FirmwareAttribute, i32>,
+    /// In-flight deferred GPU firmware writes (`dgpu_disable`, `gpu_mux_mode`, …)
+    /// that must survive reboot when the first shutdown only applies part of the
+    /// set (for example MUX flip before `dgpu_disable`, which the kernel
+    /// rejects with `-EBUSY` until after reboot). Cleared after successful apply;
+    /// lasting intent remains in `armoury_settings`.
+    #[serde(default)]
+    pub pending_gpu: HashMap<FirmwareAttribute, i32>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub screenpad_gamma: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -115,6 +124,7 @@ impl Default for Config {
             ac_profile_tunings: HashMap::default(),
             dc_profile_tunings: HashMap::default(),
             armoury_settings: HashMap::default(),
+            pending_gpu: HashMap::default(),
             last_power_plugged: Default::default(),
             screenpad_gamma: Default::default(),
             screenpad_sync_primary: Default::default(),
@@ -193,6 +203,7 @@ impl From<Config611> for Config {
             ac_profile_tunings: HashMap::default(),
             dc_profile_tunings: HashMap::default(),
             armoury_settings: HashMap::default(),
+            pending_gpu: HashMap::default(),
             screenpad_gamma: None,
             screenpad_sync_primary: Default::default(),
             xgm_led_enabled: Default::default(),
@@ -266,6 +277,7 @@ impl From<Config601> for Config {
             ac_profile_tunings: HashMap::default(),
             dc_profile_tunings: HashMap::default(),
             armoury_settings: HashMap::default(),
+            pending_gpu: HashMap::default(),
             screenpad_gamma: None,
             screenpad_sync_primary: Default::default(),
             xgm_led_enabled: Default::default(),

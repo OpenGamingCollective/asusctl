@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex as StdMutex, MutexGuard};
 
 use config_traits::StdConfig;
 use log::{debug, error, info, warn};
@@ -21,6 +21,50 @@ use crate::{ASUS_ZBUS_PATH, Reloadable};
 
 const MOD_NAME: &str = "asus_armoury";
 
+/// Result of updating one GPU attribute in the shared deferred queue.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DeferredGpuQueueUpdate {
+    /// Attribute already matches firmware; only that key was removed.
+    DroppedRedundant,
+    /// Attribute differs from firmware; value was queued for later apply.
+    Queued,
+}
+
+/// Update a single GPU attribute in the deferred apply queue.
+///
+/// When `already_active`, only `attr` is removed. Other pending GPU attributes
+/// must stay so Hybrid→Integrated (`dgpu_disable=1` then no-op `gpu_mux_mode=1`)
+/// cannot drop the disable request (#459).
+fn update_deferred_gpu_queue(
+    queue: &mut HashMap<FirmwareAttribute, i32>,
+    attr: FirmwareAttribute,
+    value: i32,
+    already_active: bool,
+) -> DeferredGpuQueueUpdate {
+    if already_active {
+        queue.remove(&attr);
+        DeferredGpuQueueUpdate::DroppedRedundant
+    } else {
+        queue.insert(attr, value);
+        DeferredGpuQueueUpdate::Queued
+    }
+}
+
+/// Re-queue a lasting desired GPU value when firmware drifted and no in-flight
+/// pending override exists for that attribute (#357).
+fn requeue_desired_gpu_if_drifted(
+    queue: &mut HashMap<FirmwareAttribute, i32>,
+    attr: FirmwareAttribute,
+    desired: i32,
+    firmware_matches: bool,
+) -> bool {
+    if firmware_matches || queue.contains_key(&attr) {
+        return false;
+    }
+    queue.insert(attr, desired);
+    true
+}
+
 #[derive(Debug, Default, Clone, Deserialize, Serialize, Type, Value, OwnedValue)]
 pub struct PossibleValues {
     strings: Vec<String>,
@@ -34,8 +78,12 @@ fn dbus_path_for_attr(attr_name: &str) -> OwnedObjectPath {
 #[derive(Clone)]
 pub struct AsusArmouryAttribute {
     attr: Attribute,
+    /// Shared daemon config. Still `tokio::sync::Mutex` because the rest of
+    /// asusd shares this type; never hold it across `.await` or sysfs I/O.
     config: Arc<Mutex<Config>>,
-    queued_gpu: Arc<Mutex<HashMap<FirmwareAttribute, i32>>>,
+    /// Deferred GPU queue is sync state: lock, copy/mutate, drop before any
+    /// `.await` or config lock (governance: no async mutex on hardware queues).
+    queued_gpu: Arc<StdMutex<HashMap<FirmwareAttribute, i32>>>,
     /// platform control required here for access to PPD or Throttle profile
     platform: RogPlatform,
     power: AsusPower,
@@ -48,7 +96,7 @@ impl AsusArmouryAttribute {
         platform: RogPlatform,
         power: AsusPower,
         config: Arc<Mutex<Config>>,
-        queued_gpu: Arc<Mutex<HashMap<FirmwareAttribute, i32>>>,
+        queued_gpu: Arc<StdMutex<HashMap<FirmwareAttribute, i32>>>,
     ) -> Self {
         Self {
             attr,
@@ -62,6 +110,80 @@ impl AsusArmouryAttribute {
 
     pub fn attribute_name(&self) -> String {
         String::from(self.attr.name())
+    }
+
+    fn lock_queued_gpu(&self) -> MutexGuard<'_, HashMap<FirmwareAttribute, i32>> {
+        self.queued_gpu
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    /// Persist `pending_gpu` while the caller already holds the config lock.
+    /// Callers must drop the sync queue guard before awaiting this lock.
+    fn write_pending_gpu(config: &mut Config, queue: &HashMap<FirmwareAttribute, i32>) {
+        if config.pending_gpu != *queue {
+            config.pending_gpu = queue.clone();
+            config.write();
+        }
+    }
+
+    /// Persist lasting desired GPU mode in `armoury_settings` (#357).
+    fn write_desired_gpu(config: &mut Config, attr: FirmwareAttribute, value: i32) -> bool {
+        if config.armoury_settings.get(&attr).copied() == Some(value) {
+            return false;
+        }
+        config.armoury_settings.insert(attr, value);
+        true
+    }
+
+    async fn clear_queued_if_matches(&self, name: FirmwareAttribute, value: i32) {
+        let queue_snapshot = {
+            let mut queue = self.lock_queued_gpu();
+            if queue.get(&name).copied() == Some(value) {
+                queue.remove(&name);
+            }
+            queue.clone()
+        };
+        let mut config = self.config.lock().await;
+        // Successful (or already-active) apply becomes the lasting desired mode.
+        let desired_dirty = Self::write_desired_gpu(&mut config, name, value);
+        let pending_dirty = config.pending_gpu != queue_snapshot;
+        if pending_dirty {
+            config.pending_gpu = queue_snapshot;
+        }
+        if desired_dirty || pending_dirty {
+            config.write();
+        }
+    }
+
+    /// If firmware drifted from lasting desired GPU mode, re-queue for deferred
+    /// apply via asus-shutdown. Never sync-writes GPU sysfs from reload (#357).
+    async fn ensure_desired_gpu_queued(&self) {
+        let name = self.name();
+        if name.property_type() != FirmwareAttributeType::Gpu {
+            return;
+        }
+        let desired = {
+            let config = self.config.lock().await;
+            config.armoury_settings.get(&name).copied()
+        };
+        let Some(desired) = desired else {
+            return;
+        };
+        let firmware_matches = self.attr.current_value().ok() == Some(AttrValue::Integer(desired));
+        let queue_snapshot = {
+            let mut queue = self.lock_queued_gpu();
+            if !requeue_desired_gpu_if_drifted(&mut queue, name, desired, firmware_matches) {
+                return;
+            }
+            info!(
+                "Re-queued desired GPU attribute {} = {desired} after firmware drift",
+                <&str>::from(name)
+            );
+            queue.clone()
+        };
+        let mut config = self.config.lock().await;
+        Self::write_pending_gpu(&mut config, &queue_snapshot);
     }
 
     fn resolve_i32_value(refreshed: Option<i32>, cached: &AttrValue) -> i32 {
@@ -206,11 +328,10 @@ impl crate::Reloadable for AsusArmouryAttribute {
                 apply_value.map_or(AttrValue::None, AttrValue::Integer)
             }
             FirmwareAttributeType::Gpu => {
-                if config.armoury_settings.remove(&attribute).is_some() {
-                    info!("Removed persisted GPU attribute {name} from config");
-                    config.write();
-                }
-                info!("Reload called on GPU attribute {name}: doing nothing");
+                // Lasting desired mode lives in armoury_settings and is re-queued
+                // into pending_gpu by ensure_desired_gpu_queued (#357). Never
+                // sync-write GPU firmware attributes from reload.
+                info!("Reload called on GPU attribute {name}: deferred via pending_gpu");
                 AttrValue::None
             }
             FirmwareAttributeType::ReadOnly => {
@@ -357,8 +478,22 @@ impl AsusArmouryAttribute {
             }
             _ => {
                 self.attr.restore_default()?;
+                let attribute = self.name();
+                // Drop deferred apply and lasting desired so asus-shutdown cannot
+                // undo this restore after a reboot. Drop the sync queue guard
+                // before awaiting the config lock.
+                let queue_snapshot = {
+                    let mut queue = self.lock_queued_gpu();
+                    queue.remove(&attribute);
+                    queue.clone()
+                };
                 let mut config = self.config.lock().await;
-                if config.armoury_settings.remove(&self.name()).is_some() {
+                let removed_setting = config.armoury_settings.remove(&attribute).is_some();
+                let pending_dirty = config.pending_gpu != queue_snapshot;
+                if pending_dirty {
+                    config.pending_gpu = queue_snapshot;
+                }
+                if pending_dirty || removed_setting {
                     config.write();
                 }
                 Ok(())
@@ -415,16 +550,8 @@ impl AsusArmouryAttribute {
             ));
         }
 
-        /*
-        // This code would override the current_value with queued GPU value if present
-        // but I don't want to do that for now because it would cause confusion where
-        // current_value doesn't reflect actual firmware state until apply_queued_gpu_value is called. Instead, queued GPU values are only visible through the queued_gpu_value property and are applied on shutdown without affecting current_value.
-        if self.name().property_type() == FirmwareAttributeType::Gpu {
-            if let Some(saved_value) = self.queued_gpu.lock().await.get(&self.name()) {
-                return Ok(*saved_value);
-            }
-        }
-        */
+        // Queued GPU values stay on `queued_gpu_value` / `pending_gpu` so
+        // `current_value` always mirrors firmware until shutdown apply.
 
         if let Ok(value) = self.attr.current_value() {
             self.logged_read_error.store(false, Ordering::Relaxed);
@@ -473,13 +600,35 @@ impl AsusArmouryAttribute {
                 (AttrValue::Integer(value), Some((profile, power_plugged)))
             }
             FirmwareAttributeType::Gpu => {
-                if self.attr.current_value().ok() == Some(AttrValue::Integer(value)) {
-                    info!("GPU attribute {name} is already {value}, clearing any deferred queue");
-                    self.queued_gpu.lock().await.remove(&self.name());
-                    return Ok(());
+                let attr_name = self.name();
+                let already_active =
+                    self.attr.current_value().ok() == Some(AttrValue::Integer(value));
+                // Only drop *this* attribute's pending entry. Sibling GPU
+                // attributes (e.g. dgpu_disable queued before a no-op
+                // gpu_mux_mode write) must remain for shutdown/boot apply (#459).
+                let queue_snapshot = {
+                    let mut queue = self.lock_queued_gpu();
+                    match update_deferred_gpu_queue(&mut queue, attr_name, value, already_active) {
+                        DeferredGpuQueueUpdate::DroppedRedundant => info!(
+                            "GPU attribute {name} is already {value}, dropping only that deferred entry"
+                        ),
+                        DeferredGpuQueueUpdate::Queued => {
+                            debug!("Queueing GPU attribute {name} = {value} for delayed apply")
+                        }
+                    }
+                    queue.clone()
+                };
+                let mut config = self.config.lock().await;
+                // Persist lasting desired mode immediately so a later boot can
+                // re-queue after firmware reset even once pending_gpu clears (#357).
+                let desired_dirty = Self::write_desired_gpu(&mut config, attr_name, value);
+                let pending_dirty = config.pending_gpu != queue_snapshot;
+                if pending_dirty {
+                    config.pending_gpu = queue_snapshot;
                 }
-                debug!("Queueing GPU attribute {name} = {value} for delayed apply");
-                self.queued_gpu.lock().await.insert(self.name(), value);
+                if desired_dirty || pending_dirty {
+                    config.write();
+                }
                 return Ok(());
             }
             FirmwareAttributeType::Norestore => {
@@ -541,7 +690,7 @@ impl AsusArmouryAttribute {
         if self.name().property_type() != FirmwareAttributeType::Gpu {
             return Ok(-1);
         }
-        let queued = self.queued_gpu.lock().await;
+        let queued = self.lock_queued_gpu();
         Ok(queued.get(&self.name()).copied().unwrap_or(-1))
     }
 
@@ -553,7 +702,7 @@ impl AsusArmouryAttribute {
 
         let name = self.name();
         let value = {
-            let queue = self.queued_gpu.lock().await;
+            let queue = self.lock_queued_gpu();
             let Some(value) = queue.get(&name).copied() else {
                 return Ok(false);
             };
@@ -565,13 +714,11 @@ impl AsusArmouryAttribute {
                 "Queued GPU attribute {} = {value} is already active, skipping redundant write",
                 <&str>::from(name)
             );
-            let mut queue = self.queued_gpu.lock().await;
-            if queue.get(&name).copied() == Some(value) {
-                queue.remove(&name);
-            }
+            self.clear_queued_if_matches(name, value).await;
             return Ok(true);
         }
 
+        // Sysfs write with no queue/config lock held.
         self.attr
             .set_current_value(&AttrValue::Integer(value))
             .map_err(|e| {
@@ -587,13 +734,9 @@ impl AsusArmouryAttribute {
             <&str>::from(name)
         );
 
-        // Remove only after successful firmware write, and only if the queued
-        // value was not updated concurrently by another call.
-        let mut queue = self.queued_gpu.lock().await;
-        if queue.get(&name).copied() == Some(value) {
-            queue.remove(&name);
-        }
-
+        // Keep the value queued (and persisted) on failure so the next reboot
+        // can finish a partial Ultimate→Hybrid apply.
+        self.clear_queued_if_matches(name, value).await;
         Ok(true)
     }
 }
@@ -606,7 +749,17 @@ pub async fn start_attributes_zbus(
     config: Arc<Mutex<Config>>,
 ) -> Result<ArmouryAttributeRegistry, RogError> {
     let mut registry = ArmouryAttributeRegistry::default();
-    let queued_gpu = Arc::new(Mutex::new(HashMap::new()));
+    let pending = {
+        let config = config.lock().await;
+        config.pending_gpu.clone()
+    };
+    if !pending.is_empty() {
+        info!(
+            "Restored {} deferred GPU attribute(s) from config for deferred apply",
+            pending.len()
+        );
+    }
+    let queued_gpu = Arc::new(StdMutex::new(pending));
     for attr in attributes.attributes() {
         let mut attr = AsusArmouryAttribute::new(
             attr.clone(),
@@ -617,6 +770,10 @@ pub async fn start_attributes_zbus(
         );
 
         let registry_attr = attr.clone();
+
+        // Re-queue lasting desired GPU mode before reload so asus-shutdown's
+        // boot apply can see pending_gpu when firmware reset to Hybrid (#357).
+        attr.ensure_desired_gpu_queued().await;
 
         if let Err(e) = attr.reload().await {
             error!(
@@ -715,15 +872,9 @@ pub async fn set_config_or_default(
                 }
             }
             FirmwareAttributeType::Gpu => {
-                // Clean stale persisted queue from older versions. GPU deferred
-                // writes are now in-memory and are applied only on shutdown.
-                if config.armoury_settings.remove(&name).is_some() {
-                    info!(
-                        "Removed stale persisted GPU attribute {} from config",
-                        <&str>::from(name)
-                    );
-                    changed = true;
-                }
+                // Lasting desired GPU mode stays in armoury_settings and is
+                // re-queued into pending_gpu at Armoury start (#357). Profile/AC
+                // changes must not wipe it or sync-write GPU sysfs here.
             }
             FirmwareAttributeType::ReadOnly => {
                 if config.armoury_settings.remove(&name).is_some() {
@@ -763,5 +914,85 @@ pub async fn set_config_or_default(
     }
     if changed {
         config.write();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn redundant_mux_write_keeps_queued_dgpu_disable() {
+        let mut queue = HashMap::new();
+        assert_eq!(
+            update_deferred_gpu_queue(&mut queue, FirmwareAttribute::DgpuDisable, 1, false),
+            DeferredGpuQueueUpdate::Queued
+        );
+        assert_eq!(queue.get(&FirmwareAttribute::DgpuDisable), Some(&1));
+
+        assert_eq!(
+            update_deferred_gpu_queue(&mut queue, FirmwareAttribute::GpuMuxMode, 1, true),
+            DeferredGpuQueueUpdate::DroppedRedundant
+        );
+        assert_eq!(
+            queue.get(&FirmwareAttribute::DgpuDisable),
+            Some(&1),
+            "sibling dgpu_disable must survive a no-op gpu_mux_mode write"
+        );
+        assert!(!queue.contains_key(&FirmwareAttribute::GpuMuxMode));
+    }
+
+    #[test]
+    fn redundant_write_drops_only_that_attribute_pending_value() {
+        let mut queue = HashMap::from([
+            (FirmwareAttribute::DgpuDisable, 1),
+            (FirmwareAttribute::GpuMuxMode, 0),
+        ]);
+        assert_eq!(
+            update_deferred_gpu_queue(&mut queue, FirmwareAttribute::GpuMuxMode, 0, true),
+            DeferredGpuQueueUpdate::DroppedRedundant
+        );
+        assert_eq!(queue.get(&FirmwareAttribute::DgpuDisable), Some(&1));
+        assert!(!queue.contains_key(&FirmwareAttribute::GpuMuxMode));
+    }
+
+    #[test]
+    fn desired_gpu_requeues_when_firmware_drifted() {
+        let mut queue = HashMap::new();
+        assert!(requeue_desired_gpu_if_drifted(
+            &mut queue,
+            FirmwareAttribute::DgpuDisable,
+            1,
+            false,
+        ));
+        assert_eq!(queue.get(&FirmwareAttribute::DgpuDisable), Some(&1));
+    }
+
+    #[test]
+    fn desired_gpu_skips_requeue_when_firmware_matches() {
+        let mut queue = HashMap::new();
+        assert!(!requeue_desired_gpu_if_drifted(
+            &mut queue,
+            FirmwareAttribute::DgpuDisable,
+            1,
+            true,
+        ));
+        assert!(queue.is_empty());
+    }
+
+    #[test]
+    fn desired_gpu_preserves_in_flight_pending_override() {
+        let mut queue = HashMap::from([(FirmwareAttribute::DgpuDisable, 0)]);
+        assert!(!requeue_desired_gpu_if_drifted(
+            &mut queue,
+            FirmwareAttribute::DgpuDisable,
+            1,
+            false,
+        ));
+        assert_eq!(
+            queue.get(&FirmwareAttribute::DgpuDisable),
+            Some(&0),
+            "in-flight pending must win over lasting desired"
+        );
     }
 }
