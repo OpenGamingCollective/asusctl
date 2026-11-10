@@ -89,12 +89,12 @@ fn dev_prop_matches(dev: &Device, prop: &str, value: &str) -> bool {
 ///
 /// Each controller within should track its dbus path so it can be removed if
 /// required. `cancel_tx` stops logind/udev listeners started via `CtrlTask`
-/// when the device is hot-unplugged.
+/// when the device is hot-unplugged; `None` for controllers without those tasks.
 pub struct AsusDevice {
     device: DeviceHandle,
     dbus_path: OwnedObjectPath,
     hid_key: Option<String>,
-    cancel_tx: tokio::sync::watch::Sender<bool>,
+    cancel_tx: Option<tokio::sync::watch::Sender<bool>>,
 }
 
 fn task_cancel_channel() -> (
@@ -189,7 +189,6 @@ impl DeviceManager {
                     && let DeviceHandle::Slash(slash) = dev_type.clone()
                 {
                     let path = dbus_path_for_dev(&usb_device).unwrap_or(dbus_path_for_slash());
-                    let (cancel_tx, _cancel_rx) = task_cancel_channel();
                     let ctrl = SlashZbus::new(slash);
                     if ctrl
                         .start_tasks(connection, path.clone())
@@ -203,7 +202,7 @@ impl DeviceManager {
                             device: dev_type,
                             dbus_path: path,
                             hid_key: Some(hid_key.clone()),
-                            cancel_tx,
+                            cancel_tx: None,
                         });
                     }
                 }
@@ -214,10 +213,10 @@ impl DeviceManager {
                     && let DeviceHandle::AniMe(anime) = dev_type.clone()
                 {
                     let path = dbus_path_for_dev(&usb_device).unwrap_or(dbus_path_for_anime());
-                    let (cancel_tx, _cancel_rx) = task_cancel_channel();
+                    let (cancel_tx, cancel_rx) = task_cancel_channel();
                     let ctrl = AniMeZbus::new(anime);
                     if ctrl
-                        .start_tasks(connection, path.clone())
+                        .start_tasks(connection, path.clone(), cancel_rx)
                         .await
                         .map_err(|e| {
                             error!("Failed to start AniMe tasks: {e:?}, not adding this device")
@@ -228,7 +227,7 @@ impl DeviceManager {
                             device: dev_type,
                             dbus_path: path,
                             hid_key: Some(hid_key.clone()),
-                            cancel_tx,
+                            cancel_tx: Some(cancel_tx),
                         });
                     }
                 }
@@ -253,7 +252,7 @@ impl DeviceManager {
                             device: dev_type,
                             dbus_path: path,
                             hid_key: Some(hid_key),
-                            cancel_tx,
+                            cancel_tx: Some(cancel_tx),
                         });
                     }
                 }
@@ -386,7 +385,6 @@ impl DeviceManager {
                 && let Ok(dev_type) = DeviceHandle::maybe_scsi(&dev_str, &prod_id).await
                 && let DeviceHandle::Scsi(scsi) = dev_type.clone()
             {
-                let (cancel_tx, _cancel_rx) = task_cancel_channel();
                 let ctrl = ScsiZbus::new(scsi);
                 if ctrl
                     .start_tasks(connection, path.clone())
@@ -400,7 +398,7 @@ impl DeviceManager {
                         device: dev_type,
                         dbus_path: path,
                         hid_key: None,
-                        cancel_tx,
+                        cancel_tx: None,
                     });
                 }
             }
@@ -476,7 +474,6 @@ impl DeviceManager {
             if let Ok(dev_type) = DeviceHandle::new_slash_usb().await {
                 if let DeviceHandle::Slash(slash) = dev_type.clone() {
                     let path = dbus_path_for_slash();
-                    let (cancel_tx, _cancel_rx) = task_cancel_channel();
                     let ctrl = SlashZbus::new(slash);
                     if ctrl
                         .start_tasks(connection, path.clone())
@@ -490,7 +487,7 @@ impl DeviceManager {
                             device: dev_type,
                             dbus_path: path,
                             hid_key: None,
-                            cancel_tx,
+                            cancel_tx: None,
                         });
                     }
                 }
@@ -504,10 +501,10 @@ impl DeviceManager {
                 // TODO: this is copy/pasted
                 if let DeviceHandle::AniMe(anime) = dev_type.clone() {
                     let path = dbus_path_for_anime();
-                    let (cancel_tx, _cancel_rx) = task_cancel_channel();
+                    let (cancel_tx, cancel_rx) = task_cancel_channel();
                     let ctrl = AniMeZbus::new(anime);
                     if ctrl
-                        .start_tasks(connection, path.clone())
+                        .start_tasks(connection, path.clone(), cancel_rx)
                         .await
                         .map_err(|e| error!("Failed to start tasks: {e:?}, not adding this device"))
                         .is_ok()
@@ -516,7 +513,7 @@ impl DeviceManager {
                             device: dev_type,
                             dbus_path: path,
                             hid_key: None,
-                            cancel_tx,
+                            cancel_tx: Some(cancel_tx),
                         });
                     }
                 }
@@ -554,7 +551,7 @@ impl DeviceManager {
                             device: dev_type,
                             dbus_path: path,
                             hid_key: None,
-                            cancel_tx,
+                            cancel_tx: Some(cancel_tx),
                         });
                     }
                 }
@@ -699,11 +696,8 @@ impl DeviceManager {
                                         let dev = devices.lock().await.remove(*index);
                                         // Stop logind/udev listeners between events; do not
                                         // abort mid hardware write.
-                                        if let Err(e) = dev.cancel_tx.send(true) {
-                                            debug!(
-                                                "AuraManager: cancel listeners for {:?}: {e}",
-                                                dev.dbus_path
-                                            );
+                                        if let Some(cancel_tx) = &dev.cancel_tx {
+                                            cancel_tx.send_replace(true);
                                         }
                                         let path = dev.dbus_path.clone();
                                         let res = match dev.device {

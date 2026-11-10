@@ -1,7 +1,7 @@
 use std::sync::atomic::Ordering;
 
 use config_traits::StdConfig;
-use log::{debug, error, warn};
+use log::{debug, warn};
 use logind_zbus::manager::ManagerProxy;
 use rog_anime::usb::{
     Brightness, pkt_set_brightness, pkt_set_builtin_animations, pkt_set_enable_display,
@@ -15,8 +15,8 @@ use zbus::{Connection, interface};
 
 use super::AniMe;
 use super::config::AniMeConfig;
-use crate::Reloadable;
 use crate::error::RogError;
+use crate::start_hotplug_tasks;
 
 async fn get_logind_manager<'a>() -> ManagerProxy<'a> {
     let connection = Connection::system()
@@ -30,6 +30,27 @@ async fn get_logind_manager<'a>() -> ManagerProxy<'a> {
         .expect("Controller could not create ManagerProxy")
 }
 
+/// Keep the panel off when the user disabled it or an active lid/power
+/// restriction applies. Shared by `create_tasks` handlers and `reload`.
+fn anime_display_allowed(
+    display_enabled: bool,
+    lid_closed: bool,
+    off_when_lid_closed: bool,
+    power_plugged: bool,
+    off_when_unplugged: bool,
+) -> bool {
+    if !display_enabled {
+        return false;
+    }
+    let restricted = (lid_closed && off_when_lid_closed) || (!power_plugged && off_when_unplugged);
+    !restricted
+}
+
+/// Combine lid/power allowance with the suspend-off policy.
+fn anime_sleep_enable(sleeping: bool, off_when_suspended: bool, allowed: bool) -> bool {
+    allowed && !(sleeping && off_when_suspended)
+}
+
 #[derive(Clone)]
 pub struct AniMeZbus(AniMe);
 
@@ -39,22 +60,12 @@ impl AniMeZbus {
     }
 
     pub async fn start_tasks(
-        mut self,
+        self,
         connection: &Connection,
         path: OwnedObjectPath,
+        cancel: tokio::sync::watch::Receiver<bool>,
     ) -> Result<(), RogError> {
-        // let task = zbus.clone();
-        self.reload()
-            .await
-            .unwrap_or_else(|err| warn!("Controller error: {}", err));
-        connection
-            .object_server()
-            .at(path.clone(), self)
-            .await
-            .map_err(|e| {
-                error!("Couldn't add server at path: {path}, {e:?}");
-                e
-            })?;
+        start_hotplug_tasks(self, connection, path, cancel).await?;
         debug!("start_tasks was successful");
         Ok(())
     }
@@ -320,46 +331,81 @@ impl crate::CtrlTask for AniMeZbus {
         let inner2 = self.0.clone();
         let inner3 = self.0.clone();
         let inner4 = self.0.clone();
+        // One system-bus proxy for all event handlers (Clone is cheap).
+        let manager = get_logind_manager().await;
+        let sleep_mgr = manager.clone();
+        let lid_mgr = manager.clone();
+        let power_mgr = manager;
         self.create_sys_event_tasks(
             cancel,
             move |sleeping| {
                 // on_sleep
                 let inner = inner1.clone();
+                let manager = sleep_mgr.clone();
                 async move {
                     let config = inner.config.lock().await.clone();
-                    if config.display_enabled {
-                        inner.thread_exit.store(true, Ordering::Release); // ensure clean slate
+                    if !config.display_enabled {
+                        return;
+                    }
+                    inner.thread_exit.store(true, Ordering::Release); // ensure clean slate
 
+                    // Suspend-off must not depend on D-Bus: a failed query must not
+                    // skip the off write and leave the panel lit during sleep.
+                    let enable = if sleeping && config.off_when_suspended {
+                        false
+                    } else {
+                        match (
+                            manager.lid_closed().await,
+                            manager.on_external_power().await,
+                        ) {
+                            (Ok(lid_closed), Ok(power_plugged)) => anime_sleep_enable(
+                                sleeping,
+                                config.off_when_suspended,
+                                anime_display_allowed(
+                                    true,
+                                    lid_closed,
+                                    config.off_when_lid_closed,
+                                    power_plugged,
+                                    config.off_when_unplugged,
+                                ),
+                            ),
+                            _ => {
+                                // Resume (or sleep without suspend-off): do not leave
+                                // the panel stuck off after a failed lid/power query.
+                                warn!(
+                                    "create_sys_event_tasks::sleep: lid/power query failed; \
+                                     using display_enabled only"
+                                );
+                                true
+                            }
+                        }
+                    };
+
+                    if config.builtin_anims_enabled {
                         inner
-                            .write_bytes(&pkt_set_enable_display(
-                                !(sleeping && config.off_when_suspended),
-                            ))
+                            .write_bytes(&pkt_set_enable_powersave_anim(enable))
                             .await
                             .map_err(|err| {
                                 warn!("create_sys_event_tasks::off_when_suspended {}", err);
                             })
                             .ok();
+                    } else if !sleeping && enable {
+                        // Run custom wake animation
+                        inner
+                            .write_bytes(&pkt_set_enable_powersave_anim(false))
+                            .await
+                            .ok(); // ensure builtins are disabled
 
-                        if config.builtin_anims_enabled {
-                            inner
-                                .write_bytes(&pkt_set_enable_powersave_anim(
-                                    !(sleeping && config.off_when_suspended),
-                                ))
-                                .await
-                                .map_err(|err| {
-                                    warn!("create_sys_event_tasks::off_when_suspended {}", err);
-                                })
-                                .ok();
-                        } else if !sleeping && !config.builtin_anims_enabled {
-                            // Run custom wake animation
-                            inner
-                                .write_bytes(&pkt_set_enable_powersave_anim(false))
-                                .await
-                                .ok(); // ensure builtins are disabled
-
-                            inner.run_thread(inner.cache.wake.clone(), true).await;
-                        }
+                        inner.run_thread(inner.cache.wake.clone(), true).await;
                     }
+
+                    inner
+                        .write_bytes(&pkt_set_enable_display(enable))
+                        .await
+                        .map_err(|err| {
+                            warn!("create_sys_event_tasks::off_when_suspended {}", err);
+                        })
+                        .ok();
                 }
             },
             move |shutting_down| {
@@ -382,63 +428,90 @@ impl crate::CtrlTask for AniMeZbus {
             },
             move |lid_closed| {
                 let inner = inner3.clone();
+                let manager = lid_mgr.clone();
                 // on lid change
                 async move {
                     let AniMeConfig {
+                        display_enabled,
                         off_when_lid_closed,
+                        off_when_unplugged,
                         builtin_anims_enabled,
                         ..
                     } = *inner.config.lock().await;
-                    if off_when_lid_closed {
-                        if builtin_anims_enabled {
-                            inner
-                                .write_bytes(&pkt_set_enable_powersave_anim(!lid_closed))
-                                .await
-                                .map_err(|err| {
-                                    warn!("create_sys_event_tasks::off_when_suspended {}", err);
-                                })
-                                .ok();
-                        }
+                    if !off_when_lid_closed {
+                        return;
+                    }
+                    let Ok(power_plugged) = manager.on_external_power().await else {
+                        warn!("create_sys_event_tasks::lid: on_external_power query failed");
+                        return;
+                    };
+                    let enable = anime_display_allowed(
+                        display_enabled, lid_closed, true, power_plugged, off_when_unplugged,
+                    );
+                    if builtin_anims_enabled {
                         inner
-                            .write_bytes(&pkt_set_enable_display(!lid_closed))
+                            .write_bytes(&pkt_set_enable_powersave_anim(enable))
                             .await
                             .map_err(|err| {
                                 warn!("create_sys_event_tasks::off_when_lid_closed {}", err);
                             })
                             .ok();
                     }
+                    inner
+                        .write_bytes(&pkt_set_enable_display(enable))
+                        .await
+                        .map_err(|err| {
+                            warn!("create_sys_event_tasks::off_when_lid_closed {}", err);
+                        })
+                        .ok();
                 }
             },
             move |power_plugged| {
                 let inner = inner4.clone();
+                let manager = power_mgr.clone();
                 // on power change
                 async move {
                     let AniMeConfig {
+                        display_enabled,
+                        off_when_lid_closed,
                         off_when_unplugged,
                         builtin_anims_enabled,
                         brightness_on_battery,
+                        display_brightness,
                         ..
                     } = *inner.config.lock().await;
                     if off_when_unplugged {
+                        let Ok(lid_closed) = manager.lid_closed().await else {
+                            warn!("create_sys_event_tasks::power: lid_closed query failed");
+                            return;
+                        };
+                        let enable = anime_display_allowed(
+                            display_enabled, lid_closed, off_when_lid_closed, power_plugged, true,
+                        );
                         if builtin_anims_enabled {
                             inner
-                                .write_bytes(&pkt_set_enable_powersave_anim(power_plugged))
+                                .write_bytes(&pkt_set_enable_powersave_anim(enable))
                                 .await
                                 .map_err(|err| {
-                                    warn!("create_sys_event_tasks::off_when_suspended {}", err);
+                                    warn!("create_sys_event_tasks::off_when_unplugged {}", err);
                                 })
                                 .ok();
                         }
                         inner
-                            .write_bytes(&pkt_set_enable_display(power_plugged))
+                            .write_bytes(&pkt_set_enable_display(enable))
                             .await
                             .map_err(|err| {
                                 warn!("create_sys_event_tasks::off_when_unplugged {}", err);
                             })
                             .ok();
                     } else {
+                        let brightness = if power_plugged {
+                            display_brightness
+                        } else {
+                            brightness_on_battery
+                        };
                         inner
-                            .write_bytes(&pkt_set_brightness(brightness_on_battery))
+                            .write_bytes(&pkt_set_brightness(brightness))
                             .await
                             .map_err(|err| {
                                 warn!("create_sys_event_tasks::off_when_unplugged {}", err);
@@ -486,17 +559,18 @@ impl crate::Reloadable for AniMeZbus {
         let lid_closed = manager.lid_closed().await.unwrap_or_default();
         let power_plugged = manager.on_external_power().await.unwrap_or_default();
 
-        let turn_off =
-            (lid_closed && off_when_lid_closed) || (!power_plugged && off_when_unplugged);
+        let allowed = anime_display_allowed(
+            display_enabled, lid_closed, off_when_lid_closed, power_plugged, off_when_unplugged,
+        );
         self.0
-            .write_bytes(&pkt_set_enable_display(!turn_off))
+            .write_bytes(&pkt_set_enable_display(allowed))
             .await
             .map_err(|err| {
                 warn!("create_sys_event_tasks::reload {}", err);
             })
             .ok();
 
-        if turn_off || !display_enabled {
+        if !allowed {
             self.0.write_bytes(&pkt_set_enable_display(false)).await?;
             // early return so we don't run animation thread
             return Ok(());
@@ -512,5 +586,56 @@ impl crate::Reloadable for AniMeZbus {
             self.0.run_thread(action, true).await;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{anime_display_allowed, anime_sleep_enable};
+
+    #[test]
+    fn rejects_when_display_disabled() {
+        assert!(!anime_display_allowed(false, false, true, true, true));
+    }
+
+    #[test]
+    fn rejects_lid_closed_with_policy() {
+        assert!(!anime_display_allowed(true, true, true, true, true));
+    }
+
+    #[test]
+    fn allows_lid_closed_without_policy() {
+        assert!(anime_display_allowed(true, true, false, true, true));
+    }
+
+    #[test]
+    fn rejects_unplugged_with_policy() {
+        assert!(!anime_display_allowed(true, false, false, false, true));
+    }
+
+    #[test]
+    fn allows_unplugged_without_policy() {
+        assert!(anime_display_allowed(true, false, false, false, false));
+    }
+
+    #[test]
+    fn allows_when_clear() {
+        assert!(anime_display_allowed(true, false, true, true, true));
+    }
+
+    #[test]
+    fn sleep_enable_four_combinations() {
+        assert!(!anime_sleep_enable(true, true, true));
+        assert!(anime_sleep_enable(true, false, true));
+        assert!(anime_sleep_enable(false, true, true));
+        assert!(anime_sleep_enable(false, false, true));
+        assert!(!anime_sleep_enable(false, false, false));
+    }
+
+    #[test]
+    fn resume_keeps_lid_restriction_when_suspend_off_disabled() {
+        // Regression: lid closed + off_when_lid_closed, off_when_suspended=false, resume.
+        let allowed = anime_display_allowed(true, true, true, true, true);
+        assert!(!anime_sleep_enable(false, false, allowed));
     }
 }

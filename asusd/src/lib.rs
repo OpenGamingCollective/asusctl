@@ -54,6 +54,19 @@ async fn watch_cancelled(cancel: &mut tokio::sync::watch::Receiver<bool>) {
     }
 }
 
+/// Race `fut` against [`watch_cancelled`]. Returns `None` on cancel or when
+/// `fut` yields `None` (stream end / closed channel).
+async fn next_or_cancel<T>(
+    cancel: &mut tokio::sync::watch::Receiver<bool>,
+    fut: impl Future<Output = Option<T>>,
+) -> Option<T> {
+    tokio::select! {
+        biased;
+        _ = watch_cancelled(cancel) => None,
+        item = fut => item,
+    }
+}
+
 /// Check if a power supply type string represents an external power source.
 fn is_external_power_type(supply_type: &str) -> bool {
     let t = supply_type.trim();
@@ -448,23 +461,10 @@ pub trait CtrlTask {
                     let Ok(mut notif) = logind_manager.receive_prepare_for_shutdown().await else {
                         return;
                     };
-                    loop {
-                        tokio::select! {
-                            _ = watch_cancelled(&mut cancel) => break,
-                            event = notif.next() => {
-                                match event {
-                                    Some(event) => {
-                                        if let Ok(args) = event.args() {
-                                            debug!(
-                                                "Doing on_prepare_for_shutdown({})",
-                                                args.start
-                                            );
-                                            on_prepare_for_shutdown(args.start).await;
-                                        }
-                                    }
-                                    None => break,
-                                }
-                            }
+                    while let Some(event) = next_or_cancel(&mut cancel, notif.next()).await {
+                        if let Ok(args) = event.args() {
+                            debug!("Doing on_prepare_for_shutdown({})", args.start);
+                            on_prepare_for_shutdown(args.start).await;
                         }
                     }
                 }
@@ -477,23 +477,10 @@ pub trait CtrlTask {
                     let Ok(mut notif) = logind_manager.receive_prepare_for_sleep().await else {
                         return;
                     };
-                    loop {
-                        tokio::select! {
-                            _ = watch_cancelled(&mut cancel) => break,
-                            event = notif.next() => {
-                                match event {
-                                    Some(event) => {
-                                        if let Ok(args) = event.args() {
-                                            debug!(
-                                                "Doing on_prepare_for_sleep({})",
-                                                args.start
-                                            );
-                                            on_prepare_for_sleep(args.start).await;
-                                        }
-                                    }
-                                    None => break,
-                                }
-                            }
+                    while let Some(event) = next_or_cancel(&mut cancel, notif.next()).await {
+                        if let Ok(args) = event.args() {
+                            debug!("Doing on_prepare_for_sleep({})", args.start);
+                            on_prepare_for_sleep(args.start).await;
                         }
                     }
                 }
@@ -518,30 +505,19 @@ pub trait CtrlTask {
                         }
                     };
 
-                    loop {
-                        tokio::select! {
-                            _ = watch_cancelled(&mut cancel) => break,
-                            change = stream.next() => {
-                                match change {
-                                    Some(change) => match change.get().await {
-                                        Ok(lid_closed) if last_lid != Some(lid_closed) => {
-                                            last_lid = Some(lid_closed);
-                                            debug!("Lid state changed: {lid_closed}");
-                                            on_lid_change(lid_closed).await;
-                                        }
-                                        Ok(_) => {}
-                                        Err(e) => {
-                                            // The tracked state is now unknown, let the next
-                                            // signal through
-                                            last_lid = None;
-                                            debug!(
-                                                "Failed to read lid state after a logind \
-                                                 change: {e}"
-                                            );
-                                        }
-                                    },
-                                    None => break,
-                                }
+                    while let Some(change) = next_or_cancel(&mut cancel, stream.next()).await {
+                        match change.get().await {
+                            Ok(lid_closed) if last_lid != Some(lid_closed) => {
+                                last_lid = Some(lid_closed);
+                                debug!("Lid state changed: {lid_closed}");
+                                on_lid_change(lid_closed).await;
+                            }
+                            Ok(_) => {}
+                            Err(e) => {
+                                // The tracked state is now unknown, let the next
+                                // signal through
+                                last_lid = None;
+                                debug!("Failed to read lid state after a logind change: {e}");
                             }
                         }
                     }
@@ -555,20 +531,15 @@ pub trait CtrlTask {
                 let mut cancel = cancel.clone();
                 tokio::spawn(async move {
                     let mut last_power = *power_state_rx.borrow_and_update();
-                    loop {
-                        tokio::select! {
-                            _ = watch_cancelled(&mut cancel) => break,
-                            changed = power_state_rx.changed() => {
-                                if changed.is_err() {
-                                    break;
-                                }
-                                let online = *power_state_rx.borrow_and_update();
-                                if online != last_power {
-                                    last_power = online;
-                                    debug!("External power supply state changed: {online}");
-                                    on_external_power_change(online).await;
-                                }
-                            }
+                    while next_or_cancel(&mut cancel, async { power_state_rx.changed().await.ok() })
+                        .await
+                        .is_some()
+                    {
+                        let online = *power_state_rx.borrow_and_update();
+                        if online != last_power {
+                            last_power = online;
+                            debug!("External power supply state changed: {online}");
+                            on_external_power_change(online).await;
                         }
                     }
                 });
@@ -605,9 +576,36 @@ where
     Ok(())
 }
 
+/// Hotplug Aura/AniMe controllers: reload, register at `path`, run `CtrlTask`
+/// listeners until `cancel` is signalled.
+pub async fn start_hotplug_tasks<T>(
+    mut zbus: T,
+    connection: &Connection,
+    path: zbus::zvariant::OwnedObjectPath,
+    cancel: tokio::sync::watch::Receiver<bool>,
+) -> Result<(), RogError>
+where
+    T: Reloadable + CtrlTask + Clone + Interface,
+{
+    let task = zbus.clone();
+    zbus.reload()
+        .await
+        .unwrap_or_else(|err| warn!("Controller error: {}", err));
+    connection
+        .object_server()
+        .at(path.clone(), zbus)
+        .await
+        .map_err(|e| {
+            error!("Couldn't add server at path: {path}, {e:?}");
+            e
+        })?;
+    let signal_ctx = SignalEmitter::new(connection, path)?;
+    task.create_tasks(signal_ctx, cancel).await
+}
+
 #[cfg(test)]
 mod tests {
-    use super::watch_cancelled;
+    use super::{next_or_cancel, watch_cancelled};
 
     #[tokio::test]
     async fn watch_cancelled_returns_when_flag_set() {
@@ -623,5 +621,23 @@ mod tests {
     async fn watch_cancelled_returns_immediately_if_already_set() {
         let (_tx, mut rx) = tokio::sync::watch::channel(true);
         watch_cancelled(&mut rx).await;
+    }
+
+    #[tokio::test]
+    async fn next_or_cancel_yields_item_before_cancel() {
+        let (_tx, mut rx) = tokio::sync::watch::channel(false);
+        let item = next_or_cancel(&mut rx, async { Some(7_u8) }).await;
+        assert_eq!(item, Some(7));
+    }
+
+    #[tokio::test]
+    async fn next_or_cancel_returns_none_when_cancelled() {
+        let (tx, mut rx) = tokio::sync::watch::channel(false);
+        tx.send(true).expect("cancel send");
+        let item = next_or_cancel(&mut rx, async {
+            std::future::pending::<Option<u8>>().await
+        })
+        .await;
+        assert_eq!(item, None);
     }
 }

@@ -11,7 +11,7 @@ use zbus::{Connection, interface};
 
 use super::Aura;
 use crate::error::RogError;
-use crate::{CtrlTask, Reloadable};
+use crate::{CtrlTask, Reloadable, start_hotplug_tasks};
 
 pub const AURA_ZBUS_NAME: &str = "Aura";
 pub const AURA_ZBUS_PATH: &str = "/xyz/ljones";
@@ -25,25 +25,12 @@ impl AuraZbus {
     }
 
     pub async fn start_tasks(
-        mut self,
+        self,
         connection: &Connection,
         path: OwnedObjectPath,
         cancel: tokio::sync::watch::Receiver<bool>,
     ) -> Result<(), RogError> {
-        let task = self.clone();
-        self.reload()
-            .await
-            .unwrap_or_else(|err| warn!("Controller error: {}", err));
-        connection
-            .object_server()
-            .at(path.clone(), self)
-            .await
-            .map_err(|e| {
-                error!("Couldn't add server at path: {path}, {e:?}");
-                e
-            })?;
-        let signal_ctx = SignalEmitter::new(connection, path)?;
-        task.create_tasks(signal_ctx, cancel).await
+        start_hotplug_tasks(self, connection, path, cancel).await
     }
 }
 
