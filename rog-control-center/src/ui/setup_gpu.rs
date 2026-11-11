@@ -105,7 +105,13 @@ impl GpuCaps {
         }
     }
 
-    /// Apply a target mode, writing only the attributes that exist.
+    /// Apply a target mode, writing every available attribute.
+    ///
+    /// Always forward to asusd even when firmware already matches. Skipping the
+    /// D-Bus write left a stale `pending_gpu` entry when the user canceled a
+    /// queued change (Integrated→back to Hybrid, or Ultimate→Hybrid) before
+    /// reboot. asusd drops only that attribute's deferred entry on a redundant
+    /// write and keeps sibling queue items (#459).
     async fn apply(&self, mode: GpuMode) -> zbus::Result<()> {
         let (dgpu_val, mux_val) = match mode {
             GpuMode::Integrated => (1, 1),
