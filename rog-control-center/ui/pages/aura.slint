@@ -44,7 +44,7 @@ export component PageAura inherits Rectangle {
                     selected => {
                         AuraPageData.apply_effect({
                             mode: AuraPageData.supported_basic_modes[self.current-index],
-                            zone: AuraPageData.led_mode_data.zone,
+                            zone: AuraPageData.selected_effect_zone,
                             colour1: AuraPageData.led_mode_data.colour1,
                             colour2: AuraPageData.led_mode_data.colour2,
                             speed: AuraPageData.led_mode_data.speed,
@@ -76,7 +76,7 @@ export component PageAura inherits Rectangle {
                                 released => {
                                     AuraPageData.apply_effect({
                                         mode: AuraPageData.led_mode_data.mode,
-                                        zone: AuraPageData.led_mode_data.zone,
+                                        zone: AuraPageData.selected_effect_zone,
                                         colour1: AuraPageData.color1,
                                         colour2: AuraPageData.led_mode_data.colour2,
                                         speed: AuraPageData.led_mode_data.speed,
@@ -98,7 +98,7 @@ export component PageAura inherits Rectangle {
                                 released => {
                                     AuraPageData.apply_effect({
                                         mode: AuraPageData.led_mode_data.mode,
-                                        zone: AuraPageData.led_mode_data.zone,
+                                        zone: AuraPageData.selected_effect_zone,
                                         colour1: AuraPageData.led_mode_data.colour1,
                                         colour2: AuraPageData.color2,
                                         speed: AuraPageData.led_mode_data.speed,
@@ -115,25 +115,16 @@ export component PageAura inherits Rectangle {
                 spacing: 10px;
                 min-height: 80px;
                 max-height: 90px;
-                RogItem {
-                    VerticalBox {
-                        Text { text: @tr("Zone"); vertical-alignment: TextVerticalAlignment.center; horizontal-alignment: TextHorizontalAlignment.center; }
-                        ComboBox {
-                            enabled: false;
-                            current_index <=> AuraPageData.zone;
-                            current_value: AuraPageData.zone_names[self.current-index];
-                            model <=> AuraPageData.zone_names;
-                            selected => {
-                                AuraPageData.apply_effect({
-                                    mode: AuraPageData.led_mode_data.mode,
-                                    zone: self.current-index,
-                                    colour1: AuraPageData.led_mode_data.colour1,
-                                    colour2: AuraPageData.led_mode_data.colour2,
-                                    speed: AuraPageData.led_mode_data.speed,
-                                    direction: AuraPageData.led_mode_data.direction,
-                                });
-                            }
-                        }
+                SystemDropdown {
+                    text: @tr("Zone");
+                    enabled: AuraPageData.effect_targets_enabled;
+                    // All (synced) vs Keyboard / Lightbar / Logo. Changing the
+                    // target alone does not write LEDs; colour/mode/speed do.
+                    current_index <=> AuraPageData.effect_target_index;
+                    current_value: AuraPageData.effect_target_names[self.current_index];
+                    model <=> AuraPageData.effect_target_names;
+                    selected(idx) => {
+                        AuraPageData.cb_effect_target_index(idx);
                     }
                 }
                 RogItem {
@@ -147,7 +138,7 @@ export component PageAura inherits Rectangle {
                             selected => {
                                 AuraPageData.apply_effect({
                                     mode: AuraPageData.led_mode_data.mode,
-                                    zone: AuraPageData.led_mode_data.zone,
+                                    zone: AuraPageData.selected_effect_zone,
                                     colour1: AuraPageData.led_mode_data.colour1,
                                     colour2: AuraPageData.led_mode_data.colour2,
                                     speed: AuraPageData.led_mode_data.speed,
@@ -168,7 +159,7 @@ export component PageAura inherits Rectangle {
                             selected => {
                                 AuraPageData.apply_effect({
                                     mode: AuraPageData.led_mode_data.mode,
-                                    zone: AuraPageData.led_mode_data.zone,
+                                    zone: AuraPageData.selected_effect_zone,
                                     colour1: AuraPageData.led_mode_data.colour1,
                                     colour2: AuraPageData.led_mode_data.colour2,
                                     speed: self.current-index,

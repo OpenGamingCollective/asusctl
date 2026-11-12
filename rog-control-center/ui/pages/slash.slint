@@ -15,6 +15,9 @@ export global SlashPageData {
     in-out property <int> mode: 0;
     callback cb_mode(int);
 
+    // False for asus::slash sysfs (no power_states); true for legacy HID/USB.
+    in-out property <bool> power_triggers_supported: true;
+
     in-out property <bool> show_on_boot: true;
     callback cb_show_on_boot(bool);
     in-out property <bool> show_on_shutdown: true;
@@ -97,7 +100,7 @@ export component PageSlash inherits Rectangle {
                 }
             }
 
-            Rectangle {
+            if SlashPageData.power_triggers_supported: Rectangle {
                 background: Palette.alternate-background;
                 border-color: Palette.border;
                 border-width: 1px;
@@ -111,7 +114,7 @@ export component PageSlash inherits Rectangle {
                 }
             }
 
-            SystemToggle {
+            if SlashPageData.power_triggers_supported: SystemToggle {
                 text: @tr("Show on boot");
                 checked <=> SlashPageData.show_on_boot;
                 toggled => {
@@ -119,7 +122,7 @@ export component PageSlash inherits Rectangle {
                 }
             }
 
-            SystemToggle {
+            if SlashPageData.power_triggers_supported: SystemToggle {
                 text: @tr("Show on shutdown");
                 checked <=> SlashPageData.show_on_shutdown;
                 toggled => {
@@ -127,7 +130,7 @@ export component PageSlash inherits Rectangle {
                 }
             }
 
-            SystemToggle {
+            if SlashPageData.power_triggers_supported: SystemToggle {
                 text: @tr("Show on sleep");
                 checked <=> SlashPageData.show_on_sleep;
                 toggled => {
@@ -135,7 +138,7 @@ export component PageSlash inherits Rectangle {
                 }
             }
 
-            SystemToggle {
+            if SlashPageData.power_triggers_supported: SystemToggle {
                 text: @tr("Show on battery");
                 checked <=> SlashPageData.show_on_battery;
                 toggled => {
@@ -143,7 +146,7 @@ export component PageSlash inherits Rectangle {
                 }
             }
 
-            SystemToggle {
+            if SlashPageData.power_triggers_supported: SystemToggle {
                 text: @tr("Show low-battery warning");
                 checked <=> SlashPageData.show_battery_warning;
                 toggled => {
@@ -151,7 +154,7 @@ export component PageSlash inherits Rectangle {
                 }
             }
 
-            SystemToggle {
+            if SlashPageData.power_triggers_supported: SystemToggle {
                 text: @tr("Show when lid is closed");
                 checked <=> SlashPageData.show_on_lid_closed;
                 toggled => {

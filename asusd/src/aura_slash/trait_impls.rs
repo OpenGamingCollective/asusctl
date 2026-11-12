@@ -13,6 +13,37 @@ use super::Slash;
 use crate::Reloadable;
 use crate::error::RogError;
 
+const SLASH_POWER_UNSUPPORTED: &str = concat!(
+    "Kernel Slash LED has no power_states; ",
+    "boot/sleep/shutdown/battery/lid persistence is not supported"
+);
+
+fn slash_power_not_supported() -> zbus::fdo::Error {
+    zbus::fdo::Error::NotSupported(SLASH_POWER_UNSUPPORTED.into())
+}
+
+fn slash_sysfs_power_supported(slash: &Slash) -> bool {
+    slash.led().is_some_and(|led| led.has_power_states())
+}
+
+/// Update one DL `power_states` token (`boot` / `awake` / `sleep` / `shutdown`).
+fn slash_set_dl_power_token(slash: &Slash, token: &str, enable: bool) -> Result<(), RogError> {
+    let led = slash
+        .led()
+        .ok_or_else(|| RogError::MissingFunction("Slash LED missing for power_states".into()))?;
+    let raw = led.get_power_states().map_err(RogError::from)?;
+    let owned: Vec<String> = raw.split_whitespace().map(str::to_owned).collect();
+    let mut states: Vec<&str> = owned.iter().map(String::as_str).collect();
+    let present = states.contains(&token);
+    if enable && !present {
+        states.push(token);
+    } else if !enable {
+        states.retain(|s| *s != token);
+    }
+    led.set_power_states_list(&states).map_err(RogError::from)?;
+    Ok(())
+}
+
 #[derive(Clone)]
 pub struct SlashZbus(Slash);
 
@@ -26,7 +57,6 @@ impl SlashZbus {
         connection: &Connection,
         path: OwnedObjectPath,
     ) -> Result<(), RogError> {
-        // let task = zbus.clone();
         self.reload()
             .await
             .unwrap_or_else(|err| warn!("Controller error: {}", err));
@@ -34,22 +64,29 @@ impl SlashZbus {
             .object_server()
             .at(path.clone(), self)
             .await
-            .map_err(|e| error!("Couldn't add server at path: {path}, {e:?}"))
-            .ok();
-        Ok(())
+            .map_err(|e| {
+                error!("Couldn't add server at path: {path}, {e:?}");
+                RogError::from(e)
+            })
+            .map(|_| ())
     }
 }
 
 #[interface(name = "xyz.ljones.Slash")]
 impl SlashZbus {
-    /// Get enabled or not
+    /// True when boot/sleep/... persistence toggles are backed by HID/USB
+    /// or by Slash Dynamic Lighting `power_states`.
+    #[zbus(property)]
+    async fn power_triggers_supported(&self) -> bool {
+        !self.0.has_sysfs_led() || slash_sysfs_power_supported(&self.0)
+    }
+
     #[zbus(property)]
     async fn enabled(&self) -> bool {
         let lock = self.0.lock_config().await;
         lock.enabled
     }
 
-    /// Set enabled true or false
     #[zbus(property)]
     async fn set_enabled(&self, enabled: bool) {
         let mut config = self.0.lock_config().await;
@@ -58,55 +95,62 @@ impl SlashZbus {
         } else {
             config.brightness
         };
-        self.0
-            .write_bytes(&slash_pkt_enable(config.slash_type, enabled))
-            .await
-            .map_err(|err| {
-                warn!("ctrl_slash::enable {}", err);
-            })
-            .ok();
-        self.0
-            .write_bytes(&slash_pkt_options(
-                config.slash_type,
-                enabled,
-                brightness,
-                config.display_interval,
-            ))
-            .await
-            .map_err(|err| {
-                warn!("ctrl_slash::set_options {}", err);
-            })
-            .ok();
+
+        if let Some(led) = self.0.led() {
+            let b = if enabled { brightness } else { 0 };
+            if let Err(err) = led.set_brightness(b) {
+                warn!("ctrl_slash::set_enabled via sysfs: {err}");
+            }
+        } else {
+            self.0
+                .write_bytes(&slash_pkt_enable(config.slash_type, enabled))
+                .await
+                .map_err(|err| warn!("ctrl_slash::enable {err}"))
+                .ok();
+            self.0
+                .write_bytes(&slash_pkt_options(
+                    config.slash_type,
+                    enabled,
+                    brightness,
+                    config.display_interval,
+                ))
+                .await
+                .map_err(|err| warn!("ctrl_slash::set_options {err}"))
+                .ok();
+        }
 
         config.enabled = enabled;
         config.brightness = brightness;
         config.write();
     }
 
-    /// Get brightness level
     #[zbus(property)]
     async fn brightness(&self) -> u8 {
         let config = self.0.lock_config().await;
         config.brightness
     }
 
-    /// Set brightness level
     #[zbus(property)]
     async fn set_brightness(&self, brightness: u8) {
         let mut config = self.0.lock_config().await;
         let enabled = brightness > 0;
-        self.0
-            .write_bytes(&slash_pkt_options(
-                config.slash_type,
-                enabled,
-                brightness,
-                config.display_interval,
-            ))
-            .await
-            .map_err(|err| {
-                warn!("ctrl_slash::set_options {}", err);
-            })
-            .ok();
+
+        if let Some(led) = self.0.led() {
+            if let Err(err) = led.set_brightness(brightness) {
+                warn!("ctrl_slash::set_brightness via sysfs: {err}");
+            }
+        } else {
+            self.0
+                .write_bytes(&slash_pkt_options(
+                    config.slash_type,
+                    enabled,
+                    brightness,
+                    config.display_interval,
+                ))
+                .await
+                .map_err(|err| warn!("ctrl_slash::set_options {err}"))
+                .ok();
+        }
 
         config.enabled = enabled;
         config.brightness = brightness;
@@ -119,19 +163,23 @@ impl SlashZbus {
         config.display_interval
     }
 
-    /// Set interval between slash animations (0-255)
     #[zbus(property)]
     async fn set_interval(&self, interval: u8) {
         let mut config = self.0.lock_config().await;
-        self.0
-            .write_bytes(&slash_pkt_options(
-                config.slash_type, config.enabled, config.brightness, interval,
-            ))
-            .await
-            .map_err(|err| {
-                warn!("ctrl_slash::set_options {}", err);
-            })
-            .ok();
+
+        if let Some(led) = self.0.led() {
+            if let Err(err) = led.set_interval(interval) {
+                warn!("ctrl_slash::set_interval via sysfs: {err}");
+            }
+        } else {
+            self.0
+                .write_bytes(&slash_pkt_options(
+                    config.slash_type, config.enabled, config.brightness, interval,
+                ))
+                .await
+                .map_err(|err| warn!("ctrl_slash::set_options {err}"))
+                .ok();
+        }
 
         config.display_interval = interval;
         config.write();
@@ -143,28 +191,29 @@ impl SlashZbus {
         Ok(config.display_mode as u8)
     }
 
-    /// Set interval between slash animations (0-255)
     #[zbus(property)]
     async fn set_mode(&self, mode: u8) -> zbus::Result<()> {
-        let mode = SlashMode::try_from(mode).map_err(|err| {
-            zbus::fdo::Error::InvalidArgs(format!("ctrl_slash::set_mode {}", err))
-        })?;
+        let mode = SlashMode::try_from(mode)
+            .map_err(|err| zbus::fdo::Error::InvalidArgs(format!("ctrl_slash::set_mode {err}")))?;
         let mut config = self.0.lock_config().await;
 
-        let command_packets = slash_pkt_set_mode(config.slash_type, mode);
-        // self.node.write_bytes(&command_packets[0])?;
-        self.0.write_bytes(&command_packets[1]).await?;
-        self.0
-            .write_bytes(&slash_pkt_save(config.slash_type))
-            .await?;
+        if let Some(led) = self.0.led() {
+            led.set_mode(&mode.to_string()).map_err(|err| {
+                zbus::fdo::Error::Failed(format!("ctrl_slash::set_mode sysfs: {err}"))
+            })?;
+        } else {
+            let command_packets = slash_pkt_set_mode(config.slash_type, mode);
+            self.0.write_bytes(&command_packets[1]).await?;
+            self.0
+                .write_bytes(&slash_pkt_save(config.slash_type))
+                .await?;
+        }
 
         config.display_mode = mode;
         config.write();
         Ok(())
     }
 
-    /// Get the device state as stored by asusd
-    // #[zbus(property)]
     async fn device_state(&self) -> DeviceState {
         let config = self.0.lock_config().await;
         DeviceState::from(&*config)
@@ -178,6 +227,16 @@ impl SlashZbus {
 
     #[zbus(property)]
     async fn set_show_on_boot(&self, enable: bool) -> zbus::Result<()> {
+        if slash_sysfs_power_supported(&self.0) {
+            slash_set_dl_power_token(&self.0, "boot", enable)?;
+            let mut config = self.0.lock_config().await;
+            config.show_on_boot = enable;
+            config.write();
+            return Ok(());
+        }
+        if self.0.has_sysfs_led() {
+            return Err(slash_power_not_supported().into());
+        }
         let mut config = self.0.lock_config().await;
         self.0
             .write_bytes(&slash_pkt_boot(config.slash_type, enable))
@@ -195,6 +254,16 @@ impl SlashZbus {
 
     #[zbus(property)]
     async fn set_show_on_sleep(&self, enable: bool) -> zbus::Result<()> {
+        if slash_sysfs_power_supported(&self.0) {
+            slash_set_dl_power_token(&self.0, "sleep", enable)?;
+            let mut config = self.0.lock_config().await;
+            config.show_on_sleep = enable;
+            config.write();
+            return Ok(());
+        }
+        if self.0.has_sysfs_led() {
+            return Err(slash_power_not_supported().into());
+        }
         let mut config = self.0.lock_config().await;
         self.0
             .write_bytes(&slash_pkt_sleep(config.slash_type, enable))
@@ -212,6 +281,16 @@ impl SlashZbus {
 
     #[zbus(property)]
     async fn set_show_on_shutdown(&self, enable: bool) -> zbus::Result<()> {
+        if slash_sysfs_power_supported(&self.0) {
+            slash_set_dl_power_token(&self.0, "shutdown", enable)?;
+            let mut config = self.0.lock_config().await;
+            config.show_on_shutdown = enable;
+            config.write();
+            return Ok(());
+        }
+        if self.0.has_sysfs_led() {
+            return Err(slash_power_not_supported().into());
+        }
         let mut config = self.0.lock_config().await;
         self.0
             .write_bytes(&slash_pkt_shutdown(config.slash_type, enable))
@@ -229,6 +308,9 @@ impl SlashZbus {
 
     #[zbus(property)]
     async fn set_show_on_battery(&self, enable: bool) -> zbus::Result<()> {
+        if self.0.has_sysfs_led() {
+            return Err(slash_power_not_supported().into());
+        }
         let mut config = self.0.lock_config().await;
         self.0
             .write_bytes(&slash_pkt_battery_saver(config.slash_type, enable))
@@ -246,6 +328,9 @@ impl SlashZbus {
 
     #[zbus(property)]
     async fn set_show_battery_warning(&self, enable: bool) -> zbus::Result<()> {
+        if self.0.has_sysfs_led() {
+            return Err(slash_power_not_supported().into());
+        }
         let mut config = self.0.lock_config().await;
         self.0
             .write_bytes(&slash_pkt_low_battery(config.slash_type, enable))
@@ -263,12 +348,12 @@ impl SlashZbus {
 
     #[zbus(property)]
     async fn set_show_on_lid_closed(&self, enable: bool) -> zbus::Result<()> {
+        if self.0.has_sysfs_led() {
+            return Err(slash_power_not_supported().into());
+        }
         let mut config = self.0.lock_config().await;
         self.0
             .write_bytes(&slash_pkt_lid_closed(config.slash_type, enable))
-            .await?;
-        self.0
-            .write_bytes(&slash_pkt_save(config.slash_type))
             .await?;
         config.show_on_lid_closed = enable;
         config.write();
@@ -279,42 +364,6 @@ impl SlashZbus {
 impl Reloadable for SlashZbus {
     async fn reload(&mut self) -> Result<(), RogError> {
         debug!("reloading slash settings");
-        let config = self.0.lock_config().await;
-        self.0
-            .write_bytes(&slash_pkt_options(
-                config.slash_type,
-                config.enabled,
-                config.brightness,
-                config.display_interval,
-            ))
-            .await
-            .map_err(|err| {
-                warn!("set_options {}", err);
-            })
-            .ok();
-
-        macro_rules! write_bytes_with_warning {
-            ($packet_fn:expr, $cfg:ident, $warn_msg:expr) => {
-                self.0
-                    .write_bytes(&$packet_fn(config.slash_type, config.$cfg))
-                    .await
-                    .map_err(|err| {
-                        warn!("{} {}", $warn_msg, err);
-                    })
-                    .ok();
-            };
-        }
-
-        write_bytes_with_warning!(slash_pkt_boot, show_on_boot, "show_on_boot");
-        write_bytes_with_warning!(slash_pkt_sleep, show_on_sleep, "show_on_sleep");
-        write_bytes_with_warning!(slash_pkt_shutdown, show_on_shutdown, "show_on_shutdown");
-        write_bytes_with_warning!(slash_pkt_battery_saver, show_on_battery, "show_on_battery");
-        write_bytes_with_warning!(
-            slash_pkt_low_battery,
-            show_battery_warning,
-            "show_battery_warning"
-        );
-
-        Ok(())
+        self.0.do_initialization().await
     }
 }
