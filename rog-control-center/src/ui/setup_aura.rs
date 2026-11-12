@@ -105,7 +105,8 @@ pub fn setup_aura_page(
                 let mut mode_names = Vec::new();
                 for (i, name) in names.iter().enumerate() {
                     let raw = i as i32;
-                    if modes_vec.contains(&raw) && i != 9 {
+                    // Skip Direct (13): the basic dropdown has no frame producer.
+                    if modes_vec.contains(&raw) && i != 9 && raw != 13 {
                         raws.push(raw);
                         mode_names.push(name.clone());
                     }

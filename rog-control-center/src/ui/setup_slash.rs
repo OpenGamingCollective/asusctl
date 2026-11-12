@@ -47,6 +47,18 @@ pub fn setup_slash_page(ui: &MainWindow, _states: Arc<Mutex<Config>>) {
             set_ui_props_async!(handle, slash, SlashPageData, enabled);
             set_ui_props_async!(handle, slash, SlashPageData, brightness);
             set_ui_props_async!(handle, slash, SlashPageData, interval);
+            match slash.power_triggers_supported().await {
+                Ok(supported) => {
+                    let handle2 = handle.clone();
+                    handle2
+                        .upgrade_in_event_loop(move |ui| {
+                            ui.global::<SlashPageData>()
+                                .set_power_triggers_supported(supported);
+                        })
+                        .ok();
+                }
+                Err(e) => error!("setup_slash: power_triggers_supported: {e}"),
+            }
             set_ui_props_async!(handle, slash, SlashPageData, show_on_boot);
             set_ui_props_async!(handle, slash, SlashPageData, show_on_shutdown);
             set_ui_props_async!(handle, slash, SlashPageData, show_on_sleep);
