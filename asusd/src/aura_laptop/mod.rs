@@ -104,8 +104,16 @@ impl Aura {
             if let Some(multizones) = config.multizone.as_mut()
                 && let Some(set) = multizones.get(&mode)
             {
-                for mode in set.clone() {
-                    self.write_effect_and_apply(config.led_type, &mode).await?;
+                let effects = if self.has_dynamic_lighting() {
+                    // Key1–4 / BarLeft–Right collapse to one keyboard + one
+                    // lightbar node. Applying every legacy subzone stomps the
+                    // previous colour (Key4 teal over Key1 red).
+                    dl_dedupe_multizone_effects(set)
+                } else {
+                    set.clone()
+                };
+                for fx in effects {
+                    self.write_effect_and_apply(config.led_type, &fx).await?;
                 }
             }
             // Under DL, keep the last whole-keyboard builtin alive when only a
@@ -307,24 +315,27 @@ impl Aura {
         let mut applied = false;
         let off = brightness == LedBrightness::Off;
 
+        // Lightbar first so a keyboard enable/apply cannot leave the bar on a
+        // stomped colour while brightness is still mid-update.
+        if let Some(lb) = &self.dynamic_lightbar {
+            let led = lb.lock().await;
+            if led.has_enabled() && map_dl_result(led.set_lighting_enabled(!off))?.is_some() {
+                applied = true;
+            }
+        }
+
         if let Some(kbd) = &self.dynamic_kbd {
             let led = kbd.lock().await;
             if led.has_enabled() && map_dl_result(led.set_lighting_enabled(!off))?.is_some() {
                 applied = true;
             }
+            // Dimmer last: ba c5 c4 can reset MCU colours; hid-asus re-pushes
+            // LampArray host-RGB frames after this write.
             if !off || !led.has_enabled() {
                 let max = led.get_max_brightness()?;
                 if map_dl_result(led.set_brightness(brightness.to_scaled(max)))?.is_some() {
                     applied = true;
                 }
-            }
-        }
-
-        // Lightbar: enabled gates the zone; do not write brightness.
-        if let Some(lb) = &self.dynamic_lightbar {
-            let led = lb.lock().await;
-            if led.has_enabled() && map_dl_result(led.set_lighting_enabled(!off))?.is_some() {
-                applied = true;
             }
         }
 
@@ -675,6 +686,72 @@ pub(super) fn supports_dynamic_zone(zone: rog_aura::AuraZone) -> bool {
     )
 }
 
+/// Pick one effect per Dynamic Lighting node from a legacy multizone list.
+///
+/// Preference: `Key1` over Key2–4 for the keyboard; `BarLeft` over `BarRight`
+/// for the lightbar; `Logo` as-is. `None` is kept for fan-out.
+fn dl_dedupe_multizone_effects(set: &[AuraEffect]) -> Vec<AuraEffect> {
+    let mut keyboard: Option<AuraEffect> = None;
+    let mut lightbar: Option<AuraEffect> = None;
+    let mut logo: Option<AuraEffect> = None;
+    let mut none: Option<AuraEffect> = None;
+
+    for fx in set {
+        match fx.zone {
+            rog_aura::AuraZone::None => none = Some(fx.clone()),
+            rog_aura::AuraZone::Logo => logo = Some(fx.clone()),
+            rog_aura::AuraZone::BarLeft => lightbar = Some(fx.clone()),
+            rog_aura::AuraZone::BarRight => {
+                if lightbar.is_none() {
+                    lightbar = Some(fx.clone());
+                }
+            }
+            rog_aura::AuraZone::Key1 => keyboard = Some(fx.clone()),
+            rog_aura::AuraZone::Key2 | rog_aura::AuraZone::Key3 | rog_aura::AuraZone::Key4 => {
+                // Key1 is the canonical keyboard proxy under DL.
+                if keyboard.is_none() {
+                    keyboard = Some(fx.clone());
+                }
+            }
+        }
+    }
+
+    let mut out = Vec::with_capacity(4);
+    if let Some(fx) = none {
+        out.push(fx);
+    }
+    if let Some(fx) = keyboard {
+        out.push(fx);
+    }
+    if let Some(fx) = lightbar {
+        out.push(fx);
+    }
+    if let Some(fx) = logo {
+        out.push(fx);
+    }
+    out
+}
+
+/// Chassis effect targets for UI: `None` = synced fan-out; `Key1` = keyboard
+/// node; `BarLeft` = lightbar; `Logo` when registered. Not legacy Key2–4 / L-R.
+pub(super) fn dynamic_effect_targets(
+    has_keyboard: bool,
+    has_lightbar: bool,
+    has_logo: bool,
+) -> Vec<rog_aura::AuraZone> {
+    let mut targets = vec![rog_aura::AuraZone::None];
+    if has_keyboard {
+        targets.push(rog_aura::AuraZone::Key1);
+    }
+    if has_lightbar {
+        targets.push(rog_aura::AuraZone::BarLeft);
+    }
+    if has_logo {
+        targets.push(rog_aura::AuraZone::Logo);
+    }
+    targets
+}
+
 impl Aura {
     fn supports_zone(&self, zone: rog_aura::AuraZone) -> bool {
         match zone {
@@ -780,12 +857,12 @@ mod tests {
     use std::io::{Error, ErrorKind};
 
     use rog_aura::keyboard::AuraPowerState;
-    use rog_aura::{AuraZone, PowerZones};
+    use rog_aura::{AuraEffect, AuraModeNum, AuraZone, Colour, PowerZones};
     use rog_platform::error::PlatformError;
 
     use super::{
-        direct_rgb_payload, filter_power_states, is_dl_node_inactive, power_flags_for_state,
-        supports_dynamic_zone,
+        direct_rgb_payload, dl_dedupe_multizone_effects, dynamic_effect_targets,
+        filter_power_states, is_dl_node_inactive, power_flags_for_state, supports_dynamic_zone,
     };
     use crate::error::RogError;
 
@@ -849,6 +926,71 @@ mod tests {
         assert!(supports_dynamic_zone(AuraZone::Key1));
         assert!(supports_dynamic_zone(AuraZone::BarLeft));
         assert!(supports_dynamic_zone(AuraZone::Logo));
+    }
+
+    #[test]
+    fn dl_dedupe_prefers_key1_and_bar_left() {
+        let set = vec![
+            AuraEffect {
+                mode: AuraModeNum::Static,
+                zone: AuraZone::Key1,
+                colour1: Colour { r: 255, g: 0, b: 0 },
+                ..AuraEffect::default()
+            },
+            AuraEffect {
+                mode: AuraModeNum::Static,
+                zone: AuraZone::Key4,
+                colour1: Colour {
+                    r: 0,
+                    g: 124,
+                    b: 128,
+                },
+                colour2: Colour { r: 0, g: 255, b: 0 },
+                ..AuraEffect::default()
+            },
+            AuraEffect {
+                mode: AuraModeNum::Static,
+                zone: AuraZone::BarLeft,
+                colour1: Colour { r: 0, g: 0, b: 255 },
+                ..AuraEffect::default()
+            },
+            AuraEffect {
+                mode: AuraModeNum::Static,
+                zone: AuraZone::BarRight,
+                colour1: Colour { r: 0, g: 255, b: 0 },
+                ..AuraEffect::default()
+            },
+        ];
+        let out = dl_dedupe_multizone_effects(&set);
+        assert_eq!(out.len(), 2);
+        assert_eq!(out[0].zone, AuraZone::Key1);
+        assert_eq!(out[0].colour1.r, 255);
+        assert_eq!(out[1].zone, AuraZone::BarLeft);
+        assert_eq!(out[1].colour1.b, 255);
+    }
+
+    #[test]
+    fn dynamic_effect_targets_lists_synced_then_present_nodes() {
+        assert_eq!(
+            dynamic_effect_targets(true, true, false),
+            vec![
+                AuraZone::None,
+                AuraZone::Key1,
+                AuraZone::BarLeft
+            ]
+        );
+        assert_eq!(
+            dynamic_effect_targets(true, false, true),
+            vec![
+                AuraZone::None,
+                AuraZone::Key1,
+                AuraZone::Logo
+            ]
+        );
+        assert_eq!(
+            dynamic_effect_targets(false, false, false),
+            vec![AuraZone::None]
+        );
     }
 
     #[test]
