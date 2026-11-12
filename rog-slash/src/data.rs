@@ -1,6 +1,7 @@
 use std::fmt::Display;
 use std::str::FromStr;
 
+#[cfg(feature = "detect")]
 use dmi_id::DMIID;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "dbus")]
@@ -56,6 +57,18 @@ impl SlashType {
         }
     }
 
+    /// Select hidraw packet layout from the USB product id.
+    /// Report 0x5e vs 0x5d is a device capability, not a DMI board name.
+    pub fn from_usb_product(id: &str) -> Self {
+        match id.trim_start_matches("0x").to_ascii_uppercase().as_str() {
+            PROD_ID1_STR => SlashType::GA403_2024,
+            PROD_ID2_STR => SlashType::GA403_2025,
+            _ => SlashType::Unsupported,
+        }
+    }
+
+    /// Board-name detection used by legacy HID/USB Slash control.
+    #[cfg(feature = "detect")]
     pub fn from_dmi() -> Self {
         let board_name = DMIID::new().unwrap_or_default().board_name.to_uppercase();
         if board_name.contains("G614F") {

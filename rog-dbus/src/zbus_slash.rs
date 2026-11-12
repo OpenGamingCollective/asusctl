@@ -30,6 +30,10 @@ pub trait Slash {
     #[zbus(property)]
     fn set_mode(&self, value: u8) -> zbus::Result<()>;
 
+    /// True when boot/sleep/... persistence toggles are backed by HID/USB.
+    #[zbus(property)]
+    fn power_triggers_supported(&self) -> zbus::Result<bool>;
+
     /// ShowBatteryWarning property
     #[zbus(property)]
     fn show_battery_warning(&self) -> zbus::Result<bool>;
