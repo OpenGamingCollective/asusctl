@@ -46,9 +46,9 @@ export struct LaptopAuraPower {
     states: [AuraPowerState],
 }
 
-// Modes with colour1: Static,Breathe,Star,Rain,Highlight,Laser,Ripple,Pulse,Comet,Flash (excl. Strobe,Rainbow,Nothing)
-// Modes with colour2: Breathe, Star only.
-// Speed: Breathe,Strobe,Rainbow,Star,Rain,Highlight,Laser,Ripple. Direction: Rainbow only.
+// Colour 1: Static, Breathe, Star, Highlight, Laser, Ripple, Pulse, Comet, Flash.
+// Colour 2: Breathe, Star. Speed: Breathe through Ripple. Direction: Rainbow wave.
+// Index 9 is unused. The page shows only the modes the device reports.
 export global AuraPageData {
     in-out property <[string]> power_zone_names: [
         @tr("Aura power zone" => "Logo"),
@@ -77,8 +77,8 @@ export global AuraPageData {
     in-out property <[string]> mode_names: [
         @tr("Basic aura mode" => "Static"),
         @tr("Basic aura mode" => "Breathe"),
-        @tr("Basic aura mode" => "Strobe"),
-        @tr("Basic aura mode" => "Rainbow"),
+        @tr("Basic aura mode" => "Rainbow cycle"),
+        @tr("Basic aura mode" => "Rainbow wave"),
         @tr("Basic aura mode" => "Star"),
         @tr("Basic aura mode" => "Rain"),
         @tr("Basic aura mode" => "Highlight"),
@@ -88,8 +88,17 @@ export global AuraPageData {
         @tr("Basic aura mode" => "Pulse"),
         @tr("Basic aura mode" => "Comet"),
         @tr("Basic aura mode" => "Flash"),
+        @tr("Basic aura mode" => "Direct"),
+        @tr("Basic aura mode" => "Reactive"),
     ];
-    in-out property <[string]> available_mode_names: [ @tr("Basic aura mode" => "Static"), @tr("Basic aura mode" => "Breathe"), @tr("Basic aura mode" => "Strobe") ];
+    // Direct is omitted here: advertise it only when the daemon reports it
+    // (frame producer / per-key path available).
+    in-out property <[string]> available_mode_names: [
+        @tr("Basic aura mode" => "Static"),
+        @tr("Basic aura mode" => "Breathe"),
+        @tr("Basic aura mode" => "Rainbow cycle"),
+        @tr("Basic aura mode" => "Rainbow wave"),
+    ];
     in-out property <int> current_available_mode: 0;
     in-out property <[int]> supported_basic_modes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12];
     in-out property <[string]> zone_names: [
@@ -127,7 +136,7 @@ export global AuraPageData {
     in-out property <color> color2;
     in-out property <brush> colorbox2;
 
-    out property <bool> colour1_enabled: led_mode_data.mode == 0 || led_mode_data.mode == 1 || led_mode_data.mode == 4 || led_mode_data.mode == 6 || led_mode_data.mode == 7 || led_mode_data.mode == 8 || led_mode_data.mode == 10 || led_mode_data.mode == 11 || led_mode_data.mode == 12;
+    out property <bool> colour1_enabled: led_mode_data.mode == 0 || led_mode_data.mode == 1 || led_mode_data.mode == 4 || led_mode_data.mode == 6 || led_mode_data.mode == 7 || led_mode_data.mode == 8 || led_mode_data.mode == 10 || led_mode_data.mode == 11 || led_mode_data.mode == 12 || led_mode_data.mode == 14;
     out property <bool> colour2_enabled: led_mode_data.mode == 1 || led_mode_data.mode == 4;
     out property <bool> speed_enabled: led_mode_data.mode == 1 || led_mode_data.mode == 2 || led_mode_data.mode == 3 || led_mode_data.mode == 4 || led_mode_data.mode == 5 || led_mode_data.mode == 6 || led_mode_data.mode == 7 || led_mode_data.mode == 8;
     out property <bool> direction_enabled: led_mode_data.mode == 3;
