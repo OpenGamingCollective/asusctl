@@ -675,6 +675,26 @@ pub(super) fn supports_dynamic_zone(zone: rog_aura::AuraZone) -> bool {
     )
 }
 
+/// Chassis effect targets for UI: `None` = synced fan-out; `Key1` = keyboard
+/// node; `BarLeft` = lightbar; `Logo` when registered. Not legacy Key2–4 / L-R.
+pub(super) fn dynamic_effect_targets(
+    has_keyboard: bool,
+    has_lightbar: bool,
+    has_logo: bool,
+) -> Vec<rog_aura::AuraZone> {
+    let mut targets = vec![rog_aura::AuraZone::None];
+    if has_keyboard {
+        targets.push(rog_aura::AuraZone::Key1);
+    }
+    if has_lightbar {
+        targets.push(rog_aura::AuraZone::BarLeft);
+    }
+    if has_logo {
+        targets.push(rog_aura::AuraZone::Logo);
+    }
+    targets
+}
+
 impl Aura {
     fn supports_zone(&self, zone: rog_aura::AuraZone) -> bool {
         match zone {
@@ -784,8 +804,8 @@ mod tests {
     use rog_platform::error::PlatformError;
 
     use super::{
-        direct_rgb_payload, filter_power_states, is_dl_node_inactive, power_flags_for_state,
-        supports_dynamic_zone,
+        direct_rgb_payload, dynamic_effect_targets, filter_power_states, is_dl_node_inactive,
+        power_flags_for_state, supports_dynamic_zone,
     };
     use crate::error::RogError;
 
@@ -849,6 +869,30 @@ mod tests {
         assert!(supports_dynamic_zone(AuraZone::Key1));
         assert!(supports_dynamic_zone(AuraZone::BarLeft));
         assert!(supports_dynamic_zone(AuraZone::Logo));
+    }
+
+    #[test]
+    fn dynamic_effect_targets_lists_synced_then_present_nodes() {
+        assert_eq!(
+            dynamic_effect_targets(true, true, false),
+            vec![
+                AuraZone::None,
+                AuraZone::Key1,
+                AuraZone::BarLeft
+            ]
+        );
+        assert_eq!(
+            dynamic_effect_targets(true, false, true),
+            vec![
+                AuraZone::None,
+                AuraZone::Key1,
+                AuraZone::Logo
+            ]
+        );
+        assert_eq!(
+            dynamic_effect_targets(false, false, false),
+            vec![AuraZone::None]
+        );
     }
 
     #[test]

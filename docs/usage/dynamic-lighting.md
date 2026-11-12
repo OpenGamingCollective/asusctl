@@ -34,9 +34,12 @@ remains the legacy TUF/`KeyboardBacklight` path only when no keyboard DL node
 is present. When any keyboard DL node exists, the legacy platform brightness
 handle is not kept.
 
-There is no `asus::global` aggregate and no userspace `aura_mode` selector.
-Each node accepts its own effect, palette, and direct writes. Whole-device
-requests fan out to every present zone (keyboard, lightbar, logo). Intensity
+There is no `asus::global` aggregate. Each node accepts its own effect,
+palette, and direct writes. Whole-device (`AuraZone::None`) requests fan out
+to every present zone (keyboard, lightbar, logo). Independent applies use
+chassis aliases (`Key1` → keyboard, `BarLeft` → lightbar, `Logo` → logo).
+asusd advertises those choices on `SupportedEffectTargets` for ROG Control
+Center; `SupportedBasicZones` stays empty under Dynamic Lighting. Intensity
 (`brightness`) is written primarily to the keyboard node; lightbar uses
 `enabled` (and brightness only when the kernel exposes a dimmer).
 
@@ -79,10 +82,12 @@ hidraw Ally power fix is not used when Dynamic Lighting owns the device.
 
 The D-Bus API still describes historical keyboard and left/right lightbar
 subzones. Under Dynamic Lighting those are not advertised
-(`supported_basic_zones` is empty). Incoming legacy zone values are accepted
-only as aliases: Key1–4 map to the keyboard node, BarLeft/BarRight to the
-lightbar, Logo to `asus::logo` when present, and `None` fans out to every
-present zone.
+(`supported_basic_zones` is empty). `supported_effect_targets` lists the
+chassis apply targets instead: `None` (synced), `Key1` (keyboard), `BarLeft`
+(lightbar), and `Logo` when that node exists. Incoming legacy zone values are
+still accepted as aliases: Key1–4 map to the keyboard node, BarLeft/BarRight
+to the lightbar, Logo to `asus::logo` when present, and `None` fans out to
+every present zone.
 
 ## Other devices
 

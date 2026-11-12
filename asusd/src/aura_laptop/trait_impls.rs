@@ -137,6 +137,31 @@ impl AuraZbus {
         Ok(config.support_data.basic_zones.clone())
     }
 
+    /// Effect apply targets for the UI.
+    ///
+    /// Under Dynamic Lighting this is the chassis topology (`None` = synced
+    /// fan-out, `Key1` = keyboard, `BarLeft` = lightbar, `Logo` when present),
+    /// not legacy Key2–4 / lightbar-left/right. Legacy Aura keeps
+    /// `None` plus `supported_basic_zones`.
+    #[zbus(property)]
+    async fn supported_effect_targets(&self) -> Result<Vec<AuraZone>, ZbErr> {
+        if self.0.has_dynamic_lighting() {
+            return Ok(super::dynamic_effect_targets(
+                self.0.dynamic_kbd.is_some(),
+                self.0.dynamic_lightbar.is_some(),
+                self.0.has_dynamic_logo(),
+            ));
+        }
+        let config = self.0.config.lock().await;
+        let mut targets = vec![AuraZone::None];
+        for zone in &config.support_data.basic_zones {
+            if !targets.contains(zone) {
+                targets.push(*zone);
+            }
+        }
+        Ok(targets)
+    }
+
     #[zbus(property)]
     async fn supported_power_zones(&self) -> Result<Vec<PowerZones>, ZbErr> {
         if self.0.has_dynamic_lighting() {

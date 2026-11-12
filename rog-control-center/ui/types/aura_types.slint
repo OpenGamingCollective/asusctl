@@ -101,16 +101,25 @@ export global AuraPageData {
     ];
     in-out property <int> current_available_mode: 0;
     in-out property <[int]> supported_basic_modes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12];
+    // Full AuraZone enum labels (index == AuraZone discriminant). Filtered
+    // `effect_target_names` is what the Zone ComboBox shows.
     in-out property <[string]> zone_names: [
-        @tr("Aura zone" => "None"),
-        @tr("Aura zone" => "Key1"),
+        @tr("Aura zone" => "All (synced)"),
+        @tr("Aura zone" => "Keyboard"),
         @tr("Aura zone" => "Key2"),
         @tr("Aura zone" => "Key3"),
         @tr("Aura zone" => "Key4"),
         @tr("Aura zone" => "Logo"),
-        @tr("Aura zone" => "Lightbar Left"),
+        @tr("Aura zone" => "Lightbar"),
         @tr("Aura zone" => "Lightbar Right"),
     ];
+    // AuraZone discriminants for the Zone ComboBox (from asusd).
+    in-out property <[int]> supported_effect_targets: [0];
+    in-out property <[string]> effect_target_names: [
+        @tr("Aura zone" => "All (synced)"),
+    ];
+    in-out property <bool> effect_targets_enabled: false;
+    in-out property <int> effect_target_index: 0;
     in-out property <[string]> direction_names: [
         @tr("Aura direction" => "Right"),
         @tr("Aura direction" => "Left"),
@@ -144,6 +153,10 @@ export global AuraPageData {
     callback apply_led_mode_data();
     callback apply_effect(AuraEffect);
     apply_effect(e) => { led_mode_data = e; apply_led_mode_data(); }
+    // Chassis target from the Zone dropdown (source of truth for applies).
+    out property <int> selected_effect_zone: supported_effect_targets[effect_target_index];
+    // Switch editing target only — do not write LEDs until colour/mode/speed change.
+    callback cb_effect_target_index(int);
     in-out property <int> zone;
     in-out property <int> speed;
     in-out property <int> direction;
@@ -158,6 +171,7 @@ export global AuraPageData {
         color2 = d.colour2;
         colorbox1 = d.colour1;
         colorbox2 = d.colour2;
+        // effect_target_index is synced from Rust when targets are known.
     }
     callback cb_hex_from_colour(color) -> string;
     callback cb_hex_to_colour(string) -> color;
