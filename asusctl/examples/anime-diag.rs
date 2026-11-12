@@ -24,9 +24,7 @@ fn main() {
         }
 
         for c in (0..35).step_by(step) {
-            for i in &mut matrix.get_mut()[c] {
-                *i = 50;
-            }
+            matrix.get_mut()[c].fill(50);
         }
 
         let anime_type = get_anime_type();
