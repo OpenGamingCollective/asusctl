@@ -97,6 +97,7 @@ pub fn setup_aura_page(
         // Use effect.mode as single source — avoid led_mode() which can fail (try_lock).
         let restore = aura.led_mode_data().await.ok();
         let raw_mode: Option<i32> = restore.as_ref().map(|d| d.mode.into());
+        let restore_zone: Option<i32> = restore.as_ref().map(|d| d.zone.into());
         let d_slint = restore.map(|d| d.into());
         handle
             .upgrade_in_event_loop(move |h| {
@@ -160,6 +161,41 @@ pub fn setup_aura_page(
                 .ok();
         }
 
+        if let Ok(targets) = aura.supported_effect_targets().await {
+            handle
+                .upgrade_in_event_loop(move |handle| {
+                    let labels: Vec<SharedString> = handle
+                        .global::<AuraPageData>()
+                        .get_zone_names()
+                        .iter()
+                        .collect();
+                    let mut raws: Vec<i32> = Vec::new();
+                    let mut names: Vec<SharedString> = Vec::new();
+                    for zone in &targets {
+                        let raw: i32 = (*zone).into();
+                        if let Some(label) = labels.get(raw as usize) {
+                            raws.push(raw);
+                            names.push(label.clone());
+                        }
+                    }
+                    // Enable when there is a real choice (synced + at least one
+                    // chassis node beyond a redundant single-zone keyboard).
+                    let enabled = raws.len() > 2
+                        || raws.iter().any(|z| {
+                            matches!(*z, 5..=7) // Logo / Lightbar / Lightbar Right
+                        });
+                    let idx = restore_zone
+                        .and_then(|z| raws.iter().position(|&r| r == z))
+                        .unwrap_or(0) as i32;
+                    let g = handle.global::<AuraPageData>();
+                    g.set_supported_effect_targets(raws.as_slice().into());
+                    g.set_effect_target_names(names.as_slice().into());
+                    g.set_effect_targets_enabled(enabled);
+                    g.set_effect_target_index(idx);
+                })
+                .ok();
+        }
+
         let proxy = aura.clone();
         let weak = handle.clone();
         handle
@@ -175,7 +211,10 @@ pub fn setup_aura_page(
                 let w = weak.clone();
                 h.global::<AuraPageData>().on_apply_led_mode_data(move || {
                     let Some(ui) = w.upgrade() else { return };
-                    let slint_effect = ui.global::<AuraPageData>().get_led_mode_data();
+                    let g = ui.global::<AuraPageData>();
+                    let mut slint_effect = g.get_led_mode_data();
+                    // Zone dropdown is authoritative for chassis target.
+                    slint_effect.zone = g.get_selected_effect_zone();
                     let raw: rog_aura::AuraEffect = slint_effect.into();
                     let pp = p.clone();
                     let t = w.clone();
@@ -184,6 +223,27 @@ pub fn setup_aura_page(
                         show_toast("LED mode applied".into(), "LED mode failed".into(), t, r);
                     });
                 });
+
+                // Zone dropdown only switches the editing target. Hardware is
+                // written when colour / mode / speed / direction apply, using
+                // selected_effect_zone (not a stale led_mode_data.zone).
+                let w_zone = weak.clone();
+                h.global::<AuraPageData>()
+                    .on_cb_effect_target_index(move |idx| {
+                        let Some(ui) = w_zone.upgrade() else { return };
+                        let g = ui.global::<AuraPageData>();
+                        let targets: Vec<i32> = g.get_supported_effect_targets().iter().collect();
+                        let Some(&zone) = targets.get(idx as usize) else {
+                            error!("Effect target index out of range: {idx}");
+                            return;
+                        };
+                        g.set_effect_target_index(idx);
+                        let mut effect = g.get_led_mode_data();
+                        effect.zone = zone;
+                        g.set_led_mode_data(effect);
+                        g.set_zone(zone);
+                    });
+
                 h.invoke_external_colour_change();
             })
             .ok();
@@ -220,14 +280,17 @@ pub fn setup_aura_page(
                     let data = out.into();
                     stream_handle
                         .upgrade_in_event_loop(move |h| {
-                            h.global::<AuraPageData>().invoke_update_led_mode_data(data);
-                            let supported: Vec<i32> = h
-                                .global::<AuraPageData>()
-                                .get_supported_basic_modes()
-                                .iter()
-                                .collect();
+                            let g = h.global::<AuraPageData>();
+                            g.invoke_update_led_mode_data(data);
+                            let supported: Vec<i32> =
+                                g.get_supported_basic_modes().iter().collect();
                             let idx = supported.iter().position(|&x| x == raw).unwrap_or(0) as i32;
-                            h.global::<AuraPageData>().set_current_available_mode(idx);
+                            g.set_current_available_mode(idx);
+                            let targets: Vec<i32> =
+                                g.get_supported_effect_targets().iter().collect();
+                            let zone = g.get_led_mode_data().zone;
+                            let zidx = targets.iter().position(|&t| t == zone).unwrap_or(0) as i32;
+                            g.set_effect_target_index(zidx);
                             h.invoke_external_colour_change();
                         })
                         .map_err(|e| error!("{e}"))
