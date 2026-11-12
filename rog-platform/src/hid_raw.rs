@@ -21,6 +21,12 @@ pub struct HidRaw {
 }
 
 impl HidRaw {
+    /// Check whether a hidraw endpoint descriptor declares an output report ID.
+    pub fn supports_output_report(endpoint: &Device, report_id: u8) -> bool {
+        std::fs::read(endpoint.syspath().join("device/report_descriptor"))
+            .is_ok_and(|descriptor| descriptor_has_output_report(&descriptor, report_id))
+    }
+
     pub fn new(id_product: &str) -> Result<Self> {
         let mut enumerator = udev::Enumerator::new().map_err(|err| {
             warn!("{}", err);
@@ -87,7 +93,7 @@ impl HidRaw {
                 file: RefCell::new(OpenOptions::new().write(true).open(dev_node)?),
                 devfs_path: dev_node.to_owned(),
                 prod_id: id_product.to_string_lossy().into(),
-                _device_bcd: endpoint
+                _device_bcd: parent
                     .attribute_value("bcdDevice")
                     .unwrap_or_default()
                     .to_string_lossy()
@@ -106,12 +112,73 @@ impl HidRaw {
 
     /// Write an array of raw bytes to the device using the hidraw interface
     pub fn write_bytes(&self, message: &[u8]) -> Result<()> {
-        if let Ok(mut file) = self.file.try_borrow_mut() {
-            // TODO: re-get the file if error?
-            file.write_all(message).map_err(|e| {
-                PlatformError::IoPath(self.devfs_path.to_string_lossy().to_string(), e)
-            })?;
+        if message.is_empty() {
+            return Err(PlatformError::InvalidValue);
         }
-        Ok(())
+        let mut file = self
+            .file
+            .try_borrow_mut()
+            .map_err(|_| PlatformError::InvalidValue)?;
+        file.write_all(message)
+            .map_err(|e| PlatformError::IoPath(self.devfs_path.to_string_lossy().to_string(), e))
+    }
+}
+
+fn descriptor_has_output_report(descriptor: &[u8], wanted_id: u8) -> bool {
+    let mut offset = 0;
+    let mut report_id = 0;
+    while let Some(prefix) = descriptor.get(offset).copied() {
+        if prefix == 0xfe {
+            let Some(size) = descriptor.get(offset + 1).copied() else {
+                return false;
+            };
+            offset = match offset.checked_add(3 + usize::from(size)) {
+                Some(next) => next,
+                None => return false,
+            };
+            continue;
+        }
+        let size = match prefix & 0x03 {
+            3 => 4,
+            value => usize::from(value),
+        };
+        let end = match offset.checked_add(1 + size) {
+            Some(end) => end,
+            None => return false,
+        };
+        let Some(data) = descriptor.get(offset + 1..end) else {
+            return false;
+        };
+        let item_type = (prefix >> 2) & 0x03;
+        let tag = prefix >> 4;
+        if item_type == 1 && tag == 8 && size == 1 {
+            report_id = data[0];
+        } else if item_type == 0 && tag == 9 && report_id == wanted_id {
+            return true;
+        }
+        offset = end;
+    }
+    false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::descriptor_has_output_report;
+
+    #[test]
+    fn parses_output_report_id_safely() {
+        assert!(descriptor_has_output_report(
+            &[
+                0x85, 0x5d, 0x09, 0x01, 0x91, 0x02
+            ],
+            0x5d
+        ));
+        assert!(!descriptor_has_output_report(
+            &[
+                0x85, 0x5d, 0x09, 0x01, 0x81, 0x02
+            ],
+            0x5d
+        ));
+        assert!(!descriptor_has_output_report(&[0x85], 0x5d));
     }
 }
