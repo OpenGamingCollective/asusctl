@@ -892,6 +892,7 @@ impl crate::Reloadable for CtrlPlatform {
                     .await;
             }
             self.run_ac_or_bat_cmd(power_plugged > 0).await;
+            self.manage_nvidia_powerd(power_plugged > 0).await;
         }
 
         Ok(())
