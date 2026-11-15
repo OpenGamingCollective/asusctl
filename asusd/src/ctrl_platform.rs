@@ -946,6 +946,7 @@ impl CtrlTask for CtrlPlatform {
                         }
                         if !sleeping {
                             platform1.run_ac_or_bat_cmd(power_plugged > 0).await;
+                            platform1.manage_nvidia_powerd(power_plugged > 0).await;
                             if let Ok(profile) =
                                 platform1.platform.get_platform_profile().map(|p| p.into())
                             {
