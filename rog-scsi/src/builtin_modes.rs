@@ -304,17 +304,19 @@ impl From<AuraEffect> for AuraMode {
 #[cfg_attr(feature = "dbus", derive(Type, Value, OwnedValue))]
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct AuraEffect {
-    /// The effect type
+    /// Effect mode.
     pub mode: AuraMode,
-    /// One of three speeds for modes that support speed (most that animate)
+    /// Animation speed: `Slowest`, `Slow`, `Med`, `Fast`, or `Fastest`.
     pub speed: Speed,
-    /// Up, down, left, right. Only Rainbow mode seems to use this
+    /// Animation direction: `Forward` or `Reverse`.
     pub direction: Direction,
-    /// Primary colour for all modes
+    /// First colour.
     pub colour1: Colour,
-    /// Secondary colour in some modes like Breathing or Stars
+    /// Second colour.
     pub colour2: Colour,
+    /// Third colour.
     pub colour3: Colour,
+    /// Fourth colour.
     pub colour4: Colour,
 }
 
