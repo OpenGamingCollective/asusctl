@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use futures_util::StreamExt;
 use log::{debug, error, info, warn};
-use logind_zbus::manager::{InhibitType, ManagerProxy};
+use logind_zbus::{InhibitType, ManagerProxy};
 use rog_dbus::asus_armoury::AsusArmouryProxy;
 use tokio::signal::unix::{SignalKind, signal};
 use tokio::sync::Mutex;

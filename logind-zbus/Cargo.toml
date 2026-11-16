@@ -1,0 +1,16 @@
+[package]
+name = "logind-zbus"
+version = "5.3.2"
+license = "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT"
+edition.workspace = true
+rust-version.workspace = true
+authors = ["Luke D Jones <luke@ljones.dev>"]
+repository.workspace = true
+homepage.workspace = true
+description = "logind Manager zbus client"
+keywords = ["systemd", "logind", "zbus"]
+categories = ["os::unix-apis"]
+
+[dependencies]
+serde = { workspace = true }
+zbus = { workspace = true }
