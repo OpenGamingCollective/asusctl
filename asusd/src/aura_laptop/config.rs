@@ -105,32 +105,36 @@ impl AuraConfig {
     /// Set the mode data, current mode, and if multizone enabled.
     ///
     /// Multipurpose, will accept `AuraEffect` with zones and put in the correct
-    /// store.
+    /// store. `builtins` always mirrors the last applied effect (including
+    /// zone) so D-Bus `LedModeData` / RCC Zone selection stay in sync when
+    /// applying Keyboard or Lightbar independently.
     pub fn set_builtin(&mut self, effect: AuraEffect) {
         self.current_mode = effect.mode;
+        self.builtins.insert(*effect.mode(), effect.clone());
         if effect.zone() == AuraZone::None {
-            self.builtins.insert(*effect.mode(), effect);
             self.multizone_on = false;
-        } else {
-            if let Some(multi) = self.multizone.as_mut() {
-                if let Some(fx_vec) = multi.get_mut(effect.mode()) {
-                    for fx in fx_vec.iter_mut() {
-                        if fx.zone == effect.zone {
-                            *fx = effect;
-                            return;
-                        }
-                    }
-                    fx_vec.push(effect);
-                } else {
-                    multi.insert(*effect.mode(), vec![effect]);
-                }
-            } else {
-                let mut tmp = BTreeMap::new();
-                tmp.insert(*effect.mode(), vec![effect]);
-                self.multizone = Some(tmp);
-            }
-            self.multizone_on = true;
+            return;
         }
+
+        if let Some(multi) = self.multizone.as_mut() {
+            if let Some(fx_vec) = multi.get_mut(effect.mode()) {
+                for fx in fx_vec.iter_mut() {
+                    if fx.zone == effect.zone {
+                        *fx = effect;
+                        self.multizone_on = true;
+                        return;
+                    }
+                }
+                fx_vec.push(effect);
+            } else {
+                multi.insert(*effect.mode(), vec![effect]);
+            }
+        } else {
+            let mut tmp = BTreeMap::new();
+            tmp.insert(*effect.mode(), vec![effect]);
+            self.multizone = Some(tmp);
+        }
+        self.multizone_on = true;
     }
 
     /// Create a default for the `current_mode` if multizone and no config
@@ -281,6 +285,12 @@ mod tests {
         config.set_builtin(effect);
         // This should replace existing
         config.set_builtin(effect_clone);
+
+        assert_eq!(
+            config.builtins.get(&AuraModeNum::Static).map(|e| e.zone),
+            Some(AuraZone::Key4),
+            "builtins mirrors last applied zone for LedModeData"
+        );
 
         let res = config.multizone.unwrap();
         let sta = res.get(&AuraModeNum::Static).unwrap();

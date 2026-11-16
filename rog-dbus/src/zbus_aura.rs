@@ -81,6 +81,10 @@ pub trait Aura {
     #[zbus(property)]
     fn supported_basic_zones(&self) -> zbus::Result<Vec<AuraZone>>;
 
+    /// SupportedEffectTargets property (synced / keyboard / lightbar / logo)
+    #[zbus(property)]
+    fn supported_effect_targets(&self) -> zbus::Result<Vec<AuraZone>>;
+
     /// SupportedPowerZones property
     #[zbus(property)]
     fn supported_power_zones(&self) -> zbus::Result<Vec<PowerZones>>;
