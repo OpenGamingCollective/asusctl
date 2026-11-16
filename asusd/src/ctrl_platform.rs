@@ -907,12 +907,17 @@ impl CtrlTask for CtrlPlatform {
         PLATFORM_ZBUS_PATH
     }
 
-    async fn create_tasks(&self, signal_ctxt: SignalEmitter<'static>) -> Result<(), RogError> {
+    async fn create_tasks(
+        &self,
+        signal_ctxt: SignalEmitter<'static>,
+        cancel: tokio::sync::watch::Receiver<bool>,
+    ) -> Result<(), RogError> {
         let platform1 = self.clone();
         let platform2 = self.clone();
         let platform3 = self.clone();
         let signal_ctxt_copy = signal_ctxt.clone();
         self.create_sys_event_tasks(
+            cancel,
             move |sleeping| {
                 let platform1 = platform1.clone();
                 async move {
