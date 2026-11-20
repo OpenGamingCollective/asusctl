@@ -17,7 +17,7 @@ use zbus::{Connection, fdo, interface};
 
 use crate::config::Config;
 use crate::error::RogError;
-use crate::{ASUS_ZBUS_PATH, Reloadable};
+use crate::{ASUS_ZBUS_PATH, Reloadable, nvidia_powerd};
 
 const MOD_NAME: &str = "asus_armoury";
 
@@ -438,7 +438,11 @@ impl AsusArmouryAttribute {
     }
 
     #[zbus(property)]
-    async fn set_current_value(&mut self, value: i32) -> fdo::Result<()> {
+    async fn set_current_value(
+        &mut self,
+        value: i32,
+        #[zbus(connection)] connection: &Connection,
+    ) -> fdo::Result<()> {
         let name = self.attr.name();
 
         // if read-only, don't even attempt to set or persist value
@@ -522,12 +526,7 @@ impl AsusArmouryAttribute {
             FirmwareAttribute::NvDynamicBoost
             | FirmwareAttribute::NvTempTarget
             | FirmwareAttribute::DgpuTgp => {
-                let _ = std::process::Command::new("systemctl")
-                    .args([
-                        "try-restart",
-                        "nvidia-powerd.service",
-                    ])
-                    .output();
+                nvidia_powerd::try_restart_if_enabled(connection).await;
             }
             _ => {}
         }
