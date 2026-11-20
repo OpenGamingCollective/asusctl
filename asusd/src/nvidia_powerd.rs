@@ -122,7 +122,10 @@ pub async fn try_restart_if_enabled(connection: &Connection) {
     let Some(manager) = manager_if_enabled(connection).await else {
         return;
     };
-    if active_state(&manager).await.as_deref() != Some("active") {
+    if !matches!(
+        active_state(&manager).await.as_deref(),
+        Some("active" | "activating")
+    ) {
         debug!("{UNIT} isn't running, not restarting it");
         return;
     }
