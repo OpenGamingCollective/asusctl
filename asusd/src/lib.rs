@@ -16,6 +16,8 @@ pub mod aura_scsi;
 pub mod aura_slash;
 pub mod aura_types;
 pub mod error;
+/// Start and stop nvidia-powerd, if its unit is enabled
+pub mod nvidia_powerd;
 
 use std::future::Future;
 

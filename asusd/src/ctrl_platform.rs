@@ -16,7 +16,7 @@ use zbus::{Connection, interface};
 use crate::asus_armoury::{ArmouryAttributeRegistry, set_config_or_default};
 use crate::config::Config;
 use crate::error::RogError;
-use crate::{CtrlTask, ReloadAndNotify, task_watch_item};
+use crate::{CtrlTask, ReloadAndNotify, nvidia_powerd, task_watch_item};
 use rog_profiles::find_fan_curve_node;
 
 const PLATFORM_ZBUS_PATH: &str = "/xyz/ljones";
@@ -323,42 +323,22 @@ impl CtrlPlatform {
         configured
     }
 
-    /// Manage nvidia-powerd service based on current power state and config.
-    /// When transitioning to battery with `disable_nvidia_powerd_on_battery = true`,
-    /// stop nvidia-powerd. When transitioning back to AC, restart it (if it was
-    /// previously stopped and the service unit is enabled on the system).
+    /// Start or stop nvidia-powerd to match the power source.
+    ///
+    /// Only an enabled unit is managed (`systemctl enable nvidia-powerd`). A
+    /// disabled, masked or missing unit is never started or stopped. On battery
+    /// the service is stopped if `disable_nvidia_powerd_on_battery` is set. On
+    /// AC it is started, which brings it back after a battery session.
     async fn manage_nvidia_powerd(&self, power_plugged: bool) {
         let disable_on_battery = self.config.lock().await.disable_nvidia_powerd_on_battery;
-        if !disable_on_battery {
-            // When the toggle is off, attempt to ensure nvidia-powerd is running
-            // (it may have been stopped earlier by a previous battery session).
-            if power_plugged {
-                let _ = Command::new("systemctl")
-                    .args([
-                        "start",
-                        "nvidia-powerd.service",
-                    ])
-                    .output();
-            }
+        if !power_plugged && !disable_on_battery {
             return;
         }
 
         if power_plugged {
-            // AC: start nvidia-powerd if it was stopped on battery
-            let _ = Command::new("systemctl")
-                .args([
-                    "start",
-                    "nvidia-powerd.service",
-                ])
-                .output();
+            nvidia_powerd::start_if_enabled(&self.connection).await;
         } else {
-            // Battery: stop nvidia-powerd
-            let _ = Command::new("systemctl")
-                .args([
-                    "stop",
-                    "nvidia-powerd.service",
-                ])
-                .output();
+            nvidia_powerd::stop_if_enabled(&self.connection).await;
         }
     }
 
@@ -702,7 +682,8 @@ impl CtrlPlatform {
         Ok(())
     }
 
-    /// Whether nvidia-powerd should be stopped when switching to battery
+    /// Whether nvidia-powerd should be stopped when switching to battery.
+    /// Has no effect unless the nvidia-powerd unit is enabled.
     #[zbus(property)]
     async fn disable_nvidia_powerd_on_battery(&self) -> Result<bool, FdoErr> {
         Ok(self.config.lock().await.disable_nvidia_powerd_on_battery)
