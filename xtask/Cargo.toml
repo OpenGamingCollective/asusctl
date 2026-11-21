@@ -1,0 +1,16 @@
+[package]
+name = "xtask"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+anyhow = "1"
+proc-macro2 = "1"
+quote = "1"
+ron.workspace = true
+serde_json.workspace = true
+similar = "2"
+syn = { version = "2", features = ["full"] }
+asusd = { path = "../asusd" }
+rog-platform = { path = "../rog-platform", package = "rog_platform" }

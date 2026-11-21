@@ -24,10 +24,11 @@ sudo journalctl -b -u asusd
 - [armoury](#armoury)
 - [backlight](#backlight)
 - [xgmled](#xgmled)
+- [Full command reference](command-reference.md)
 
 ## info
 
-Show the program version and system information, and list what your laptop supports.
+Show the program version and system information, and list what your laptop supports. `asusctl` with no subcommand runs `info`.
 
 ```bash
 asusctl info
@@ -80,7 +81,9 @@ asusctl profile set Performance -a  # profile to use on AC
 | Option | Description |
 |---|---|
 | `-a`, `--ac` | With `set`: also set the profile to use while on AC power |
-| `-b`, `--battery` | With `set`: also set the profile to use while on battery power |
+| `-b`, `--battery` | With `set`: also set the profile to use on battery power |
+
+`profile` with no subcommand runs `list`.
 
 Profile tuning enables and disables the PPT (TDP) tuning group, which controls whether power limits set through the [armoury](#armoury) interface are applied. When tuning is disabled, the updated PPT configuration is stored but only applied once tuning is enabled again:
 
@@ -93,6 +96,9 @@ asusctl profile tuning false
 ## battery
 
 Battery charge control.
+
+> [!WARNING]
+> `battery` with no subcommand runs `oneshot` and starts a full charge. Use `asusctl battery info` to only read the current limit.
 
 ```bash
 asusctl battery info         # show the current charge limit
@@ -154,6 +160,8 @@ asusctl leds prev        # cycle to the previous brightness level
 | `get` | Show the current keyboard brightness |
 | `next` | Toggle to the next brightness level |
 | `prev` | Toggle to the previous brightness level |
+
+`leds` with no subcommand runs `get`.
 
 ## aura
 
@@ -332,14 +340,9 @@ asusctl anime set-builtins --shutdown SeeYa --set true
 | `--shutdown <animation>` | Animation shown while shutting down |
 | `--set <true\|false>` | Apply the animations (required) |
 
-Available built-in animations:
+Available built-in animations (the `builtin_anims` config keys are the same without `--`):
 
-| Power state | Animations |
-|---|---|
-| `--boot` | `GlitchConstruction`, `StaticEmergence` |
-| `--awake` | `BinaryBannerScroll`, `RogLogoGlitch` |
-| `--sleep` | `BannerSwipe`, `Starfield` |
-| `--shutdown` | `GlitchOut`, `SeeYa` |
+{{#include ../generated/anime-builtins.md}}
 
 ## slash
 
@@ -384,7 +387,7 @@ asusctl slash set --show-battery-warning true
 | `-b`, `--show-on-battery <true\|false>` | Show the animation on battery power |
 | `-w`, `--show-battery-warning <true\|false>` | Show the low-battery warning animation |
 
-Available animations: `Static`, `Bounce`, `Slash`, `Loading`, `BitStream`, `Transmission`, `Flow` (default), `Flux`, `Phantom`, `Spectrum`, `Hazard`, `Interfacing`, `Ramp`, `GameOver`, `Start`, `Buzzer`.
+Available animations: {{#include ../generated/slash-modes.md}}
 
 ## scsi
 
@@ -406,7 +409,7 @@ asusctl scsi --mode Static --colours ff0000 --colours 00ff00
 | `--colours <hex>` | Set the LED colours; repeat the option for up to 4 colours |
 | `--list` | List the available animations |
 
-Available modes: `Off`, `Static`, `Breathe`, `Flashing`, `RainbowCycle`, `RainbowWave`, `RainbowCycleBreathe`, `ChaseFade`, `RainbowCycleChaseFade`, `Chase`, `RainbowCycleChase`, `RainbowCycleWave`, `RainbowPulseChase`, `RandomFlicker`, `DoubleFade`.
+Available modes: {{#include ../generated/scsi-modes.md}}
 
 ## armoury
 
@@ -425,7 +428,9 @@ asusctl armoury set dgpu_disable -1 # reset an attribute to its default
 | `get <property>` | Get the value of a firmware attribute |
 | `set <property> <value>` | Set a firmware attribute; a value of `-1` resets it to the default |
 
-Attributes of type PPT (power limits) are only applied to the hardware while [profile tuning](#profile) is enabled; otherwise the new value is stored and applied the next time tuning is turned on.
+`armoury` with no subcommand runs `list`.
+
+Attributes of type PPT (power limits) are only applied to the hardware while [profile tuning](#profile) is enabled; when tuning is disabled, `asusd` rejects the write with an error. Enable tuning first with `asusctl profile tuning true`.
 
 See [GPU Switching](../faq/gpu-switching.md) for the full dGPU/MUX story.
 
@@ -459,7 +464,9 @@ asusctl xgmled set 1    # 1 = on, 0 = off
 | Subcommand | Description |
 |---|---|
 | `get` | Show the current XG Mobile LED state |
-| `set <0\|1>` | Set the XG Mobile LED on (`1`) or off (`0`) |
+| `set <0|1>` | Set the XG Mobile LED on (`1`) or off (`0`) |
+
+`xgmled` with no subcommand runs `get`.
 
 ## Something not working?
 

@@ -20,7 +20,9 @@ fn root_conf_dir() -> PathBuf {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ConfigAnime {
+    /// Must match the file stem.
     pub name: String,
+    /// Ordered list of `ActionLoader` actions.
     pub anime: Vec<ActionLoader>,
 }
 
@@ -120,7 +122,9 @@ impl StdConfigLoad for ConfigAnime {}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ConfigAura {
+    /// Must match the file stem.
     pub name: String,
+    /// `AdvancedEffects` value with the ordered effect list and the packet layout.
     pub aura: AuraSequences,
 }
 

@@ -65,7 +65,7 @@ Feature availability depends on upstream Linux kernel support and specific hardw
 - [x] **Battery charge thresholds:** Configure maximum charging limits (requires kernel support)
 - [x] **Custom fan curves:** Adjust fan profiles on supported hardware
 - [x] **GPU MUX toggling:** Switch GPU operational modes (G-Sync / MUX) on 2022 and newer laptops
-- [x] **Power profile management:** Control system performance profiles as detailed in [MANUAL.md](MANUAL.md)
+- [x] **Power profile management:** Control system performance profiles as detailed in [the configuration documentation](docs/configuration/asusd.md)
 
 ### Lighting and displays
 
