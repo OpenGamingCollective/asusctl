@@ -30,7 +30,6 @@ body:
       description: Select the main component or crate where this feature belongs.
       options:
         - "asusd (System Daemon / D-Bus)"
-        - "asusd-user (User Session Daemon)"
         - "asusctl (CLI Tool)"
         - "rog-control-center (GUI / Slint / System Tray)"
         - "rog-aura (Keyboard / Aura RGB)"
