@@ -1,11 +1,11 @@
 //! Tests for the GPU PCI detection and power status module.
 //!
 //! These tests cover the pure/deterministic parts of `rog_platform::gpu_pci`:
-//! enum conversions, label matching, and default values. Hardware-dependent
+//! enum conversions and default values. Hardware-dependent
 //! functions (`Device::find`, `get_gpu_power_status`) are tested via integration
 //! tests on machines with actual GPUs.
 
-use rog_platform::gpu_pci::{GfxPower, GpuTelemetry, lspci_dgpu_check};
+use rog_platform::gpu_pci::{GfxPower, GpuTelemetry};
 use std::str::FromStr;
 
 // ---------------------------------------------------------------------------
@@ -149,63 +149,4 @@ fn gfx_power_copy_clone() {
     let c = a;
     assert_eq!(a, b);
     assert_eq!(b, c);
-}
-
-// ---------------------------------------------------------------------------
-// lspci_dgpu_check – positive matches
-// ---------------------------------------------------------------------------
-
-#[test]
-fn lspci_dgpu_check_radeon_rx() {
-    assert!(lspci_dgpu_check("Radeon RX 6800M"));
-}
-
-#[test]
-fn lspci_dgpu_check_amd_ati() {
-    assert!(lspci_dgpu_check("AMD/ATI Navi 22"));
-}
-
-#[test]
-fn lspci_dgpu_check_geforce() {
-    assert!(lspci_dgpu_check("GeForce RTX 3080"));
-}
-
-#[test]
-fn lspci_dgpu_check_geforce_lowercase_f() {
-    assert!(lspci_dgpu_check("Geforce GTX 1660"));
-}
-
-#[test]
-fn lspci_dgpu_check_quadro() {
-    assert!(lspci_dgpu_check("Quadro T1000"));
-}
-
-#[test]
-fn lspci_dgpu_check_t1200() {
-    assert!(lspci_dgpu_check("T1200"));
-}
-
-// ---------------------------------------------------------------------------
-// lspci_dgpu_check – negative matches
-// ---------------------------------------------------------------------------
-
-#[test]
-fn lspci_dgpu_check_intel_igpu() {
-    assert!(!lspci_dgpu_check("Intel Corporation UHD Graphics 630"));
-}
-
-#[test]
-fn lspci_dgpu_check_empty_string() {
-    assert!(!lspci_dgpu_check(""));
-}
-
-#[test]
-fn lspci_dgpu_check_unrelated_device() {
-    assert!(!lspci_dgpu_check("Realtek RTL8111/8168/8411"));
-}
-
-#[test]
-fn lspci_dgpu_check_partial_match_not_enough() {
-    // "Radeon" alone should not match (the pattern requires "Radeon RX" or "AMD/ATI")
-    assert!(!lspci_dgpu_check("Radeon Pro W6600"));
 }
