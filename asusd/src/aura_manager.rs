@@ -88,11 +88,20 @@ fn dev_prop_matches(dev: &Device, prop: &str, value: &str) -> bool {
 /// A device.
 ///
 /// Each controller within should track its dbus path so it can be removed if
-/// required.
+/// required. `cancel_tx` stops logind/udev listeners started via `CtrlTask`
+/// when the device is hot-unplugged; `None` for controllers without those tasks.
 pub struct AsusDevice {
     device: DeviceHandle,
     dbus_path: OwnedObjectPath,
     hid_key: Option<String>,
+    cancel_tx: Option<tokio::sync::watch::Sender<bool>>,
+}
+
+fn task_cancel_channel() -> (
+    tokio::sync::watch::Sender<bool>,
+    tokio::sync::watch::Receiver<bool>,
+) {
+    tokio::sync::watch::channel(false)
 }
 
 pub struct DeviceManager {
@@ -193,6 +202,7 @@ impl DeviceManager {
                             device: dev_type,
                             dbus_path: path,
                             hid_key: Some(hid_key.clone()),
+                            cancel_tx: None,
                         });
                     }
                 }
@@ -203,9 +213,10 @@ impl DeviceManager {
                     && let DeviceHandle::AniMe(anime) = dev_type.clone()
                 {
                     let path = dbus_path_for_dev(&usb_device).unwrap_or(dbus_path_for_anime());
+                    let (cancel_tx, cancel_rx) = task_cancel_channel();
                     let ctrl = AniMeZbus::new(anime);
                     if ctrl
-                        .start_tasks(connection, path.clone())
+                        .start_tasks(connection, path.clone(), cancel_rx)
                         .await
                         .map_err(|e| {
                             error!("Failed to start AniMe tasks: {e:?}, not adding this device")
@@ -216,6 +227,7 @@ impl DeviceManager {
                             device: dev_type,
                             dbus_path: path,
                             hid_key: Some(hid_key.clone()),
+                            cancel_tx: Some(cancel_tx),
                         });
                     }
                 }
@@ -226,9 +238,10 @@ impl DeviceManager {
                     && let DeviceHandle::Aura(aura) = dev_type.clone()
                 {
                     let path = dbus_path_for_dev(&usb_device).unwrap_or(dbus_path_for_tuf());
+                    let (cancel_tx, cancel_rx) = task_cancel_channel();
                     let ctrl = AuraZbus::new(aura);
                     if ctrl
-                        .start_tasks(connection, path.clone())
+                        .start_tasks(connection, path.clone(), cancel_rx)
                         .await
                         .map_err(|e| {
                             error!("Failed to start Aura tasks: {e:?}, not adding this device")
@@ -239,6 +252,7 @@ impl DeviceManager {
                             device: dev_type,
                             dbus_path: path,
                             hid_key: Some(hid_key),
+                            cancel_tx: Some(cancel_tx),
                         });
                     }
                 }
@@ -384,6 +398,7 @@ impl DeviceManager {
                         device: dev_type,
                         dbus_path: path,
                         hid_key: None,
+                        cancel_tx: None,
                     });
                 }
             }
@@ -472,6 +487,7 @@ impl DeviceManager {
                             device: dev_type,
                             dbus_path: path,
                             hid_key: None,
+                            cancel_tx: None,
                         });
                     }
                 }
@@ -485,9 +501,10 @@ impl DeviceManager {
                 // TODO: this is copy/pasted
                 if let DeviceHandle::AniMe(anime) = dev_type.clone() {
                     let path = dbus_path_for_anime();
+                    let (cancel_tx, cancel_rx) = task_cancel_channel();
                     let ctrl = AniMeZbus::new(anime);
                     if ctrl
-                        .start_tasks(connection, path.clone())
+                        .start_tasks(connection, path.clone(), cancel_rx)
                         .await
                         .map_err(|e| error!("Failed to start tasks: {e:?}, not adding this device"))
                         .is_ok()
@@ -496,6 +513,7 @@ impl DeviceManager {
                             device: dev_type,
                             dbus_path: path,
                             hid_key: None,
+                            cancel_tx: Some(cancel_tx),
                         });
                     }
                 }
@@ -519,9 +537,10 @@ impl DeviceManager {
                     && let DeviceHandle::Aura(aura) = dev_type.clone()
                 {
                     let path = dbus_path_for_tuf();
+                    let (cancel_tx, cancel_rx) = task_cancel_channel();
                     let ctrl = AuraZbus::new(aura);
                     if ctrl
-                        .start_tasks(connection, path.clone())
+                        .start_tasks(connection, path.clone(), cancel_rx)
                         .await
                         .map_err(|e| {
                             error!("Failed to start TUF Aura tasks: {e:?}, not adding this device")
@@ -532,6 +551,7 @@ impl DeviceManager {
                             device: dev_type,
                             dbus_path: path,
                             hid_key: None,
+                            cancel_tx: Some(cancel_tx),
                         });
                     }
                 }
@@ -674,6 +694,11 @@ impl DeviceManager {
                                     // Iter in reverse so as to not screw up indexing
                                     for index in removals.iter().rev() {
                                         let dev = devices.lock().await.remove(*index);
+                                        // Stop logind/udev listeners between events; do not
+                                        // abort mid hardware write.
+                                        if let Some(cancel_tx) = &dev.cancel_tx {
+                                            cancel_tx.send_replace(true);
+                                        }
                                         let path = dev.dbus_path.clone();
                                         let res = match dev.device {
                                             DeviceHandle::Aura(_) => {
