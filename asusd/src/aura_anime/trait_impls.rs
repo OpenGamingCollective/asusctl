@@ -3,10 +3,7 @@ use std::sync::atomic::Ordering;
 use config_traits::StdConfig;
 use log::{debug, error, warn};
 use logind_zbus::manager::ManagerProxy;
-use rog_anime::usb::{
-    Brightness, pkt_set_brightness, pkt_set_builtin_animations, pkt_set_enable_display,
-    pkt_set_enable_powersave_anim,
-};
+use rog_anime::usb::Brightness;
 use rog_anime::{Animations, AnimeDataBuffer, DeviceState};
 use zbus::object_server::SignalEmitter;
 use zbus::proxy::CacheProperties;
@@ -43,7 +40,6 @@ impl AniMeZbus {
         connection: &Connection,
         path: OwnedObjectPath,
     ) -> Result<(), RogError> {
-        // let task = zbus.clone();
         self.reload()
             .await
             .unwrap_or_else(|err| warn!("Controller error: {}", err));
@@ -60,24 +56,25 @@ impl AniMeZbus {
     }
 }
 
-// None of these calls can be guarnateed to succeed unless we loop until okay
-// If the try_lock *does* succeed then any other thread trying to lock will not
-// grab it until we finish.
 #[interface(name = "xyz.ljones.Anime")]
 impl AniMeZbus {
     /// Writes a data stream of length. Will force system thread to exit until
     /// it is restarted
     async fn write(&self, input: AnimeDataBuffer) -> zbus::fdo::Result<()> {
-        let mut config = self.0.config.lock().await;
-        let bright = config.display_brightness;
-        if config.builtin_anims_enabled {
-            // This clears the display, causing flickers if done indiscriminately on every
-            // write. Therefore, we guard it behind a config check.
-            self.0.set_builtins_enabled(false, bright).await?;
+        let (bright, settings, disable_builtins) = {
+            let config = self.0.config.lock().await;
+            (
+                config.display_brightness,
+                config.builtin_anims,
+                config.builtin_anims_enabled,
+            )
+        };
+        if disable_builtins {
+            self.0.set_builtins_enabled(false, bright, settings).await?;
+            let mut config = self.0.config.lock().await;
             config.builtin_anims_enabled = false;
             config.write();
         }
-        drop(config);
         self.0.thread_exit.store(true, Ordering::SeqCst);
         self.0.write_data_buffer(input).await.map_err(|err| {
             warn!("ctrl_anime::run_animation:callback {}", err);
@@ -99,14 +96,7 @@ impl AniMeZbus {
     #[zbus(property)]
     async fn set_brightness(&self, brightness: Brightness) {
         self.0
-            .write_bytes(&pkt_set_brightness(brightness))
-            .await
-            .map_err(|err| {
-                warn!("ctrl_anime::set_brightness {}", err);
-            })
-            .ok();
-        self.0
-            .write_bytes(&pkt_set_enable_display(brightness != Brightness::Off))
+            .apply_brightness(brightness)
             .await
             .map_err(|err| {
                 warn!("ctrl_anime::set_brightness {}", err);
@@ -131,10 +121,16 @@ impl AniMeZbus {
     /// animations" in Armory crate
     #[zbus(property)]
     async fn set_builtins_enabled(&self, enabled: bool) {
-        let mut config = self.0.config.lock().await;
-        let brightness = config.display_brightness;
+        let (brightness, settings, anime_type) = {
+            let config = self.0.config.lock().await;
+            (
+                config.display_brightness,
+                config.builtin_anims,
+                config.anime_type,
+            )
+        };
         self.0
-            .set_builtins_enabled(enabled, brightness)
+            .set_builtins_enabled(enabled, brightness, settings)
             .await
             .map_err(|err| {
                 warn!("ctrl_anime::set_builtins_enabled {}", err);
@@ -142,13 +138,12 @@ impl AniMeZbus {
             .ok();
 
         if !enabled {
-            let anime_type = config.anime_type;
             let data = vec![255u8; anime_type.data_length()];
             if let Ok(tmp) = AnimeDataBuffer::from_vec(anime_type, data).map_err(|err| {
                 warn!("ctrl_anime::set_builtins_enabled {}", err);
             }) {
                 self.0
-                    .write_bytes(tmp.data())
+                    .write_data_buffer(tmp)
                     .await
                     .map_err(|err| {
                         warn!("ctrl_anime::set_builtins_enabled {}", err);
@@ -157,6 +152,7 @@ impl AniMeZbus {
             }
         }
 
+        let mut config = self.0.config.lock().await;
         config.builtin_anims_enabled = enabled;
         config.write();
         if enabled {
@@ -175,24 +171,28 @@ impl AniMeZbus {
     /// Set which builtin animation is used for each stage
     #[zbus(property)]
     async fn set_builtin_animations(&self, settings: Animations) {
+        let brightness = {
+            let config = self.0.config.lock().await;
+            config.display_brightness
+        };
+        // Apply the just-supplied settings (not a stale config snapshot).
         self.0
-            .write_bytes(&pkt_set_builtin_animations(
-                settings.boot, settings.awake, settings.sleep, settings.shutdown,
-            ))
+            .apply_builtin_animations(settings)
             .await
             .map_err(|err| {
-                warn!("ctrl_anime::run_animation:callback {}", err);
+                warn!("ctrl_anime::set_builtin_animations {}", err);
             })
             .ok();
         self.0
-            .write_bytes(&pkt_set_enable_powersave_anim(true))
+            .set_builtins_enabled(true, brightness, settings)
             .await
             .map_err(|err| {
-                warn!("ctrl_anime::run_animation:callback {}", err);
+                warn!("ctrl_anime::set_builtin_animations {}", err);
             })
             .ok();
         let mut config = self.0.config.lock().await;
         config.display_enabled = true;
+        config.builtin_anims_enabled = true;
         config.builtin_anims = settings;
         config.write();
     }
@@ -209,10 +209,10 @@ impl AniMeZbus {
     #[zbus(property)]
     async fn set_enable_display(&self, enabled: bool) {
         self.0
-            .write_bytes(&pkt_set_enable_display(enabled))
+            .apply_display_enabled(enabled)
             .await
             .map_err(|err| {
-                warn!("ctrl_anime::run_animation:callback {}", err);
+                warn!("ctrl_anime::set_enable_display {}", err);
             })
             .ok();
         let mut config = self.0.config.lock().await;
@@ -235,10 +235,10 @@ impl AniMeZbus {
         let pow = manager.on_external_power().await.unwrap_or_default();
 
         self.0
-            .write_bytes(&pkt_set_enable_display(!pow && !enabled))
+            .apply_display_enabled(pow || !enabled)
             .await
             .map_err(|err| {
-                warn!("create_sys_event_tasks::off_when_lid_closed {}", err);
+                warn!("create_sys_event_tasks::off_when_unplugged {}", err);
             })
             .ok();
 
@@ -278,7 +278,7 @@ impl AniMeZbus {
         let lid = manager.lid_closed().await.unwrap_or_default();
 
         self.0
-            .write_bytes(&pkt_set_enable_display(lid && !enabled))
+            .apply_display_enabled(!(lid && enabled))
             .await
             .map_err(|err| {
                 warn!("create_sys_event_tasks::off_when_lid_closed {}", err);
@@ -300,7 +300,6 @@ impl AniMeZbus {
     }
 
     /// Get the device state as stored by asusd
-    // #[zbus(property)]
     async fn device_state(&self) -> DeviceState {
         DeviceState::from(&*self.0.config.lock().await)
     }
@@ -318,17 +317,14 @@ impl crate::CtrlTask for AniMeZbus {
         let inner4 = self.0.clone();
         self.create_sys_event_tasks(
             move |sleeping| {
-                // on_sleep
                 let inner = inner1.clone();
                 async move {
                     let config = inner.config.lock().await.clone();
                     if config.display_enabled {
-                        inner.thread_exit.store(true, Ordering::Release); // ensure clean slate
+                        inner.thread_exit.store(true, Ordering::Release);
 
                         inner
-                            .write_bytes(&pkt_set_enable_display(
-                                !(sleeping && config.off_when_suspended),
-                            ))
+                            .apply_display_enabled(!(sleeping && config.off_when_suspended))
                             .await
                             .map_err(|err| {
                                 warn!("create_sys_event_tasks::off_when_suspended {}", err);
@@ -337,28 +333,31 @@ impl crate::CtrlTask for AniMeZbus {
 
                         if config.builtin_anims_enabled {
                             inner
-                                .write_bytes(&pkt_set_enable_powersave_anim(
+                                .set_builtins_enabled(
                                     !(sleeping && config.off_when_suspended),
-                                ))
+                                    config.display_brightness,
+                                    config.builtin_anims,
+                                )
                                 .await
                                 .map_err(|err| {
                                     warn!("create_sys_event_tasks::off_when_suspended {}", err);
                                 })
                                 .ok();
                         } else if !sleeping && !config.builtin_anims_enabled {
-                            // Run custom wake animation
                             inner
-                                .write_bytes(&pkt_set_enable_powersave_anim(false))
+                                .set_builtins_enabled(
+                                    false,
+                                    config.display_brightness,
+                                    config.builtin_anims,
+                                )
                                 .await
-                                .ok(); // ensure builtins are disabled
-
+                                .ok();
                             inner.run_thread(inner.cache.wake.clone(), true).await;
                         }
                     }
                 }
             },
             move |shutting_down| {
-                // on_shutdown
                 let inner = inner2.clone();
                 async move {
                     let AniMeConfig {
@@ -377,25 +376,28 @@ impl crate::CtrlTask for AniMeZbus {
             },
             move |lid_closed| {
                 let inner = inner3.clone();
-                // on lid change
                 async move {
                     let AniMeConfig {
                         off_when_lid_closed,
                         builtin_anims_enabled,
+                        builtin_anims,
+                        display_brightness,
                         ..
                     } = *inner.config.lock().await;
                     if off_when_lid_closed {
                         if builtin_anims_enabled {
                             inner
-                                .write_bytes(&pkt_set_enable_powersave_anim(!lid_closed))
+                                .set_builtins_enabled(
+                                    !lid_closed, display_brightness, builtin_anims,
+                                )
                                 .await
                                 .map_err(|err| {
-                                    warn!("create_sys_event_tasks::off_when_suspended {}", err);
+                                    warn!("create_sys_event_tasks::off_when_lid_closed {}", err);
                                 })
                                 .ok();
                         }
                         inner
-                            .write_bytes(&pkt_set_enable_display(!lid_closed))
+                            .apply_display_enabled(!lid_closed)
                             .await
                             .map_err(|err| {
                                 warn!("create_sys_event_tasks::off_when_lid_closed {}", err);
@@ -406,26 +408,29 @@ impl crate::CtrlTask for AniMeZbus {
             },
             move |power_plugged| {
                 let inner = inner4.clone();
-                // on power change
                 async move {
                     let AniMeConfig {
                         off_when_unplugged,
                         builtin_anims_enabled,
+                        builtin_anims,
                         brightness_on_battery,
+                        display_brightness,
                         ..
                     } = *inner.config.lock().await;
                     if off_when_unplugged {
                         if builtin_anims_enabled {
                             inner
-                                .write_bytes(&pkt_set_enable_powersave_anim(power_plugged))
+                                .set_builtins_enabled(
+                                    power_plugged, display_brightness, builtin_anims,
+                                )
                                 .await
                                 .map_err(|err| {
-                                    warn!("create_sys_event_tasks::off_when_suspended {}", err);
+                                    warn!("create_sys_event_tasks::off_when_unplugged {}", err);
                                 })
                                 .ok();
                         }
                         inner
-                            .write_bytes(&pkt_set_enable_display(power_plugged))
+                            .apply_display_enabled(power_plugged)
                             .await
                             .map_err(|err| {
                                 warn!("create_sys_event_tasks::off_when_unplugged {}", err);
@@ -433,7 +438,7 @@ impl crate::CtrlTask for AniMeZbus {
                             .ok();
                     } else {
                         inner
-                            .write_bytes(&pkt_set_brightness(brightness_on_battery))
+                            .apply_brightness(brightness_on_battery)
                             .await
                             .map_err(|err| {
                                 warn!("create_sys_event_tasks::off_when_unplugged {}", err);
@@ -461,20 +466,11 @@ impl crate::Reloadable for AniMeZbus {
             ..
         } = *self.0.config.lock().await;
 
-        // Set builtins
         if builtin_anims_enabled {
-            self.0
-                .write_bytes(&pkt_set_builtin_animations(
-                    builtin_anims.boot,
-                    builtin_anims.awake,
-                    builtin_anims.sleep,
-                    builtin_anims.shutdown,
-                ))
-                .await?;
+            self.0.apply_builtin_animations(builtin_anims).await?;
         }
-        // Builtins enabled or na?
         self.0
-            .set_builtins_enabled(builtin_anims_enabled, display_brightness)
+            .set_builtins_enabled(builtin_anims_enabled, display_brightness, builtin_anims)
             .await?;
 
         let manager = get_logind_manager().await;
@@ -484,7 +480,7 @@ impl crate::Reloadable for AniMeZbus {
         let turn_off =
             (lid_closed && off_when_lid_closed) || (!power_plugged && off_when_unplugged);
         self.0
-            .write_bytes(&pkt_set_enable_display(!turn_off))
+            .apply_display_enabled(!turn_off)
             .await
             .map_err(|err| {
                 warn!("create_sys_event_tasks::reload {}", err);
@@ -492,14 +488,13 @@ impl crate::Reloadable for AniMeZbus {
             .ok();
 
         if turn_off || !display_enabled {
-            self.0.write_bytes(&pkt_set_enable_display(false)).await?;
-            // early return so we don't run animation thread
+            self.0.apply_display_enabled(false).await?;
             return Ok(());
         }
 
         if !builtin_anims_enabled && !self.0.cache.boot.is_empty() {
             self.0
-                .write_bytes(&pkt_set_enable_powersave_anim(false))
+                .set_builtins_enabled(false, display_brightness, builtin_anims)
                 .await
                 .ok();
 
