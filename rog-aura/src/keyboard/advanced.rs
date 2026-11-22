@@ -170,6 +170,10 @@ pub enum LedCode {
 /// Represents the per-key raw USB packets
 pub type AuraLaptopUsbPackets = Vec<Vec<u8>>;
 
+/// Index of the packet holding the lid and lightbar LEDs in per-key mode, it
+/// comes after the eleven key packets
+const LID_LIGHTBAR_PACKET_INDEX: usize = 11;
+
 /// A `UsbPackets` contains all data to change the full set of keyboard
 /// key colours individually.
 ///
@@ -251,6 +255,18 @@ impl LedUsbPackets {
             usb_packets: vec![pkt],
             zoned: true,
         }
+    }
+
+    /// In per-key mode, the packet that follows the key packets and carries
+    /// the lid and lightbar colours.
+    fn new_lid_lightbar_packet() -> Vec<u8> {
+        let mut pkt = vec![0u8; 64];
+        pkt[0] = 0x5d; // Report ID
+        pkt[1] = 0xbc; // Direct LED colours, same as the key packets
+        pkt[2] = 0x00;
+        pkt[3] = 0x01;
+        pkt[4] = 0x04; // 0x01 in the key packets
+        pkt
     }
 
     /// Initialise and clear the keyboard for custom effects, this must be done
@@ -437,6 +453,11 @@ impl LedUsbPackets {
                 "LedCode {led_code:?} for zoned is not correct or out of Zone range. Setting to 0",
             );
             return None;
+        }
+
+        // The lid and lightbar packet is only sent once one of its LEDs is set
+        if !self.zoned && row == LID_LIGHTBAR_PACKET_INDEX && self.usb_packets.len() == row {
+            self.usb_packets.push(Self::new_lid_lightbar_packet());
         }
 
         Some(&mut self.usb_packets[row][col..=col + 2])
@@ -647,6 +668,66 @@ mod tests {
         colour_check_zoned!(LedCode::LightbarLeftBottom, 36);
         colour_check_zoned!(LedCode::LightbarLeftCorner, 39);
         colour_check_zoned!(LedCode::LightbarLeft, 42);
+    }
+
+    macro_rules! colour_check_lid_lightbar {
+        ($led:expr, $pkt_idx_start:expr) => {
+            let mut per_key = LedUsbPackets::new_per_key();
+            let c = per_key.rgb_for_led_code($led).unwrap();
+            c[0] = 255;
+            c[1] = 255;
+            c[2] = 255;
+
+            let pkt: AuraLaptopUsbPackets = per_key.into();
+            assert_eq!(pkt.len(), 12);
+            assert_eq!(pkt[11][$pkt_idx_start], 0xff);
+            assert_eq!(pkt[11][$pkt_idx_start + 1], 0xff);
+            assert_eq!(pkt[11][$pkt_idx_start + 2], 0xff);
+        };
+    }
+
+    #[test]
+    fn perkey_lid_lightbar_packet_check() {
+        // Not sent unless a lid or lightbar LED is set
+        let mut per_key = LedUsbPackets::new_per_key();
+        per_key.set(LedCode::D, 255, 255, 255);
+        let pkt: AuraLaptopUsbPackets = per_key.into();
+        assert_eq!(pkt.len(), 11);
+
+        // Setting several of them gives a single extra packet
+        let mut per_key = LedUsbPackets::new_per_key();
+        per_key.set(LedCode::LightbarLeft, 255, 0, 0);
+        per_key.set(LedCode::LightbarRight, 0, 0, 255);
+        let pkt: AuraLaptopUsbPackets = per_key.into();
+        assert_eq!(pkt.len(), 12);
+
+        assert_eq!(pkt[11][0], 0x5d);
+        assert_eq!(pkt[11][1], 0xbc);
+        assert_eq!(pkt[11][2], 0x00);
+        assert_eq!(pkt[11][3], 0x01);
+        assert_eq!(pkt[11][4], 0x04);
+        assert_eq!(pkt[11][5], 0x00);
+        assert_eq!(pkt[11][6], 0x00);
+        assert_eq!(pkt[11][7], 0x00);
+        assert_eq!(pkt[11][8], 0x00);
+
+        assert_eq!(pkt[11][15], 0x00); // LightbarRight, blue
+        assert_eq!(pkt[11][16], 0x00);
+        assert_eq!(pkt[11][17], 0xff);
+
+        assert_eq!(pkt[11][30], 0xff); // LightbarLeft, red
+        assert_eq!(pkt[11][31], 0x00);
+        assert_eq!(pkt[11][32], 0x00);
+
+        colour_check_lid_lightbar!(LedCode::LidLogo, 9);
+        colour_check_lid_lightbar!(LedCode::LightbarRight, 15);
+        colour_check_lid_lightbar!(LedCode::LightbarRightCorner, 18);
+        colour_check_lid_lightbar!(LedCode::LightbarRightBottom, 21);
+        colour_check_lid_lightbar!(LedCode::LightbarLeftBottom, 24);
+        colour_check_lid_lightbar!(LedCode::LightbarLeftCorner, 27);
+        colour_check_lid_lightbar!(LedCode::LightbarLeft, 30);
+        colour_check_lid_lightbar!(LedCode::LidLeft, 36);
+        colour_check_lid_lightbar!(LedCode::LidRight, 39);
     }
 
     #[test]
