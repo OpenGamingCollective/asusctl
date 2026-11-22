@@ -61,8 +61,8 @@ impl AuraZbus {
     /// Return the current LED brightness
     #[zbus(property)]
     async fn brightness(&self) -> Result<LedBrightness, ZbErr> {
-        if let Some(bl) = self.0.backlight.as_ref() {
-            return Ok(bl.lock().await.get_brightness().map(|n| n.into())?);
+        if self.0.backlight.is_some() {
+            return Ok(self.0.config.lock().await.brightness);
         }
         Err(ZbErr::Failed("No sysfs brightness control".to_string()))
     }
@@ -348,6 +348,9 @@ impl Reloadable for AuraZbus {
             .ok();
         debug!("reloading keyboard mode");
         self.0.write_current_config_mode(&mut config).await?;
+        if let Err(e) = self.0.set_brightness(config.brightness.into()).await {
+            warn!("Could not set keyboard backlight brightness: {e}");
+        }
         Ok(())
     }
 }
