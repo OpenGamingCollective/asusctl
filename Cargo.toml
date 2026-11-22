@@ -30,6 +30,7 @@ members = [
   "rog-slash",
   "simulators",
   "rog-scsi",
+  "logind-zbus",
 ]
 
 default-members = ["asusctl", "asusd", "asus-shutdown", "asusd-user", "rog-control-center"]
@@ -50,7 +51,7 @@ inotify = "^0.11.5"
 ksni = { version = "^0.3.6", default-features = false, features = ["async-io"] }
 libc = "^0.2.189"
 log = "^0.4.33"
-logind-zbus = { version = "^5.3.2" }
+logind-zbus = { path = "logind-zbus" }
 mio = "^1.2.2"
 # z = ["zbus", "serde", "async"]
 notify-rust = { version = "=4.18.2", default-features = false, features = ["z"] }
