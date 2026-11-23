@@ -801,6 +801,15 @@
         power_zones: [Keyboard, Lightbar],
     ),
     (
+        device_name: "G814FP-NEBULA006W",
+        product_id: "",
+        layout_name: "g814ji-per-key",
+        basic_modes: [Static, Breathe, RainbowCycle, RainbowWave, Star, Rain, Highlight, Laser, Ripple, Pulse, Comet, Flash],
+        basic_zones: [],
+        advanced_type: PerKey,
+        power_zones: [Keyboard, Lightbar],
+    ),
+    (
         device_name: "G814J",
         product_id: "",
         layout_name: "g814ji-per-key",
